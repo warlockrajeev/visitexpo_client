@@ -371,7 +371,7 @@ export default function SettingsPage() {
                 <input
                   type="text"
                   readOnly
-                  value="http://localhost:5000/api/orders/checkout"
+                  value="https://visitexpo-server.onrender.com/api/orders/checkout"
                   className="w-full rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
                 />
               </div>
