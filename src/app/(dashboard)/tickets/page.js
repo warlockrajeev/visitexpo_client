@@ -87,14 +87,15 @@ export default function TicketingPage() {
 
   // 2. Fetch Tickets & Orders
   const fetchData = async () => {
-    if (!selectedEventId || !accessToken) return;
+    if (!selectedEventId) return;
     setLoading(true);
     setError('');
     try {
+      const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
       // Fetch Tiers
       const ticketRes = await axios.get(`${API_URL}/tickets`, {
         params: { eventId: selectedEventId },
-        headers: { Authorization: `Bearer ${accessToken}` }
+        headers
       });
       if (ticketRes.data && ticketRes.data.success) {
         setTickets(ticketRes.data.data || []);
@@ -106,7 +107,7 @@ export default function TicketingPage() {
       // Fetch Orders
       const orderRes = await axios.get(`${API_URL}/orders`, {
         params: { eventId: selectedEventId, limit: 20 },
-        headers: { Authorization: `Bearer ${accessToken}` }
+        headers
       });
       if (orderRes.data && orderRes.data.success) {
         setOrders(orderRes.data.data.docs || []);

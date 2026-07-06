@@ -67,13 +67,14 @@ export default function CampaignsPage() {
 
   // 2. Fetch Campaigns
   const fetchCampaigns = async () => {
-    if (!selectedEventId || !accessToken) return;
+    if (!selectedEventId) return;
     setLoading(true);
     setError('');
     try {
+      const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
       const res = await axios.get(`${API_URL}/campaigns`, {
         params: { eventId: selectedEventId },
-        headers: { Authorization: `Bearer ${accessToken}` }
+        headers
       });
       if (res.data && res.data.success) {
         setCampaigns(res.data.data || []);

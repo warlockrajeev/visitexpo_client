@@ -213,16 +213,31 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="text-center pt-2">
+        <div className="text-center pt-2 space-y-3">
           <button
             onClick={() => {
               setIsSignup(!isSignup);
               setFormError('');
             }}
-            className="text-xs text-zinc-400 hover:text-primary transition-colors font-medium"
+            className="text-xs text-zinc-400 hover:text-primary transition-colors font-medium block mx-auto"
           >
-            {isSignup ? 'Already have an account? Sign In' : 'Create an organizer tenant account'}
+            {isSignup ? 'Already have an account? Sign In' : 'Need an organizer account? Register here'}
           </button>
+
+          <div className="border-t border-zinc-800 pt-3 flex flex-col gap-2">
+            <a
+              href="/onboarding/organizer"
+              className="text-xs font-semibold text-amber-400 hover:underline flex items-center justify-center gap-1"
+            >
+              ⚡ Complete Organizer Onboarding & WP Claim &rarr;
+            </a>
+            <a
+              href="/onboarding/exhibitor"
+              className="text-xs font-semibold text-pink-400 hover:underline flex items-center justify-center gap-1"
+            >
+              🏢 Register as Event Exhibitor &rarr;
+            </a>
+          </div>
         </div>
       </div>
     </div>

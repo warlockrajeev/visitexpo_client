@@ -72,17 +72,18 @@ export default function ExhibitorsPage() {
     fetchEvents();
   }, []);
 
-  // 2. Fetch Exhibitors when selected event or token changes
+  // 2. Fetch Exhibitors when selected event changes
   useEffect(() => {
-    if (!selectedEventId || !accessToken) return;
+    if (!selectedEventId) return;
 
     const fetchExhibitors = async () => {
       setLoading(true);
       setError('');
       try {
+        const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
         const res = await axios.get(`${API_URL}/exhibitors`, {
           params: { eventId: selectedEventId },
-          headers: { Authorization: `Bearer ${accessToken}` }
+          headers
         });
         if (res.data && res.data.success) {
           setExhibitors(res.data.data.docs || []);
@@ -358,7 +359,14 @@ export default function ExhibitorsPage() {
                           )}
                         </div>
                         <div>
-                          <p className="font-semibold text-foreground">{ex.name}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-semibold text-foreground">{ex.name}</p>
+                            {ex.wpSource && (
+                              <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-full">
+                                WP
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground max-w-xs truncate">{ex.description}</p>
                         </div>
                       </div>

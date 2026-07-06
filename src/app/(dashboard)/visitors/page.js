@@ -78,13 +78,14 @@ export default function VisitorsCRMPage() {
 
   // 2. Fetch Visitors
   const fetchVisitors = async () => {
-    if (!selectedEventId || !accessToken) return;
+    if (!selectedEventId) return;
     setLoading(true);
     setError('');
     try {
+      const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
       const res = await axios.get(`${API_URL}/visitors`, {
         params: { eventId: selectedEventId, limit: 100 },
-        headers: { Authorization: `Bearer ${accessToken}` }
+        headers
       });
       if (res.data && res.data.success) {
         setVisitors(res.data.data.docs || []);

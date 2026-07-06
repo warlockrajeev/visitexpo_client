@@ -29,8 +29,13 @@ import {
   ShieldCheck
 } from 'lucide-react';
 
+import axios from 'axios';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [dynamicEvents, setDynamicEvents] = useState([]);
   const pathname = usePathname();
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
@@ -42,6 +47,24 @@ export default function DashboardLayout({ children }) {
     }
   }, [user, loading, router]);
 
+  // Dynamically fetch live WordPress events from backend API for sidebar
+  useEffect(() => {
+    const fetchDynamicSidebarEvents = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/wordpress/claimable-events?limit=5`);
+        if (res.data && res.data.success && res.data.data.docs) {
+          setDynamicEvents(res.data.data.docs.slice(0, 5));
+        }
+      } catch (err) {
+        console.warn('Could not fetch dynamic sidebar events from backend API.');
+      }
+    };
+
+    if (user && user.isVerified) {
+      fetchDynamicSidebarEvents();
+    }
+  }, [user]);
+
   if (loading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
@@ -52,6 +75,40 @@ export default function DashboardLayout({ children }) {
 
   if (!user) {
     return null;
+  }
+
+  // Lock dashboard if organizer account is pending Super Admin verification
+  if (user.role === 'organizer' && !user.isVerified) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4 text-foreground">
+        <div className="max-w-md w-full bg-card border border-border rounded-2xl p-8 shadow-xl text-center space-y-6">
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-amber-500/10 text-amber-500 mx-auto ring-8 ring-amber-500/20">
+            <ShieldCheck className="h-10 w-10 animate-pulse" />
+          </div>
+
+          <div className="space-y-2">
+            <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+              Account Pending Super Admin Approval
+            </span>
+            <h2 className="text-2xl font-extrabold text-foreground">
+              Welcome, {user.name}!
+            </h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Your organizer account registration request is currently under review by our Super Admin moderation team. Dashboard access will be unlocked automatically once approved.
+            </p>
+          </div>
+
+          <div className="pt-2">
+            <button
+              onClick={logout}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-secondary border border-border hover:bg-secondary/80 px-6 py-2.5 text-xs font-bold text-foreground transition-all"
+            >
+              Sign Out & Return to Login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const navigation = [
@@ -139,6 +196,30 @@ export default function DashboardLayout({ children }) {
               </Link>
             );
           })}
+
+          {/* Dynamic Backend Synced WP Events Subsection */}
+          {dynamicEvents.length > 0 && (
+            <div className="pt-4 mt-2 border-t border-border/60">
+              <span className="block px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center justify-between">
+                <span>Live Synced Events</span>
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+              </span>
+              <div className="space-y-1">
+                {dynamicEvents.map((evt) => (
+                  <Link
+                    key={evt._id || evt.id}
+                    href="/events/claim"
+                    className="flex items-center justify-between px-3 py-2 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-primary hover:bg-secondary/60 transition-colors truncate"
+                  >
+                    <span className="truncate max-w-[140px]">{evt.title}</span>
+                    <span className="text-[9px] font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                      WP
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </nav>
 
         {/* Footer Area with Theme Toggle & User Info */}

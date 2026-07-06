@@ -33,7 +33,7 @@ import {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function EventsPage() {
-  const { accessToken } = useAuth();
+  const { user, accessToken } = useAuth();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -66,27 +66,43 @@ export default function EventsPage() {
     }
   });
 
-  // Fetch events on mount and token availability
+  // Fetch events owned/claimed by logged in organizer
   const fetchEvents = async () => {
-    if (!accessToken) return;
     setLoading(true);
     setError('');
     try {
-      const res = await axios.get(`${API_URL}/events`);
+      const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+      const res = await axios.get(`${API_URL}/events?limit=100`, { headers });
+      
       if (res.data && res.data.success) {
-        setEvents(res.data.data.docs || []);
+        const allDocs = res.data.data?.docs || [];
+        // Filter events owned or claimed by logged in organizer (or show created events)
+        const myEvents = allDocs.filter(evt => {
+          if (!user) return true;
+          const userOrg = user.organization?._id || user.organization;
+          const evtOrg = evt.organizer?._id || evt.organizer;
+          const claimedBy = evt.claimedBy?._id || evt.claimedBy;
+
+          return (
+            (evtOrg && String(evtOrg) === String(userOrg)) ||
+            (claimedBy && String(claimedBy) === String(user.id)) ||
+            evt.isClaimed === true
+          );
+        });
+
+        setEvents(myEvents.length > 0 ? myEvents : allDocs.filter(e => e.isClaimed));
       }
     } catch (err) {
       console.error('Failed to fetch events', err);
       setError('Could not load events. Make sure server is running and database connected.');
-    } fontally: {
+    } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchEvents();
-  }, [accessToken]);
+  }, [user, accessToken]);
 
   // Handle Input Changes
   const handleInputChange = (e) => {

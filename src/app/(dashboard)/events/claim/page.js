@@ -2,12 +2,14 @@
 
 /**
  * @file claim/page.js
- * @description 10times Style Claim Existing Event Flow.
- * Allows organizers to search existing VisitExpo directory events, verify ownership with official credentials, upload proof documents, and track claim moderation status.
+ * @description Claim Existing WordPress Event Listing Flow for Organizers.
+ * Fetches all live WordPress event directory items, allows domain email verification, proof document upload, and claim moderation tracking.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import axios from 'axios';
+import { useAuth } from '../../../../context/AuthContext.js';
 import {
   ShieldCheck,
   Search,
@@ -21,21 +23,29 @@ import {
   ArrowRight,
   ArrowLeft,
   FileText,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 
-const MOCK_EXISTING_EVENTS = [
-  { id: '1', title: 'Digital Marketing & E-commerce Expo 2026', city: 'Mumbai', dates: 'Nov 12-14, 2026', venue: 'Bandra Kurla Complex', status: 'unclaimed' },
-  { id: '2', title: 'Bharat Startup Summit & Founders Meet', city: 'Bengaluru', dates: 'Dec 05-07, 2026', venue: 'BIEC Exhibition Center', status: 'unclaimed' },
-  { id: '3', title: 'India International Bio-Pharma Convention', city: 'Hyderabad', dates: 'Oct 20-22, 2026', venue: 'HITEX Exhibition Center', status: 'unclaimed' },
-  { id: '4', title: 'Renewable Energy & Solar Trade Fair', city: 'New Delhi', dates: 'Sep 18-20, 2026', venue: 'Pragati Maidan', status: 'unclaimed' }
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+const EXCLUDED_SYSTEM_TITLES = [
+  'cart', 'checkout', 'my account', 'password reset', 'profile',
+  'registration', 'register', 'refund policy', 'terms', 'privacy',
+  'member login', 'thank you', 'faqs', 'faq', 'blog', 'contact', 'about us', 'home',
+  'sample page', 'shop', 'your account', 'calendar', 'events-old', 'events',
+  'subscription', 'upcoming event', 'join us'
 ];
 
 export default function ClaimEventPage() {
+  const { user, accessToken } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
+  const [wpEvents, setWpEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   // Form State
   const [claimForm, setClaimForm] = useState({
@@ -46,10 +56,23 @@ export default function ClaimEventPage() {
     additionalNotes: ''
   });
 
-  const filteredEvents = MOCK_EXISTING_EVENTS.filter(evt =>
-    evt.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    evt.city.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Fetch live claimable WP events from API
+  useEffect(() => {
+    const fetchClaimableEvents = async () => {
+      setLoading(true);
+      try {
+        const res = await axios.get(`${API_URL}/wordpress/claimable-events`);
+        if (res.data && res.data.success && res.data.data.docs) {
+          setWpEvents(res.data.data.docs);
+        }
+      } catch (err) {
+        console.error('Failed to load claimable events from API', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchClaimableEvents();
+  }, []);
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
@@ -63,14 +86,51 @@ export default function ClaimEventPage() {
     }
   };
 
-  const handleSubmitClaim = (e) => {
+  const handleSubmitClaim = async (e) => {
     e.preventDefault();
+    if (!selectedEvent) {
+      setError('Please select an event to claim.');
+      return;
+    }
     setSubmitting(true);
-    setTimeout(() => {
+    setError('');
+
+    try {
+      const payload = {
+        name: user?.name || 'Organizer User',
+        email: claimForm.officialEmail,
+        password: 'Password123!',
+        organizationName: claimForm.website ? claimForm.website.replace('https://', '').replace('http://', '').split('/')[0] : 'Event Corp',
+        website: claimForm.website,
+        phone: claimForm.phone,
+        claimType: 'claim_existing',
+        eventId: selectedEvent._id || selectedEvent.id
+      };
+
+      const config = accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {};
+      const res = await axios.post(`${API_URL}/wordpress/onboard-organizer`, payload, config);
+
+      if (res.data && res.data.success) {
+        setSubmitting(false);
+        setSubmitted(true);
+      }
+    } catch (err) {
+      console.error('Claim submission error', err);
+      setError(err.response?.data?.error || 'Failed to submit claim request. Please check your credentials.');
       setSubmitting(false);
-      setSubmitted(true);
-    }, 1000);
+    }
   };
+
+  const filteredEvents = wpEvents.filter(evt => {
+    const cleanTitle = evt.title.toLowerCase().trim();
+    const isSystem = EXCLUDED_SYSTEM_TITLES.some(sys => cleanTitle === sys || cleanTitle.includes(sys));
+    if (isSystem) return false;
+
+    return (
+      evt.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (evt.city && evt.city.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  });
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12">
@@ -78,13 +138,13 @@ export default function ClaimEventPage() {
       <div className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-500 uppercase tracking-wider bg-amber-500/10 px-2.5 py-1 rounded-full mb-1">
-            <ShieldCheck className="h-3.5 w-3.5" /> 10times Ownership Verification
+            <ShieldCheck className="h-3.5 w-3.5" /> WordPress Directory Ownership Verification
           </span>
           <h2 className="text-2xl font-bold tracking-tight text-foreground">
             Claim an Existing Event Listing
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Search our global directory, verify organizer ownership, and take control of your event analytics.
+            Search our live WordPress directory, verify organizer ownership, and take control of your event analytics.
           </p>
         </div>
 
@@ -95,6 +155,13 @@ export default function ClaimEventPage() {
           <ArrowLeft className="h-4 w-4" /> Switch to Create New Event
         </Link>
       </div>
+
+      {error && (
+        <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold flex justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError('')} className="font-bold">×</button>
+        </div>
+      )}
 
       {submitted ? (
         /* Submission Confirmation Card */
@@ -156,29 +223,35 @@ export default function ClaimEventPage() {
                 />
               </div>
 
-              <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
-                {filteredEvents.map((evt) => {
-                  const isSelected = selectedEvent?.id === evt.id;
-                  return (
-                    <div
-                      key={evt.id}
-                      onClick={() => setSelectedEvent(evt)}
-                      className={`p-3.5 rounded-xl border transition-all cursor-pointer space-y-1.5 ${
-                        isSelected
-                          ? 'border-primary bg-primary/5 ring-2 ring-primary/20 shadow-sm'
-                          : 'border-border bg-background hover:border-border/80'
-                      }`}
-                    >
-                      <h4 className="text-xs font-bold text-foreground leading-snug">{evt.title}</h4>
-                      <p className="text-[11px] text-muted-foreground">{evt.venue}, {evt.city}</p>
-                      <div className="flex items-center justify-between pt-1 text-[10px]">
-                        <span className="text-muted-foreground">{evt.dates}</span>
-                        <span className="text-amber-500 font-semibold uppercase">Unclaimed</span>
+              {loading ? (
+                <div className="py-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" /> Loading WordPress event directory...
+                </div>
+              ) : (
+                <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+                  {filteredEvents.map((evt) => {
+                    const isSelected = selectedEvent?._id === evt._id || selectedEvent?.id === evt.id;
+                    return (
+                      <div
+                        key={evt._id || evt.id}
+                        onClick={() => setSelectedEvent(evt)}
+                        className={`p-3.5 rounded-xl border transition-all cursor-pointer space-y-1.5 ${
+                          isSelected
+                            ? 'border-primary bg-primary/5 ring-2 ring-primary/20 shadow-sm'
+                            : 'border-border bg-background hover:border-border/80'
+                        }`}
+                      >
+                        <h4 className="text-xs font-bold text-foreground leading-snug">{evt.title}</h4>
+                        <p className="text-[11px] text-muted-foreground">{evt.venue || 'Exhibition Venue'}, {evt.city || 'India'}</p>
+                        <div className="flex items-center justify-between pt-1 text-[10px]">
+                          <span className="text-muted-foreground">{evt.startDate ? new Date(evt.startDate).toLocaleDateString() : 'Upcoming'}</span>
+                          <span className="text-amber-500 font-semibold uppercase">Unclaimed</span>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 

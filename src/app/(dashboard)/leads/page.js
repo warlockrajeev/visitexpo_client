@@ -73,13 +73,14 @@ export default function LeadsCRMPage() {
 
   // 2. Fetch Leads
   const fetchLeads = async () => {
-    if (!selectedEventId || !accessToken) return;
+    if (!selectedEventId) return;
     setLoading(true);
     setError('');
     try {
+      const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
       const res = await axios.get(`${API_URL}/leads`, {
         params: { eventId: selectedEventId, limit: 100 },
-        headers: { Authorization: `Bearer ${accessToken}` }
+        headers
       });
       if (res.data && res.data.success) {
         setLeads(res.data.data.docs || []);
