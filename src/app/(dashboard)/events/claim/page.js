@@ -2,8 +2,8 @@
 
 /**
  * @file claim/page.js
- * @description Claim Existing WordPress Event Listing Flow for Organizers.
- * Fetches all live WordPress event directory items, allows domain email verification, proof document upload, and claim moderation tracking.
+ * @description Claim Existing VisitExpo Event Listing Flow for Organizers.
+ * Fetches all live VisitExpo event directory items, allows domain email verification, proof document upload, and claim moderation tracking.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -138,13 +138,13 @@ export default function ClaimEventPage() {
       <div className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-500 uppercase tracking-wider bg-amber-500/10 px-2.5 py-1 rounded-full mb-1">
-            <ShieldCheck className="h-3.5 w-3.5" /> WordPress Directory Ownership Verification
+            <ShieldCheck className="h-3.5 w-3.5" /> VisitExpo Directory Ownership Verification
           </span>
           <h2 className="text-2xl font-bold tracking-tight text-foreground">
             Claim an Existing Event Listing
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Search our live WordPress directory, verify organizer ownership, and take control of your event analytics.
+            Search our live VisitExpo directory, verify organizer ownership, and take control of your event analytics.
           </p>
         </div>
 
@@ -196,7 +196,7 @@ export default function ClaimEventPage() {
 
           <div className="pt-2">
             <Link
-              href="/"
+              href="/dashboard"
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-all"
             >
               Return to Organizer Dashboard <ArrowRight className="h-4 w-4" />
@@ -225,7 +225,7 @@ export default function ClaimEventPage() {
 
               {loading ? (
                 <div className="py-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" /> Loading WordPress event directory...
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" /> Loading VisitExpo event directory...
                 </div>
               ) : (
                 <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">

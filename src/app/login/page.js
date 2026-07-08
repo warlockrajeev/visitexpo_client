@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext.js';
 import {
@@ -17,7 +18,8 @@ import {
   EyeOff,
   Loader2,
   Lock,
-  ArrowRight
+  ArrowRight,
+  ArrowLeft
 } from 'lucide-react';
 
 export default function LoginPage() {
@@ -40,7 +42,7 @@ export default function LoginPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (!loading && user) {
-      router.push('/');
+      router.push('/dashboard');
     }
   }, [user, loading, router]);
 
@@ -67,7 +69,7 @@ export default function LoginPage() {
         if (!res.success) {
           setFormError(res.error || 'Registration failed.');
         } else {
-          router.push('/');
+          router.push('/dashboard');
         }
       } else {
         if (!formData.email || !formData.password) {
@@ -79,7 +81,7 @@ export default function LoginPage() {
         if (!res.success) {
           setFormError(res.error || 'Invalid credentials.');
         } else {
-          router.push('/');
+          router.push('/dashboard');
         }
       }
     } catch (err) {
@@ -104,6 +106,16 @@ export default function LoginPage() {
       <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-96 h-96 rounded-full bg-indigo-500/10 blur-[100px] pointer-events-none" />
 
       <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900/50 backdrop-blur-md p-8 shadow-2xl relative z-10 space-y-6">
+        <div className="flex items-center justify-between pb-2 border-b border-zinc-800/60">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-400 hover:text-primary transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to Dashboard
+          </Link>
+          <span className="text-[10px] font-bold text-zinc-600 tracking-wider uppercase">VisitExpo Hub</span>
+        </div>
+
         <div className="text-center space-y-2">
           <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground font-extrabold text-xl shadow-lg shadow-primary/20">
             VE
@@ -229,7 +241,7 @@ export default function LoginPage() {
               href="/onboarding/organizer"
               className="text-xs font-semibold text-amber-400 hover:underline flex items-center justify-center gap-1"
             >
-              ⚡ Complete Organizer Onboarding & WP Claim &rarr;
+              ⚡ Complete Organizer Onboarding & Directory Claim &rarr;
             </a>
             <a
               href="/onboarding/exhibitor"

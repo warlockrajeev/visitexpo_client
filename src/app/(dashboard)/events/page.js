@@ -617,7 +617,7 @@ export default function EventsPage() {
               {/* SEO Sub-section */}
               <div className="border border-border/80 rounded-xl p-4 bg-muted/10 space-y-3">
                 <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
-                  <Info className="h-4 w-4 text-primary" /> SEO Meta Options (For WordPress integration)
+                  <Info className="h-4 w-4 text-primary" /> SEO Meta Options (For public directory listing)
                 </h4>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>

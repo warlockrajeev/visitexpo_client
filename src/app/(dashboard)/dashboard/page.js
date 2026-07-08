@@ -48,7 +48,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { useAuth } from '../../context/AuthContext.js';
+import { useAuth } from '../../../context/AuthContext.js';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -281,7 +281,7 @@ export function OrganizerDashboardInner() {
             <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
               <Users className="h-4.5 w-4.5 text-emerald-500" /> Recent Visitor Registrations
             </h3>
-            <p className="text-[11px] text-muted-foreground">Real-time registry logs connected to WordPress form submitter</p>
+            <p className="text-[11px] text-muted-foreground">Real-time registry logs connected to VisitExpo form submitter</p>
           </div>
           <Link href="/visitors" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
             View All Visitors <ArrowRight className="h-3.5 w-3.5" />

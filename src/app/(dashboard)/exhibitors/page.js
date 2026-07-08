@@ -367,7 +367,7 @@ export default function ExhibitorsPage() {
                             <p className="font-semibold text-foreground">{ex.name}</p>
                             {ex.wpSource && (
                               <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-full">
-                                WP
+                                DIR
                               </span>
                             )}
                           </div>

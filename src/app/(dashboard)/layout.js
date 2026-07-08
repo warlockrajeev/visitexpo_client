@@ -47,7 +47,7 @@ export default function DashboardLayout({ children }) {
     }
   }, [user, loading, router]);
 
-  // Dynamically fetch live WordPress events from backend API for sidebar
+  // Dynamically fetch live directory events from backend API for sidebar
   useEffect(() => {
     const fetchDynamicSidebarEvents = async () => {
       try {
@@ -147,11 +147,11 @@ export default function DashboardLayout({ children }) {
 
   const navigation = (user.role === 'exhibitor' || isExhibitorView)
     ? [
-        { name: 'Exhibitor Hub', href: '/', icon: LayoutDashboard },
+        { name: 'Exhibitor Hub', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Settings', href: '/settings', icon: Settings },
       ]
     : [
-        { name: 'Dashboard Hub', href: '/', icon: LayoutDashboard },
+        { name: 'Dashboard Hub', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Event Wizard', href: '/events/wizard', icon: Sparkles, badge: 'Onboarding' },
         { name: 'Claim Event', href: '/events/claim', icon: ShieldCheck },
         { name: 'Manage Events', href: '/events', icon: Calendar },
@@ -164,7 +164,7 @@ export default function DashboardLayout({ children }) {
       ];
 
   const getPageTitle = (path) => {
-    if (path === '/') {
+    if (path === '/dashboard') {
       return (user.role === 'exhibitor' || isExhibitorView) ? 'Exhibitor Hub' : 'Organizer Dashboard Hub';
     }
     if (path === '/events/wizard') return 'Event Onboarding Wizard';
@@ -192,8 +192,8 @@ export default function DashboardLayout({ children }) {
       >
         {/* Logo Section */}
         <div className="flex h-16 items-center justify-between px-6 border-b border-border">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold shadow-md">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold shadow-md">
               VE
             </div>
             <span className="text-xl font-bold tracking-tight text-foreground">
@@ -254,7 +254,7 @@ export default function DashboardLayout({ children }) {
                   >
                     <span className="truncate max-w-[140px]">{evt.title}</span>
                     <span className="text-[9px] font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                      WP
+                      DIR
                     </span>
                   </Link>
                 ))}

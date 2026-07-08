@@ -2,7 +2,7 @@
 
 /**
  * @file onboarding/organizer/page.js
- * @description Dedicated Organizer Onboarding Portal with WordPress 7.0 Event Directory Claim & Integration.
+ * @description Dedicated Organizer Onboarding Portal with VisitExpo Event Directory Claim & Integration.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -90,7 +90,7 @@ function OrganizerOnboardingContent() {
           setWpEvents(res.data.data.docs);
         }
       } catch (err) {
-        console.warn('Using default WordPress event directory list for onboarding.');
+        console.warn('Using default VisitExpo event directory list for onboarding.');
       }
     };
     fetchClaimableEvents();
@@ -196,7 +196,7 @@ function OrganizerOnboardingContent() {
               V
             </div>
             <span className="text-lg font-bold tracking-tight text-foreground">
-              Visit<span className="text-amber-500">Expo</span> <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">WordPress 7.0 Partner</span>
+              Visit<span className="text-amber-500">Expo</span> <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">Verified Directory Partner</span>
             </span>
           </Link>
           <div className="text-xs text-muted-foreground flex items-center gap-2">
@@ -388,13 +388,13 @@ function OrganizerOnboardingContent() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-500 uppercase tracking-wider bg-amber-500/10 px-2.5 py-1 rounded-full mb-1">
-                  <Sparkles className="h-3.5 w-3.5" /> WordPress Directory & Expo Link
+                  <Sparkles className="h-3.5 w-3.5" /> VisitExpo Directory & Expo Link
                 </span>
                 <h2 className="text-2xl font-extrabold tracking-tight text-foreground">
                   Connect Your Event
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Choose whether to claim an existing listing from the WordPress site or create a new event.
+                  Choose whether to claim an existing listing from the VisitExpo main directory or create a new event.
                 </p>
               </div>
             </div>
@@ -410,7 +410,7 @@ function OrganizerOnboardingContent() {
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <Layers className="h-4 w-4 text-amber-500" /> Claim WordPress Listing (1,431+ Events)
+                <Layers className="h-4 w-4 text-amber-500" /> Claim Directory Listing (1,431+ Events)
               </button>
               <button
                 type="button"
@@ -431,7 +431,7 @@ function OrganizerOnboardingContent() {
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <input
                     type="text"
-                    placeholder="Search WordPress events by title or city (e.g. Rotorcraft, Cement, EV Expo)..."
+                    placeholder="Search VisitExpo events by title or city (e.g. Rotorcraft, Cement, EV Expo)..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full rounded-xl border border-border bg-background py-2.5 pl-9 pr-4 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
@@ -455,7 +455,7 @@ function OrganizerOnboardingContent() {
                           <div className="flex items-center gap-2">
                             <h4 className="text-xs font-bold text-foreground">{evt.title}</h4>
                             <span className="text-[10px] font-semibold uppercase text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                              WordPress Listing
+                              Directory Listing
                             </span>
                           </div>
                           <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -664,7 +664,7 @@ function OrganizerOnboardingContent() {
 
       {/* Footer */}
       <footer className="border-t border-border py-4 text-center text-[11px] text-muted-foreground">
-        © 2026 VisitExpo Inc. Integrated with WordPress 7.0 Platform.
+        © 2026 VisitExpo Inc. Integrated with VisitExpo Directory.
       </footer>
     </div>
   );

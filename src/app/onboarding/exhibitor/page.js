@@ -2,7 +2,7 @@
 
 /**
  * @file onboarding/exhibitor/page.js
- * @description Standalone Exhibitor Onboarding Portal connected with WordPress event pages.
+ * @description Standalone Exhibitor Onboarding Portal connected with VisitExpo event listing pages.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -650,7 +650,7 @@ function ExhibitorOnboardingContent() {
       </main>
 
       <footer className="border-t border-border py-4 text-center text-[11px] text-muted-foreground">
-        © 2026 VisitExpo Inc. Connected with WordPress Event Directory.
+        © 2026 VisitExpo Inc. Connected with VisitExpo Event Directory.
       </footer>
     </div>
   );

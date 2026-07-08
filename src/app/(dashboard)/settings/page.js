@@ -88,7 +88,7 @@ export default function SettingsPage() {
             <Settings className="h-6 w-6 text-primary" /> Settings & Organizer Profile
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Configure branding parameters, manage security, and retrieve WordPress API keys.
+            Configure branding parameters, manage security, and retrieve VisitExpo API keys.
           </p>
         </div>
 
@@ -340,9 +340,9 @@ export default function SettingsPage() {
               </h3>
 
               <div className="space-y-3 bg-muted/20 border border-border rounded-xl p-4">
-                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">How to connect WordPress plugin?</h4>
+                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">How to connect VisitExpo Form Connector?</h4>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Install the **VisitExpo Form Connector** plugin on your WordPress website. Copy the secret API key below and paste it into the plugin configuration page. This will automatically sync forms data to your Lead and Visitor CRM.
+                  Install the **VisitExpo Form Connector** or copy the API integration script onto your website. Copy the secret API key below and paste it into the plugin configuration page. This will automatically sync forms data to your Lead and Visitor CRM.
                 </p>
               </div>
 
@@ -378,7 +378,7 @@ export default function SettingsPage() {
 
               <div className="border-t border-border/80 pt-4 mt-4 text-xs text-muted-foreground flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>External WordPress registration integration is active</span>
+                <span>External form registration integration is active</span>
               </div>
             </div>
           )}
