@@ -19,6 +19,32 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isExhibitorView, setIsExhibitorView] = useState(false);
+  const [hasExhibitorProfile, setHasExhibitorProfile] = useState(false);
+
+  const checkExhibitorProfile = async (token) => {
+    try {
+      const res = await axios.get(`${API_URL}/exhibitors/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data && res.data.success && res.data.data && res.data.data.length > 0) {
+        setHasExhibitorProfile(true);
+      } else {
+        setHasExhibitorProfile(false);
+      }
+    } catch (err) {
+      setHasExhibitorProfile(false);
+    }
+  };
+
+  useEffect(() => {
+    if (accessToken) {
+      checkExhibitorProfile(accessToken);
+    } else {
+      setHasExhibitorProfile(false);
+      setIsExhibitorView(false);
+    }
+  }, [accessToken]);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -99,7 +125,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, accessToken, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{
+      user,
+      accessToken,
+      loading,
+      login,
+      signup,
+      logout,
+      isExhibitorView,
+      setIsExhibitorView,
+      hasExhibitorProfile
+    }}>
       {children}
     </AuthContext.Provider>
   );

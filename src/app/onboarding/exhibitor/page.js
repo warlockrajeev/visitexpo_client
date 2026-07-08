@@ -143,7 +143,8 @@ function ExhibitorOnboardingContent() {
         contactPhone: exhibitorForm.contactPhone,
         attendanceType: exhibitorForm.attendanceType,
         productCategories: categoriesArray,
-        staff: exhibitorForm.staff
+        staff: exhibitorForm.staff,
+        password: exhibitorForm.password
       };
 
       const res = await axios.post(`${API_URL}/exhibitors/register`, payload);
@@ -425,6 +426,34 @@ function ExhibitorOnboardingContent() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
+                  <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">Account Password *</label>
+                  <input
+                    type="password"
+                    required
+                    name="password"
+                    value={exhibitorForm.password || ''}
+                    onChange={handleFormChange}
+                    placeholder="Min 6 characters"
+                    className="w-full rounded-xl border border-border bg-background py-2.5 px-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">Confirm Password *</label>
+                  <input
+                    type="password"
+                    required
+                    name="confirmPassword"
+                    value={exhibitorForm.confirmPassword || ''}
+                    onChange={handleFormChange}
+                    placeholder="Confirm password"
+                    className="w-full rounded-xl border border-border bg-background py-2.5 px-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
                   <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">Logo Image URL</label>
                   <input
                     type="url"
@@ -463,6 +492,12 @@ function ExhibitorOnboardingContent() {
                 onClick={() => {
                   if (!exhibitorForm.name || !exhibitorForm.description || !exhibitorForm.contactEmail || !exhibitorForm.contactPhone) {
                     return setError('Please fill in required company profile fields.');
+                  }
+                  if (!exhibitorForm.password || exhibitorForm.password.length < 6) {
+                    return setError('Password must be at least 6 characters.');
+                  }
+                  if (exhibitorForm.password !== exhibitorForm.confirmPassword) {
+                    return setError('Passwords do not match.');
                   }
                   setError('');
                   setStep(3);

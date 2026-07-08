@@ -39,7 +39,7 @@ export default function DashboardLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, isExhibitorView, setIsExhibitorView, hasExhibitorProfile } = useAuth();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -111,21 +111,62 @@ export default function DashboardLayout({ children }) {
     );
   }
 
-  const navigation = [
-    { name: 'Dashboard Hub', href: '/', icon: LayoutDashboard },
-    { name: 'Event Wizard', href: '/events/wizard', icon: Sparkles, badge: 'Onboarding' },
-    { name: 'Claim Event', href: '/events/claim', icon: ShieldCheck },
-    { name: 'Manage Events', href: '/events', icon: Calendar },
-    { name: 'Exhibitors', href: '/exhibitors', icon: Building },
-    { name: 'Visitor CRM', href: '/visitors', icon: Users },
-    { name: 'Lead CRM', href: '/leads', icon: Target },
-    { name: 'Campaigns', href: '/campaigns', icon: Mail },
-    { name: 'Ticketing', href: '/tickets', icon: Ticket },
-    { name: 'Settings', href: '/settings', icon: Settings },
-  ];
+  // Lock dashboard if exhibitor account is pending Organizer verification
+  if (user.role === 'exhibitor' && !user.isVerified) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4 text-foreground">
+        <div className="max-w-md w-full bg-card border border-border rounded-2xl p-8 shadow-xl text-center space-y-6">
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-amber-500/10 text-amber-500 mx-auto ring-8 ring-amber-500/20">
+            <ShieldCheck className="h-10 w-10 animate-pulse" />
+          </div>
+
+          <div className="space-y-2">
+            <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+              Booth Pending Organizer Approval
+            </span>
+            <h2 className="text-2xl font-extrabold text-foreground">
+              Welcome, {user.name}!
+            </h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Your exhibitor registration and booth allocation request is currently pending review. Access will be unlocked automatically once approved by the event organizers.
+            </p>
+          </div>
+
+          <div className="pt-2">
+            <button
+              onClick={logout}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-secondary border border-border hover:bg-secondary/80 px-6 py-2.5 text-xs font-bold text-foreground transition-all"
+            >
+              Sign Out & Return to Login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const navigation = (user.role === 'exhibitor' || isExhibitorView)
+    ? [
+        { name: 'Exhibitor Hub', href: '/', icon: LayoutDashboard },
+        { name: 'Settings', href: '/settings', icon: Settings },
+      ]
+    : [
+        { name: 'Dashboard Hub', href: '/', icon: LayoutDashboard },
+        { name: 'Event Wizard', href: '/events/wizard', icon: Sparkles, badge: 'Onboarding' },
+        { name: 'Claim Event', href: '/events/claim', icon: ShieldCheck },
+        { name: 'Manage Events', href: '/events', icon: Calendar },
+        { name: 'Exhibitors', href: '/exhibitors', icon: Building },
+        { name: 'Visitor CRM', href: '/visitors', icon: Users },
+        { name: 'Lead CRM', href: '/leads', icon: Target },
+        { name: 'Campaigns', href: '/campaigns', icon: Mail },
+        { name: 'Ticketing', href: '/tickets', icon: Ticket },
+        { name: 'Settings', href: '/settings', icon: Settings },
+      ];
 
   const getPageTitle = (path) => {
-    if (path === '/') return 'Organizer Dashboard Hub';
+    if (path === '/') {
+      return (user.role === 'exhibitor' || isExhibitorView) ? 'Exhibitor Hub' : 'Organizer Dashboard Hub';
+    }
     if (path === '/events/wizard') return 'Event Onboarding Wizard';
     if (path === '/events/claim') return 'Claim Existing Event';
     if (path === '/events') return 'Event Management';
@@ -198,7 +239,7 @@ export default function DashboardLayout({ children }) {
           })}
 
           {/* Dynamic Backend Synced WP Events Subsection */}
-          {dynamicEvents.length > 0 && (
+          {dynamicEvents.length > 0 && user.role !== 'exhibitor' && !isExhibitorView && (
             <div className="pt-4 mt-2 border-t border-border/60">
               <span className="block px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center justify-between">
                 <span>Live Synced Events</span>
@@ -272,15 +313,39 @@ export default function DashboardLayout({ children }) {
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            <Link
-              href="/events/wizard"
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"
-            >
-              <Sparkles className="h-3.5 w-3.5" /> Start Onboarding
-            </Link>
-            <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-500 ring-1 ring-inset ring-emerald-500/20">
-              10times Sync Active
-            </span>
+            {hasExhibitorProfile && (
+              <button
+                onClick={() => setIsExhibitorView(!isExhibitorView)}
+                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all shadow-sm ${
+                  isExhibitorView
+                    ? 'bg-amber-500/10 border-amber-500/20 text-amber-500 hover:bg-amber-500/20'
+                    : 'bg-primary/10 border-primary/20 text-primary hover:bg-primary/20'
+                }`}
+              >
+                {isExhibitorView ? (
+                  <>
+                    <Building className="h-3.5 w-3.5" /> Switch to Organizer View
+                  </>
+                ) : (
+                  <>
+                    <LayoutDashboard className="h-3.5 w-3.5" /> Switch to Exhibitor View
+                  </>
+                )}
+              </button>
+            )}
+            {user.role !== 'exhibitor' && !isExhibitorView && (
+              <Link
+                href="/events/wizard"
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"
+              >
+                <Sparkles className="h-3.5 w-3.5" /> Start Onboarding
+              </Link>
+            )}
+            {user.role !== 'exhibitor' && !isExhibitorView && (
+              <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-500 ring-1 ring-inset ring-emerald-500/20">
+                10times Sync Active
+              </span>
+            )}
           </div>
         </header>
 

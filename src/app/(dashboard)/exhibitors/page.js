@@ -27,7 +27,7 @@ import {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function ExhibitorsPage() {
-  const { accessToken } = useAuth();
+  const { user, accessToken } = useAuth();
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [exhibitors, setExhibitors] = useState([]);
@@ -55,9 +55,13 @@ export default function ExhibitorsPage() {
 
   // 1. Fetch Events on Load
   useEffect(() => {
+    if (!user) return;
     const fetchEvents = async () => {
       try {
-        const res = await axios.get(`${API_URL}/events`);
+        const url = user.role === 'super_admin'
+          ? `${API_URL}/events`
+          : `${API_URL}/events?organizerId=${user._id}`;
+        const res = await axios.get(url);
         if (res.data && res.data.success && res.data.data.docs) {
           setEvents(res.data.data.docs);
           if (res.data.data.docs.length > 0) {
@@ -70,7 +74,7 @@ export default function ExhibitorsPage() {
       }
     };
     fetchEvents();
-  }, []);
+  }, [user]);
 
   // 2. Fetch Exhibitors when selected event changes
   useEffect(() => {
