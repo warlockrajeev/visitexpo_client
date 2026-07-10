@@ -73,6 +73,7 @@ export default function EventWizardPage() {
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -201,6 +202,7 @@ export default function EventWizardPage() {
   // Form Submission
   const handleSubmitEvent = async () => {
     setSubmitting(true);
+    setSubmitError('');
     try {
       const categoriesArray = [formData.category, formData.industry].filter(Boolean);
       const payload = {
@@ -222,18 +224,20 @@ export default function EventWizardPage() {
         }
       };
 
-      if (accessToken) {
-        await axios.post(`${API_URL}/events`, payload, {
-          headers: { Authorization: `Bearer ${accessToken}` }
-        }).catch(err => console.log('Mock fallback submit:', err));
+      if (!accessToken) {
+        throw new Error('No authentication token found. Please log in again.');
       }
+
+      await axios.post(`${API_URL}/events`, payload, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
 
       setIsSubmitted(true);
       setCurrentStep(8);
     } catch (err) {
       console.error('Submission error:', err);
-      setIsSubmitted(true);
-      setCurrentStep(8);
+      const errMsg = err.response?.data?.error || err.message || 'Failed to submit event';
+      setSubmitError(errMsg);
     } finally {
       setSubmitting(false);
     }
@@ -1025,35 +1029,43 @@ export default function EventWizardPage() {
 
         {/* Bottom Stepper Navigation Control Buttons */}
         {currentStep < 8 && (
-          <div className="flex items-center justify-between pt-8 border-t border-border mt-8">
-            <button
-              onClick={prevStep}
-              disabled={currentStep === 1}
-              className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
-                currentStep === 1
-                  ? 'opacity-0 cursor-default'
-                  : 'border border-border bg-secondary text-foreground hover:bg-secondary/80'
-              }`}
-            >
-              <ArrowLeft className="h-4 w-4" /> Previous Step
-            </button>
-
-            {currentStep === 7 ? (
-              <button
-                onClick={handleSubmitEvent}
-                disabled={submitting}
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-500/20 transition-all"
-              >
-                {submitting ? 'Submitting...' : 'Submit Event for Moderation'} <ArrowRight className="h-4 w-4" />
-              </button>
-            ) : (
-              <button
-                onClick={nextStep}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary hover:bg-primary/90 px-6 py-2.5 text-xs font-bold text-primary-foreground shadow-md transition-all"
-              >
-                Continue to Next Step <ArrowRight className="h-4 w-4" />
-              </button>
+          <div className="flex flex-col gap-4 pt-8 border-t border-border mt-8">
+            {submitError && (
+              <div className="p-4 rounded-xl border border-red-500/20 bg-red-500/10 text-red-500 text-xs font-semibold flex items-center justify-between">
+                <span>{submitError}</span>
+                <button onClick={() => setSubmitError('')} className="font-bold">×</button>
+              </div>
             )}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={prevStep}
+                disabled={currentStep === 1}
+                className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
+                  currentStep === 1
+                    ? 'opacity-0 cursor-default'
+                    : 'border border-border bg-secondary text-foreground hover:bg-secondary/80'
+                }`}
+              >
+                <ArrowLeft className="h-4 w-4" /> Previous Step
+              </button>
+
+              {currentStep === 7 ? (
+                <button
+                  onClick={handleSubmitEvent}
+                  disabled={submitting}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-500/20 transition-all"
+                >
+                  {submitting ? 'Submitting...' : 'Submit Event for Moderation'} <ArrowRight className="h-4 w-4" />
+                </button>
+              ) : (
+                <button
+                  onClick={nextStep}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary hover:bg-primary/90 px-6 py-2.5 text-xs font-bold text-primary-foreground shadow-md transition-all"
+                >
+                  Continue to Next Step <ArrowRight className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
         )}
 
