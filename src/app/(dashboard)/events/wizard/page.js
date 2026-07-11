@@ -47,7 +47,8 @@ import {
   Check,
   Lock,
   Layers,
-  Star
+  Star,
+  Loader2
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -66,6 +67,7 @@ const STEPS = [
 export default function EventWizardPage() {
   const router = useRouter();
   const { accessToken, user } = useAuth();
+  const fileInputRef = React.useRef(null);
 
   const [currentStep, setCurrentStep] = useState(1);
   const [lastAutosaved, setLastAutosaved] = useState('Just now');
@@ -74,6 +76,7 @@ export default function EventWizardPage() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -149,6 +152,38 @@ export default function EventWizardPage() {
     // Auto-fill Meta Title if empty
     if (!formData.metaTitle && formData.title) {
       setFormData(prev => ({ ...prev, metaTitle: `${formData.title} | VisitExpo` }));
+    }
+  };
+
+  const triggerFileInput = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleBannerUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const uploadData = new FormData();
+    uploadData.append('file', file);
+
+    try {
+      const res = await axios.post(`${API_URL}/upload`, uploadData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (res.data && res.data.success) {
+        setFormData(prev => ({ ...prev, bannerUrl: res.data.url }));
+      }
+    } catch (err) {
+      console.error('Banner upload error:', err);
+      alert(err.response?.data?.error || 'Failed to upload image. Please try again.');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -742,8 +777,22 @@ export default function EventWizardPage() {
               <label className="block text-xs font-bold text-muted-foreground uppercase">
                 Event Main Banner Cover (Recommended: 1920 x 1080 px) *
               </label>
-              <div className="relative rounded-2xl border-2 border-dashed border-border p-6 bg-muted/10 text-center hover:border-primary transition-colors cursor-pointer">
-                {formData.bannerUrl ? (
+              <div 
+                onClick={triggerFileInput}
+                className="relative rounded-2xl border-2 border-dashed border-border p-6 bg-muted/10 text-center hover:border-primary transition-colors cursor-pointer"
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleBannerUpload}
+                  accept="image/*"
+                  className="hidden"
+                />
+                {isUploading ? (
+                  <div className="py-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2 justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" /> Uploading image to Cloudinary...
+                  </div>
+                ) : formData.bannerUrl ? (
                   <div className="relative h-44 w-full rounded-xl overflow-hidden shadow-md">
                     <img src={formData.bannerUrl} alt="Banner Preview" className="h-full w-full object-cover" />
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
