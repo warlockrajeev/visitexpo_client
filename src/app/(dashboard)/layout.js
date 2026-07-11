@@ -343,7 +343,7 @@ export default function DashboardLayout({ children }) {
             )}
             {user.role !== 'exhibitor' && !isExhibitorView && (
               <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-500 ring-1 ring-inset ring-emerald-500/20">
-                10times Sync Active
+                Sync Active
               </span>
             )}
           </div>
