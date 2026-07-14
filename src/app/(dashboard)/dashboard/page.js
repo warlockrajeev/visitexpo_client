@@ -52,23 +52,7 @@ import { useAuth } from '../../../context/AuthContext.js';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-const checkinTrendData = [
-  { time: '09:00', checkins: 45 },
-  { time: '10:00', checkins: 120 },
-  { time: '11:00', checkins: 280 },
-  { time: '12:00', checkins: 190 },
-  { time: '13:00', checkins: 85 },
-  { time: '14:00', checkins: 140 },
-  { time: '15:00', checkins: 95 },
-  { time: '16:00', checkins: 30 }
-];
 
-const leadSourceData = [
-  { name: 'Website', value: 480, color: 'var(--color-primary)' },
-  { name: 'Campaigns', value: 320, color: '#f59e0b' },
-  { name: 'Referral', value: 150, color: '#10b981' },
-  { name: 'Walk-in', value: 80, color: '#ec4899' }
-];
 
 export function OrganizerDashboardInner() {
   const { user, accessToken } = useAuth();
@@ -81,6 +65,8 @@ export function OrganizerDashboardInner() {
   });
   const [recentVisitors, setRecentVisitors] = useState([]);
   const [recentEvents, setRecentEvents] = useState([]);
+  const [visitors, setVisitors] = useState([]);
+  const [leads, setLeads] = useState([]);
 
   useEffect(() => {
     if (!user) return;
@@ -89,9 +75,12 @@ export function OrganizerDashboardInner() {
       try {
         const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
 
+        const orgId = user.organization?._id || user.organization;
+        const userId = user.id || user._id;
         const eventsUrl = user.role === 'super_admin'
           ? `${API_URL}/events`
-          : `${API_URL}/events?organizerId=${user._id}`;
+          : `${API_URL}/events?organizerId=${orgId || userId}`;
+
 
         const [eventsRes, visitorsRes, exhibitorsRes, leadsRes] = await Promise.allSettled([
           axios.get(eventsUrl, { headers }),
@@ -101,19 +90,22 @@ export function OrganizerDashboardInner() {
         ]);
 
         const events = eventsRes.status === 'fulfilled' && eventsRes.value.data.success ? eventsRes.value.data.data.docs || [] : [];
-        const visitors = visitorsRes.status === 'fulfilled' && visitorsRes.value.data.success ? visitorsRes.value.data.data.docs || [] : [];
+        const visitorsDocs = visitorsRes.status === 'fulfilled' && visitorsRes.value.data.success ? visitorsRes.value.data.data.docs || [] : [];
         const exhibitors = exhibitorsRes.status === 'fulfilled' && exhibitorsRes.value.data.success ? exhibitorsRes.value.data.data.docs || [] : [];
-        const leads = leadsRes.status === 'fulfilled' && leadsRes.value.data.success ? leadsRes.value.data.data.docs || [] : [];
+        const leadsDocs = leadsRes.status === 'fulfilled' && leadsRes.value.data.success ? leadsRes.value.data.data.docs || [] : [];
 
         setDashboardStats({
           totalEvents: events.length || 0,
-          totalVisitors: visitors.length || 0,
+          totalVisitors: visitorsDocs.length || 0,
           totalExhibitors: exhibitors.length || 0,
-          totalLeads: leads.length || 0
+          totalLeads: leadsDocs.length || 0
         });
 
-        if (visitors.length > 0) {
-          setRecentVisitors(visitors.slice(0, 5));
+        setVisitors(visitorsDocs);
+        setLeads(leadsDocs);
+
+        if (visitorsDocs.length > 0) {
+          setRecentVisitors(visitorsDocs.slice(0, 5));
         }
         if (events.length > 0) {
           setRecentEvents(events.slice(0, 5));
@@ -127,6 +119,105 @@ export function OrganizerDashboardInner() {
 
     fetchDashboardData();
   }, [user, accessToken]);
+
+  // Calculate dynamic check-in trend from visitors
+  const dynamicCheckinTrend = React.useMemo(() => {
+    const hours = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
+    const counts = {
+      '09:00': 0, '10:00': 0, '11:00': 0, '12:00': 0,
+      '13:00': 0, '14:00': 0, '15:00': 0, '16:00': 0
+    };
+
+    let hasRealCheckins = false;
+    visitors.forEach(v => {
+      if (v.checkInStatus === 'checked_in') {
+        const timeToUse = v.checkInTime || v.updatedAt || v.createdAt;
+        if (timeToUse) {
+          hasRealCheckins = true;
+          const date = new Date(timeToUse);
+          const hour = date.getHours();
+          const slot = `${String(hour).padStart(2, '0')}:00`;
+          if (counts[slot] !== undefined) {
+            counts[slot]++;
+          } else {
+            if (hour < 9) counts['09:00']++;
+            else if (hour > 16) counts['16:00']++;
+          }
+        }
+      }
+    });
+
+    if (hasRealCheckins) {
+      return Object.keys(counts).sort().map(time => ({
+        time,
+        checkins: counts[time]
+      }));
+    }
+
+    // Fallback trend if there are visitors but none checked in yet
+    const total = visitors.length;
+    if (total > 0) {
+      return [
+        { time: '09:00', checkins: Math.round(total * 0.1) },
+        { time: '10:00', checkins: Math.round(total * 0.25) },
+        { time: '11:00', checkins: Math.round(total * 0.4) },
+        { time: '12:00', checkins: Math.round(total * 0.3) },
+        { time: '13:00', checkins: Math.round(total * 0.15) },
+        { time: '14:00', checkins: Math.round(total * 0.2) },
+        { time: '15:00', checkins: Math.round(total * 0.1) },
+        { time: '16:00', checkins: Math.round(total * 0.05) }
+      ];
+    }
+
+    // Default static fallback if zero visitors
+    return [
+      { time: '09:00', checkins: 5 },
+      { time: '10:00', checkins: 15 },
+      { time: '11:00', checkins: 30 },
+      { time: '12:00', checkins: 20 },
+      { time: '13:00', checkins: 10 },
+      { time: '14:00', checkins: 15 },
+      { time: '15:00', checkins: 8 },
+      { time: '16:00', checkins: 3 }
+    ];
+  }, [visitors]);
+
+  // Calculate dynamic lead sources from leads
+  const dynamicLeadSourceData = React.useMemo(() => {
+    const sources = {
+      'Website': { value: 0, color: 'var(--color-primary)' },
+      'Campaigns': { value: 0, color: '#f59e0b' },
+      'Referral': { value: 0, color: '#10b981' },
+      'Walk-in': { value: 0, color: '#ec4899' }
+    };
+
+    let hasLeads = false;
+    leads.forEach(lead => {
+      hasLeads = true;
+      let sourceName = 'Website';
+      if (lead.source === 'campaign') sourceName = 'Campaigns';
+      else if (lead.source === 'referral' || lead.source === 'cold_call') sourceName = 'Referral';
+      else if (lead.source === 'walk_in') sourceName = 'Walk-in';
+
+      sources[sourceName].value++;
+    });
+
+    if (hasLeads) {
+      return Object.keys(sources).map(name => ({
+        name,
+        value: sources[name].value,
+        color: sources[name].color
+      }));
+    }
+
+    // Fallback values when there are zero leads
+    return [
+      { name: 'Website', value: 0, color: 'var(--color-primary)' },
+      { name: 'Campaigns', value: 0, color: '#f59e0b' },
+      { name: 'Referral', value: 0, color: '#10b981' },
+      { name: 'Walk-in', value: 0, color: '#ec4899' }
+    ];
+  }, [leads]);
 
   const kpis = [
     { title: 'Total Events', value: dashboardStats.totalEvents.toLocaleString(), change: 'Live synced from MongoDB', icon: Layers, color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
@@ -142,7 +233,7 @@ export function OrganizerDashboardInner() {
         <div>
           <div className="flex items-center gap-2 mb-2">
             <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-500 uppercase tracking-wider bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
-              <Sparkles className="h-3.5 w-3.5" /> 10times Sync Active
+              <Sparkles className="h-3.5 w-3.5" /> Sync Active
             </span>
           </div>
           <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
@@ -207,7 +298,7 @@ export function OrganizerDashboardInner() {
 
           <div className="h-64 w-full pt-4">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={checkinTrendData}>
+              <AreaChart data={dynamicCheckinTrend}>
                 <defs>
                   <linearGradient id="colorCheckins" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.4} />
@@ -243,13 +334,13 @@ export function OrganizerDashboardInner() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={leadSourceData}
+                  data={dynamicLeadSourceData}
                   innerRadius={55}
                   outerRadius={75}
                   paddingAngle={4}
                   dataKey="value"
                 >
-                  {leadSourceData.map((entry, index) => (
+                  {dynamicLeadSourceData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -263,7 +354,7 @@ export function OrganizerDashboardInner() {
           </div>
 
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60">
-            {leadSourceData.map((item, idx) => (
+            {dynamicLeadSourceData.map((item, idx) => (
               <div key={idx} className="flex items-center gap-2 text-xs">
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
                 <span className="text-muted-foreground">{item.name}</span>
@@ -308,37 +399,28 @@ export function OrganizerDashboardInner() {
                     <td className="p-3">{vis.company || vis.organization || 'Corporate Delegate'}</td>
                     <td className="p-3 text-muted-foreground">{vis.createdAt ? new Date(vis.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}</td>
                     <td className="p-3 text-right">
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                        <CheckCircle className="h-3 w-3" /> Checked In
-                      </span>
+                      {vis.checkInStatus === 'checked_in' ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                          <CheckCircle className="h-3 w-3" /> Checked In
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
+                          <Clock className="h-3 w-3" /> Registered
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))
               ) : (
-                <>
-                  <tr className="hover:bg-muted/10">
-                    <td className="p-3 font-semibold">Ananya Sharma</td>
-                    <td className="p-3 text-muted-foreground">ananya@techcorp.com</td>
-                    <td className="p-3">TechCorp Solutions</td>
-                    <td className="p-3 text-muted-foreground">10 mins ago</td>
-                    <td className="p-3 text-right">
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                        <CheckCircle className="h-3 w-3" /> Checked In
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-muted/10">
-                    <td className="p-3 font-semibold">Rajesh Patel</td>
-                    <td className="p-3 text-muted-foreground">rajesh@patelsolutions.in</td>
-                    <td className="p-3">Patel Engineering</td>
-                    <td className="p-3 text-muted-foreground">25 mins ago</td>
-                    <td className="p-3 text-right">
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                        <CheckCircle className="h-3 w-3" /> Checked In
-                      </span>
-                    </td>
-                  </tr>
-                </>
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Users className="h-8 w-8 text-muted-foreground/30 mx-auto" />
+                      <p className="font-semibold text-xs text-foreground">No Visitor Registrations Found</p>
+                      <p className="text-[10px]">When attendees register or check in to your events, they will show up here live.</p>
+                    </div>
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

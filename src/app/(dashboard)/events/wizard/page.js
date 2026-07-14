@@ -296,13 +296,80 @@ export default function EventWizardPage() {
   };
 
   // AI Description Generator
-  const generateAiDescription = () => {
+  const generateAiDescription = async () => {
+    if (!formData.title) {
+      alert("Please enter the Event Title first so AI Assist can generate a relevant description.");
+      return;
+    }
+
     setIsAiGenerating(true);
-    setTimeout(() => {
+    try {
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error('Gemini API key is not configured in the environment.');
+      }
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`;
+
+      const prompt = `You are a professional B2B copywriter for the international trade show and exhibition platform VisitExpo.
+Given the following event details:
+- Title: "${formData.title}"
+- Category: "${formData.category || ''}"
+- Industry: "${formData.industry || ''}"
+- City: "${formData.city || ''}"
+- Venue: "${formData.venueName || ''}"
+
+Generate a compelling, professional B2B description for this event. It should be informative, highlighting who should attend (delegates, speakers, sponsors, exhibitors), key themes, and the value proposition. Also generate a short SEO meta description (under 160 characters).
+Return the result strictly as a JSON object with the following keys:
+{
+  "description": "The detailed B2B description (2-3 paragraphs, professionally styled)",
+  "metaDescription": "The short SEO meta description (under 150 characters)"
+}
+Do not return any markdown code block formatting or explanation. Just return the raw JSON object.`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt
+                }
+              ]
+            }
+          ]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.statusText}`);
+      }
+
+      const resData = await response.json();
+      const textResponse = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!textResponse) {
+        throw new Error('No content returned from Gemini');
+      }
+
+      // Parse JSON from response
+      let cleaned = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+      const aiData = JSON.parse(cleaned);
+
+      setFormData(prev => ({
+        ...prev,
+        description: aiData.description || '',
+        metaDescription: aiData.metaDescription || ''
+      }));
+    } catch (err) {
+      console.error('AI generation failed:', err);
+      // Fallback code in case of API issues
       const title = formData.title || 'Tech & Trade Expo 2026';
       const cat = formData.category || 'Technology';
       const city = formData.city || 'New Delhi';
-
       const aiText = `${title} is the premier B2B gathering for ${cat} pioneers, industry innovators, and global corporate leaders. Held in ${city}, this landmark event features live technology demonstrations, strategic keynote panels, high-impact networking lounges, and exclusive B2B matching sessions designed to accelerate commercial growth. Join over 5,000+ registered delegates and top exhibitor brands shaping the future of global trade.`;
 
       setFormData(prev => ({
@@ -310,8 +377,9 @@ export default function EventWizardPage() {
         description: aiText,
         metaDescription: `Join ${title} in ${city}. The premier B2B ${cat} expo featuring live demos, networking, and industry keynotes.`
       }));
+    } finally {
       setIsAiGenerating(false);
-    }, 1200);
+    }
   };
 
   // Calculate Pre-submission SEO Score (0-100)
@@ -755,21 +823,47 @@ export default function EventWizardPage() {
             </div>
 
             {/* Interactive Map Suggestion Widget */}
-            <div className="border border-border/80 rounded-2xl p-4 bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <MapPin className="h-5 w-5" />
+            <div className="border border-border/80 rounded-2xl p-4 bg-muted/20 space-y-4">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <MapPin className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-foreground">Automatic Venue Map Integration</h4>
+                    <p className="text-[11px] text-muted-foreground">
+                      VisitExpo automatically embeds Google Maps directions for visitors to {formData.venueName || 'your venue'}.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-xs font-bold text-foreground">Automatic Venue Map Integration</h4>
-                  <p className="text-[11px] text-muted-foreground">
-                    VisitExpo automatically embeds Google Maps directions for visitors to {formData.venueName || 'your venue'}.
-                  </p>
-                </div>
+                <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 whitespace-nowrap">
+                  Map Active
+                </span>
               </div>
-              <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 whitespace-nowrap">
-                Map Active
-              </span>
+
+              {/* Live Google Map Preview Iframe */}
+              {[formData.venueName, formData.address, formData.city].some(Boolean) ? (
+                <div className="w-full h-64 rounded-xl overflow-hidden border border-border bg-card shadow-inner">
+                  <iframe
+                    title="Venue Google Map Preview"
+                    width="100%"
+                    height="100%"
+                    frameBorder="0"
+                    scrolling="no"
+                    marginHeight="0"
+                    marginWidth="0"
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(
+                      [formData.venueName, formData.address, formData.city].filter(Boolean).join(', ')
+                    )}&t=&z=14&ie=UTF8&iwloc=&output=embed`}
+                    className="w-full h-full border-0"
+                  />
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 px-4 border border-dashed border-border rounded-xl bg-card/50 text-center text-muted-foreground text-xs">
+                  <MapPin className="h-6 w-6 text-muted-foreground/40 mb-2" />
+                  <span>Enter a venue name, street address, or city to see the map preview.</span>
+                </div>
+              )}
             </div>
           </div>
         )}
