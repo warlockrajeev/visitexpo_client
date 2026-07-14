@@ -100,6 +100,7 @@ export default function EventWizardPage() {
     orgWebsite: 'https://globaltechevents.com',
     orgGst: '07AAAAA1111A1Z1',
     orgLogo: '',
+    orgDesc: '',
     socialFacebook: '',
     socialLinkedIn: '',
     socialInstagram: '',
@@ -109,6 +110,13 @@ export default function EventWizardPage() {
     gallery: [],
     brochurePdf: '',
     promoVideoUrl: '',
+    sponsorsList: [],
+    // Schedule
+    schedules: [{ name: 'Event Day', date: '' }],
+    // FAQs
+    faqsList: [],
+    // Contact
+    contactShortcode: '',
     // Ticketing & Form
     isFreeEvent: true,
     paidTicketPrice: '499',
@@ -187,6 +195,106 @@ export default function EventWizardPage() {
     }
   };
 
+  const [newSponsor, setNewSponsor] = useState({ name: '', link: '', logo: '', tier: 'Platinum' });
+  const [isSponsorUploading, setIsSponsorUploading] = useState(false);
+
+  const [newFaq, setNewFaq] = useState({ question: '', answer: '' });
+  const [newSchedule, setNewSchedule] = useState({ name: '', date: '' });
+
+  const handleOrgLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const uploadData = new FormData();
+    uploadData.append('file', file);
+
+    try {
+      const res = await axios.post(`${API_URL}/upload`, uploadData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (res.data && res.data.success) {
+        setFormData(prev => ({ ...prev, orgLogo: res.data.url }));
+      }
+    } catch (err) {
+      console.error('Org logo upload error:', err);
+      alert('Failed to upload logo.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleSponsorLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsSponsorUploading(true);
+    const uploadData = new FormData();
+    uploadData.append('file', file);
+
+    try {
+      const res = await axios.post(`${API_URL}/upload`, uploadData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (res.data && res.data.success) {
+        setNewSponsor(prev => ({ ...prev, logo: res.data.url }));
+      }
+    } catch (err) {
+      console.error('Sponsor logo upload error:', err);
+      alert('Failed to upload sponsor logo.');
+    } finally {
+      setIsSponsorUploading(false);
+    }
+  };
+
+  const addSponsor = () => {
+    if (!newSponsor.name) return alert('Sponsor name is required');
+    setFormData(prev => ({
+      ...prev,
+      sponsorsList: [...prev.sponsorsList, { ...newSponsor }]
+    }));
+    setNewSponsor({ name: '', link: '', logo: '', tier: 'Platinum' });
+  };
+
+  const removeSponsor = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      sponsorsList: prev.sponsorsList.filter((_, idx) => idx !== index)
+    }));
+  };
+
+  const addFaq = () => {
+    if (!newFaq.question || !newFaq.answer) return alert('Question and Answer are required');
+    setFormData(prev => ({
+      ...prev,
+      faqsList: [...prev.faqsList, { ...newFaq }]
+    }));
+    setNewFaq({ question: '', answer: '' });
+  };
+
+  const removeFaq = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      faqsList: prev.faqsList.filter((_, idx) => idx !== index)
+    }));
+  };
+
+  const addSchedule = () => {
+    if (!newSchedule.name || !newSchedule.date) return alert('Day/Name and Date are required');
+    setFormData(prev => ({
+      ...prev,
+      schedules: [...prev.schedules, { ...newSchedule }]
+    }));
+    setNewSchedule({ name: '', date: '' });
+  };
+
+  const removeSchedule = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      schedules: prev.schedules.filter((_, idx) => idx !== index)
+    }));
+  };
+
   // AI Description Generator
   const generateAiDescription = () => {
     setIsAiGenerating(true);
@@ -253,6 +361,16 @@ export default function EventWizardPage() {
         timings: formData.timings,
         categories: categoriesArray,
         status: 'draft',
+        orgName: formData.orgName,
+        orgEmail: formData.orgEmail,
+        orgPhone: formData.orgPhone,
+        orgWebsite: formData.orgWebsite,
+        orgDesc: formData.orgDesc,
+        orgLogo: formData.orgLogo,
+        schedules: formData.schedules,
+        sponsorsList: formData.sponsorsList,
+        faqsList: formData.faqsList,
+        contactShortcode: formData.contactShortcode,
         seo: {
           metaTitle: formData.metaTitle,
           metaDescription: formData.metaDescription
@@ -737,6 +855,42 @@ export default function EventWizardPage() {
               </div>
             </div>
 
+            {/* Organizer Logo & Description */}
+            <div className="grid gap-6 sm:grid-cols-3">
+              <div className="sm:col-span-1 space-y-1">
+                <label className="block text-xs font-bold text-muted-foreground uppercase">
+                  Organizer Logo (.png)
+                </label>
+                <div className="relative border border-dashed border-border rounded-xl p-4 text-center bg-background hover:border-primary transition-colors cursor-pointer min-h-[110px] flex items-center justify-center">
+                  <input
+                    type="file"
+                    onChange={handleOrgLogoUpload}
+                    accept="image/*"
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                  />
+                  {formData.orgLogo ? (
+                    <img src={formData.orgLogo} alt="Org Logo" className="mx-auto max-h-16 object-contain" />
+                  ) : (
+                    <div className="text-[11px] text-muted-foreground">Click to upload logo</div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="sm:col-span-2 space-y-1">
+                <label className="block text-xs font-bold text-muted-foreground uppercase">
+                  Organizer About / Description
+                </label>
+                <textarea
+                  name="orgDesc"
+                  value={formData.orgDesc}
+                  onChange={handleChange}
+                  placeholder="A brief bio of the organizing body..."
+                  rows={4}
+                  className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-medium"
+                />
+              </div>
+            </div>
+
             {/* Social Links Sub-section */}
             <div className="border border-border/80 rounded-2xl p-4 bg-muted/10 space-y-4">
               <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Social Links</h4>
@@ -846,6 +1000,104 @@ export default function EventWizardPage() {
                 </div>
               </div>
             </div>
+
+            {/* Repeatable Sponsor Logos Section */}
+            <div className="border border-border/80 rounded-2xl p-5 bg-muted/10 space-y-4">
+              <div>
+                <h4 className="text-sm font-bold text-foreground">Official Co-Sponsors &amp; Tech Partners</h4>
+                <p className="text-xs text-muted-foreground">Add sponsors, co-sponsors, and media partners for the event banner logos.</p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-4 items-end bg-card p-4 rounded-xl border border-border">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Sponsor Name</label>
+                  <input
+                    type="text"
+                    value={newSponsor.name}
+                    onChange={e => setNewSponsor(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g. Google Cloud"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Website Link</label>
+                  <input
+                    type="url"
+                    value={newSponsor.link}
+                    onChange={e => setNewSponsor(prev => ({ ...prev, link: e.target.value }))}
+                    placeholder="https://..."
+                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Tier / Label</label>
+                  <select
+                    value={newSponsor.tier}
+                    onChange={e => setNewSponsor(prev => ({ ...prev, tier: e.target.value }))}
+                    className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none"
+                  >
+                    <option value="Platinum">Platinum Sponsor</option>
+                    <option value="Gold">Gold Sponsor</option>
+                    <option value="Silver">Silver Sponsor</option>
+                    <option value="Co-Sponsor">Co-Sponsor</option>
+                    <option value="Technology Partner">Technology Partner</option>
+                    <option value="Media Partner">Media Partner</option>
+                  </select>
+                </div>
+                <div className="space-y-1 flex items-center gap-2">
+                  <div className="relative border border-dashed border-border rounded-lg p-1.5 text-center bg-background hover:border-primary transition-colors cursor-pointer flex-1 h-[32px] flex items-center justify-center">
+                    <input
+                      type="file"
+                      onChange={handleSponsorLogoUpload}
+                      accept="image/*"
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                    />
+                    {isSponsorUploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    ) : newSponsor.logo ? (
+                      <img src={newSponsor.logo} alt="Sponsor Logo Preview" className="max-h-6 object-contain" />
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground font-semibold">Upload Logo</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addSponsor}
+                    className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/95 text-white font-bold text-xs h-[32px]"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+
+              {/* Sponsor Grid Display */}
+              {formData.sponsorsList && formData.sponsorsList.length > 0 && (
+                <div className="grid gap-3 sm:grid-cols-2 mt-2">
+                  {formData.sponsorsList.map((sp, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-border bg-card">
+                      <div className="flex items-center gap-3">
+                        {sp.logo ? (
+                          <img src={sp.logo} alt={sp.name} className="h-8 w-8 object-contain rounded bg-muted p-1" />
+                        ) : (
+                          <div className="h-8 w-8 rounded bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground">LOGO</div>
+                        )}
+                        <div>
+                          <p className="text-xs font-bold text-foreground">{sp.name}</p>
+                          <p className="text-[10px] text-primary font-semibold">{sp.tier}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeSponsor(idx)}
+                        className="text-red-500 hover:text-red-700 text-xs font-bold px-2 py-1 rounded hover:bg-red-500/10"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -927,6 +1179,137 @@ export default function EventWizardPage() {
                   </span>
                 ))}
               </div>
+            </div>
+
+            {/* Event Schedules / Date agenda section */}
+            <div className="border border-border/80 rounded-2xl p-5 bg-muted/10 space-y-4">
+              <div>
+                <h4 className="text-sm font-bold text-foreground">Event Schedule Dates</h4>
+                <p className="text-xs text-muted-foreground">Add specific event days or session timelines (e.g. "Event Day" or "Day 1", Date: "13 Nov 2026").</p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3 items-end bg-card p-4 rounded-xl border border-border">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Day / Session Label</label>
+                  <input
+                    type="text"
+                    value={newSchedule.name}
+                    onChange={e => setNewSchedule(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g. Day 1: Main Panel"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Date Value</label>
+                  <input
+                    type="text"
+                    value={newSchedule.date}
+                    onChange={e => setNewSchedule(prev => ({ ...prev, date: e.target.value }))}
+                    placeholder="e.g. 13 Nov 2026"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={addSchedule}
+                  className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/95 text-white font-bold text-xs h-[32px]"
+                >
+                  Add Day
+                </button>
+              </div>
+
+              {formData.schedules && formData.schedules.length > 0 && (
+                <div className="space-y-2">
+                  {formData.schedules.map((sch, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-border bg-card">
+                      <div className="text-xs">
+                        <strong className="text-foreground">{sch.name}</strong>: <span className="text-muted-foreground">{sch.date}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeSchedule(idx)}
+                        className="text-red-500 hover:text-red-700 text-xs font-bold px-2 py-0.5"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Event FAQ Section */}
+            <div className="border border-border/80 rounded-2xl p-5 bg-muted/10 space-y-4">
+              <div>
+                <h4 className="text-sm font-bold text-foreground">Frequently Asked Questions (FAQ)</h4>
+                <p className="text-xs text-muted-foreground">Add standard FAQs that will display on your event web page.</p>
+              </div>
+
+              <div className="space-y-3 bg-card p-4 rounded-xl border border-border">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase block">Question</label>
+                  <input
+                    type="text"
+                    value={newFaq.question}
+                    onChange={e => setNewFaq(prev => ({ ...prev, question: e.target.value }))}
+                    placeholder="e.g. Where can I collect my entry pass?"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase block">Answer</label>
+                  <textarea
+                    value={newFaq.answer}
+                    onChange={e => setNewFaq(prev => ({ ...prev, answer: e.target.value }))}
+                    placeholder="Enter details..."
+                    rows={2}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={addFaq}
+                  className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/95 text-white font-bold text-xs"
+                >
+                  Add FAQ
+                </button>
+              </div>
+
+              {formData.faqsList && formData.faqsList.length > 0 && (
+                <div className="space-y-2">
+                  {formData.faqsList.map((faq, idx) => (
+                    <div key={idx} className="p-3 rounded-xl border border-border bg-card space-y-1 text-xs">
+                      <div className="flex items-center justify-between">
+                        <strong className="text-foreground">Q: {faq.question}</strong>
+                        <button
+                          type="button"
+                          onClick={() => removeFaq(idx)}
+                          className="text-red-500 hover:text-red-700 font-bold px-2"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <p className="text-muted-foreground">A: {faq.answer}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Event Contact shortcode */}
+            <div className="border border-border/80 rounded-2xl p-5 bg-muted/10 space-y-3">
+              <div>
+                <h4 className="text-sm font-bold text-foreground">Contact Form Shortcode</h4>
+                <p className="text-xs text-muted-foreground">Paste your Contact Form 7 shortcode generated on WordPress.</p>
+              </div>
+              <input
+                type="text"
+                name="contactShortcode"
+                value={formData.contactShortcode}
+                onChange={handleChange}
+                placeholder='e.g. [contact-form-7 id="1275" title="Contact Event"]'
+                className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none"
+              />
             </div>
           </div>
         )}
