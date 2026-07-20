@@ -439,6 +439,9 @@ Do not return any markdown code block formatting or explanation. Just return the
         sponsorsList: formData.sponsorsList,
         faqsList: formData.faqsList,
         contactShortcode: formData.contactShortcode,
+        // Ticketing data — server auto-creates a Ticket tier from this
+        isFreeEvent: formData.isFreeEvent,
+        paidTicketPrice: formData.isFreeEvent ? 0 : (formData.paidTicketPrice || 0),
         seo: {
           metaTitle: formData.metaTitle,
           metaDescription: formData.metaDescription

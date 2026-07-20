@@ -27,7 +27,8 @@ import {
   ExternalLink,
   Info,
   ShieldCheck,
-  Eye
+  Eye,
+  Ticket
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -70,6 +71,8 @@ export default function EventsPage() {
     sponsorsList: [],
     faqsList: [],
     contactShortcode: '',
+    isFreeEvent: true,
+    paidTicketPrice: '499',
     seo: {
       metaTitle: '',
       metaDescription: ''
@@ -264,13 +267,15 @@ export default function EventsPage() {
       sponsorsList: [],
       faqsList: [],
       contactShortcode: '',
+      isFreeEvent: true,
+      paidTicketPrice: '499',
       seo: { metaTitle: '', metaDescription: '' }
     });
     setIsModalOpen(true);
   };
 
   // Open modal in edit mode
-  const openEditModal = (event) => {
+  const openEditModal = async (event) => {
     setEditMode(true);
     setCurrentEventId(event._id);
     
@@ -300,11 +305,32 @@ export default function EventsPage() {
       sponsorsList: event.sponsorsList || [],
       faqsList: event.faqsList || [],
       contactShortcode: event.contactShortcode || '',
+      isFreeEvent: true,
+      paidTicketPrice: '499',
       seo: {
         metaTitle: event.seo?.metaTitle || '',
         metaDescription: event.seo?.metaDescription || ''
       }
     });
+
+    // Load existing ticket tier for this event to pre-fill ticketing fields
+    try {
+      const ticketRes = await axios.get(`${API_URL}/tickets`, {
+        params: { eventId: event._id },
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
+      });
+      if (ticketRes.data?.success && ticketRes.data.data?.length > 0) {
+        const defaultTier = ticketRes.data.data[0];
+        setEventForm(prev => ({
+          ...prev,
+          isFreeEvent: defaultTier.type === 'free',
+          paidTicketPrice: String(defaultTier.price || 0)
+        }));
+      }
+    } catch (ticketErr) {
+      console.warn('Could not load existing ticket tiers:', ticketErr);
+    }
+
     setIsModalOpen(true);
   };
 
@@ -324,7 +350,9 @@ export default function EventsPage() {
 
     const payload = {
       ...eventForm,
-      categories: categoriesArray
+      categories: categoriesArray,
+      isFreeEvent: eventForm.isFreeEvent,
+      paidTicketPrice: eventForm.isFreeEvent ? 0 : (eventForm.paidTicketPrice || 0)
     };
 
     try {
@@ -1034,6 +1062,58 @@ export default function EventsPage() {
                   placeholder='e.g. [contact-form-7 id="1275" title="Contact Event"]'
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none"
                 />
+              </div>
+
+              {/* Ticketing Configuration Sub-section */}
+              <div className="border border-border/80 rounded-xl p-4 bg-muted/10 space-y-3">
+                <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                  <Ticket className="h-4 w-4 text-primary" /> Ticketing & Registration
+                </h4>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div
+                    onClick={() => setEventForm(prev => ({ ...prev, isFreeEvent: true }))}
+                    className={`rounded-xl border-2 p-3 cursor-pointer transition-all text-center ${
+                      eventForm.isFreeEvent
+                        ? 'border-primary bg-primary/5 shadow-sm'
+                        : 'border-border bg-card hover:border-border/80'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${eventForm.isFreeEvent ? 'border-primary bg-primary text-white' : 'border-border'}`}>
+                        {eventForm.isFreeEvent && <Check className="h-3 w-3" />}
+                      </div>
+                      <span className="text-xs font-bold text-foreground">Free Registration</span>
+                    </div>
+                  </div>
+                  <div
+                    onClick={() => setEventForm(prev => ({ ...prev, isFreeEvent: false }))}
+                    className={`rounded-xl border-2 p-3 cursor-pointer transition-all text-center ${
+                      !eventForm.isFreeEvent
+                        ? 'border-primary bg-primary/5 shadow-sm'
+                        : 'border-border bg-card hover:border-border/80'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${!eventForm.isFreeEvent ? 'border-primary bg-primary text-white' : 'border-border'}`}>
+                        {!eventForm.isFreeEvent && <Check className="h-3 w-3" />}
+                      </div>
+                      <span className="text-xs font-bold text-foreground">Paid Ticket</span>
+                    </div>
+                  </div>
+                </div>
+                {!eventForm.isFreeEvent && (
+                  <div className="w-full sm:w-1/2">
+                    <label className="block text-[10px] font-bold text-muted-foreground mb-1 uppercase">Ticket Price (INR ₹)</label>
+                    <input
+                      type="number"
+                      name="paidTicketPrice"
+                      value={eventForm.paidTicketPrice}
+                      onChange={handleInputChange}
+                      min="1"
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Action buttons */}
