@@ -31,7 +31,7 @@ import {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function LeadsCRMPage() {
-  const { accessToken } = useAuth();
+  const { user, accessToken } = useAuth();
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [leads, setLeads] = useState([]);
@@ -56,11 +56,27 @@ export default function LeadsCRMPage() {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const res = await axios.get(`${API_URL}/events`);
+        const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+        const res = await axios.get(`${API_URL}/events?limit=1000&all=true`, { headers });
         if (res.data && res.data.success && res.data.data.docs) {
-          setEvents(res.data.data.docs);
-          if (res.data.data.docs.length > 0) {
-            setSelectedEventId(res.data.data.docs[0]._id);
+          const rawEvents = res.data.data.docs;
+          const userOrgId = user?.organization?._id || user?.organization;
+          const userId = user?._id || user?.id;
+
+          const sorted = [...rawEvents].sort((a, b) => {
+            const aOrg = a.organizer?._id || a.organizer;
+            const bOrg = b.organizer?._id || b.organizer;
+            const aIsMine = (userOrgId && aOrg?.toString() === userOrgId?.toString()) || (userId && a.claimedBy?.toString() === userId?.toString());
+            const bIsMine = (userOrgId && bOrg?.toString() === userOrgId?.toString()) || (userId && b.claimedBy?.toString() === userId?.toString());
+
+            if (aIsMine && !bIsMine) return -1;
+            if (!aIsMine && bIsMine) return 1;
+            return 0;
+          });
+
+          setEvents(sorted);
+          if (sorted.length > 0) {
+            setSelectedEventId(sorted[0]._id);
           }
         }
       } catch (err) {
@@ -69,7 +85,7 @@ export default function LeadsCRMPage() {
       }
     };
     fetchEvents();
-  }, []);
+  }, [user, accessToken]);
 
   // 2. Fetch Leads
   const fetchLeads = async () => {
