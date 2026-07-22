@@ -31,6 +31,8 @@ import {
   Ticket
 } from 'lucide-react';
 
+import { renderRichText, RichTextEditor } from './wizard/page.js';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function EventsPage() {
@@ -613,7 +615,7 @@ export default function EventsPage() {
                         <Trash2 className="h-4.5 w-4.5" />
                       </button>
                       <a
-                        href={`https://visitexpo.in/events/${evt.slug}`}
+                        href={`https://visitexpo.in/event/${evt.slug}`}
                         target="_blank"
                         rel="noreferrer"
                         className="p-1.5 text-muted-foreground hover:text-primary hover:bg-secondary rounded-md transition-colors"
@@ -673,14 +675,11 @@ export default function EventsPage() {
 
               <div>
                 <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Event Description *</label>
-                <textarea
-                  name="description"
-                  required
-                  rows={3}
+                <RichTextEditor
                   value={eventForm.description}
-                  onChange={handleInputChange}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  onChange={(val) => setEventForm(prev => ({ ...prev, description: val }))}
                   placeholder="Provide a comprehensive explanation of this expo event."
+                  rows={5}
                 />
               </div>
 

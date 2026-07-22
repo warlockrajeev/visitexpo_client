@@ -48,10 +48,379 @@ import {
   Lock,
   Layers,
   Star,
+  Bold,
+  Italic,
+  Underline,
+  List,
+  ListOrdered,
+  Quote,
+  Code,
+  Link as LinkIcon,
+  Edit3,
+  Eraser,
   Loader2
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+// Render Rich Text Markdown/HTML content into styled React elements
+export function renderRichText(content) {
+  if (!content || typeof content !== 'string') return null;
+
+  const lines = content.split('\n');
+  const elements = [];
+
+  let inList = false;
+  let listItems = [];
+  let isNumbered = false;
+
+  const formatInline = (text) => {
+    if (!text) return '';
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/<u>(.*?)<\/u>/g, '<u>$1</u>')
+      .replace(/`([^`]+)`/g, '<code class="bg-muted px-1 py-0.5 rounded text-xs font-mono">$1</code>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-primary underline font-medium">$1</a>');
+  };
+
+  const flushList = (key) => {
+    if (listItems.length > 0) {
+      if (isNumbered) {
+        elements.push(
+          <ol key={`ol-${key}`} className="list-decimal list-inside space-y-1 my-2 pl-2 text-foreground">
+            {listItems.map((item, idx) => (
+              <li key={idx} dangerouslySetInnerHTML={{ __html: formatInline(item) }} />
+            ))}
+          </ol>
+        );
+      } else {
+        elements.push(
+          <ul key={`ul-${key}`} className="list-disc list-inside space-y-1 my-2 pl-2 text-foreground">
+            {listItems.map((item, idx) => (
+              <li key={idx} dangerouslySetInnerHTML={{ __html: formatInline(item) }} />
+            ))}
+          </ul>
+        );
+      }
+      listItems = [];
+      inList = false;
+    }
+  };
+
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith('# ')) {
+      flushList(idx);
+      elements.push(<h1 key={idx} className="text-xl font-extrabold tracking-tight text-foreground my-3 border-b border-border pb-1" dangerouslySetInnerHTML={{ __html: formatInline(trimmed.slice(2)) }} />);
+    } else if (trimmed.startsWith('## ')) {
+      flushList(idx);
+      elements.push(<h2 key={idx} className="text-lg font-bold text-foreground my-2.5" dangerouslySetInnerHTML={{ __html: formatInline(trimmed.slice(3)) }} />);
+    } else if (trimmed.startsWith('### ')) {
+      flushList(idx);
+      elements.push(<h3 key={idx} className="text-base font-bold text-foreground my-2 text-primary" dangerouslySetInnerHTML={{ __html: formatInline(trimmed.slice(4)) }} />);
+    } else if (trimmed.startsWith('> ')) {
+      flushList(idx);
+      elements.push(<blockquote key={idx} className="border-l-4 border-primary pl-4 py-1 italic text-muted-foreground my-2 bg-muted/20 rounded-r" dangerouslySetInnerHTML={{ __html: formatInline(trimmed.slice(2)) }} />);
+    } else if (trimmed.startsWith('• ') || trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      if (!inList || isNumbered) {
+        flushList(idx);
+        inList = true;
+        isNumbered = false;
+      }
+      listItems.push(trimmed.replace(/^[•\-*]\s+/, ''));
+    } else if (/^\d+\.\s+/.test(trimmed)) {
+      if (!inList || !isNumbered) {
+        flushList(idx);
+        inList = true;
+        isNumbered = true;
+      }
+      listItems.push(trimmed.replace(/^\d+\.\s+/, ''));
+    } else {
+      flushList(idx);
+      if (trimmed === '') {
+        elements.push(<div key={idx} className="h-2" />);
+      } else {
+        elements.push(<p key={idx} className="text-sm text-foreground leading-relaxed my-1" dangerouslySetInnerHTML={{ __html: formatInline(line) }} />);
+      }
+    }
+  });
+
+  flushList('end');
+  return elements;
+}
+
+// Interactive Rich Text Editor Component
+export function RichTextEditor({
+  value = '',
+  onChange,
+  onAiAssist,
+  isAiGenerating = false,
+  placeholder = 'Describe the main highlights, key themes, delegate profile, and exhibitor benefits...',
+  rows = 6,
+  minHeight = '180px'
+}) {
+  const [activeTab, setActiveTab] = React.useState('write'); // 'write' or 'preview'
+  const textareaRef = React.useRef(null);
+
+  const applyFormat = (type) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = value || '';
+    const selected = text.substring(start, end);
+
+    let prefix = '';
+    let suffix = '';
+    let replacement = '';
+
+    switch (type) {
+      case 'h1':
+        prefix = '# ';
+        replacement = prefix + (selected || 'Main Heading');
+        break;
+      case 'h2':
+        prefix = '## ';
+        replacement = prefix + (selected || 'Subheading');
+        break;
+      case 'h3':
+        prefix = '### ';
+        replacement = prefix + (selected || 'Section Title');
+        break;
+      case 'bold':
+        prefix = '**';
+        suffix = '**';
+        replacement = prefix + (selected || 'bold text') + suffix;
+        break;
+      case 'italic':
+        prefix = '*';
+        suffix = '*';
+        replacement = prefix + (selected || 'italic text') + suffix;
+        break;
+      case 'underline':
+        prefix = '<u>';
+        suffix = '</u>';
+        replacement = prefix + (selected || 'underlined text') + suffix;
+        break;
+      case 'bullet':
+        prefix = '• ';
+        replacement = selected ? selected.split('\n').map(l => `• ${l}`).join('\n') : '• Bullet list item';
+        break;
+      case 'number':
+        prefix = '1. ';
+        replacement = selected ? selected.split('\n').map((l, i) => `${i + 1}. ${l}`).join('\n') : '1. Numbered list item';
+        break;
+      case 'quote':
+        prefix = '> ';
+        replacement = prefix + (selected || 'Blockquote text');
+        break;
+      case 'code':
+        prefix = '`';
+        suffix = '`';
+        replacement = prefix + (selected || 'code') + suffix;
+        break;
+      case 'link':
+        const url = window.prompt('Enter URL link (e.g. https://visitexpo.in):', 'https://');
+        if (!url) return;
+        replacement = `[${selected || 'Link Title'}](${url})`;
+        break;
+      case 'clear':
+        replacement = selected.replace(/[\*#>`•]/g, '').replace(/<\/?u>/g, '');
+        break;
+      default:
+        return;
+    }
+
+    const newValue = text.substring(0, start) + replacement + text.substring(end);
+    onChange(newValue);
+
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(start + prefix.length, start + replacement.length - suffix.length);
+      }
+    }, 10);
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden space-y-0">
+      {/* Editor Header Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-border bg-muted/30">
+        {/* Mode Switcher */}
+        <div className="flex items-center gap-1 bg-background border border-border rounded-lg p-0.5 text-xs font-semibold">
+          <button
+            type="button"
+            onClick={() => setActiveTab('write')}
+            className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 ${
+              activeTab === 'write' ? 'bg-primary text-primary-foreground font-bold shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Edit3 className="h-3.5 w-3.5" /> Editor
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('preview')}
+            className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 ${
+              activeTab === 'preview' ? 'bg-primary text-primary-foreground font-bold shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Eye className="h-3.5 w-3.5" /> Rich Preview
+          </button>
+        </div>
+
+      </div>
+
+      {/* Formatting Toolbar (Only shown in 'write' mode) */}
+      {activeTab === 'write' && (
+        <div className="flex flex-wrap items-center gap-1 px-3 py-1.5 border-b border-border/70 bg-card text-xs overflow-x-auto">
+          {/* Headings */}
+          <div className="flex items-center border-r border-border pr-1 mr-1 gap-0.5">
+            <button
+              type="button"
+              onClick={() => applyFormat('h1')}
+              title="Heading 1 (#)"
+              className="px-2 py-1 rounded hover:bg-secondary text-foreground font-extrabold text-xs"
+            >
+              H1
+            </button>
+            <button
+              type="button"
+              onClick={() => applyFormat('h2')}
+              title="Heading 2 (##)"
+              className="px-2 py-1 rounded hover:bg-secondary text-foreground font-bold text-xs"
+            >
+              H2
+            </button>
+            <button
+              type="button"
+              onClick={() => applyFormat('h3')}
+              title="Heading 3 (###)"
+              className="px-2 py-1 rounded hover:bg-secondary text-foreground font-semibold text-xs"
+            >
+              H3
+            </button>
+          </div>
+
+          {/* Inline Styles */}
+          <div className="flex items-center border-r border-border pr-1 mr-1 gap-0.5">
+            <button
+              type="button"
+              onClick={() => applyFormat('bold')}
+              title="Bold (**text**)"
+              className="p-1.5 rounded hover:bg-secondary text-foreground font-bold"
+            >
+              <Bold className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => applyFormat('italic')}
+              title="Italic (*text*)"
+              className="p-1.5 rounded hover:bg-secondary text-foreground italic"
+            >
+              <Italic className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => applyFormat('underline')}
+              title="Underline (<u>text</u>)"
+              className="p-1.5 rounded hover:bg-secondary text-foreground underline"
+            >
+              <Underline className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Lists */}
+          <div className="flex items-center border-r border-border pr-1 mr-1 gap-0.5">
+            <button
+              type="button"
+              onClick={() => applyFormat('bullet')}
+              title="Bulleted List (• item)"
+              className="p-1.5 rounded hover:bg-secondary text-foreground"
+            >
+              <List className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => applyFormat('number')}
+              title="Numbered List (1. item)"
+              className="p-1.5 rounded hover:bg-secondary text-foreground"
+            >
+              <ListOrdered className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Special Elements */}
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => applyFormat('quote')}
+              title="Blockquote (> text)"
+              className="p-1.5 rounded hover:bg-secondary text-foreground"
+            >
+              <Quote className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => applyFormat('code')}
+              title="Inline Code (`code`)"
+              className="p-1.5 rounded hover:bg-secondary text-foreground"
+            >
+              <Code className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => applyFormat('link')}
+              title="Hyperlink [title](url)"
+              className="p-1.5 rounded hover:bg-secondary text-foreground"
+            >
+              <LinkIcon className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => applyFormat('clear')}
+              title="Remove formatting"
+              className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-destructive ml-1"
+            >
+              <Eraser className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Active Editor Pane */}
+      {activeTab === 'write' ? (
+        <div className="relative">
+          <textarea
+            ref={textareaRef}
+            rows={rows}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            className="w-full bg-background p-3.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary leading-relaxed border-none resize-y"
+            style={{ minHeight }}
+          />
+          <div className="flex justify-between items-center px-3 py-1.5 bg-muted/20 border-t border-border/50 text-[10px] text-muted-foreground">
+            <span>Supports Rich Formatting (H1, H2, Bold, Lists, Links, Quotes)</span>
+            <span>{value.length} characters</span>
+          </div>
+        </div>
+      ) : (
+        <div className="p-4 bg-background min-h-[180px] overflow-y-auto space-y-2 border-t border-border">
+          {!value || !value.trim() ? (
+            <p className="text-xs text-muted-foreground italic">No description content entered yet. Switch to Editor mode to write.</p>
+          ) : (
+            <div className="prose dark:prose-invert max-w-none text-foreground text-sm">
+              {renderRichText(value)}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const STEPS = [
   { id: 1, title: 'Welcome & Path', icon: Layers },
@@ -318,13 +687,13 @@ Given the following event details:
 - City: "${formData.city || ''}"
 - Venue: "${formData.venueName || ''}"
 
-Generate a compelling, professional B2B description for this event. It should be informative, highlighting who should attend (delegates, speakers, sponsors, exhibitors), key themes, and the value proposition. Also generate a short SEO meta description (under 160 characters).
+Generate a compelling, professional B2B description for this event using rich markdown formatting (# Heading 1, ## Heading 2, **bold text**, • bullet points, > quote). It should be informative, highlighting who should attend (delegates, speakers, sponsors, exhibitors), key themes, and value proposition. Also generate a short SEO meta description (under 160 characters).
 Return the result strictly as a JSON object with the following keys:
 {
-  "description": "The detailed B2B description (2-3 paragraphs, professionally styled)",
+  "description": "The detailed rich markdown formatted B2B description",
   "metaDescription": "The short SEO meta description (under 150 characters)"
 }
-Do not return any markdown code block formatting or explanation. Just return the raw JSON object.`;
+Do not return any markdown code block wrapper around the JSON object. Just return raw JSON.`;
 
       const response = await fetch(url, {
         method: 'POST',
@@ -370,7 +739,7 @@ Do not return any markdown code block formatting or explanation. Just return the
       const title = formData.title || 'Tech & Trade Expo 2026';
       const cat = formData.category || 'Technology';
       const city = formData.city || 'New Delhi';
-      const aiText = `${title} is the premier B2B gathering for ${cat} pioneers, industry innovators, and global corporate leaders. Held in ${city}, this landmark event features live technology demonstrations, strategic keynote panels, high-impact networking lounges, and exclusive B2B matching sessions designed to accelerate commercial growth. Join over 5,000+ registered delegates and top exhibitor brands shaping the future of global trade.`;
+      const aiText = `# ${title}\n\n${title} is the premier international B2B gathering for **${cat}** pioneers, industry leaders, and enterprise buyers.\n\n## Key Expo Highlights\n• **150+ Interactive Exhibitor Stalls**: Explore cutting-edge product launches and live tech demos.\n• **C-Suite Keynotes & Panels**: Gain actionable strategic insights from 40+ global keynote speakers.\n• **High-Impact Networking Lounges**: Connect with pre-qualified buyers and strategic venture partners.\n\n> "Join over 5,000+ registered delegates driving the future of global trade and industrial transformation in ${city}."`;
 
       setFormData(prev => ({
         ...prev,
@@ -490,14 +859,6 @@ Do not return any markdown code block formatting or explanation. Just return the
               <Save className={`h-3.5 w-3.5 ${isSaving ? 'animate-spin text-primary' : 'text-emerald-500'}`} />
               <span>{isSaving ? 'Saving Draft...' : `Autosaved at ${lastAutosaved}`}</span>
             </div>
-            {currentStep > 1 && currentStep < 8 && (
-              <button
-                onClick={() => setCurrentStep(7)}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground bg-secondary hover:bg-secondary/80 px-3 py-1.5 rounded-lg border border-border transition-colors"
-              >
-                <Eye className="h-3.5 w-3.5 text-primary" /> Live Preview
-              </button>
-            )}
           </div>
         </div>
 
@@ -610,7 +971,7 @@ Do not return any markdown code block formatting or explanation. Just return the
                 </h3>
                 <p className="text-xs text-muted-foreground">Provide core identity and taxonomy for your expo.</p>
               </div>
-              <button
+              {/* <button
                 type="button"
                 onClick={generateAiDescription}
                 disabled={isAiGenerating}
@@ -618,7 +979,7 @@ Do not return any markdown code block formatting or explanation. Just return the
               >
                 <Sparkles className={`h-4 w-4 ${isAiGenerating ? 'animate-spin' : ''}`} />
                 {isAiGenerating ? 'Generating AI Description...' : 'AI Assist: Generate Description'}
-              </button>
+              </button> */}
             </div>
 
             <div className="grid gap-6 sm:grid-cols-2">
@@ -694,21 +1055,16 @@ Do not return any markdown code block formatting or explanation. Just return the
             </div>
 
             <div>
-              <div className="flex justify-between items-center mb-1">
+              <div className="flex justify-between items-center mb-1.5">
                 <label className="block text-xs font-bold text-muted-foreground uppercase">
                   Event Description *
                 </label>
-                <span className="text-[10px] text-muted-foreground">
-                  {formData.description.length} characters
-                </span>
               </div>
-              <textarea
-                name="description"
-                rows={5}
+              <RichTextEditor
                 value={formData.description}
-                onChange={handleChange}
+                onChange={(val) => setFormData(prev => ({ ...prev, description: val }))}
                 placeholder="Describe the main highlights, target visitor profiles, exhibitor benefits, and key conference themes..."
-                className="w-full rounded-lg border border-border bg-background p-3.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary leading-relaxed"
+                rows={6}
               />
             </div>
           </div>
@@ -1460,9 +1816,9 @@ Do not return any markdown code block formatting or explanation. Just return the
                       {formData.title || 'Untitled Expo Event 2026'}
                     </h2>
 
-                    <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">
-                      {formData.description || 'Comprehensive event description will be rendered here.'}
-                    </p>
+                    <div className="text-xs text-muted-foreground leading-relaxed max-h-48 overflow-y-auto space-y-1 my-2">
+                      {formData.description ? renderRichText(formData.description) : 'Comprehensive event description will be rendered here.'}
+                    </div>
 
                     <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t border-border">
                       <MapPin className="h-4 w-4 text-primary" />
