@@ -647,17 +647,64 @@ export default function EventWizardPage() {
     metaDescription: ''
   });
 
-  // Autosave simulation every 25 seconds
+  const saveDraftToStorage = (dataToSave = formData, stepToSave = currentStep) => {
+    try {
+      if (typeof window !== 'undefined') {
+        const payload = {
+          formData: dataToSave,
+          currentStep: stepToSave > 1 ? stepToSave : 2,
+          savedAt: new Date().toISOString()
+        };
+        localStorage.setItem('visitexpo_wizard_draft', JSON.stringify(payload));
+      }
+    } catch (e) {
+      console.error('Save draft error', e);
+    }
+  };
+
+  const handleManualSaveDraft = () => {
+    setIsSaving(true);
+    saveDraftToStorage(formData, currentStep);
+    setTimeout(() => {
+      setIsSaving(false);
+      setLastAutosaved(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    }, 600);
+  };
+
+  // Restore saved draft on mount if available
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('visitexpo_wizard_draft');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          const loadedData = parsed.formData || (parsed.title || parsed.description || parsed.venueName ? parsed : null);
+          const loadedStep = parsed.currentStep || (loadedData?.title || loadedData?.venueName ? 2 : 1);
+
+          if (loadedData && (loadedData.title || loadedData.description || loadedData.venueName)) {
+            setFormData(prev => ({ ...prev, ...loadedData }));
+            setCurrentStep(loadedStep > 1 ? loadedStep : 2);
+            setLastAutosaved(parsed.savedAt ? new Date(parsed.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Loaded Draft');
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error restoring saved draft', e);
+    }
+  }, []);
+
+  // Autosave interval every 25 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       setIsSaving(true);
+      saveDraftToStorage(formData, currentStep);
       setTimeout(() => {
         setIsSaving(false);
         setLastAutosaved(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
       }, 800);
     }, 25000);
     return () => clearInterval(interval);
-  }, []);
+  }, [formData, currentStep]);
 
   // Handle Category & Sub-Sector Changes
   const handleCategoryChange = (e) => {
@@ -706,6 +753,47 @@ export default function EventWizardPage() {
     if (!formData.metaTitle && formData.title) {
       setFormData(prev => ({ ...prev, metaTitle: `${formData.title} | VisitExpo` }));
     }
+  };
+
+  // Time picker helpers for Daily Visitor Timings
+  const parse12hTo24h = (time12h) => {
+    if (!time12h) return '';
+    const match = time12h.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!match) return '';
+    let [_, hStr, mStr, ampm] = match;
+    let h = parseInt(hStr, 10);
+    ampm = ampm.toUpperCase();
+    if (ampm === 'PM' && h < 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return `${String(h).padStart(2, '0')}:${mStr}`;
+  };
+
+  const format24hTo12h = (time24) => {
+    if (!time24) return '';
+    const [hStr, mStr] = time24.split(':');
+    let h = parseInt(hStr, 10);
+    if (isNaN(h)) return '';
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    if (h === 0) h = 12;
+    return `${String(h).padStart(2, '0')}:${mStr} ${ampm}`;
+  };
+
+  const getTimingParts = (timingsStr) => {
+    if (!timingsStr) return { start: '09:00', end: '18:00' };
+    const parts = timingsStr.split(/\s*-\s*/);
+    const start = parse12hTo24h(parts[0]) || (parts[0] && parts[0].includes(':') ? parts[0] : '09:00');
+    const end = parse12hTo24h(parts[1]) || (parts[1] && parts[1].includes(':') ? parts[1] : '18:00');
+    return { start, end };
+  };
+
+  const handleTimingChange = (newStart24, newEnd24) => {
+    const formattedStart = format24hTo12h(newStart24) || '09:00 AM';
+    const formattedEnd = format24hTo12h(newEnd24) || '06:00 PM';
+    setFormData(prev => ({
+      ...prev,
+      timings: `${formattedStart} - ${formattedEnd}`
+    }));
   };
 
   const triggerFileInput = () => {
@@ -1021,9 +1109,9 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
       <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/80 pb-4">
           <div>
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary uppercase tracking-wider bg-primary/10 px-2.5 py-1 rounded-full mb-1">
+            {/* <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary uppercase tracking-wider bg-primary/10 px-2.5 py-1 rounded-full mb-1">
               <Sparkles className="h-3.5 w-3.5" /> 10times Style Onboarding Wizard
-            </span>
+            </span> */}
             <h2 className="text-2xl font-bold tracking-tight text-foreground">
               Event & Organizer Onboarding
             </h2>
@@ -1032,12 +1120,36 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Autosave Indicator */}
-            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-lg border border-border">
+          <div className="flex items-center gap-2">
+            {(formData.title || currentStep > 1) && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to discard this draft and start fresh?')) {
+                    if (typeof window !== 'undefined') {
+                      localStorage.removeItem('visitexpo_wizard_draft');
+                    }
+                    window.location.href = '/events/wizard';
+                  }
+                }}
+                className="text-xs font-semibold text-muted-foreground hover:text-red-500 px-2.5 py-1.5 rounded-lg border border-border hover:border-red-500/30 bg-muted/20 hover:bg-red-500/10 transition-all cursor-pointer"
+                title="Discard draft and start fresh"
+              >
+                Discard Draft
+              </button>
+            )}
+
+            {/* Autosave / Save Draft Button */}
+            <button
+              type="button"
+              onClick={handleManualSaveDraft}
+              disabled={isSaving}
+              title="Click to save draft now"
+              className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted active:scale-95 px-3 py-1.5 rounded-lg border border-border transition-all cursor-pointer hover:border-primary/50 shadow-2xs"
+            >
               <Save className={`h-3.5 w-3.5 ${isSaving ? 'animate-spin text-primary' : 'text-emerald-500'}`} />
               <span>{isSaving ? 'Saving Draft...' : `Autosaved at ${lastAutosaved}`}</span>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -1321,14 +1433,27 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
                   Daily Visitor Timings
                 </label>
-                <input
-                  type="text"
-                  name="timings"
-                  value={formData.timings}
-                  onChange={handleChange}
-                  placeholder="09:00 AM - 06:00 PM"
-                  className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="time"
+                    value={getTimingParts(formData.timings).start}
+                    onChange={(e) => {
+                      const { end } = getTimingParts(formData.timings);
+                      handleTimingChange(e.target.value, end);
+                    }}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <span className="text-xs font-semibold text-muted-foreground">to</span>
+                  <input
+                    type="time"
+                    value={getTimingParts(formData.timings).end}
+                    onChange={(e) => {
+                      const { start } = getTimingParts(formData.timings);
+                      handleTimingChange(start, e.target.value);
+                    }}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
               </div>
             </div>
 
@@ -1898,11 +2023,10 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase">Date Value</label>
                   <input
-                    type="text"
+                    type="date"
                     value={newSchedule.date}
                     onChange={e => setNewSchedule(prev => ({ ...prev, date: e.target.value }))}
-                    placeholder="e.g. 13 Nov 2026"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
                 <button
@@ -1916,20 +2040,25 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
 
               {formData.schedules && formData.schedules.length > 0 && (
                 <div className="space-y-2">
-                  {formData.schedules.map((sch, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-border bg-card">
-                      <div className="text-xs">
-                        <strong className="text-foreground">{sch.name}</strong>: <span className="text-muted-foreground">{sch.date}</span>
+                  {formData.schedules.map((sch, idx) => {
+                    const displayDate = sch.date && /^\d{4}-\d{2}-\d{2}$/.test(sch.date)
+                      ? new Date(sch.date + 'T00:00:00').toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+                      : sch.date;
+                    return (
+                      <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-border bg-card">
+                        <div className="text-xs">
+                          <strong className="text-foreground">{sch.name}</strong>: <span className="text-muted-foreground">{displayDate}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeSchedule(idx)}
+                          className="text-red-500 hover:text-red-700 text-xs font-bold px-2 py-0.5"
+                        >
+                          Remove
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeSchedule(idx)}
-                        className="text-red-500 hover:text-red-700 text-xs font-bold px-2 py-0.5"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

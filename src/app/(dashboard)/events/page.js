@@ -187,30 +187,41 @@ export default function EventsPage() {
   };
 
   // Fetch events owned/claimed by logged in organizer
+  const [localDraft, setLocalDraft] = useState(null);
+
+  // Fetch events owned/claimed by logged in organizer (including drafts)
   const fetchEvents = async () => {
     setLoading(true);
     setError('');
     try {
       const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
-      const res = await axios.get(`${API_URL}/events?limit=100`, { headers });
+      const res = await axios.get(`${API_URL}/events?limit=100&all=true`, { headers });
       
       if (res.data && res.data.success) {
         const allDocs = res.data.data?.docs || [];
-        // Filter events owned or claimed by logged in organizer (or show created events)
+
+        // Filter to only include events created by or belonging to the logged in user
         const myEvents = allDocs.filter(evt => {
-          if (!user) return true;
-          const userOrg = user.organization?._id || user.organization;
-          const evtOrg = evt.organizer?._id || evt.organizer;
-          const claimedBy = evt.claimedBy?._id || evt.claimedBy;
+          if (!user) return false;
+
+          const userId = String(user._id || user.id || '');
+          const userEmail = (user.email || '').toLowerCase().trim();
+          const userOrgId = String(user.organization?._id || user.organization || '');
+
+          const evtOrgId = String(evt.organizer?._id || evt.organizer || '');
+          const evtClaimedBy = String(evt.claimedBy?._id || evt.claimedBy || '');
+          const evtCreatedBy = String(evt.createdBy?._id || evt.createdBy || evt.user?._id || evt.user || '');
+          const evtOrgEmail = (evt.orgEmail || '').toLowerCase().trim();
 
           return (
-            (evtOrg && String(evtOrg) === String(userOrg)) ||
-            (claimedBy && String(claimedBy) === String(user.id)) ||
-            evt.isClaimed === true
+            (userId && evtClaimedBy === userId) ||
+            (userId && evtCreatedBy === userId) ||
+            (userOrgId && evtOrgId === userOrgId) ||
+            (userEmail && evtOrgEmail === userEmail)
           );
         });
 
-        setEvents(myEvents.length > 0 ? myEvents : allDocs.filter(e => e.isClaimed));
+        setEvents(myEvents);
       }
     } catch (err) {
       console.error('Failed to fetch events', err);
@@ -223,6 +234,20 @@ export default function EventsPage() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchEvents();
+
+    try {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('visitexpo_wizard_draft');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && (parsed.title || parsed.description)) {
+            setLocalDraft(parsed);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error loading local draft', e);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, accessToken]);
 
@@ -245,6 +270,46 @@ export default function EventsPage() {
         .replace(/[^\w\-]+/g, '');
       setEventForm(prev => ({ ...prev, slug: mockSlug }));
     }
+  };
+  // Time picker helpers for Daily Timings
+  const parse12hTo24h = (time12h) => {
+    if (!time12h) return '';
+    const match = time12h.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!match) return '';
+    let [_, hStr, mStr, ampm] = match;
+    let h = parseInt(hStr, 10);
+    ampm = ampm.toUpperCase();
+    if (ampm === 'PM' && h < 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return `${String(h).padStart(2, '0')}:${mStr}`;
+  };
+
+  const format24hTo12h = (time24) => {
+    if (!time24) return '';
+    const [hStr, mStr] = time24.split(':');
+    let h = parseInt(hStr, 10);
+    if (isNaN(h)) return '';
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    if (h === 0) h = 12;
+    return `${String(h).padStart(2, '0')}:${mStr} ${ampm}`;
+  };
+
+  const getTimingParts = (timingsStr) => {
+    if (!timingsStr) return { start: '09:00', end: '18:00' };
+    const parts = timingsStr.split(/\s*-\s*/);
+    const start = parse12hTo24h(parts[0]) || (parts[0] && parts[0].includes(':') ? parts[0] : '09:00');
+    const end = parse12hTo24h(parts[1]) || (parts[1] && parts[1].includes(':') ? parts[1] : '18:00');
+    return { start, end };
+  };
+
+  const handleTimingChange = (newStart24, newEnd24) => {
+    const formattedStart = format24hTo12h(newStart24) || '09:00 AM';
+    const formattedEnd = format24hTo12h(newEnd24) || '06:00 PM';
+    setEventForm(prev => ({
+      ...prev,
+      timings: `${formattedStart} - ${formattedEnd}`
+    }));
   };
 
   // Open modal in create mode
@@ -471,7 +536,7 @@ export default function EventsPage() {
             href="/events/wizard"
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-all"
           >
-            <Sparkles className="h-4 w-4" /> Start 10times Wizard
+            <Sparkles className="h-4 w-4" /> Start Visitexpo Wizard
           </Link>
           <button
             onClick={openCreateModal}
@@ -491,19 +556,30 @@ export default function EventsPage() {
             { id: 'draft', label: 'Drafts' },
             { id: 'completed', label: 'Completed' },
             { id: 'cancelled', label: 'Cancelled' }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setStatusFilter(tab.id)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                statusFilter === tab.id
-                  ? 'bg-secondary text-foreground shadow-sm border border-border'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+          ].map((tab) => {
+            const count = tab.id === 'all'
+              ? events.length
+              : events.filter(e => e.status === tab.id).length;
+            const isActive = statusFilter === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setStatusFilter(tab.id)}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                  isActive
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary'
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                  isActive ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-muted-foreground'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         <div className="relative md:w-80">
@@ -517,6 +593,27 @@ export default function EventsPage() {
           />
         </div>
       </div>
+
+      {/* Unsaved local wizard draft banner */}
+      {localDraft && (statusFilter === 'all' || statusFilter === 'draft') && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400">Unsaved Wizard Draft Detected</p>
+              <p className="text-sm font-bold text-foreground">{localDraft.title || 'Untitled Expo Event'}</p>
+            </div>
+          </div>
+          <Link
+            href="/events/wizard"
+            className="inline-flex items-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-xs transition-colors whitespace-nowrap"
+          >
+            Resume In Wizard <ExternalLink className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      )}
 
       {/* Render Loader, Errors, or Event Cards */}
       {loading ? (
@@ -763,14 +860,27 @@ export default function EventsPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Daily Timings</label>
-                  <input
-                    type="text"
-                    name="timings"
-                    value={eventForm.timings}
-                    onChange={handleInputChange}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="09:00 AM - 06:00 PM"
-                  />
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="time"
+                      value={getTimingParts(eventForm.timings).start}
+                      onChange={(e) => {
+                        const { end } = getTimingParts(eventForm.timings);
+                        handleTimingChange(e.target.value, end);
+                      }}
+                      className="w-full rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                    <span className="text-xs font-semibold text-muted-foreground">to</span>
+                    <input
+                      type="time"
+                      value={getTimingParts(eventForm.timings).end}
+                      onChange={(e) => {
+                        const { start } = getTimingParts(eventForm.timings);
+                        handleTimingChange(start, e.target.value);
+                      }}
+                      className="w-full rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -988,14 +1098,13 @@ export default function EventsPage() {
                     value={newSchedule.name}
                     onChange={e => setNewSchedule(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="Day / Session Name"
-                    className="rounded-lg border border-border bg-background px-3 py-1 text-xs text-foreground focus:outline-none"
+                    className="rounded-lg border border-border bg-background px-3 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                   <input
-                    type="text"
+                    type="date"
                     value={newSchedule.date}
                     onChange={e => setNewSchedule(prev => ({ ...prev, date: e.target.value }))}
-                    placeholder="Date e.g. 13 Nov 2026"
-                    className="rounded-lg border border-border bg-background px-3 py-1 text-xs text-foreground focus:outline-none"
+                    className="rounded-lg border border-border bg-background px-3 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                   <button
                     type="button"
@@ -1007,16 +1116,21 @@ export default function EventsPage() {
                 </div>
                 {eventForm.schedules && eventForm.schedules.length > 0 && (
                   <div className="space-y-1.5">
-                    {eventForm.schedules.map((sch, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-2 rounded-lg border border-border bg-card text-xs">
-                        <div>
-                          <strong>{sch.name}</strong>: {sch.date}
+                    {eventForm.schedules.map((sch, idx) => {
+                      const displayDate = sch.date && /^\d{4}-\d{2}-\d{2}$/.test(sch.date)
+                        ? new Date(sch.date + 'T00:00:00').toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+                        : sch.date;
+                      return (
+                        <div key={idx} className="flex items-center justify-between p-2 rounded-lg border border-border bg-card text-xs">
+                          <div>
+                            <strong>{sch.name}</strong>: {displayDate}
+                          </div>
+                          <button type="button" onClick={() => removeSchedule(idx)} className="text-red-500 hover:text-red-700 font-semibold px-2">
+                            Remove
+                          </button>
                         </div>
-                        <button type="button" onClick={() => removeSchedule(idx)} className="text-red-500 hover:text-red-700 font-semibold px-2">
-                          Remove
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

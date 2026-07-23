@@ -341,11 +341,11 @@ export default function DashboardLayout({ children }) {
                 <Sparkles className="h-3.5 w-3.5" /> Start Onboarding
               </Link>
             )}
-            {user.role !== 'exhibitor' && !isExhibitorView && (
+            {/* {user.role !== 'exhibitor' && !isExhibitorView && (
               <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-500 ring-1 ring-inset ring-emerald-500/20">
                 Sync Active
               </span>
-            )}
+            )} */}
           </div>
         </header>
 
