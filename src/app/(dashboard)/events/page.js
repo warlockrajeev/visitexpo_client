@@ -31,7 +31,7 @@ import {
   Ticket
 } from 'lucide-react';
 
-import { renderRichText, RichTextEditor } from './wizard/page.js';
+import { renderRichText, RichTextEditor, SPONSOR_TIER_GROUPS, PRESET_SPONSOR_TIERS, CATEGORY_SUBSECTORS } from './wizard/page.js';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -81,7 +81,9 @@ export default function EventsPage() {
     }
   });
 
-  const [newSponsor, setNewSponsor] = useState({ name: '', link: '', logo: '', tier: 'Platinum' });
+  const [newSponsor, setNewSponsor] = useState({ name: '', link: '', logo: '', tier: 'Platinum Sponsor' });
+  const [isCustomSponsorTier, setIsCustomSponsorTier] = useState(false);
+  const [isCustomIndustry, setIsCustomIndustry] = useState(false);
   const [isSponsorUploading, setIsSponsorUploading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -136,11 +138,13 @@ export default function EventsPage() {
 
   const addSponsor = () => {
     if (!newSponsor.name) return alert('Sponsor name is required');
+    const finalTier = newSponsor.tier?.trim() || 'Platinum Sponsor';
     setEventForm(prev => ({
       ...prev,
-      sponsorsList: [...(prev.sponsorsList || []), { ...newSponsor }]
+      sponsorsList: [...(prev.sponsorsList || []), { ...newSponsor, tier: finalTier }]
     }));
-    setNewSponsor({ name: '', link: '', logo: '', tier: 'Platinum' });
+    setNewSponsor({ name: '', link: '', logo: '', tier: 'Platinum Sponsor' });
+    setIsCustomSponsorTier(false);
   };
 
   const removeSponsor = (index) => {
@@ -247,6 +251,7 @@ export default function EventsPage() {
   const openCreateModal = () => {
     setEditMode(false);
     setCurrentEventId(null);
+    setIsCustomIndustry(false);
     setEventForm({
       title: '',
       slug: '',
@@ -257,7 +262,8 @@ export default function EventsPage() {
       startDate: '',
       endDate: '',
       timings: '09:00 AM - 06:00 PM',
-      categories: '',
+      category: 'Technology & AI',
+      industry: 'Information Technology',
       status: 'draft',
       orgName: '',
       orgEmail: '',
@@ -285,6 +291,29 @@ export default function EventsPage() {
     const fmtStartDate = event.startDate ? new Date(event.startDate).toISOString().split('T')[0] : '';
     const fmtEndDate = event.endDate ? new Date(event.endDate).toISOString().split('T')[0] : '';
 
+    let initialCat = 'Technology & AI';
+    let initialSub = 'Information Technology';
+
+    if (Array.isArray(event.categories) && event.categories.length > 0) {
+      if (CATEGORY_SUBSECTORS[event.categories[0]]) {
+        initialCat = event.categories[0];
+        initialSub = event.categories[1] || CATEGORY_SUBSECTORS[initialCat]?.[0] || '';
+      } else {
+        const foundCat = Object.keys(CATEGORY_SUBSECTORS).find(cat =>
+          CATEGORY_SUBSECTORS[cat].includes(event.categories[0])
+        );
+        if (foundCat) {
+          initialCat = foundCat;
+          initialSub = event.categories[0];
+        } else {
+          initialCat = 'Technology & AI';
+          initialSub = event.categories[0];
+        }
+      }
+    }
+
+    setIsCustomIndustry(false);
+
     setEventForm({
       title: event.title,
       slug: event.slug,
@@ -295,7 +324,8 @@ export default function EventsPage() {
       startDate: fmtStartDate,
       endDate: fmtEndDate,
       timings: event.timings || '09:00 AM - 06:00 PM',
-      categories: event.categories?.join(', ') || '',
+      category: initialCat,
+      industry: initialSub,
       status: event.status || 'draft',
       orgName: event.orgName || '',
       orgEmail: event.orgEmail || '',
@@ -345,10 +375,8 @@ export default function EventsPage() {
       return;
     }
 
-    // Process categories string to array
-    const categoriesArray = eventForm.categories
-      ? eventForm.categories.split(',').map(c => c.trim()).filter(Boolean)
-      : [];
+    // Process categories selection to array
+    const categoriesArray = [eventForm.category, eventForm.industry].filter(Boolean);
 
     const payload = {
       ...eventForm,
@@ -748,30 +776,97 @@ export default function EventsPage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Categories (comma-separated)</label>
-                  <input
-                    type="text"
-                    name="categories"
-                    value={eventForm.categories}
-                    onChange={handleInputChange}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="AI, SaaS, Security"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Lifecycle Status</label>
+                  <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Primary Category *</label>
                   <select
-                    name="status"
-                    value={eventForm.status}
-                    onChange={handleInputChange}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    name="category"
+                    value={eventForm.category || 'Technology & AI'}
+                    onChange={(e) => {
+                      const newCat = e.target.value;
+                      const subList = CATEGORY_SUBSECTORS[newCat] || [];
+                      setEventForm(prev => ({
+                        ...prev,
+                        category: newCat,
+                        industry: subList[0] || ''
+                      }));
+                      setIsCustomIndustry(false);
+                    }}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-medium"
                   >
-                    <option value="draft">Draft</option>
-                    <option value="published">Published</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
+                    {Object.keys(CATEGORY_SUBSECTORS).map(catKey => (
+                      <option key={catKey} value={catKey}>
+                        {catKey}
+                      </option>
+                    ))}
                   </select>
                 </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Industry Sub-Sector</label>
+                  {(() => {
+                    const currentSubSectors = CATEGORY_SUBSECTORS[eventForm.category] || [];
+                    const isPreset = currentSubSectors.includes(eventForm.industry);
+                    const selectValue = isCustomIndustry
+                      ? 'CUSTOM'
+                      : isPreset
+                      ? eventForm.industry
+                      : eventForm.industry
+                      ? 'CUSTOM'
+                      : currentSubSectors[0] || '';
+
+                    return (
+                      <div className="space-y-1.5">
+                        <select
+                          value={selectValue}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === 'CUSTOM') {
+                              setIsCustomIndustry(true);
+                              setEventForm(prev => ({ ...prev, industry: '' }));
+                            } else {
+                              setIsCustomIndustry(false);
+                              setEventForm(prev => ({ ...prev, industry: val }));
+                            }
+                          }}
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-medium"
+                        >
+                          {currentSubSectors.map(sub => (
+                            <option key={sub} value={sub}>
+                              {sub}
+                            </option>
+                          ))}
+                          <option value="CUSTOM">+ Custom Sub-Sector...</option>
+                        </select>
+
+                        {(isCustomIndustry || (!isPreset && eventForm.industry !== '' && eventForm.industry !== undefined)) && (
+                          <input
+                            type="text"
+                            name="industry"
+                            value={eventForm.industry || ''}
+                            onChange={(e) => setEventForm(prev => ({ ...prev, industry: e.target.value }))}
+                            placeholder="Type custom sub-sector..."
+                            className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                            autoFocus
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Lifecycle Status</label>
+                <select
+                  name="status"
+                  value={eventForm.status}
+                  onChange={handleInputChange}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
               </div>
 
               {/* SEO Sub-section */}
@@ -946,18 +1041,53 @@ export default function EventsPage() {
                     placeholder="Link"
                     className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
                   />
-                  <select
-                    value={newSponsor.tier}
-                    onChange={e => setNewSponsor(prev => ({ ...prev, tier: e.target.value }))}
-                    className="rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground focus:outline-none"
-                  >
-                    <option value="Platinum">Platinum</option>
-                    <option value="Gold">Gold</option>
-                    <option value="Silver">Silver</option>
-                    <option value="Co-Sponsor">Co-Sponsor</option>
-                    <option value="Technology Partner">Tech Partner</option>
-                    <option value="Media Partner">Media Partner</option>
-                  </select>
+                  <div className="flex flex-col gap-1">
+                    <select
+                      value={
+                        isCustomSponsorTier
+                          ? 'CUSTOM'
+                          : PRESET_SPONSOR_TIERS.includes(newSponsor.tier)
+                          ? newSponsor.tier
+                          : newSponsor.tier
+                          ? 'CUSTOM'
+                          : 'Platinum Sponsor'
+                      }
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === 'CUSTOM') {
+                          setIsCustomSponsorTier(true);
+                          setNewSponsor(prev => ({ ...prev, tier: '' }));
+                        } else {
+                          setIsCustomSponsorTier(false);
+                          setNewSponsor(prev => ({ ...prev, tier: val }));
+                        }
+                      }}
+                      className="rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground focus:outline-none"
+                    >
+                      {SPONSOR_TIER_GROUPS.map(group => (
+                        <optgroup key={group.label} label={group.label}>
+                          {group.options.map(opt => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                      <optgroup label="Custom">
+                        <option value="CUSTOM">+ Custom Tier / Label...</option>
+                      </optgroup>
+                    </select>
+                    {(isCustomSponsorTier || (!PRESET_SPONSOR_TIERS.includes(newSponsor.tier) && newSponsor.tier !== '')) && (
+                      <input
+                        type="text"
+                        value={newSponsor.tier}
+                        onChange={e => setNewSponsor(prev => ({ ...prev, tier: e.target.value }))}
+                        placeholder="Custom label..."
+                        className="w-full rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                        autoFocus
+                      />
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5">
                     <div className="relative border border-dashed border-border rounded-lg p-1 text-center bg-background hover:border-primary transition-colors cursor-pointer flex-1 h-[28px] flex items-center justify-center">
                       <input

@@ -63,6 +63,157 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
+export const SPONSOR_TIER_GROUPS = [
+  {
+    label: 'Major Tiers',
+    options: [
+      'Title Sponsor',
+      'Presenting Sponsor',
+      'Powered By Sponsor',
+      'Diamond Sponsor',
+      'Platinum Sponsor',
+      'Gold Sponsor',
+      'Silver Sponsor',
+      'Bronze Sponsor',
+      'Co-Sponsor',
+      'Lead Sponsor'
+    ]
+  },
+  {
+    label: 'Partners & Domain',
+    options: [
+      'Official Partner',
+      'Strategic Partner',
+      'Technology Partner',
+      'Media Partner',
+      'Knowledge Partner',
+      'Content Partner',
+      'Ecosystem Partner',
+      'Association Partner',
+      'Innovation Partner',
+      'Community Partner',
+      'Industry Partner',
+      'Sustainability Partner'
+    ]
+  },
+  {
+    label: 'Experience & Event Roles',
+    options: [
+      'Registration Partner',
+      'Badge & Lanyard Partner',
+      'VIP Lounge Partner',
+      'Networking Partner',
+      'After-Party Partner',
+      'Gala Dinner Partner',
+      'Hospitality Partner',
+      'Beverage Partner',
+      'Gift & Goodie Bag Partner',
+      'Travel Partner',
+      'Supporting Partner',
+      'Exhibitor'
+    ]
+  }
+];
+
+export const PRESET_SPONSOR_TIERS = SPONSOR_TIER_GROUPS.flatMap(g => g.options);
+
+export const CATEGORY_SUBSECTORS = {
+  'Technology & AI': [
+    'Information Technology',
+    'Artificial Intelligence & ML',
+    'Cybersecurity & Cloud Computing',
+    'Data Analytics & Big Data',
+    'Robotics & Automation',
+    'Telecommunications & 5G',
+    'Fintech & Digital Banking',
+    'Web3, Blockchain & Crypto',
+    'Consumer Electronics & Smart Devices',
+    'E-commerce & Retail Tech',
+    'Semiconductor & Microelectronics',
+    'EdTech & E-Learning'
+  ],
+  'Industrial Manufacturing': [
+    'Machinery & Heavy Equipment',
+    'Industrial Automation & Control',
+    'Metal, Steel & Metallurgy',
+    'Chemical & Process Engineering',
+    'Plastics, Polymers & Rubber',
+    'Packaging & Printing',
+    'Tooling, Moulding & Dies',
+    'Electrical & Power Electronics',
+    'Hydraulics, Pneumatics & Valves',
+    'Textile Machinery & Apparel Tech',
+    'Safety, Fire & Defense Engineering'
+  ],
+  'Healthcare & Pharma': [
+    'Pharmaceuticals & API',
+    'Medical Devices & Diagnostics',
+    'Hospital Equipment & Infrastructure',
+    'Biotechnology & Life Sciences',
+    'Digital Health & Telemedicine',
+    'Dental & Oral Healthcare',
+    'Surgical & Laboratory Instruments',
+    'Wellness, Fitness & Nutrition',
+    'Ayush, Herbal & Alternative Medicine'
+  ],
+  'Renewable Energy & ESG': [
+    'Solar Energy & Photovoltaics',
+    'Wind & Bio Energy',
+    'EV & Battery Storage Technology',
+    'Smart Grid & Energy Efficiency',
+    'Waste Management & Recycling',
+    'Water & Wastewater Treatment',
+    'Environmental & Climate Tech',
+    'Green Building & Sustainable Materials'
+  ],
+  'Agriculture & Food Tech': [
+    'Agri-Machinery & Implements',
+    'Agritech & Precision Farming',
+    'Fertilizer, Seeds & Crop Protection',
+    'Food Processing & Packaging',
+    'Dairy, Poultry & Aquaculture',
+    'Organic & Sustainable Produce',
+    'Cold Chain & Logistics',
+    'Beverages & Food Ingredients'
+  ],
+  'Consumer Goods & Retail': [
+    'FMCG & Personal Care',
+    'Apparel, Fashion & Lifestyle',
+    'Home Decor, Furniture & Kitchenware',
+    'Gems & Jewellery',
+    'Retail Tech & POS Solutions',
+    'Toys, Baby & Kids Products',
+    'Sports, Outdoor & Leisure',
+    'Cosmetics & Beauty Expo'
+  ],
+  'Automotive & Transport': [
+    'Electric Vehicles & Hybrid Systems',
+    'Auto Components & Spare Parts',
+    'Commercial Vehicles & Logistics',
+    'Aviation, Aerospace & Defense',
+    'Rail, Fleet & Infrastructure',
+    'Marine & Maritime Expo'
+  ],
+  'Real Estate, Building & Construction': [
+    'Construction Machinery & Building Materials',
+    'Architecture, Interiors & Design',
+    'Real Estate & Property Development',
+    'HVAC & Refrigeration',
+    'Plumbing, Sanitation & Tiles',
+    'Smart Home & Lighting Systems'
+  ],
+  'Services, Finance & Education': [
+    'BFSI & Investment Services',
+    'Franchise & Business Opportunities',
+    'Higher Education & Study Abroad',
+    'Supply Chain, Logistics & Warehousing',
+    'Media, Advertising & MarTech',
+    'Travel, Tourism & Hospitality'
+  ]
+};
+
+
+
 // Render Rich Text Markdown/HTML content into styled React elements
 export function renderRichText(content) {
   if (!content || typeof content !== 'string') return null;
@@ -446,6 +597,7 @@ export default function EventWizardPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [isCustomIndustry, setIsCustomIndustry] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -507,6 +659,30 @@ export default function EventWizardPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Handle Category & Sub-Sector Changes
+  const handleCategoryChange = (e) => {
+    const selectedCat = e.target.value;
+    const subList = CATEGORY_SUBSECTORS[selectedCat] || [];
+    const defaultSub = subList[0] || '';
+    setFormData(prev => ({
+      ...prev,
+      category: selectedCat,
+      industry: defaultSub
+    }));
+    setIsCustomIndustry(false);
+  };
+
+  const handleSubSectorChange = (e) => {
+    const val = e.target.value;
+    if (val === 'CUSTOM') {
+      setIsCustomIndustry(true);
+      setFormData(prev => ({ ...prev, industry: '' }));
+    } else {
+      setIsCustomIndustry(false);
+      setFormData(prev => ({ ...prev, industry: val }));
+    }
+  };
+
   // Handle input changes
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -564,7 +740,8 @@ export default function EventWizardPage() {
     }
   };
 
-  const [newSponsor, setNewSponsor] = useState({ name: '', link: '', logo: '', tier: 'Platinum' });
+  const [newSponsor, setNewSponsor] = useState({ name: '', link: '', logo: '', tier: 'Platinum Sponsor' });
+  const [isCustomSponsorTier, setIsCustomSponsorTier] = useState(false);
   const [isSponsorUploading, setIsSponsorUploading] = useState(false);
 
   const [newFaq, setNewFaq] = useState({ question: '', answer: '' });
@@ -618,11 +795,13 @@ export default function EventWizardPage() {
 
   const addSponsor = () => {
     if (!newSponsor.name) return alert('Sponsor name is required');
+    const finalTier = newSponsor.tier?.trim() || 'Platinum Sponsor';
     setFormData(prev => ({
       ...prev,
-      sponsorsList: [...prev.sponsorsList, { ...newSponsor }]
+      sponsorsList: [...prev.sponsorsList, { ...newSponsor, tier: finalTier }]
     }));
-    setNewSponsor({ name: '', link: '', logo: '', tier: 'Platinum' });
+    setNewSponsor({ name: '', link: '', logo: '', tier: 'Platinum Sponsor' });
+    setIsCustomSponsorTier(false);
   };
 
   const removeSponsor = (index) => {
@@ -1027,15 +1206,14 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 <select
                   name="category"
                   value={formData.category}
-                  onChange={handleChange}
+                  onChange={handleCategoryChange}
                   className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="Technology & AI">Technology & AI</option>
-                  <option value="Industrial Manufacturing">Industrial Manufacturing</option>
-                  <option value="Healthcare & Pharma">Healthcare & Pharma</option>
-                  <option value="Renewable Energy & ESG">Renewable Energy & ESG</option>
-                  <option value="Agriculture & Food Tech">Agriculture & Food Tech</option>
-                  <option value="Consumer Goods & Retail">Consumer Goods & Retail</option>
+                  {Object.keys(CATEGORY_SUBSECTORS).map(catKey => (
+                    <option key={catKey} value={catKey}>
+                      {catKey}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1043,14 +1221,46 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
                   Industry Sub-Sector
                 </label>
-                <input
-                  type="text"
-                  name="industry"
-                  value={formData.industry}
-                  onChange={handleChange}
-                  placeholder="E.g. Enterprise Software, Robotics, IoT"
-                  className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+                {(() => {
+                  const currentSubSectors = CATEGORY_SUBSECTORS[formData.category] || [];
+                  const isPreset = currentSubSectors.includes(formData.industry);
+                  const selectValue = isCustomIndustry
+                    ? 'CUSTOM'
+                    : isPreset
+                    ? formData.industry
+                    : formData.industry
+                    ? 'CUSTOM'
+                    : currentSubSectors[0] || '';
+
+                  return (
+                    <div className="space-y-2">
+                      <select
+                        value={selectValue}
+                        onChange={handleSubSectorChange}
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        {currentSubSectors.map(sub => (
+                          <option key={sub} value={sub}>
+                            {sub}
+                          </option>
+                        ))}
+                        <option value="CUSTOM">+ Custom Sub-Sector...</option>
+                      </select>
+
+                      {(isCustomIndustry || (!isPreset && formData.industry !== '')) && (
+                        <input
+                          type="text"
+                          name="industry"
+                          value={formData.industry}
+                          onChange={e => setFormData(prev => ({ ...prev, industry: e.target.value }))}
+                          placeholder="Enter custom industry sub-sector..."
+                          className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                          autoFocus
+                        />
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
@@ -1485,17 +1695,50 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase">Tier / Label</label>
                   <select
-                    value={newSponsor.tier}
-                    onChange={e => setNewSponsor(prev => ({ ...prev, tier: e.target.value }))}
+                    value={
+                      isCustomSponsorTier
+                        ? 'CUSTOM'
+                        : PRESET_SPONSOR_TIERS.includes(newSponsor.tier)
+                        ? newSponsor.tier
+                        : newSponsor.tier
+                        ? 'CUSTOM'
+                        : 'Platinum Sponsor'
+                    }
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === 'CUSTOM') {
+                        setIsCustomSponsorTier(true);
+                        setNewSponsor(prev => ({ ...prev, tier: '' }));
+                      } else {
+                        setIsCustomSponsorTier(false);
+                        setNewSponsor(prev => ({ ...prev, tier: val }));
+                      }
+                    }}
                     className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none"
                   >
-                    <option value="Platinum">Platinum Sponsor</option>
-                    <option value="Gold">Gold Sponsor</option>
-                    <option value="Silver">Silver Sponsor</option>
-                    <option value="Co-Sponsor">Co-Sponsor</option>
-                    <option value="Technology Partner">Technology Partner</option>
-                    <option value="Media Partner">Media Partner</option>
+                    {SPONSOR_TIER_GROUPS.map(group => (
+                      <optgroup key={group.label} label={group.label}>
+                        {group.options.map(opt => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                    <optgroup label="Custom">
+                      <option value="CUSTOM">+ Custom Tier / Label...</option>
+                    </optgroup>
                   </select>
+                  {(isCustomSponsorTier || (!PRESET_SPONSOR_TIERS.includes(newSponsor.tier) && newSponsor.tier !== '')) && (
+                    <input
+                      type="text"
+                      value={newSponsor.tier}
+                      onChange={e => setNewSponsor(prev => ({ ...prev, tier: e.target.value }))}
+                      placeholder="Type custom tier label..."
+                      className="w-full mt-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      autoFocus
+                    />
+                  )}
                 </div>
                 <div className="space-y-1 flex items-center gap-2">
                   <div className="relative border border-dashed border-border rounded-lg p-1.5 text-center bg-background hover:border-primary transition-colors cursor-pointer flex-1 h-[32px] flex items-center justify-center">
