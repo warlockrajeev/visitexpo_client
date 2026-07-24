@@ -19,6 +19,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../context/AuthContext.js';
 import axios from 'axios';
+import { validateEventImage } from '../../../../utils/imageValidation.js';
 import {
   Sparkles,
   Calendar,
@@ -28,6 +29,7 @@ import {
   Ticket,
   Eye,
   CheckCircle2,
+  Plus,
   Clock,
   ArrowRight,
   ArrowLeft,
@@ -599,6 +601,11 @@ export default function EventWizardPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isCustomIndustry, setIsCustomIndustry] = useState(false);
 
+  // Image Dimension Validation State
+  const [bannerValidation, setBannerValidation] = useState(null);
+  const [orgLogoValidation, setOrgLogoValidation] = useState(null);
+  const [sponsorLogoValidation, setSponsorLogoValidation] = useState(null);
+
   // Form State
   const [formData, setFormData] = useState({
     title: '',
@@ -739,6 +746,19 @@ export default function EventWizardPage() {
     }));
   };
 
+  // Toggle Step 6 Registration Form Required Fields
+  const toggleFormField = (fieldId) => {
+    if (['name', 'email', 'phone'].includes(fieldId)) return;
+    setFormData(prev => {
+      const current = prev.formFields || ['name', 'email', 'phone', 'company', 'designation'];
+      const exists = current.includes(fieldId);
+      const updated = exists
+        ? current.filter(id => id !== fieldId)
+        : [...current, fieldId];
+      return { ...prev, formFields: updated };
+    });
+  };
+
   // Generate Slug
   const handleTitleBlur = () => {
     if (!formData.slug && formData.title) {
@@ -806,6 +826,15 @@ export default function EventWizardPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate image dimensions client-side before starting network upload
+    const validation = await validateEventImage(file, 'banner');
+    setBannerValidation(validation);
+
+    if (!validation.isValid) {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     setIsUploading(true);
     const uploadData = new FormData();
     uploadData.append('file', file);
@@ -819,6 +848,17 @@ export default function EventWizardPage() {
 
       if (res.data && res.data.success) {
         setFormData(prev => ({ ...prev, bannerUrl: res.data.url }));
+        // Enrich dimensions if returned from API
+        if (res.data.width && res.data.height) {
+          setBannerValidation(prev => ({
+            ...prev,
+            dimensions: {
+              width: res.data.width,
+              height: res.data.height,
+              aspectRatio: prev?.dimensions?.aspectRatio || `${res.data.width}:${res.data.height}`
+            }
+          }));
+        }
       }
     } catch (err) {
       console.error('Banner upload error:', err);
@@ -838,6 +878,10 @@ export default function EventWizardPage() {
   const handleOrgLogoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const validation = await validateEventImage(file, 'logo');
+    setOrgLogoValidation(validation);
+    if (!validation.isValid) return;
 
     setIsUploading(true);
     const uploadData = new FormData();
@@ -861,6 +905,10 @@ export default function EventWizardPage() {
   const handleSponsorLogoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const validation = await validateEventImage(file, 'logo');
+    setSponsorLogoValidation(validation);
+    if (!validation.isValid) return;
 
     setIsSponsorUploading(true);
     const uploadData = new FormData();
@@ -1647,8 +1695,11 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
             <div className="grid gap-6 sm:grid-cols-3">
               <div className="sm:col-span-1 space-y-1">
                 <label className="block text-xs font-bold text-muted-foreground uppercase">
-                  Organizer Logo (.png)
+                  Organizer Logo (Min 100×100 px)
                 </label>
+                {orgLogoValidation?.error && (
+                  <p className="text-[11px] font-semibold text-red-500 my-1">{orgLogoValidation.error}</p>
+                )}
                 <div className="relative border border-dashed border-border rounded-xl p-4 text-center bg-background hover:border-primary transition-colors cursor-pointer min-h-[110px] flex items-center justify-center">
                   <input
                     type="file"
@@ -1716,9 +1767,42 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
 
             {/* Main Cover Banner Upload Zone */}
             <div className="space-y-2">
-              <label className="block text-xs font-bold text-muted-foreground uppercase">
-                Event Main Banner Cover (Recommended: 1920 x 1080 px) *
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-muted-foreground uppercase">
+                  Event Main Banner Cover (Recommended: 1920 × 1080 px | Min: 1200 × 630 px) *
+                </label>
+                {bannerValidation?.dimensions && formData.bannerUrl && (
+                  <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                    bannerValidation.qualityScore === 'optimal'
+                      ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
+                      : 'bg-amber-500/10 text-amber-600 border-amber-500/30'
+                  }`}>
+                    <CheckCircle2 className="h-3 w-3" />
+                    {bannerValidation.dimensions.width} × {bannerValidation.dimensions.height} px ({bannerValidation.dimensions.aspectRatio})
+                  </span>
+                )}
+              </div>
+
+              {bannerValidation?.error && (
+                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-600 text-xs flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="font-bold">Image Resolution Rejected: </strong>
+                    {bannerValidation.error}
+                  </div>
+                </div>
+              )}
+
+              {bannerValidation?.warning && formData.bannerUrl && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-600 text-xs flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="font-semibold">Quality Recommendation: </strong>
+                    {bannerValidation.warning}
+                  </div>
+                </div>
+              )}
+
               <div 
                 onClick={triggerFileInput}
                 className="relative rounded-2xl border-2 border-dashed border-border p-6 bg-muted/10 text-center hover:border-primary transition-colors cursor-pointer"
@@ -1747,7 +1831,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                   <div className="space-y-2">
                     <Upload className="mx-auto h-10 w-10 text-muted-foreground/60" />
                     <p className="text-sm font-semibold text-foreground">Drag and drop event banner image here</p>
-                    <p className="text-xs text-muted-foreground">PNG, JPG, WebP up to 10MB</p>
+                    <p className="text-xs text-muted-foreground">PNG, JPG, WebP (Min 1200×630px, Rec 1920×1080px up to 10MB)</p>
                   </div>
                 )}
               </div>
@@ -1988,17 +2072,50 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               </div>
             )}
 
-            {/* Form Fields selector */}
+            {/* Form Fields Selector */}
             <div className="border border-border/80 rounded-2xl p-5 bg-muted/10 space-y-3">
-              <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
-                Registration Form Required Fields
-              </h4>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
+                  Registration Form Required Fields
+                </h4>
+                <span className="text-[11px] text-muted-foreground">
+                  Click optional fields to toggle collection
+                </span>
+              </div>
               <div className="flex flex-wrap gap-2">
-                {['Full Name', 'Email Address', 'Mobile Number', 'Company / Org', 'Designation', 'Industry Sector', 'City'].map((field, idx) => (
-                  <span key={idx} className="inline-flex items-center gap-1.5 rounded-lg bg-card border border-border px-3 py-1.5 text-xs font-semibold text-foreground">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> {field}
-                  </span>
-                ))}
+                {[
+                  { id: 'name', label: 'Full Name', fixed: true },
+                  { id: 'email', label: 'Email Address', fixed: true },
+                  { id: 'phone', label: 'Mobile Number', fixed: true },
+                  { id: 'company', label: 'Company / Org' },
+                  { id: 'designation', label: 'Designation' },
+                  { id: 'industry', label: 'Industry Sector' },
+                  { id: 'city', label: 'City' }
+                ].map((field) => {
+                  const isChecked = (formData.formFields || ['name', 'email', 'phone', 'company', 'designation']).includes(field.id);
+                  return (
+                    <button
+                      key={field.id}
+                      type="button"
+                      onClick={() => toggleFormField(field.id)}
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all cursor-pointer ${
+                        isChecked
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 shadow-xs'
+                          : 'bg-card border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                      }`}
+                    >
+                      {isChecked ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                      ) : (
+                        <Plus className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0" />
+                      )}
+                      {field.label}
+                      {field.fixed && (
+                        <span className="text-[10px] opacity-75 font-medium ml-0.5">(Required)</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

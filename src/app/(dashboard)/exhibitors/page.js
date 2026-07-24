@@ -58,15 +58,27 @@ export default function ExhibitorsPage() {
     if (!user) return;
     const fetchEvents = async () => {
       try {
-        const url = user.role === 'super_admin'
-          ? `${API_URL}/events`
-          : `${API_URL}/events?organizerId=${user._id}`;
-        const res = await axios.get(url);
-        if (res.data && res.data.success && res.data.data.docs) {
-          setEvents(res.data.data.docs);
-          if (res.data.data.docs.length > 0) {
-            setSelectedEventId(res.data.data.docs[0]._id);
-          }
+        const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+        const orgId = user.organization?._id || user.organization;
+        
+        let url = `${API_URL}/events?limit=100&all=true`;
+        if (user.role !== 'super_admin') {
+          const filterId = orgId || user._id;
+          url = `${API_URL}/events?organizerId=${filterId}&all=true`;
+        }
+
+        let res = await axios.get(url, { headers });
+        let docs = res.data?.data?.docs || [];
+
+        // Fallback: If no events returned for specific organizerId filter, fetch all user accessible events with all=true
+        if (docs.length === 0 && user.role !== 'super_admin') {
+          const fallbackRes = await axios.get(`${API_URL}/events?limit=100&all=true`, { headers });
+          docs = fallbackRes.data?.data?.docs || [];
+        }
+
+        setEvents(docs);
+        if (docs.length > 0) {
+          setSelectedEventId(prev => prev || docs[0]._id);
         }
       } catch (err) {
         console.error('Failed to load events', err);
@@ -74,7 +86,7 @@ export default function ExhibitorsPage() {
       }
     };
     fetchEvents();
-  }, [user]);
+  }, [user, accessToken]);
 
   // 2. Fetch Exhibitors when selected event changes
   useEffect(() => {
@@ -164,6 +176,10 @@ export default function ExhibitorsPage() {
   // 6. Handle Onboarding Form Submit
   const handleOnboardSubmit = async (e) => {
     e.preventDefault();
+    if (!selectedEventId) {
+      alert('Please select an Active Event before onboarding an exhibitor.');
+      return;
+    }
     if (!newExhibitor.name || !newExhibitor.description || !newExhibitor.contactEmail || !newExhibitor.contactPhone) {
       alert('Please fill out all required fields');
       return;
@@ -479,6 +495,21 @@ export default function ExhibitorsPage() {
             <h3 className="text-xl font-bold text-foreground mb-4">Onboard New Exhibitor</h3>
 
             <form onSubmit={handleOnboardSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Target Event *</label>
+                <select
+                  required
+                  value={selectedEventId}
+                  onChange={(e) => setSelectedEventId(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-semibold"
+                >
+                  {events.length === 0 && <option value="">No events found. Please create an event first.</option>}
+                  {events.map(evt => (
+                    <option key={evt._id} value={evt._id}>{evt.title} ({evt.city})</option>
+                  ))}
+                </select>
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Company Name *</label>

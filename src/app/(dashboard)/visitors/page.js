@@ -23,7 +23,8 @@ import {
   X,
   AlertCircle,
   Loader2,
-  Video
+  Video,
+  Trash2
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -186,6 +187,21 @@ export default function VisitorsCRMPage() {
     } catch (err) {
       console.error('Failed to register visitor', err);
       alert('Error: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  // 6. Handle Delete Individual Visitor
+  const handleDeleteVisitor = async (id) => {
+    if (!window.confirm('Are you sure you want to remove this visitor record?')) return;
+    try {
+      const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+      const res = await axios.delete(`${API_URL}/visitors/${id}`, { headers });
+      if (res.data && res.data.success) {
+        setVisitors(prev => prev.filter(v => v._id !== id));
+      }
+    } catch (err) {
+      console.error('Failed to delete visitor', err);
+      alert('Error deleting visitor: ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -402,29 +418,38 @@ export default function VisitorsCRMPage() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {vis.attendanceType === 'in_person' ? (
+                      <div className="flex items-center justify-end gap-2">
+                        {vis.attendanceType === 'in_person' ? (
+                          <button
+                            onClick={() => setSelectedQR({ name: vis.name, qrCode: vis.qrCode, company: vis.company })}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-secondary hover:bg-secondary/80 px-2.5 py-1.5 text-xs font-semibold text-foreground border border-border shadow-sm transition-all"
+                          >
+                            <QrCode className="h-4 w-4 text-muted-foreground" /> View Badge
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => copyJoinLink(vis._id)}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-secondary hover:bg-secondary/80 px-2.5 py-1.5 text-xs font-semibold text-foreground border border-border shadow-sm transition-all"
+                          >
+                            {copiedId === vis._id ? (
+                              <>
+                                <Check className="h-4 w-4 text-emerald-500" /> Copied
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-4 w-4 text-muted-foreground" /> Join Link
+                              </>
+                            )}
+                          </button>
+                        )}
                         <button
-                          onClick={() => setSelectedQR({ name: vis.name, qrCode: vis.qrCode, company: vis.company })}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-secondary hover:bg-secondary/80 px-2.5 py-1.5 text-xs font-semibold text-foreground border border-border shadow-sm transition-all"
+                          onClick={() => handleDeleteVisitor(vis._id)}
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                          title="Remove visitor record"
                         >
-                          <QrCode className="h-4 w-4 text-muted-foreground" /> View Badge
+                          <Trash2 className="h-4 w-4" />
                         </button>
-                      ) : (
-                        <button
-                          onClick={() => copyJoinLink(vis._id)}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-secondary hover:bg-secondary/80 px-2.5 py-1.5 text-xs font-semibold text-foreground border border-border shadow-sm transition-all"
-                        >
-                          {copiedId === vis._id ? (
-                            <>
-                              <Check className="h-4 w-4 text-emerald-500" /> Copied
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-4 w-4 text-muted-foreground" /> Join Link
-                            </>
-                          )}
-                        </button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}

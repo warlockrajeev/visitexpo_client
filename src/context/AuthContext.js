@@ -168,6 +168,7 @@ export const AuthProvider = ({ children }) => {
       login,
       signup,
       logout,
+      updateUser: (updatedUser) => setUser(updatedUser),
       isExhibitorView,
       setIsExhibitorView,
       hasExhibitorProfile

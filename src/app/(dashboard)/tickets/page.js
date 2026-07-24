@@ -34,7 +34,12 @@ import {
   Tag,
   AlertTriangle,
   User,
-  ExternalLink
+  ExternalLink,
+  Eye,
+  Printer,
+  Download,
+  Mail,
+  Phone
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -54,7 +59,8 @@ export default function TicketingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Modals state for Pricing Tiers
+  // Modals state for Pricing Tiers & Order Details
+  const [selectedOrder, setSelectedOrder] = useState(null);
   const [isTierModalOpen, setIsTierModalOpen] = useState(false);
   const [isSimulateModalOpen, setIsSimulateModalOpen] = useState(false);
   const [simulating, setSimulating] = useState(false);
@@ -585,23 +591,31 @@ export default function TicketingPage() {
                           <th className="px-5 py-3.5">Items</th>
                           <th className="px-5 py-3.5">Total</th>
                           <th className="px-5 py-3.5">Payment</th>
+                          <th className="px-5 py-3.5 text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
                         {orders.map((ord) => (
-                          <tr key={ord._id} className="hover:bg-secondary/40 transition-colors">
+                          <tr 
+                            key={ord._id} 
+                            onClick={() => setSelectedOrder(ord)}
+                            className="hover:bg-primary/5 transition-colors cursor-pointer group"
+                            title="Click to view full order details"
+                          >
                             <td className="px-5 py-3.5 font-mono text-xs">
-                              <p className="font-semibold text-foreground">{ord.orderNumber}</p>
+                              <p className="font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-1">
+                                {ord.orderNumber}
+                              </p>
                               <span className="text-[10px] text-muted-foreground">
                                 {new Date(ord.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                               </span>
                             </td>
                             <td className="px-5 py-3.5">
-                              <p className="font-medium text-foreground">{ord.buyer.name}</p>
-                              <span className="text-xs text-muted-foreground">{ord.buyer.email}</span>
+                              <p className="font-medium text-foreground">{ord.buyer?.name}</p>
+                              <span className="text-xs text-muted-foreground">{ord.buyer?.email}</span>
                             </td>
                             <td className="px-5 py-3.5">
-                              {ord.items.map((item, idx) => (
+                              {ord.items?.map((item, idx) => (
                                 <div key={idx} className="text-xs">
                                   <span className="font-medium text-foreground">{item.title}</span>
                                   <span className="text-muted-foreground"> (x{item.quantity})</span>
@@ -609,7 +623,7 @@ export default function TicketingPage() {
                               ))}
                             </td>
                             <td className="px-5 py-3.5 font-bold font-mono text-foreground">
-                              ₹{ord.totalAmount.toLocaleString()}
+                              ₹{ord.totalAmount?.toLocaleString()}
                             </td>
                             <td className="px-5 py-3.5">
                               <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
@@ -622,6 +636,18 @@ export default function TicketingPage() {
                                 {ord.status}
                               </span>
                               <p className="text-[10px] text-muted-foreground mt-0.5 capitalize">{ord.paymentMethod?.replace('_', ' ')}</p>
+                            </td>
+                            <td className="px-5 py-3.5 text-right">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedOrder(ord);
+                                }}
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <Eye className="h-3.5 w-3.5" /> Details
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -1277,6 +1303,185 @@ export default function TicketingPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Order Details Popup Modal */}
+      {selectedOrder && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200"
+          onClick={() => setSelectedOrder(null)}
+        >
+          <div 
+            className="bg-card border border-border rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/20">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                  <Receipt className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-foreground font-mono">
+                      {selectedOrder.orderNumber}
+                    </h3>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide border ${
+                      selectedOrder.status === 'completed'
+                        ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
+                        : selectedOrder.status === 'failed'
+                        ? 'bg-red-500/10 text-red-600 border-red-500/30'
+                        : 'bg-amber-500/10 text-amber-600 border-amber-500/30'
+                    }`}>
+                      {selectedOrder.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Ordered on {new Date(selectedOrder.createdAt).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedOrder(null)}
+                className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6 overflow-y-auto">
+              {/* Event Name Banner */}
+              {events.find(e => e._id === (selectedOrder.event?._id || selectedOrder.event))?.title && (
+                <div className="p-3.5 bg-primary/5 rounded-xl border border-primary/20 flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground font-medium">Target Event</span>
+                  <span className="text-xs font-bold text-foreground">
+                    {events.find(e => e._id === (selectedOrder.event?._id || selectedOrder.event))?.title}
+                  </span>
+                </div>
+              )}
+
+              {/* Customer & Payment Breakdown */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                {/* Customer Details */}
+                <div className="p-4 rounded-xl border border-border bg-background space-y-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5 text-primary" /> Customer Details
+                  </h4>
+                  <div className="space-y-1.5 text-xs">
+                    <p className="font-bold text-foreground text-sm">{selectedOrder.buyer?.name || 'N/A'}</p>
+                    <p className="text-muted-foreground flex items-center gap-1.5">
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground/70" /> {selectedOrder.buyer?.email || 'N/A'}
+                    </p>
+                    {selectedOrder.buyer?.phone && (
+                      <p className="text-muted-foreground flex items-center gap-1.5">
+                        <Phone className="h-3.5 w-3.5 text-muted-foreground/70" /> {selectedOrder.buyer.phone}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Payment Details */}
+                <div className="p-4 rounded-xl border border-border bg-background space-y-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <CreditCard className="h-3.5 w-3.5 text-primary" /> Payment Summary
+                  </h4>
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Method:</span>
+                      <span className="font-semibold text-foreground capitalize">
+                        {selectedOrder.paymentMethod?.replace('_', ' ') || 'Card / UPI'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Transaction ID:</span>
+                      <span className="font-mono text-foreground font-medium text-[11px]">
+                        {selectedOrder.paymentId || selectedOrder._id || 'TXN-94827'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Status:</span>
+                      <span className={`font-semibold capitalize ${
+                        selectedOrder.status === 'completed' ? 'text-emerald-500' : 'text-amber-500'
+                      }`}>
+                        {selectedOrder.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Purchased Ticket Tiers Table */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Ticket className="h-3.5 w-3.5 text-primary" /> Ordered Tickets & Passes
+                </h4>
+                <div className="rounded-xl border border-border overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-muted/30 border-b border-border text-muted-foreground font-semibold uppercase">
+                        <th className="px-4 py-2.5">Pass / Ticket Name</th>
+                        <th className="px-4 py-2.5 text-center">Qty</th>
+                        <th className="px-4 py-2.5 text-right">Unit Price</th>
+                        <th className="px-4 py-2.5 text-right">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border bg-card">
+                      {selectedOrder.items?.map((item, idx) => (
+                        <tr key={idx}>
+                          <td className="px-4 py-3 font-medium text-foreground">
+                            {item.title}
+                          </td>
+                          <td className="px-4 py-3 text-center font-bold font-mono">
+                            x{item.quantity}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-muted-foreground">
+                            {item.price === 0 ? 'FREE' : `₹${item.price?.toLocaleString()}`}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono font-bold text-foreground">
+                            {item.price * item.quantity === 0 ? 'FREE' : `₹${(item.price * item.quantity).toLocaleString()}`}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Grand Total Footer Box */}
+              <div className="p-4 rounded-xl bg-muted/20 border border-border flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Paid Amount</p>
+                  <p className="text-xs text-muted-foreground">Inclusive of taxes & platform service fees</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-2xl font-black font-mono text-primary">
+                    {selectedOrder.totalAmount === 0 ? 'FREE' : `₹${selectedOrder.totalAmount?.toLocaleString()}`}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-border bg-muted/20">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground bg-background hover:bg-muted px-3.5 py-2 rounded-xl border border-border transition-colors cursor-pointer shadow-2xs"
+              >
+                <Printer className="h-4 w-4" /> Print / Download Receipt
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedOrder(null)}
+                className="text-xs font-semibold text-white bg-primary hover:bg-primary/90 px-4.5 py-2 rounded-xl transition-colors cursor-pointer shadow-sm"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -10,6 +10,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
+import { validateEventImage } from '../../../utils/imageValidation.js';
 import {
   Calendar,
   MapPin,
@@ -28,7 +29,11 @@ import {
   Info,
   ShieldCheck,
   Eye,
-  Ticket
+  Ticket,
+  Upload,
+  Image as ImageIcon,
+  CheckCircle2,
+  AlertTriangle
 } from 'lucide-react';
 
 import { renderRichText, RichTextEditor, SPONSOR_TIER_GROUPS, PRESET_SPONSOR_TIERS, CATEGORY_SUBSECTORS } from './wizard/page.js';
@@ -55,6 +60,7 @@ export default function EventsPage() {
     title: '',
     slug: '',
     description: '',
+    banner: '',
     venue: '',
     city: '',
     country: 'India',
@@ -81,6 +87,10 @@ export default function EventsPage() {
     }
   });
 
+  const bannerFileInputRef = React.useRef(null);
+  const [bannerValidation, setBannerValidation] = useState(null);
+  const [isBannerUploading, setIsBannerUploading] = useState(false);
+
   const [newSponsor, setNewSponsor] = useState({ name: '', link: '', logo: '', tier: 'Platinum Sponsor' });
   const [isCustomSponsorTier, setIsCustomSponsorTier] = useState(false);
   const [isCustomIndustry, setIsCustomIndustry] = useState(false);
@@ -90,9 +100,56 @@ export default function EventsPage() {
   const [newFaq, setNewFaq] = useState({ question: '', answer: '' });
   const [newSchedule, setNewSchedule] = useState({ name: '', date: '' });
 
+  const handleBannerUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validation = await validateEventImage(file, 'banner');
+    setBannerValidation(validation);
+
+    if (!validation.isValid) {
+      if (bannerFileInputRef.current) bannerFileInputRef.current.value = '';
+      return;
+    }
+
+    setIsBannerUploading(true);
+    const uploadData = new FormData();
+    uploadData.append('file', file);
+
+    try {
+      const res = await axios.post(`${API_URL}/upload`, uploadData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (res.data && res.data.success) {
+        setEventForm(prev => ({ ...prev, banner: res.data.url }));
+        if (res.data.width && res.data.height) {
+          setBannerValidation(prev => ({
+            ...prev,
+            dimensions: {
+              width: res.data.width,
+              height: res.data.height,
+              aspectRatio: prev?.dimensions?.aspectRatio || `${res.data.width}:${res.data.height}`
+            }
+          }));
+        }
+      }
+    } catch (err) {
+      console.error('Event banner upload error:', err);
+      alert(err.response?.data?.error || 'Failed to upload event banner.');
+    } finally {
+      setIsBannerUploading(false);
+    }
+  };
+
   const handleOrgLogoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const validation = await validateEventImage(file, 'logo');
+    if (!validation.isValid) {
+      alert(validation.error);
+      return;
+    }
 
     setIsUploading(true);
     const uploadData = new FormData();
@@ -116,6 +173,12 @@ export default function EventsPage() {
   const handleSponsorLogoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const validation = await validateEventImage(file, 'logo');
+    if (!validation.isValid) {
+      alert(validation.error);
+      return;
+    }
 
     setIsSponsorUploading(true);
     const uploadData = new FormData();
@@ -317,10 +380,12 @@ export default function EventsPage() {
     setEditMode(false);
     setCurrentEventId(null);
     setIsCustomIndustry(false);
+    setBannerValidation(null);
     setEventForm({
       title: '',
       slug: '',
       description: '',
+      banner: '',
       venue: '',
       city: '',
       country: 'India',
@@ -351,6 +416,7 @@ export default function EventsPage() {
   const openEditModal = async (event) => {
     setEditMode(true);
     setCurrentEventId(event._id);
+    setBannerValidation(null);
     
     // Format dates for input tags (YYYY-MM-DD)
     const fmtStartDate = event.startDate ? new Date(event.startDate).toISOString().split('T')[0] : '';
@@ -383,6 +449,7 @@ export default function EventsPage() {
       title: event.title,
       slug: event.slug,
       description: event.description,
+      banner: event.banner || '',
       venue: event.venue,
       city: event.city,
       country: event.country || 'India',
@@ -795,6 +862,89 @@ export default function EventsPage() {
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="global-tech-expo-2026"
                   />
+                </div>
+              </div>
+
+              {/* Event Main Banner / Cover Image Upload Zone */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-muted-foreground uppercase">
+                    Event Banner Cover (Recommended: 1920 × 1080 px | Min: 1200 × 630 px)
+                  </label>
+                  {bannerValidation?.dimensions && eventForm.banner && (
+                    <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                      bannerValidation.qualityScore === 'optimal'
+                        ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
+                        : 'bg-amber-500/10 text-amber-600 border-amber-500/30'
+                    }`}>
+                      <CheckCircle2 className="h-3 w-3" />
+                      {bannerValidation.dimensions.width} × {bannerValidation.dimensions.height} px
+                    </span>
+                  )}
+                </div>
+
+                {bannerValidation?.error && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-600 text-xs flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="font-bold">Image Resolution Rejected: </strong>
+                      {bannerValidation.error}
+                    </div>
+                  </div>
+                )}
+
+                {bannerValidation?.warning && eventForm.banner && (
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-600 text-xs flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="font-semibold">Quality Recommendation: </strong>
+                      {bannerValidation.warning}
+                    </div>
+                  </div>
+                )}
+
+                <div 
+                  onClick={() => bannerFileInputRef.current?.click()}
+                  className="relative rounded-xl border-2 border-dashed border-border p-4 bg-muted/10 text-center hover:border-primary transition-colors cursor-pointer"
+                >
+                  <input
+                    type="file"
+                    ref={bannerFileInputRef}
+                    onChange={handleBannerUpload}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  {isBannerUploading ? (
+                    <div className="py-6 text-center text-xs text-muted-foreground flex flex-col items-center gap-2 justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" /> Uploading event banner to Cloudinary...
+                    </div>
+                  ) : eventForm.banner ? (
+                    <div className="relative h-36 w-full rounded-lg overflow-hidden shadow-sm group">
+                      <img src={eventForm.banner} alt="Event Banner Preview" className="h-full w-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-xs font-bold text-white bg-black/60 px-3 py-1.5 rounded-lg border border-white/20">
+                          Change Banner Image
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEventForm(prev => ({ ...prev, banner: '' }));
+                            setBannerValidation(null);
+                          }}
+                          className="text-xs font-bold text-white bg-red-600/80 hover:bg-red-600 px-3 py-1.5 rounded-lg border border-white/20"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1 py-3">
+                      <Upload className="mx-auto h-7 w-7 text-muted-foreground/60" />
+                      <p className="text-xs font-semibold text-foreground">Click to upload event banner cover image</p>
+                      <p className="text-[11px] text-muted-foreground">PNG, JPG, WebP (Min 1200×630px, Rec 1920×1080px up to 10MB)</p>
+                    </div>
+                  )}
                 </div>
               </div>
 

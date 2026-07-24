@@ -8,6 +8,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
+import { validateEventImage } from '../../../utils/imageValidation.js';
 import {
   Settings,
   Building,
@@ -26,14 +27,16 @@ import {
   ShieldCheck,
   Upload,
   Share2,
-  Loader2
+  Loader2,
+  Trash2
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function SettingsPage() {
-  const { user, accessToken } = useAuth();
+  const { user, accessToken, updateUser } = useAuth();
   const fileInputRef = useRef(null);
+  const [logoValidation, setLogoValidation] = useState(null);
 
   const [activeTab, setActiveTab] = useState('profile'); // profile, security, api
   const [copiedKey, setCopiedKey] = useState(false);
@@ -103,6 +106,16 @@ export default function SettingsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const validation = await validateEventImage(file, 'logo');
+    setLogoValidation(validation);
+
+    if (!validation.isValid) {
+      setErrorMessage(validation.error);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setTimeout(() => setErrorMessage(''), 5000);
+      return;
+    }
+
     setIsUploadingLogo(true);
     setSaveSuccess('');
     setErrorMessage('');
@@ -111,9 +124,11 @@ export default function SettingsPage() {
     uploadData.append('file', file);
 
     try {
-      const res = await axios.post(`${API_URL}/upload`, uploadData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const headers = {
+        'Content-Type': 'multipart/form-data',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+      };
+      const res = await axios.post(`${API_URL}/upload`, uploadData, { headers });
       if (res.data && res.data.success) {
         setOrgForm(prev => ({ ...prev, logoUrl: res.data.url }));
         setSaveSuccess('Logo uploaded! Click "Save Organizer Profile" to persist changes.');
@@ -125,6 +140,7 @@ export default function SettingsPage() {
       setTimeout(() => setErrorMessage(''), 4000);
     } finally {
       setIsUploadingLogo(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -157,6 +173,9 @@ export default function SettingsPage() {
       );
 
       if (res.data && res.data.success) {
+        if (res.data.user && updateUser) {
+          updateUser(res.data.user);
+        }
         setSaveSuccess('Organizer profile details updated and saved successfully!');
         setTimeout(() => setSaveSuccess(''), 4000);
       }
@@ -240,7 +259,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-1.5 rounded-full text-xs font-bold text-emerald-500 w-fit">
-          <ShieldCheck className="h-4 w-4" /> Verified 10times Organizer
+          <ShieldCheck className="h-4 w-4" /> Verified Organizer
         </div>
       </div>
 
@@ -301,30 +320,67 @@ export default function SettingsPage() {
                 className="hidden"
               />
 
-              {/* Logo Upload Box */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-muted-foreground uppercase">Organization Brand Logo</label>
-                <div className="flex items-center gap-4">
-                  <div className="h-20 w-20 rounded-2xl border border-border bg-muted overflow-hidden flex items-center justify-center shadow-sm relative">
+              {/* Logo Upload & URL Box */}
+              <div className="space-y-3 p-4 border border-border rounded-2xl bg-muted/10">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-muted-foreground uppercase">
+                    Organization Brand Logo (Min: 100 × 100 px | Rec: 400 × 400 px)
+                  </label>
+                  {logoValidation?.dimensions && orgForm.logoUrl && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/30">
+                      <CheckCircle2 className="h-3 w-3" />
+                      {logoValidation.dimensions.width} × {logoValidation.dimensions.height} px
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div className="h-20 w-20 shrink-0 rounded-2xl border border-border bg-card overflow-hidden flex items-center justify-center shadow-sm relative">
                     {isUploadingLogo ? (
                       <Loader2 className="h-6 w-6 animate-spin text-primary" />
                     ) : orgForm.logoUrl ? (
-                      <img src={orgForm.logoUrl} alt="Logo" className="h-full w-full object-contain p-1" />
+                      <img src={orgForm.logoUrl} alt="Organization Logo" className="h-full w-full object-contain p-1" />
                     ) : (
                       <Building className="h-8 w-8 text-muted-foreground" />
                     )}
                   </div>
-                  <div className="space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploadingLogo}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-xs font-bold text-foreground transition-colors disabled:opacity-50"
-                    >
-                      {isUploadingLogo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                      Upload Brand Logo
-                    </button>
-                    <p className="text-[10px] text-muted-foreground">Square PNG/JPG, recommended 400x400 px.</p>
+
+                  <div className="flex-1 space-y-2 w-full">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingLogo}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-primary text-primary-foreground hover:bg-primary/90 px-3.5 py-2 text-xs font-bold transition-all shadow-sm disabled:opacity-50"
+                      >
+                        {isUploadingLogo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                        Upload Logo File
+                      </button>
+
+                      {orgForm.logoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOrgForm(prev => ({ ...prev, logoUrl: '' }));
+                            setLogoValidation(null);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white px-3.5 py-2 text-xs font-bold transition-all"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Remove
+                        </button>
+                      )}
+                    </div>
+
+                    <div>
+                      <input
+                        type="text"
+                        value={orgForm.logoUrl}
+                        onChange={(e) => setOrgForm(prev => ({ ...prev, logoUrl: e.target.value }))}
+                        placeholder="https://example.com/logo.png (or click Upload above)"
+                        className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
