@@ -2,107 +2,74 @@
 
 /**
  * @file page.js
- * @description Clean, minimalist light-themed SaaS landing page for VisitExpo matching the user's reference design.
+ * @description Minimalist, high-end Event Management & Expo Discovery Platform Landing Page for VisitExpo.
+ * Fetches events directly from the WordPress website (visitexpo.in).
+ * Palette: Pure White canvas, VisitExpo Yellow (#FFCC00), and vibrant Pink (#FF2E63).
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext.js';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Sparkles,
-  ShieldCheck,
-  ArrowRight,
-  Check,
-  CheckCircle2,
-  Calendar,
-  Users,
-  Building,
-  Target,
-  Mail,
-  Ticket,
   Search,
-  HelpCircle,
+  Calendar,
+  MapPin,
+  ArrowRight,
+  Ticket,
   ChevronDown,
-  Activity,
-  Zap,
+  Phone,
+  MessageCircle,
+  Mail,
+  CheckCircle,
+  Building,
+  Store,
+  Layers,
+  ExternalLink,
   Globe,
-  Lock,
-  ArrowRightLeft,
-  Settings,
-  TrendingUp,
-  Download
+  Loader2
 } from 'lucide-react';
+import axios from 'axios';
 
-// Brand SVG Logo matching the yellow/black logo
-const Logo = ({ className = "w-10 h-10" }) => (
+// VisitExpo Circular Logo
+const Logo = ({ className = "w-9 h-9" }) => (
   <svg viewBox="0 0 100 100" className={className} xmlns="http://www.w3.org/2000/svg">
-    <circle cx="50" cy="50" r="48" fill="#FFCC00" stroke="#000000" strokeWidth="0.5" />
-    <text x="50" y="32" textAnchor="middle" fill="#000" fontSize="13" fontWeight="bold" fontFamily="system-ui, sans-serif" letterSpacing="0.2">visit</text>
-    <text x="50" y="60" textAnchor="middle" fill="#000" fontSize="26" fontWeight="950" fontFamily="system-ui, sans-serif" fontStyle="italic" letterSpacing="-1">EXPO</text>
-    <text x="50" y="78" textAnchor="middle" fill="#000" fontSize="8" fontWeight="600" fontFamily="system-ui, sans-serif" letterSpacing="0.5">visitexpo.in</text>
+    <circle cx="50" cy="50" r="48" fill="#FFCC00" stroke="#000000" strokeWidth="1" />
+    <text x="50" y="32" textAnchor="middle" fill="#000" fontSize="13" fontWeight="bold" fontFamily="system-ui, sans-serif">visit</text>
+    <text x="50" y="60" textAnchor="middle" fill="#000" fontSize="26" fontWeight="950" fontFamily="system-ui, sans-serif" fontStyle="italic">EXPO</text>
+    <text x="50" y="78" textAnchor="middle" fill="#000" fontSize="8" fontWeight="600" fontFamily="system-ui, sans-serif">visitexpo.in</text>
   </svg>
 );
-
-// Wavy underline effect for titles mimicking the hand-drawn style in the reference
-const WavyUnderline = ({ text, className = "text-amber-500" }) => (
-  <span className="relative inline-block whitespace-nowrap">
-    <span className="relative z-10">{text}</span>
-    <svg className="absolute left-0 bottom-[-6px] w-full h-[8px] z-0" viewBox="0 0 100 10" preserveAspectRatio="none">
-      <path
-        d="M0,5 Q12.5,0 25,5 T50,5 T75,5 T100,5"
-        fill="none"
-        stroke="#FFCC00"
-        strokeWidth="3.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  </span>
-);
-
-// Professional startup/collaboration illustration image
-const HeroIllustration = () => (
-  <div className="relative w-full h-auto flex items-center justify-center overflow-hidden">
-    <img
-      src="/exhibition_digitalization_yellow.png"
-      alt="Exhibition Digitalization Platform"
-      className="w-full h-auto object-cover"
-    />
-  </div>
-);
-
-const MOCK_PREVIEW_EVENTS = [
-  { title: '11th Asian Australian Rotorcraft Forum', city: 'Chennai', venue: 'IIT Madras', category: 'Aeronautics' },
-  { title: '6th EV India Expo 2026', city: 'Greater Noida', venue: 'India Expo Mart', category: 'Automotive' },
-  { title: '15th Cement Expo 2025', city: 'New Delhi', venue: 'Pragati Maidan', category: 'Industrial' },
-  { title: '16th Mega Cargo Show 2026', city: 'Mumbai', venue: 'Bandra Kurla Complex', category: 'Logistics' }
-];
-
-const MOCK_PREVIEW_Solutions = [
-  { title: 'Exhibitor Hub', desc: 'Custom portals for self-service staff badge setup & catalogues.' },
-  { title: 'Lead Flow CRM', desc: 'Qualified visitor details and scoring filters ready to download.' },
-  { title: 'Setup Wizard', desc: 'Deploy floor plans, session configurations, and tickets in minutes.' }
-];
 
 export default function LandingPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  // Navigation / Accordion states
-  const [activeFaq, setActiveFaq] = useState(null);
-  const [billingCycle, setBillingCycle] = useState('monthly'); 
-  
-  // Interactive Simulator States
-  const [demoSearch, setDemoSearch] = useState('');
-  const [selectedDemoEvent, setSelectedDemoEvent] = useState(null);
-  const [demoClaimStep, setDemoClaimStep] = useState(0); 
+  // WordPress Events State
+  const [events, setEvents] = useState([]);
+  const [isFetchingWp, setIsFetchingWp] = useState(true);
+  const [wpSource, setWpSource] = useState('wordpress_direct');
 
-  // Dashboard Preview Mock Tab
-  const [activePreviewTab, setActivePreviewTab] = useState('analytics');
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCity, setSelectedCity] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [activeCategoryTab, setActiveCategoryTab] = useState('all');
+  const [quickFilter, setQuickFilter] = useState('all');
 
-  // Interactive Floorplan Mock State
-  const [selectedBooth, setSelectedBooth] = useState(null);
+  // Claim Quick Search State
+  const [claimSearch, setClaimSearch] = useState('');
+
+  // Contact Form State
+  const [contactRole, setContactRole] = useState('Organizer');
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
+  const [contactSubmitted, setContactSubmitted] = useState(false);
+
+  // FAQ State
+  const [openFaq, setOpenFaq] = useState(null);
 
   // Redirect if logged in
   useEffect(() => {
@@ -111,796 +78,709 @@ export default function LandingPage() {
     }
   }, [user, loading, router]);
 
-  const filteredDemoEvents = MOCK_PREVIEW_EVENTS.filter(evt =>
-    evt.title.toLowerCase().includes(demoSearch.toLowerCase()) ||
-    evt.city.toLowerCase().includes(demoSearch.toLowerCase())
-  );
+  // Fetch events directly from WordPress website via route handler
+  useEffect(() => {
+    const fetchWordPressEvents = async () => {
+      setIsFetchingWp(true);
+      try {
+        const res = await axios.get('/api/wordpress-events');
+        if (res.data?.success && Array.isArray(res.data?.events) && res.data.events.length > 0) {
+          setEvents(res.data.events);
+          setWpSource(res.data.source || 'wordpress_direct');
+        }
+      } catch (err) {
+        console.error('Failed to fetch WordPress events:', err);
+      } finally {
+        setIsFetchingWp(false);
+      }
+    };
+    fetchWordPressEvents();
+  }, []);
 
-  const toggleFaq = (index) => {
-    setActiveFaq(activeFaq === index ? null : index);
+  // Distinct cities list from live WordPress events
+  const availableCities = useMemo(() => {
+    const set = new Set();
+    events.forEach(e => {
+      if (e.city && e.city !== 'India') set.add(e.city);
+    });
+    return Array.from(set);
+  }, [events]);
+
+  // Distinct categories list from live WordPress events
+  const availableCategories = useMemo(() => {
+    const set = new Set();
+    events.forEach(e => {
+      if (e.category) set.add(e.category);
+    });
+    return Array.from(set);
+  }, [events]);
+
+  // Filtered Events
+  const filteredEvents = useMemo(() => {
+    return events.filter((item) => {
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const matches =
+          item.title?.toLowerCase().includes(q) ||
+          item.category?.toLowerCase().includes(q) ||
+          item.city?.toLowerCase().includes(q) ||
+          item.venue?.toLowerCase().includes(q) ||
+          item.description?.toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+      if (selectedCity && selectedCity !== 'All Cities') {
+        if (!item.city?.toLowerCase().includes(selectedCity.toLowerCase()) && !item.venue?.toLowerCase().includes(selectedCity.toLowerCase())) {
+          return false;
+        }
+      }
+      if (selectedCategory && selectedCategory !== 'All Categories') {
+        if (!item.category?.toLowerCase().includes(selectedCategory.toLowerCase())) {
+          return false;
+        }
+      }
+      if (activeCategoryTab !== 'all') {
+        if (activeCategoryTab === 'automotive' && !item.category?.toLowerCase().includes('auto')) return false;
+        if (activeCategoryTab === 'logistics' && !item.category?.toLowerCase().includes('logistics') && !item.category?.toLowerCase().includes('cargo')) return false;
+        if (activeCategoryTab === 'aerospace' && !item.category?.toLowerCase().includes('aero') && !item.category?.toLowerCase().includes('aviation')) return false;
+        if (activeCategoryTab === 'healthcare' && !item.category?.toLowerCase().includes('health')) return false;
+        if (activeCategoryTab === 'tech' && !item.category?.toLowerCase().includes('tech') && !item.category?.toLowerCase().includes('ai')) return false;
+        if (activeCategoryTab === 'construction' && !item.category?.toLowerCase().includes('construct') && !item.category?.toLowerCase().includes('infra')) return false;
+      }
+      if (quickFilter === 'upcoming' && !item.upcoming) return false;
+      if (quickFilter === 'featured' && !item.featured) return false;
+      if (quickFilter === 'free' && !item.entryType?.toLowerCase().includes('free')) return false;
+
+      return true;
+    });
+  }, [events, searchQuery, selectedCity, selectedCategory, activeCategoryTab, quickFilter]);
+
+  // Claim filtered events
+  const claimMatches = useMemo(() => {
+    if (!claimSearch.trim()) return [];
+    const q = claimSearch.toLowerCase();
+    return events.filter(e => e.title?.toLowerCase().includes(q) || e.venue?.toLowerCase().includes(q)).slice(0, 5);
+  }, [events, claimSearch]);
+
+  const handleContactSubmit = (e) => {
+    e.preventDefault();
+    setContactSubmitted(true);
+  };
+
+  const toggleFaq = (idx) => {
+    setOpenFaq(openFaq === idx ? null : idx);
   };
 
   if (loading) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-white text-zinc-400">
-        <div className="flex flex-col items-center gap-3">
-          <Logo className="h-16 w-16 animate-pulse" />
-          <p className="text-xs font-semibold tracking-widest text-zinc-500 uppercase animate-pulse">Initializing Portal...</p>
-        </div>
+      <div className="flex h-screen w-screen items-center justify-center bg-white">
+        <Logo className="h-12 w-12 animate-pulse" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white text-zinc-900 selection:bg-primary selection:text-primary-foreground font-sans relative overflow-hidden">
-      
-      {/* HEADER SECTION (Matching reference) */}
-      <header className="sticky top-0 z-50 bg-white border-b border-zinc-100 transition-all">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3.5">
-            <Logo className="h-12 w-12" />
-            <div className="flex items-center gap-2 font-sans">
-              <span className="text-xl font-black tracking-tight text-zinc-900">
-                Visit<span className="text-amber-500">Expo</span>
-              </span>
-              <span className="text-zinc-300 text-sm">/</span>
-              <span className="text-[11px] text-zinc-500 font-bold tracking-tight">A visitexpo.in Product</span>
-            </div>
-          </div>
+    <div className="min-h-screen bg-white text-zinc-900 font-sans antialiased selection:bg-[#FF2E63] selection:text-white">
 
-          <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-zinc-650">
-            <a href="#about" className="hover:text-amber-500 transition-colors relative py-1">
-              About us
-              <div className="absolute bottom-0 left-0 w-full h-[2.5px] bg-amber-500 rounded-full" />
-            </a>
-            <a href="#features" className="hover:text-amber-500 transition-colors py-1">Solution</a>
-            <a href="#demo" className="hover:text-amber-500 transition-colors py-1">Project Claim</a>
-            <a href="#faq" className="hover:text-amber-500 transition-colors py-1">Contact us</a>
+      {/* ========================================================================= */}
+      {/* 1. HEADER                                                                 */}
+      {/* ========================================================================= */}
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-zinc-150">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-2.5">
+            <Logo className="h-8 w-8" />
+            <span className="font-extrabold text-lg tracking-tight text-zinc-900">
+              Visit<span className="text-amber-500">Expo</span>
+            </span>
+          </Link>
+
+          {/* Navigation Links */}
+          <nav className="hidden md:flex items-center gap-6 text-xs font-semibold text-zinc-600">
+            <a href="#events" className="hover:text-zinc-900 transition-colors">Explore Events</a>
+            <Link href="/onboarding/organizer" className="hover:text-zinc-900 transition-colors">For Organizers</Link>
+            <Link href="/onboarding/exhibitor" className="hover:text-zinc-900 transition-colors">For Exhibitors</Link>
+            <a href="#claim" className="hover:text-zinc-900 transition-colors">Claim Listing</a>
+            <a href="#contact" className="hover:text-zinc-900 transition-colors">Contact</a>
           </nav>
 
+          {/* Actions */}
           <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="text-xs sm:text-sm font-bold text-zinc-500 hover:text-zinc-900 px-3 py-2 transition-colors"
+              className="text-xs font-semibold text-zinc-600 hover:text-zinc-900 px-3 py-1.5 transition-colors"
             >
               Sign In
             </Link>
             <Link
               href="/login?signup=true"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/95 text-primary-foreground font-extrabold px-5 py-2.5 text-xs sm:text-sm transition-all shadow-md shadow-primary/10"
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold px-4 py-2 text-xs transition-colors shadow-xs"
             >
-              Register Portal <ArrowRight className="h-4 w-4" />
+              <span>Get Started</span>
+              <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
         </div>
       </header>
 
-      {/* HERO SECTION (Matching reference illustration & style) */}
-      <section id="about" className="relative pt-12 pb-20 md:pt-20 md:pb-28 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid md:grid-cols-12 gap-12 items-center">
+      {/* ========================================================================= */}
+      {/* 2. HERO SECTION & UNIFIED SEARCH PILL                                     */}
+      {/* ========================================================================= */}
+      <section className="pt-14 pb-16 md:pt-20 md:pb-24 border-b border-zinc-100 bg-gradient-to-b from-white via-zinc-50/40 to-white">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center space-y-6">
           
-          {/* Left Column Text */}
-          <div className="md:col-span-7 space-y-6 text-left">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-zinc-900 tracking-tight leading-[1.1]">
-              VisitExpo is a new generation <br className="hidden lg:inline" />
-              <WavyUnderline text="Digitalization of exhibitions" /> <br />
-              Solution provider
-            </h1>
+          {/* WordPress Live Sync Badge */}
+          <div className="inline-flex items-center gap-2 rounded-full bg-zinc-100 px-3.5 py-1 text-xs font-medium text-zinc-700">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>
+              Connected to <strong className="text-zinc-900">visitexpo.in</strong>
+              {events.length > 0 && ` • ${events.length} Live WordPress Events`}
+            </span>
+          </div>
 
-            <p className="text-zinc-500 text-sm sm:text-base md:text-lg leading-relaxed max-w-2xl font-medium">
-              We provide exhibition organizers with a suite of digital tools to quickly deploy private digital platforms, efficiently manage exhibition data, and ensure that visitors and exhibitors receive a high-quality digital experience, thereby empowering exhibitions.
-            </p>
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-zinc-900 leading-tight">
+            Discover Upcoming Trade Shows &amp; Exhibitions in <span className="text-amber-500">India</span> &amp; <span className="text-[#FF2E63]">Worldwide</span>
+          </h1>
 
-            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+          <p className="text-sm sm:text-base text-zinc-600 max-w-2xl mx-auto leading-relaxed">
+            Experience expos like never before — in-person or virtually. Connect directly with event organizers, book verified exhibitor booths, and register for digital passes.
+          </p>
+
+          {/* Unified Search Pill Bar */}
+          <div className="pt-4 max-w-4xl mx-auto">
+            <div className="bg-white rounded-2xl md:rounded-full p-2 border border-zinc-200 shadow-lg shadow-zinc-100 flex flex-col md:flex-row md:items-center gap-2">
+              
+              {/* Keyword Input */}
+              <div className="flex-1 px-3 py-1.5 flex items-center gap-2 md:border-r border-zinc-200">
+                <Search className="h-4 w-4 text-zinc-400 shrink-0" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search live events from visitexpo.in..."
+                  className="w-full text-xs font-medium text-zinc-800 placeholder:text-zinc-400 bg-transparent focus:outline-none"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="text-zinc-400 hover:text-zinc-600 text-xs">✕</button>
+                )}
+              </div>
+
+              {/* Location Select (Live from WP) */}
+              <div className="px-3 py-1.5 md:border-r border-zinc-200 min-w-[140px]">
+                <select
+                  value={selectedCity}
+                  onChange={(e) => setSelectedCity(e.target.value)}
+                  className="w-full text-xs font-medium text-zinc-700 bg-transparent focus:outline-none cursor-pointer"
+                >
+                  <option value="">All Cities ▾</option>
+                  {availableCities.map(city => (
+                    <option key={city} value={city}>{city}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Category Select (Live from WP) */}
+              <div className="px-3 py-1.5 min-w-[160px]">
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="w-full text-xs font-medium text-zinc-700 bg-transparent focus:outline-none cursor-pointer"
+                >
+                  <option value="">All Categories ▾</option>
+                  {availableCategories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Search Button */}
+              <a
+                href="#events"
+                className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[#FF2E63] hover:bg-[#E82054] text-white font-bold px-6 py-2.5 text-xs transition-colors shadow-sm"
+              >
+                <Search className="h-3.5 w-3.5" />
+                <span>Search</span>
+              </a>
+
+            </div>
+
+            {/* Quick Pills */}
+            <div className="pt-4 flex flex-wrap items-center justify-center gap-2 text-xs font-medium text-zinc-600">
+              <span className="text-zinc-400 mr-1">Quick browse:</span>
+              <button
+                onClick={() => setQuickFilter(quickFilter === 'upcoming' ? 'all' : 'upcoming')}
+                className={`px-3 py-1 rounded-full border transition-colors ${
+                  quickFilter === 'upcoming' ? 'bg-amber-50 border-amber-300 text-amber-900 font-bold' : 'bg-white border-zinc-200 hover:bg-zinc-50'
+                }`}
+              >
+                Upcoming
+              </button>
+              <button
+                onClick={() => setQuickFilter(quickFilter === 'featured' ? 'all' : 'featured')}
+                className={`px-3 py-1 rounded-full border transition-colors ${
+                  quickFilter === 'featured' ? 'bg-pink-50 border-pink-300 text-[#FF2E63] font-bold' : 'bg-white border-zinc-200 hover:bg-zinc-50'
+                }`}
+              >
+                Featured
+              </button>
+              <button
+                onClick={() => setQuickFilter(quickFilter === 'free' ? 'all' : 'free')}
+                className={`px-3 py-1 rounded-full border transition-colors ${
+                  quickFilter === 'free' ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-bold' : 'bg-white border-zinc-200 hover:bg-zinc-50'
+                }`}
+              >
+                Free Passes
+              </button>
+              {(searchQuery || selectedCity || selectedCategory || quickFilter !== 'all' || activeCategoryTab !== 'all') && (
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedCity('');
+                    setSelectedCategory('');
+                    setQuickFilter('all');
+                    setActiveCategoryTab('all');
+                  }}
+                  className="text-xs text-[#FF2E63] font-bold hover:underline ml-2"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* 3. THREE PERSONA ONBOARDING CARDS                                         */}
+      {/* ========================================================================= */}
+      <section className="py-16 max-w-6xl mx-auto px-4 sm:px-6">
+        <div className="text-center max-w-2xl mx-auto mb-10 space-y-2">
+          <h2 className="text-2xl font-bold tracking-tight text-zinc-900">How would you like to participate?</h2>
+          <p className="text-xs sm:text-sm text-zinc-500">VisitExpo bridges organizers, exhibitors, and trade visitors on a single platform.</p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6">
+          
+          {/* Organizers Card */}
+          <div className="bg-white border border-zinc-200 rounded-2xl p-6 flex flex-col justify-between hover:border-amber-400 transition-colors shadow-xs">
+            <div className="space-y-3">
+              <div className="h-10 w-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-200">
+                <Building className="h-5 w-5" />
+              </div>
+              <h3 className="text-base font-bold text-zinc-900">For Organizers</h3>
+              <p className="text-xs text-zinc-600 leading-relaxed">
+                Claim your pre-loaded exhibition listing from visitexpo.in, configure tickets, publish interactive booth maps, and sync attendees in real-time.
+              </p>
+            </div>
+            <div className="pt-6">
               <Link
                 href="/onboarding/organizer"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-extrabold px-8 py-4 text-sm transition-all shadow-lg"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-600 hover:text-amber-700"
               >
-                Schedule a demonstration
+                <span>Onboard as Organizer</span>
+                <ArrowRight className="h-3.5 w-3.5" />
               </Link>
-              <a
-                href="#demo"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 px-6 py-4 text-sm font-bold text-zinc-650 transition-all hover:text-zinc-900"
+            </div>
+          </div>
+
+          {/* Exhibitors Card */}
+          <div className="bg-white border border-zinc-200 rounded-2xl p-6 flex flex-col justify-between hover:border-pink-300 transition-colors shadow-xs">
+            <div className="space-y-3">
+              <div className="h-10 w-10 rounded-xl bg-pink-50 text-[#FF2E63] flex items-center justify-center border border-pink-200">
+                <Store className="h-5 w-5" />
+              </div>
+              <h3 className="text-base font-bold text-zinc-900">For Exhibitors</h3>
+              <p className="text-xs text-zinc-600 leading-relaxed">
+                Reserve prime booth spaces, manage your digital product catalog, register booth staff, and scan visitor leads via QR.
+              </p>
+            </div>
+            <div className="pt-6">
+              <Link
+                href="/onboarding/exhibitor"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-[#FF2E63] hover:text-[#E82054]"
               >
-                Claim Live Directory Portal &rarr;
+                <span>Register as Exhibitor</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          </div>
+
+          {/* Visitors Card */}
+          <div className="bg-white border border-zinc-200 rounded-2xl p-6 flex flex-col justify-between hover:border-zinc-300 transition-colors shadow-xs">
+            <div className="space-y-3">
+              <div className="h-10 w-10 rounded-xl bg-zinc-100 text-zinc-700 flex items-center justify-center border border-zinc-200">
+                <Ticket className="h-5 w-5" />
+              </div>
+              <h3 className="text-base font-bold text-zinc-900">For Visitors &amp; Buyers</h3>
+              <p className="text-xs text-zinc-600 leading-relaxed">
+                Discover upcoming trade exhibitions across India and worldwide, get free visitor badges, and schedule B2B meetings.
+              </p>
+            </div>
+            <div className="pt-6">
+              <a
+                href="#events"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-800 hover:text-zinc-950"
+              >
+                <span>Browse Free Passes</span>
+                <ArrowRight className="h-3.5 w-3.5" />
               </a>
             </div>
           </div>
 
-          {/* Right Column Illustration */}
-          <div className="md:col-span-5 flex items-center justify-center">
-            <HeroIllustration />
-          </div>
-
         </div>
       </section>
 
-      {/* SECOND HEADER (Matching reference underline style) */}
-      <section className="py-12 bg-zinc-50/40 border-y border-zinc-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-2xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight">
-            We are for many <WavyUnderline text="Professional exhibition organizers" /> Empower
-          </h2>
-        </div>
-      </section>
-
-      {/* PLATFORM FEATURES SOLUTION SECTION */}
-      <section id="features" className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
-        <div className="grid md:grid-cols-3 gap-8">
-          {MOCK_PREVIEW_Solutions.map((sol, idx) => (
-            <div key={idx} className="p-8 rounded-2xl border border-zinc-200 bg-white hover:border-zinc-300 shadow-sm hover:shadow-md transition-all duration-300 space-y-3 group">
-              <div className="h-10 w-10 rounded-xl bg-primary/10 text-zinc-900 flex items-center justify-center border border-primary/15 shadow-sm group-hover:scale-105 transition-transform">
-                {idx === 0 ? <Building className="h-5 w-5 text-amber-600" /> : idx === 1 ? <Target className="h-5 w-5 text-amber-600" /> : <Settings className="h-5 w-5 text-amber-600" />}
-              </div>
-              <h3 className="text-lg font-bold text-zinc-900 group-hover:text-amber-500 transition-colors">{sol.title}</h3>
-              <p className="text-xs text-zinc-500 leading-relaxed">{sol.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* SAAS PRODUCT UI INTERACTIVE PREVIEW */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 relative">
-        <div className="relative rounded-2xl border border-zinc-200/80 bg-zinc-50/50 p-4 sm:p-5 shadow-2xl shadow-zinc-200/40 overflow-hidden">
+      {/* ========================================================================= */}
+      {/* 4. LIVE WORDPRESS EVENT DIRECTORY GRID                                    */}
+      {/* ========================================================================= */}
+      <section id="events" className="py-16 bg-zinc-50/50 border-t border-zinc-200">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
           
-          <div className="flex items-center justify-between pb-3 border-b border-zinc-200/80 mb-4 text-xs font-bold text-zinc-400">
-            <div className="flex items-center gap-1.5">
-              <div className="h-3 w-3 rounded-full bg-red-400" />
-              <div className="h-3 w-3 rounded-full bg-yellow-400" />
-              <div className="h-3 w-3 rounded-full bg-emerald-400" />
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-2xl font-bold tracking-tight text-zinc-900">Featured Exhibitions</h2>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
+                  Live WordPress Feed
+                </span>
+              </div>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                Showing {filteredEvents.length} events directly from <strong className="text-zinc-800">visitexpo.in</strong>
+              </p>
             </div>
-            <div className="flex items-center gap-1 text-[10px] tracking-wide uppercase bg-zinc-200/40 border border-zinc-200/60 px-3 py-1 rounded-lg">
-              <Lock className="h-3 w-3 text-zinc-450" /> visitexpo-dashboard/organizer-portal
+
+            {/* Category Filter Tabs */}
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              {[
+                { id: 'all', label: 'All' },
+                { id: 'automotive', label: 'EV & Automotive' },
+                { id: 'tech', label: 'Tech & AI' },
+                { id: 'construction', label: 'Construction & Infra' },
+                { id: 'logistics', label: 'Logistics' },
+                { id: 'healthcare', label: 'Healthcare' }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveCategoryTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg font-semibold transition-colors ${
+                    activeCategoryTab === tab.id
+                      ? 'bg-zinc-900 text-white'
+                      : 'bg-white text-zinc-600 hover:bg-zinc-100 border border-zinc-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-            <span className="hidden sm:inline">VisitExpo SaaS</span>
           </div>
 
-          <div className="grid md:grid-cols-12 gap-5 min-h-[380px] bg-white border border-zinc-200 rounded-xl overflow-hidden">
-            
-            {/* Sidebar */}
-            <div className="md:col-span-3 bg-zinc-50/80 border-r border-zinc-200/80 p-3 space-y-4 text-xs font-semibold text-zinc-500">
-              <div className="flex items-center gap-2 px-2 py-1">
-                <Logo className="h-7 w-7" />
-                <span className="font-extrabold text-zinc-800">VisitExpo Dashboard</span>
-              </div>
-
-              <div className="space-y-1">
-                <button
-                  onClick={() => setActivePreviewTab('analytics')}
-                  className={`flex w-full items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                    activePreviewTab === 'analytics' ? 'bg-primary text-primary-foreground font-bold shadow-sm' : 'hover:bg-zinc-200/50 hover:text-zinc-800'
-                  }`}
-                >
-                  <TrendingUp className="h-4 w-4" /> Analytics Overview
-                </button>
-                <button
-                  onClick={() => setActivePreviewTab('leads')}
-                  className={`flex w-full items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                    activePreviewTab === 'leads' ? 'bg-primary text-primary-foreground font-bold shadow-sm' : 'hover:bg-zinc-200/50 hover:text-zinc-800'
-                  }`}
-                >
-                  <Target className="h-4 w-4" /> CRM Lead Scoring
-                </button>
-                <button
-                  onClick={() => setActivePreviewTab('floorplan')}
-                  className={`flex w-full items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                    activePreviewTab === 'floorplan' ? 'bg-primary text-primary-foreground font-bold shadow-sm' : 'hover:bg-zinc-200/50 hover:text-zinc-800'
-                  }`}
-                >
-                  <Building className="h-4 w-4" /> Exhibitor Floorplan
-                </button>
-              </div>
+          {/* Loading Indicator */}
+          {isFetchingWp && (
+            <div className="flex items-center justify-center py-12 gap-2 text-xs text-zinc-500">
+              <Loader2 className="h-4 w-4 animate-spin text-[#FF2E63]" />
+              <span>Fetching live events directly from visitexpo.in...</span>
             </div>
+          )}
 
-            {/* Panel View */}
-            <div className="md:col-span-9 p-6 space-y-4 overflow-y-auto">
-              
-              {activePreviewTab === 'analytics' && (
-                <div className="space-y-6 animate-fade-in">
-                  <div className="flex items-center justify-between border-b border-zinc-150 pb-4">
-                    <div>
-                      <h3 className="text-sm font-bold text-zinc-900">Analytics Overview</h3>
-                      <p className="text-[11px] text-zinc-450 mt-0.5">Real-time sync performance tracking for 6th EV India Expo.</p>
-                    </div>
-                    <span className="text-[10px] font-bold text-zinc-550 bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-lg flex items-center gap-1">
-                      <Globe className="h-3 w-3 text-emerald-500" /> Sync Active
+          {/* Cards Grid */}
+          {!isFetchingWp && filteredEvents.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl border border-zinc-200 text-xs text-zinc-500">
+              No events found matching your search.
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredEvents.map((expo) => (
+                <div
+                  key={expo.id}
+                  className="bg-white border border-zinc-200 rounded-xl overflow-hidden hover:border-zinc-300 hover:shadow-sm transition-all flex flex-col justify-between"
+                >
+                  <div className="relative h-44 w-full bg-zinc-100">
+                    <img src={expo.image} alt={expo.title} className="w-full h-full object-cover" />
+                    <span className="absolute top-2.5 left-2.5 bg-white/90 backdrop-blur-xs text-zinc-800 text-[10px] font-bold px-2 py-0.5 rounded shadow-xs">
+                      {expo.category}
+                    </span>
+                    <span className="absolute top-2.5 right-2.5 bg-[#FFCC00] text-zinc-950 text-[10px] font-extrabold px-2 py-0.5 rounded shadow-xs">
+                      {expo.entryType}
                     </span>
                   </div>
 
-                  {/* Summary grid */}
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="p-4 rounded-xl border border-zinc-200 shadow-sm text-xs">
-                      <span className="text-zinc-400 font-bold uppercase tracking-wider text-[9px]">Directory Views</span>
-                      <p className="text-2xl font-black text-zinc-900 mt-1">12,450</p>
-                      <span className="text-[10px] font-bold text-emerald-600 mt-1 block">▲ 14.2% this week</span>
-                    </div>
-                    <div className="p-4 rounded-xl border border-zinc-200 shadow-sm text-xs">
-                      <span className="text-zinc-400 font-bold uppercase tracking-wider text-[9px]">Attendee Registrants</span>
-                      <p className="text-2xl font-black text-zinc-900 mt-1">1,940</p>
-                      <span className="text-[10px] font-bold text-emerald-600 mt-1 block">▲ 8.1% conversion</span>
-                    </div>
-                    <div className="p-4 rounded-xl border border-zinc-200 shadow-sm text-xs">
-                      <span className="text-zinc-400 font-bold uppercase tracking-wider text-[9px]">Ticket Revenue</span>
-                      <p className="text-2xl font-black text-zinc-900 mt-1">$48,250</p>
-                      <span className="text-[10px] font-bold text-zinc-500 mt-1 block">Payout Pending</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activePreviewTab === 'leads' && (
-                <div className="space-y-4 animate-fade-in">
-                  <div className="flex items-center justify-between border-b border-zinc-150 pb-3">
-                    <div>
-                      <h3 className="text-sm font-bold text-zinc-900">Lead Flow CRM</h3>
-                      <p className="text-[11px] text-zinc-450 mt-0.5">Scoring visitor intent based on profile data and booth check-ins.</p>
-                    </div>
-                  </div>
-
-                  <div className="border border-zinc-200 rounded-xl overflow-hidden text-xs">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-zinc-50 text-zinc-500 border-b border-zinc-200 font-bold">
-                          <th className="px-4 py-2">Visitor</th>
-                          <th className="px-4 py-2">Company / Role</th>
-                          <th className="px-4 py-2 text-center">Score</th>
-                          <th className="px-4 py-2">Intent Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-150 font-medium">
-                        <tr>
-                          <td className="px-4 py-2 text-zinc-800 font-bold">Rohan Sharma</td>
-                          <td className="px-4 py-2 text-zinc-500">Tata Motors • EV Developer</td>
-                          <td className="px-4 py-2 text-center"><span className="font-extrabold text-amber-600 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">94%</span></td>
-                          <td className="px-4 py-2"><span className="text-[10px] text-emerald-650 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">High Buy Intent</span></td>
-                        </tr>
-                        <tr>
-                          <td className="px-4 py-2 text-zinc-800 font-bold">Sarah Jenkins</td>
-                          <td className="px-4 py-2 text-zinc-500">BMW Group • Buyer</td>
-                          <td className="px-4 py-2 text-center"><span className="font-extrabold text-amber-600 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">87%</span></td>
-                          <td className="px-4 py-2"><span className="text-[10px] text-emerald-650 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Hot Prospect</span></td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {activePreviewTab === 'floorplan' && (
-                <div className="space-y-4 animate-fade-in">
-                  <div className="flex items-center justify-between border-b border-zinc-150 pb-3">
-                    <div>
-                      <h3 className="text-sm font-bold text-zinc-900">Exhibitor Booth Layout</h3>
-                      <p className="text-[11px] text-zinc-450 mt-0.5">Click on a booth in the layout to inspect exhibitor details.</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3 p-3 bg-zinc-50 border border-zinc-200 rounded-xl">
-                    {[
-                      { num: 'Booth A1', company: 'Tesla Motors Ltd', status: 'Booked' },
-                      { num: 'Booth A2', company: 'Hero MotoCorp', status: 'Booked' },
-                      { num: 'Booth B1', company: 'Available Space', status: 'Open' }
-                    ].map((booth, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => setSelectedBooth(booth)}
-                        className={`p-3 rounded-xl border transition-all cursor-pointer text-xs ${
-                          selectedBooth?.num === booth.num
-                            ? 'border-primary bg-primary/10 ring-2 ring-primary/20 shadow-sm'
-                            : 'border-zinc-200 bg-white hover:border-zinc-300 shadow-sm'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center font-bold">
-                          <span className="text-zinc-800">{booth.num}</span>
-                        </div>
-                        <p className="text-[11px] text-zinc-500 mt-1 truncate">{booth.company}</p>
+                  <div className="p-5 space-y-3 flex-1 flex flex-col justify-between">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-xs text-amber-700 font-semibold">
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span>{expo.dates}</span>
                       </div>
-                    ))}
+                      <h3 className="font-bold text-sm text-zinc-900 line-clamp-1" title={expo.title}>
+                        {expo.title}
+                      </h3>
+                      <div className="flex items-center gap-1 text-xs text-zinc-500">
+                        <MapPin className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                        <span className="truncate">{expo.venue}</span>
+                      </div>
+                      {expo.description && (
+                        <p className="text-[11px] text-zinc-500 line-clamp-2 leading-relaxed pt-1">
+                          {expo.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="pt-3 border-t border-zinc-100 flex items-center justify-between">
+                      <span className="text-[11px] text-zinc-400 font-medium">{expo.city}</span>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/onboarding/exhibitor?wp_slug=${encodeURIComponent(expo.slug || '')}&wp_post_id=${expo.wpPostId || ''}`}
+                          className="text-xs font-bold text-[#FF2E63] hover:underline"
+                        >
+                          Exhibit
+                        </Link>
+                        <span className="text-zinc-300">•</span>
+                        <Link
+                          href={`/login?signup=true&event=${encodeURIComponent(expo.slug || '')}`}
+                          className="text-xs font-bold text-zinc-800 hover:underline"
+                        >
+                          Get Pass &rarr;
+                        </Link>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              )}
-
+              ))}
             </div>
-
-          </div>
+          )}
 
         </div>
       </section>
 
-      {/* SEARCH & CLAIM SIMULATOR PORTAL */}
-      <section id="demo" className="py-16 bg-zinc-50 border-t border-zinc-100 relative">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-          
-          <div className="text-center space-y-3 max-w-3xl mx-auto">
-            <h2 className="text-3xl font-black text-zinc-900 tracking-tight">Claim Your VisitExpo Directory Listing</h2>
-            <p className="text-xs sm:text-sm text-zinc-500">
-              Thousands of events are already pre-loaded into the VisitExpo directory. Test the onboarding module below to simulate event verification.
+      {/* ========================================================================= */}
+      {/* 5. DIRECTORY CLAIM FOR ORGANIZERS (Search from live WP events)            */}
+      {/* ========================================================================= */}
+      <section id="claim" className="py-16 max-w-4xl mx-auto px-4 sm:px-6">
+        <div className="bg-amber-50/50 border border-amber-200 rounded-2xl p-6 sm:p-8 space-y-6 text-center">
+          <div className="max-w-xl mx-auto space-y-2">
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-700">For Event Organizers</span>
+            <h2 className="text-xl sm:text-2xl font-bold text-zinc-900">Claim Your Pre-Loaded Event Listing</h2>
+            <p className="text-xs text-zinc-600">
+              Is your exhibition already listed on visitexpo.in? Search below to claim ownership and take control of ticketing and exhibitor spaces.
             </p>
           </div>
 
-          <div className="max-w-3xl mx-auto bg-white border border-zinc-200 shadow-xl rounded-2xl overflow-hidden">
-            {/* Header tab */}
-            <div className="bg-zinc-50 px-6 py-4 border-b border-zinc-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Logo className="h-7 w-7" />
-                <span className="text-xs font-bold text-zinc-700">Verification Engine (Onboarding Simulator)</span>
-              </div>
-              <span className="text-[9px] font-bold uppercase text-zinc-400 px-2 py-0.5 rounded border border-zinc-200 tracking-wider">Step {demoClaimStep + 1} of 3</span>
+          <div className="max-w-md mx-auto space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
+              <input
+                type="text"
+                placeholder="Search your event (e.g. Municipalika, Art Festival, Airport)..."
+                value={claimSearch}
+                onChange={(e) => setClaimSearch(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 bg-white py-2 pl-9 pr-3 text-xs text-zinc-800 focus:outline-none focus:ring-1 focus:ring-[#FFCC00]"
+              />
             </div>
 
-            <div className="p-6 md:p-8">
-              {demoClaimStep === 0 && (
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-[10px] font-extrabold text-zinc-500 uppercase tracking-widest mb-2">1. Search Event Directory</label>
-                    <div className="relative">
-                      <Search className="absolute left-3.5 top-3.5 h-4.5 w-4.5 text-zinc-400" />
-                      <input
-                        type="text"
-                        placeholder="Search pre-loaded events (e.g. Rotorcraft, EV India, Cement, Cargo)..."
-                        value={demoSearch}
-                        onChange={(e) => setDemoSearch(e.target.value)}
-                        className="w-full rounded-xl border border-zinc-200 bg-white py-3.5 pl-10 pr-4 text-xs text-zinc-800 focus:outline-none focus:ring-1 focus:ring-primary focus:border-transparent transition-all placeholder:text-zinc-400"
-                      />
+            {/* Claim Match Results dropdown */}
+            {claimMatches.length > 0 && (
+              <div className="bg-white border border-zinc-200 rounded-xl p-2 text-left space-y-1.5 shadow-md">
+                {claimMatches.map(m => (
+                  <div key={m.id} className="p-2 hover:bg-zinc-50 rounded-lg flex items-center justify-between gap-2">
+                    <div className="truncate">
+                      <div className="text-xs font-bold text-zinc-900 truncate">{m.title}</div>
+                      <div className="text-[10px] text-zinc-500 truncate">{m.venue}</div>
                     </div>
+                    <Link
+                      href={`/onboarding/organizer?wp_slug=${encodeURIComponent(m.slug || '')}&wp_post_id=${m.wpPostId || ''}`}
+                      className="text-[11px] font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-md shrink-0 transition-colors"
+                    >
+                      Claim &rarr;
+                    </Link>
                   </div>
+                ))}
+              </div>
+            )}
 
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Pre-Loaded Matches ({filteredDemoEvents.length})</p>
-                    <div className="grid gap-3 max-h-[220px] overflow-y-auto pr-1">
-                      {filteredDemoEvents.map((evt, idx) => (
-                        <div
-                          key={idx}
-                          onClick={() => setSelectedDemoEvent(evt)}
-                          className={`p-4 rounded-xl border transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
-                            selectedDemoEvent?.title === evt.title
-                              ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-                              : 'border-zinc-100 bg-white hover:border-zinc-200 shadow-sm'
+            {!claimSearch && (
+              <Link
+                href="/onboarding/organizer"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white font-bold px-4 py-2 text-xs transition-colors"
+              >
+                <span>Launch Organizer Onboarding</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* 6. CONTACT & ONBOARDING FORM                                              */}
+      {/* ========================================================================= */}
+      <section id="contact" className="py-16 bg-white border-t border-zinc-150">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="grid md:grid-cols-12 gap-8 items-start">
+            
+            {/* Left: Contact Info */}
+            <div className="md:col-span-5 space-y-4">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#FF2E63]">Direct Assistance</span>
+              <h2 className="text-2xl font-bold text-zinc-900 tracking-tight">Contact the VisitExpo Team</h2>
+              <p className="text-xs text-zinc-600 leading-relaxed">
+                Have questions about onboarding your trade show, booking exhibitor booths, or custom ticketing? Reach out directly.
+              </p>
+
+              <div className="pt-2 space-y-3 text-xs text-zinc-700">
+                <div className="flex items-center gap-2.5">
+                  <Mail className="h-4 w-4 text-zinc-400" />
+                  <a href="mailto:support@visitexpo.in" className="font-semibold hover:text-[#FF2E63]">support@visitexpo.in</a>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <Phone className="h-4 w-4 text-zinc-400" />
+                  <a href="tel:+919876543210" className="font-semibold hover:text-[#FF2E63]">+91 (0) 11 4987 6543</a>
+                </div>
+              </div>
+
+              <div className="pt-3">
+                <a
+                  href="https://wa.me/919876543210"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 text-xs transition-colors"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  <span>Chat on WhatsApp</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Right: Simple Inquiry Form */}
+            <div className="md:col-span-7 bg-zinc-50 border border-zinc-200 rounded-2xl p-6">
+              {contactSubmitted ? (
+                <div className="text-center py-8 space-y-2">
+                  <CheckCircle className="h-8 w-8 text-emerald-600 mx-auto" />
+                  <h4 className="text-sm font-bold text-zinc-900">Inquiry Sent Successfully</h4>
+                  <p className="text-xs text-zinc-500">We will get back to you within 2 business hours.</p>
+                </div>
+              ) : (
+                <form onSubmit={handleContactSubmit} className="space-y-3.5 text-xs">
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">I am an:</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['Organizer', 'Exhibitor', 'Visitor'].map((r) => (
+                        <button
+                          type="button"
+                          key={r}
+                          onClick={() => setContactRole(r)}
+                          className={`py-1.5 rounded-lg font-bold border transition-colors ${
+                            contactRole === r ? 'bg-[#FF2E63] text-white border-[#FF2E63]' : 'bg-white text-zinc-700 border-zinc-200'
                           }`}
                         >
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-bold text-zinc-800">{evt.title}</h4>
-                              <span className="text-[9px] font-bold uppercase text-zinc-700 bg-primary/25 px-2 py-0.5 rounded border border-primary/20">Directory Listing</span>
-                            </div>
-                            <p className="text-[11px] text-zinc-500 mt-1">{evt.venue}, {evt.city} • Category: {evt.category}</p>
-                          </div>
-                          <button className="text-[11px] font-bold text-amber-600 group flex items-center gap-1 hover:underline">
-                            {selectedDemoEvent?.title === evt.title ? 'Selected ✓' : 'Select'}
-                          </button>
-                        </div>
+                          {r}
+                        </button>
                       ))}
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-zinc-150 flex justify-end">
-                    <button
-                      onClick={() => selectedDemoEvent && setDemoClaimStep(1)}
-                      disabled={!selectedDemoEvent}
-                      className="inline-flex items-center gap-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold px-5 py-3 text-xs transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Verify Onboarding Status <ArrowRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {demoClaimStep === 1 && selectedDemoEvent && (
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-sm font-bold text-zinc-800 flex items-center gap-2">
-                      <ShieldCheck className="h-5 w-5 text-amber-650" /> 2. Verify Identity & Listing Ownership
-                    </h3>
-                    <p className="text-xs text-zinc-500 mt-1">Claim verification requires an official business email matching the event website domain.</p>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2 text-xs">
+                  <div className="grid sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10px] font-bold text-zinc-500 mb-1 uppercase tracking-wide">Selected Event</label>
+                      <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Your Name</label>
                       <input
                         type="text"
-                        disabled
-                        value={selectedDemoEvent.title}
-                        className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2.5 px-3.5 text-zinc-500 cursor-not-allowed"
+                        required
+                        placeholder="Vikram Malhotra"
+                        value={contactName}
+                        onChange={(e) => setContactName(e.target.value)}
+                        className="w-full rounded-lg border border-zinc-200 bg-white py-2 px-3 text-xs text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-zinc-500 mb-1 uppercase tracking-wide">Official Contact Email</label>
+                      <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Email Address</label>
                       <input
                         type="email"
-                        placeholder="organizer@officialdomain.com"
-                        defaultValue="organizer@visitexpo.in"
-                        className="w-full rounded-lg border border-zinc-200 bg-white py-2.5 px-3.5 text-zinc-800 focus:outline-none focus:ring-1 focus:ring-primary"
+                        required
+                        placeholder="vikram@company.com"
+                        value={contactEmail}
+                        onChange={(e) => setContactEmail(e.target.value)}
+                        className="w-full rounded-lg border border-zinc-200 bg-white py-2 px-3 text-xs text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
                       />
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-zinc-205 bg-zinc-50 p-4 text-xs space-y-2 text-zinc-650">
-                    <div className="flex justify-between">
-                      <span>Verification Mode:</span>
-                      <span className="font-bold text-zinc-700">VisitExpo Sync Integration</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Moderation Status:</span>
-                      <span className="font-semibold text-amber-650 flex items-center gap-1">
-                        <Activity className="h-3 w-3 animate-pulse" /> Auto-Review active
-                      </span>
-                    </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Message / Requirements</label>
+                    <textarea
+                      rows={3}
+                      placeholder="How can we assist you with your expo or onboarding?"
+                      value={contactMessage}
+                      onChange={(e) => setContactMessage(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-200 bg-white py-2 px-3 text-xs text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                    />
                   </div>
 
-                  <div className="pt-4 border-t border-zinc-150 flex justify-between">
-                    <button
-                      onClick={() => setDemoClaimStep(0)}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 px-4 py-2.5 text-xs font-bold text-zinc-500 transition-all hover:text-zinc-800"
-                    >
-                      Back to Search
-                    </button>
-                    <button
-                      onClick={() => setDemoClaimStep(2)}
-                      className="inline-flex items-center gap-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold px-6 py-3 text-xs transition-all"
-                    >
-                      Confirm Claim & Launch Portal <ArrowRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
+                  <button
+                    type="submit"
+                    className="w-full rounded-lg bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold py-2.5 text-xs transition-colors shadow-xs cursor-pointer"
+                  >
+                    Send Message
+                  </button>
+                </form>
               )}
-
-              {demoClaimStep === 2 && selectedDemoEvent && (
-                <div className="text-center py-8 space-y-6">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 mx-auto ring-8 ring-emerald-500/15">
-                    <CheckCircle2 className="h-10 w-10" />
-                  </div>
-
-                  <div className="space-y-2 max-w-md mx-auto">
-                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-550/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                      Pending Moderation Approval
-                    </span>
-                    <h3 className="text-xl font-bold text-zinc-800 tracking-tight">Onboarding Request Created!</h3>
-                    <p className="text-xs text-zinc-555 leading-relaxed">
-                      Your simulator claim for <strong className="text-zinc-800">"{selectedDemoEvent.title}"</strong> has been processed successfully. In the live platform, the Super Admin moderation team validates this proof.
-                    </p>
-                  </div>
-
-                  <div className="pt-4 border-t border-zinc-150 flex justify-center gap-4">
-                    <button
-                      onClick={() => {
-                        setSelectedDemoEvent(null);
-                        setDemoClaimStep(0);
-                        setDemoSearch('');
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 px-4 py-2.5 text-xs font-bold text-zinc-500 transition-all hover:text-zinc-800"
-                    >
-                      Reset Simulator
-                    </button>
-                    <Link
-                      href="/onboarding/organizer"
-                      className="inline-flex items-center gap-2 rounded-xl bg-primary hover:bg-primary/95 text-primary-foreground font-bold px-6 py-3 text-xs transition-all shadow-md shadow-primary/15 animate-pulse"
-                    >
-                      Start Real Onboarding <ArrowRight className="h-4 w-4" />
-                    </Link>
-                  </div>
-                </div>
-              )}
-
             </div>
-          </div>
 
-        </div>
-      </section>
-
-      {/* HOW IT WORKS / WP INTEGRATION FLOW */}
-      <section id="how-it-works" className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
-        <div className="text-center space-y-4 max-w-3xl mx-auto">
-          <h2 className="text-3xl font-extrabold text-zinc-900 tracking-tight">
-            Seamless Onboarding to visitexpo.in
-          </h2>
-          <p className="text-zinc-650 text-sm leading-relaxed">
-            Four simple stages. Setup your parameters and publish expo details to the global visitor feed automatically.
-          </p>
-        </div>
-
-        {/* Step Cards Grid */}
-        <div className="grid md:grid-cols-4 gap-8 relative">
-          
-          {/* Step 1 */}
-          <div className="bg-zinc-50/50 border border-zinc-200 rounded-2xl p-6 relative hover:border-zinc-300 transition-colors shadow-sm">
-            <span className="text-4xl font-extrabold text-zinc-350 block">01</span>
-            <h4 className="text-base font-bold text-zinc-900 mt-3">Claim Listing</h4>
-            <p className="text-xs text-zinc-650 mt-2 leading-relaxed">
-              Find your existing pre-loaded expo on the VisitExpo global directory and claim ownership of the listing.
-            </p>
-          </div>
-
-          {/* Step 2 */}
-          <div className="bg-zinc-50/50 border border-zinc-200 rounded-2xl p-6 relative hover:border-zinc-300 transition-colors shadow-sm">
-            <span className="text-4xl font-extrabold text-zinc-355 block">02</span>
-            <h4 className="text-base font-bold text-zinc-900 mt-3">Configure Details</h4>
-            <p className="text-xs text-zinc-655 mt-2 leading-relaxed">
-              Input schedules, ticketing parameters, and layout slots. Changes deploy directly onto visitexpo.in.
-            </p>
-          </div>
-
-          {/* Step 3 */}
-          <div className="bg-zinc-50/50 border border-zinc-200 rounded-2xl p-6 relative hover:border-zinc-300 transition-colors shadow-sm">
-            <span className="text-4xl font-extrabold text-zinc-355 block">03</span>
-            <h4 className="text-base font-bold text-zinc-900 mt-3">Exhibitor Bookings</h4>
-            <p className="text-xs text-zinc-655 mt-2 leading-relaxed">
-              Exhibitors gain credentials, customize catalog details, allocation requests, and staff credentials autonomously.
-            </p>
-          </div>
-
-          {/* Step 4 */}
-          <div className="bg-zinc-50/50 border border-zinc-200 rounded-2xl p-6 relative hover:border-zinc-300 transition-colors shadow-sm">
-            <span className="text-4xl font-extrabold text-zinc-355 block">04</span>
-            <h4 className="text-base font-bold text-zinc-900 mt-3">Real-Time Sync</h4>
-            <p className="text-xs text-zinc-655 mt-2 leading-relaxed">
-              Registration forms submit directly to the Lead scoring CRM, automatically updating attendee listings.
-            </p>
-          </div>
-
-        </div>
-      </section>
-
-      {/* WHY VISITEXPO COMPARISON */}
-      <section className="py-20 bg-zinc-50 border-t border-zinc-100">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white border border-zinc-200 rounded-2xl p-8 shadow-xl space-y-6">
-            <h3 className="text-xl sm:text-2xl font-extrabold text-zinc-900 text-center">Why organizers switch to VisitExpo</h3>
-            <div className="grid md:grid-cols-2 gap-8 divide-y md:divide-y-0 md:divide-x divide-zinc-200 pt-4">
-              
-              {/* Traditional */}
-              <div className="space-y-4 pr-0 md:pr-6 pb-6 md:pb-0">
-                <span className="text-xs font-bold text-red-500 uppercase tracking-widest">Traditional Fragmented Apps</span>
-                <ul className="text-xs text-zinc-550 space-y-3">
-                  <li className="flex items-start gap-2.5">
-                    <span className="text-red-500/80 font-bold">✕</span> Double entry: updating details in frontend directories, database, and PDFs separately.
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <span className="text-red-500/80 font-bold">✕</span> Exhibitors email documents and staff names manually back-and-forth.
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <span className="text-red-500/80 font-bold">✕</span> No central CRM lead scoring. Lead spreadsheets lost in folders.
-                  </li>
-                </ul>
-              </div>
-
-              {/* VisitExpo */}
-              <div className="space-y-4 pl-0 md:pl-8 pt-6 md:pt-0">
-                <span className="text-xs font-bold text-amber-600 uppercase tracking-widest">The VisitExpo Advantage</span>
-                <ul className="text-xs text-zinc-700 space-y-3">
-                  <li className="flex items-start gap-2.5">
-                    <span className="text-amber-500 font-bold">✓</span> Sync engine: one update modifies main listings and apps instantly.
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <span className="text-amber-500 font-bold">✓</span> Dedicated portal: exhibitors customize profiles and badges autonomously.
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <span className="text-amber-500 font-bold">✓</span> CRM Scoring: leads are automatically scored and aggregated.
-                  </li>
-                </ul>
-              </div>
-
-            </div>
           </div>
         </div>
       </section>
 
-      {/* PRICING PLANS */}
-      <section id="pricing" className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
-        <div className="text-center space-y-4 max-w-3xl mx-auto">
-          <h2 className="text-3xl font-extrabold text-zinc-900 tracking-tight">
-            Honest Plans Built for Expo Scales
-          </h2>
-          
-          {/* Billing Cycle Toggle */}
-          <div className="inline-flex items-center gap-1.5 p-1 bg-zinc-100 rounded-xl border border-zinc-200/60 mt-2">
-            <button
-              onClick={() => setBillingCycle('monthly')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                billingCycle === 'monthly' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-800'
-              }`}
-            >
-              Monthly Billing
-            </button>
-            <button
-              onClick={() => setBillingCycle('yearly')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                billingCycle === 'yearly' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-800'
-              }`}
-            >
-              Yearly billing <span className="bg-primary/20 text-zinc-900 text-[9px] px-1.5 py-0.5 rounded-full border border-primary/10">Save 20%</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          
-          {/* Plan 1 */}
-          <div className="bg-white border border-zinc-205 rounded-3xl p-8 space-y-6 flex flex-col justify-between hover:border-zinc-300 hover:shadow-lg transition-all duration-300">
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-base font-bold text-zinc-700">Basic Directory</h4>
-                <p className="text-xs text-zinc-500 mt-1">For single event listings looking for directory presence on visitexpo.in.</p>
-              </div>
-              <p className="text-3xl font-black text-zinc-900">
-                $0 <span className="text-xs font-normal text-zinc-400">Free forever</span>
-              </p>
-              <div className="border-t border-zinc-150 pt-4 space-y-3 text-xs text-zinc-650">
-                <p className="flex items-center gap-2"><Check className="h-4 w-4 text-amber-500" /> 1 VisitExpo directory listing</p>
-                <p className="flex items-center gap-2"><Check className="h-4 w-4 text-amber-500" /> Basic schedule editing</p>
-                <p className="flex items-center gap-2"><Check className="h-4 w-4 text-amber-500" /> Max 50 attendee registrations</p>
-                <p className="flex items-center gap-2 text-zinc-450"><Check className="h-4 w-4 text-zinc-300" /> Lead scoring CRM disabled</p>
-              </div>
-            </div>
-            <Link
-              href="/login?signup=true"
-              className="w-full inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 font-semibold py-2.5 text-xs text-zinc-700 transition-colors"
-            >
-              Get Started
-            </Link>
-          </div>
-
-          {/* Plan 2: Recommended */}
-          <div className="bg-white border-2 border-primary rounded-3xl p-8 space-y-6 flex flex-col justify-between relative shadow-xl hover:shadow-2xl transition-all">
-            <div className="absolute top-0 right-6 -translate-y-1/2 bg-zinc-950 text-white text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
-              Most Popular
-            </div>
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-base font-bold text-zinc-900 flex items-center gap-1.5">
-                  Professional Hub <Sparkles className="h-4 w-4 text-amber-500" />
-                </h4>
-                <p className="text-xs text-zinc-500 mt-1">For event organizers seeking direct ownership claims and lead CRM.</p>
-              </div>
-              <p className="text-3xl font-black text-zinc-900">
-                {billingCycle === 'monthly' ? '$99' : '$79'}{' '}
-                <span className="text-xs font-normal text-zinc-400">/ month</span>
-              </p>
-              <div className="border-t border-zinc-150 pt-4 space-y-3 text-xs text-zinc-700">
-                <p className="flex items-center gap-2"><Check className="h-4 w-4 text-amber-500" /> Claim 1 active event listing</p>
-                <p className="flex items-center gap-2"><Check className="h-4 w-4 text-amber-500" /> Unlimited custom booth layouts</p>
-                <p className="flex items-center gap-2"><Check className="h-4 w-4 text-amber-500" /> Up to 1,000 visitor registrations</p>
-                <p className="flex items-center gap-2"><Check className="h-4 w-4 text-amber-500" /> Advanced lead scoring CRM</p>
-                <p className="flex items-center gap-2"><Check className="h-4 w-4 text-amber-500" /> Automated email campaigns</p>
-              </div>
-            </div>
-            <Link
-              href="/onboarding/organizer"
-              className="w-full inline-flex items-center justify-center rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold py-3 text-xs transition-colors shadow-lg"
-            >
-              Start Claim Verification
-            </Link>
-          </div>
-
-          {/* Plan 3 */}
-          <div className="bg-white border border-zinc-205 rounded-3xl p-8 space-y-6 flex flex-col justify-between hover:border-zinc-300 hover:shadow-lg transition-all duration-300">
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-base font-bold text-zinc-300">Scale Spotlight</h4>
-                <p className="text-xs text-zinc-500 mt-1">For large agencies managing multiple expos and premium marketing tiers.</p>
-              </div>
-              <p className="text-3xl font-black text-zinc-900">
-                {billingCycle === 'monthly' ? '$299' : '$239'}{' '}
-                <span className="text-xs font-normal text-zinc-400">/ month</span>
-              </p>
-              <div className="border-t border-zinc-150 pt-4 space-y-3 text-xs text-zinc-650">
-                <p className="flex items-center gap-2"><Check className="h-4 w-4 text-amber-500" /> Claim up to 5 events concurrently</p>
-                <p className="flex items-center gap-2"><Check className="h-4 w-4 text-amber-500" /> Dedicated exhibitor portals</p>
-                <p className="flex items-center gap-2"><Check className="h-4 w-4 text-amber-500" /> Unlimited visitor registrations</p>
-                <p className="flex items-center gap-2"><Check className="h-4 w-4 text-amber-500" /> Spotlight featured placement</p>
-                <p className="flex items-center gap-2"><Check className="h-4 w-4 text-amber-500" /> Custom integrations & VIP support</p>
-              </div>
-            </div>
-            <Link
-              href="/login?signup=true"
-              className="w-full inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 font-semibold py-2.5 text-xs text-zinc-700 transition-colors"
-            >
-              Select Plan
-            </Link>
-          </div>
-
-        </div>
-      </section>
-
-      {/* FAQ SECTION */}
-      <section id="faq" className="py-20 md:py-28 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl sm:text-3xl font-black text-zinc-900 tracking-tight text-center">Got Questions? We’ve Got Answers.</h2>
-        </div>
-
-        <div className="space-y-4">
+      {/* ========================================================================= */}
+      {/* 7. FAQ ACCORDION                                                          */}
+      {/* ========================================================================= */}
+      <section className="py-16 max-w-3xl mx-auto px-4 sm:px-6 space-y-6">
+        <h2 className="text-xl font-bold text-zinc-900 text-center">Frequently Asked Questions</h2>
+        
+        <div className="space-y-2 text-xs">
           {[
             {
-              q: "How does the publishing to the main VisitExpo frontend work?",
-              a: "Once you configure your event in this dashboard, the details, ticket tiers, and exhibitor slots are automatically published to the main VisitExpo public directory portal. Attendees can search and register directly on visitexpo.in, and the data syncs back to your dashboard instantly."
+              q: "How do I claim or publish an event on VisitExpo?",
+              a: "Organizers can search for their event above or click 'Onboard as Organizer'. Once your business email is verified, you gain instant dashboard access to manage schedules, tickets, and floorplans."
             },
             {
-              q: "Can exhibitors capture and retrieve visitor leads directly?",
-              a: "Yes. Exhibitors have their own secure hubs. From their portal, they can access scanner codes for lead retrieval, register booth staff, and download list metrics in real-time."
+              q: "How can exhibitors book booths and collect visitor leads?",
+              a: "Exhibitors can click 'Register as Exhibitor' on any listed expo. Once approved, your team receives an Exhibitor Hub login with QR lead scanner capabilities."
             },
             {
-              q: "How does the ownership claim system verify event listing rights?",
-              a: "Organizers input their business email corresponding to the event directory domain. In addition, you can upload proof of incorporation, authorization letters, or official ID. The Super Admin team moderates and unlocks dashboard access once validated."
-            },
-            {
-              q: "Are there any transaction fees for digital ticket sales?",
-              a: "We do not charge transaction commissions. Ticket revenues are processed directly via your connected Stripe or payment gateway account, subject only to credit card processing fees."
-            },
-            {
-              q: "Can I customize the visitor registration form fields?",
-              a: "Yes. The onboarding and claim dashboards let you toggle custom fields (e.g. industry sector, job role, company size, telephone) to capture detailed profile fields that power the CRM lead scoring model."
+              q: "Are visitor entry passes complimentary?",
+              a: "Yes! Most trade exhibitions on VisitExpo offer free digital entry passes for industry professionals and trade buyers. Simply register to receive your instant digital badge."
             }
-          ].map((item, index) => (
-            <div key={index} className="border border-zinc-200/80 bg-zinc-50/20 rounded-xl overflow-hidden shadow-sm">
+          ].map((item, idx) => (
+            <div key={idx} className="border border-zinc-200 rounded-xl overflow-hidden bg-white">
               <button
-                onClick={() => toggleFaq(index)}
-                className="w-full px-6 py-4 text-left flex items-center justify-between text-xs sm:text-sm font-bold text-zinc-800 hover:text-amber-600 transition-colors focus:outline-none"
+                onClick={() => toggleFaq(idx)}
+                className="w-full px-4 py-3 text-left flex items-center justify-between font-bold text-zinc-800 hover:text-zinc-950 cursor-pointer"
               >
                 <span>{item.q}</span>
-                <ChevronDown className={`h-4.5 w-4.5 text-zinc-400 transition-transform duration-200 ${activeFaq === index ? 'rotate-180 text-amber-500' : ''}`} />
+                <ChevronDown className={`h-4 w-4 text-zinc-400 transition-transform ${openFaq === idx ? 'rotate-180' : ''}`} />
               </button>
-              <AnimatePresence>
-                {activeFaq === index && (
-                  <motion.div
-                    initial={{ height: 0 }}
-                    animate={{ height: "auto" }}
-                    exit={{ height: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="overflow-hidden"
-                  >
-                    <p className="px-6 pb-5 pt-1 text-xs text-zinc-650 leading-relaxed border-t border-zinc-150">
-                      {item.a}
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {openFaq === idx && (
+                <p className="px-4 pb-3 pt-1 text-zinc-600 leading-relaxed border-t border-zinc-100">
+                  {item.a}
+                </p>
+              )}
             </div>
           ))}
         </div>
       </section>
 
-      {/* FINAL CTA BAR */}
-      <section className="py-20 border-t border-zinc-100 relative bg-zinc-50/50">
-        <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8 space-y-6 relative">
-          <Logo className="h-16 w-16 mx-auto" />
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight">Ready to boost your expo footfall?</h2>
-          <p className="text-zinc-600 text-sm sm:text-base leading-relaxed max-w-xl mx-auto">
-            Claim your pre-loaded event directory item today, complete onboarding, and give your exhibitors a state-of-the-art lead experience.
-          </p>
-          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/onboarding/organizer"
-              className="inline-flex items-center gap-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-extrabold px-8 py-4 text-sm transition-all"
-            >
-              Start Onboarding Wizard <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/login"
-              className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 px-6 py-4 text-xs font-bold text-zinc-600 transition-all hover:text-zinc-900"
-            >
-              Access Dashboard
-            </Link>
+      {/* ========================================================================= */}
+      {/* 8. FOOTER                                                                 */}
+      {/* ========================================================================= */}
+      <footer className="border-t border-zinc-200 bg-zinc-50 py-10 text-xs text-zinc-500">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Logo className="h-6 w-6" />
+            <span className="font-bold text-zinc-800">VisitExpo</span>
+            <span>• Powering trade exhibitions worldwide.</span>
           </div>
-        </div>
-      </section>
-
-      {/* FOOTER */}
-      <footer className="border-t border-zinc-150 bg-zinc-50 py-12 text-zinc-550">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6 text-xs font-semibold">
-          <div className="flex items-center gap-3">
-            <Logo className="h-8 w-8" />
-            <span className="text-sm font-black tracking-tight text-zinc-800">
-              Visit<span className="text-amber-500">Expo</span>
-            </span>
-          </div>
-
-          <p>© 2026 VisitExpo Inc. Connected with VisitExpo Event Directory. All rights reserved.</p>
-
           <div className="flex items-center gap-6">
-            <a href="#about" className="hover:text-zinc-800 transition-colors">About us</a>
-            <a href="#features" className="hover:text-zinc-800 transition-colors">Solution</a>
-            <a href="#pricing" className="hover:text-zinc-800 transition-colors">Pricing</a>
-            <a href="#faq" className="hover:text-zinc-800 transition-colors">Support</a>
+            <Link href="/onboarding/organizer" className="hover:text-zinc-800">Organizers</Link>
+            <Link href="/onboarding/exhibitor" className="hover:text-zinc-800">Exhibitors</Link>
+            <Link href="/login" className="hover:text-zinc-800">Dashboard</Link>
           </div>
         </div>
       </footer>
