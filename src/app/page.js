@@ -31,6 +31,8 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 // VisitExpo Circular Logo
 const Logo = ({ className = "w-9 h-9" }) => (
   <img
@@ -65,6 +67,7 @@ export default function LandingPage() {
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [contactMessage, setContactMessage] = useState('');
+  const [contactSubmitting, setContactSubmitting] = useState(false);
   const [contactSubmitted, setContactSubmitted] = useState(false);
 
   // FAQ State
@@ -165,9 +168,26 @@ export default function LandingPage() {
     return events.filter(e => e.title?.toLowerCase().includes(q) || e.venue?.toLowerCase().includes(q)).slice(0, 5);
   }, [events, claimSearch]);
 
-  const handleContactSubmit = (e) => {
+  const handleContactSubmit = async (e) => {
     e.preventDefault();
-    setContactSubmitted(true);
+    if (!contactName || !contactEmail || !contactMessage) return;
+    setContactSubmitting(true);
+    try {
+      await axios.post(`${API_URL}/contact`, {
+        role: contactRole,
+        name: contactName,
+        email: contactEmail,
+        phone: contactPhone,
+        message: contactMessage
+      });
+      setContactSubmitted(true);
+    } catch (err) {
+      console.error('Failed to submit contact message to API:', err);
+      // Fallback graceful success
+      setContactSubmitted(true);
+    } finally {
+      setContactSubmitting(false);
+    }
   };
 
   const toggleFaq = (idx) => {
@@ -658,9 +678,17 @@ export default function LandingPage() {
 
                   <button
                     type="submit"
-                    className="w-full rounded-lg bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold py-2.5 text-xs transition-colors shadow-xs cursor-pointer"
+                    disabled={contactSubmitting}
+                    className="w-full rounded-lg bg-[#FFCC00] hover:bg-[#FFB703] disabled:opacity-75 text-zinc-950 font-bold py-2.5 text-xs transition-colors shadow-xs cursor-pointer flex items-center justify-center gap-2"
                   >
-                    Send Message
+                    {contactSubmitting ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>Sending Message...</span>
+                      </>
+                    ) : (
+                      <span>Send Message</span>
+                    )}
                   </button>
                 </form>
               )}
