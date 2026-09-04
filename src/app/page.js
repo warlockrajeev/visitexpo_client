@@ -153,6 +153,11 @@ export default function LandingPage() {
     });
   }, [events, searchQuery, selectedCity, selectedCategory, activeCategoryTab, quickFilter]);
 
+  // Display only recent 6 events on the landing page
+  const displayedEvents = useMemo(() => {
+    return filteredEvents.slice(0, 6);
+  }, [filteredEvents]);
+
   // Claim filtered events
   const claimMatches = useMemo(() => {
     if (!claimSearch.trim()) return [];
@@ -181,86 +186,98 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white text-zinc-900 font-sans antialiased selection:bg-[#FF2E63] selection:text-white">
 
       {/* ========================================================================= */}
-      {/* 1. HEADER                                                                 */}
+      {/* 1 & 2. HERO & NAVBAR CONTAINER (Continuous Event Management Background)    */}
       {/* ========================================================================= */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-zinc-150">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
-          
-          {/* Logo */}
-          <Link href="/" className="flex items-center group">
-            <Logo className="h-14 w-14 sm:h-16 sm:w-16 transition-transform duration-200 group-hover:scale-105 drop-shadow-xs" />
-          </Link>
-
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-6 text-xs font-semibold text-zinc-600">
-            <a href="#events" className="hover:text-zinc-900 transition-colors">Explore Events</a>
-            <Link href="/onboarding/organizer" className="hover:text-zinc-900 transition-colors">For Organizers</Link>
-            <Link href="/onboarding/exhibitor" className="hover:text-zinc-900 transition-colors">For Exhibitors</Link>
-            <a href="#claim" className="hover:text-zinc-900 transition-colors">Claim Listing</a>
-            <a href="#contact" className="hover:text-zinc-900 transition-colors">Contact</a>
-          </nav>
-
-          {/* Actions */}
-          <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="text-xs font-semibold text-zinc-600 hover:text-zinc-900 px-3 py-1.5 transition-colors"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/login?signup=true"
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold px-4 py-2 text-xs transition-colors shadow-xs"
-            >
-              <span>Get Started</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
+      <div className="relative overflow-hidden bg-zinc-950 border-b border-zinc-800">
+        
+        {/* Continuous Background Image & Dark Overlays spanning Navbar & Hero */}
+        <div className="absolute inset-0 z-0 pointer-events-none">
+          <img
+            src="/hero-event-bg.jpg"
+            alt="Event Management & Expo Background"
+            className="w-full h-full object-cover object-center scale-105 filter brightness-70"
+          />
+          {/* Multi-layered dark overlay for high contrast and conference atmosphere */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/85 via-black/60 to-black/90" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-950/40 via-transparent to-black/75" />
         </div>
-      </header>
 
-      {/* ========================================================================= */}
-      {/* 2. HERO SECTION & UNIFIED SEARCH PILL                                     */}
-      {/* ========================================================================= */}
-      <section className="pt-14 pb-16 md:pt-20 md:pb-24 border-b border-zinc-100 bg-gradient-to-b from-white via-zinc-50/40 to-white">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center space-y-6">
+        {/* Navbar (Seamless over background image, no separate background, no bottom border) */}
+        <header className="relative z-20 w-full text-white">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 h-24 flex items-center justify-between">
+            
+            {/* Logo */}
+            <Link href="/" className="flex items-center group">
+              <Logo className="h-14 w-14 sm:h-16 sm:w-16 transition-transform duration-200 group-hover:scale-105 drop-shadow-md" />
+            </Link>
+
+            {/* Navigation Links */}
+            <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-zinc-200">
+              <a href="#events" className="hover:text-white transition-colors">Explore Events</a>
+              <Link href="/onboarding/organizer" className="hover:text-white transition-colors">For Organizers</Link>
+              <Link href="/onboarding/exhibitor" className="hover:text-white transition-colors">For Exhibitors</Link>
+              <a href="#claim" className="hover:text-white transition-colors">Claim Listing</a>
+              <a href="#contact" className="hover:text-white transition-colors">Contact</a>
+            </nav>
+
+            {/* Actions */}
+            <div className="flex items-center gap-3">
+              <Link
+                href="/login"
+                className="text-xs font-semibold text-zinc-300 hover:text-white px-3 py-1.5 transition-colors"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/login?signup=true"
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold px-4 py-2 text-xs transition-colors shadow-xs"
+              >
+                <span>Get Started</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          </div>
+        </header>
+
+        {/* Hero Content */}
+        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 pt-6 pb-20 md:pt-10 md:pb-28 text-center space-y-6">
           
           {/* Live Sync Badge */}
-          <div className="inline-flex items-center gap-2 rounded-full bg-zinc-100 px-3.5 py-1 text-xs font-medium text-zinc-700">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-md px-4 py-1.5 text-xs font-medium text-white border border-white/20 shadow-lg">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
             <span>
-              Connected to <strong className="text-zinc-900">visitexpo.in</strong>
+              Connected to <strong className="text-white">visitexpo.in</strong>
               {events.length > 0 && ` • ${events.length} Live Events`}
             </span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-zinc-900 leading-tight">
-            Discover Upcoming Trade Shows &amp; Exhibitions in <span className="text-amber-500">India</span> &amp; <span className="text-[#FF2E63]">Worldwide</span>
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight drop-shadow-md">
+            Discover Upcoming Trade Shows &amp; Exhibitions in <span className="text-amber-400">India</span> and <span className="text-[#FF2E63]">Worldwide</span>
           </h1>
 
-          <p className="text-sm sm:text-base text-zinc-600 max-w-2xl mx-auto leading-relaxed">
-            Experience expos like never before — in-person or virtually. Connect directly with event organizers, book verified exhibitor booths, and register for digital passes.
+          <p className="text-sm sm:text-lg text-zinc-200 max-w-2xl mx-auto leading-relaxed drop-shadow-sm font-normal">
+            Experience Expos Like Never Before—In-Person or Virtually. Connect directly with event organizers, book verified exhibitor booths, and register for digital passes.
           </p>
 
           {/* Hero CTAs */}
-          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+          <div className="pt-3 flex flex-wrap items-center justify-center gap-3.5">
             <a
               href="#events"
-              className="inline-flex items-center gap-2 rounded-full bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold px-6 py-3 text-xs sm:text-sm transition-colors shadow-xs"
+              className="inline-flex items-center gap-2 rounded-full bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold px-7 py-3 text-xs sm:text-sm transition-all shadow-md hover:scale-102"
             >
               <span>Explore Exhibitions</span>
               <ArrowRight className="h-4 w-4" />
             </a>
             <Link
               href="/onboarding/organizer"
-              className="inline-flex items-center gap-2 rounded-full bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-800 font-bold px-6 py-3 text-xs sm:text-sm transition-colors shadow-2xs"
+              className="inline-flex items-center gap-2 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/30 text-white font-bold px-7 py-3 text-xs sm:text-sm transition-all shadow-sm hover:scale-102"
             >
               For Organizers
             </Link>
           </div>
 
         </div>
-      </section>
+      </div>
 
       {/* ========================================================================= */}
       {/* 3. THREE PERSONA ONBOARDING CARDS                                         */}
@@ -357,7 +374,7 @@ export default function LandingPage() {
                 </span>
               </div>
               <p className="text-xs text-zinc-500 mt-0.5">
-                Showing {filteredEvents.length} events directly from <strong className="text-zinc-800">visitexpo.in</strong>
+                Showing recent {displayedEvents.length} events directly from <strong className="text-zinc-800">visitexpo.in</strong>
               </p>
             </div>
 
@@ -395,13 +412,13 @@ export default function LandingPage() {
           )}
 
           {/* Cards Grid */}
-          {!isFetchingWp && filteredEvents.length === 0 ? (
+          {!isFetchingWp && displayedEvents.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl border border-zinc-200 text-xs text-zinc-500">
               No events found matching your search.
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredEvents.map((expo) => (
+              {displayedEvents.map((expo) => (
                 <div
                   key={expo.id}
                   className="bg-white border border-zinc-200 rounded-xl overflow-hidden hover:border-zinc-300 hover:shadow-sm transition-all flex flex-col justify-between"
@@ -457,6 +474,21 @@ export default function LandingPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* View All on visitexpo.in CTA */}
+          {filteredEvents.length > 6 && (
+            <div className="pt-4 flex justify-center">
+              <a
+                href="https://visitexpo.in"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-full bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-800 font-bold px-6 py-2.5 text-xs transition-colors shadow-2xs"
+              >
+                <span>View All {events.length}+ Events on visitexpo.in</span>
+                <ExternalLink className="h-3.5 w-3.5 text-zinc-400" />
+              </a>
             </div>
           )}
 
