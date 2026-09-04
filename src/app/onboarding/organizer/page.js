@@ -192,9 +192,11 @@ function OrganizerOnboardingContent() {
       <header className="border-b border-border bg-card/60 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-amber-600 text-white font-extrabold shadow-md shadow-amber-500/20">
-              V
-            </div>
+            <img
+              src="/logo.png"
+              alt="VisitExpo Logo"
+              className="h-9 w-9 object-contain"
+            />
             <span className="text-lg font-bold tracking-tight text-foreground">
               Visit<span className="text-amber-500">Expo</span> <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">Verified Directory Partner</span>
             </span>

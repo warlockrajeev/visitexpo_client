@@ -3,7 +3,7 @@
 /**
  * @file page.js
  * @description Minimalist, high-end Event Management & Expo Discovery Platform Landing Page for VisitExpo.
- * Fetches events directly from the WordPress website (visitexpo.in).
+ * Fetches events directly from visitexpo.in.
  * Palette: Pure White canvas, VisitExpo Yellow (#FFCC00), and vibrant Pink (#FF2E63).
  */
 
@@ -33,12 +33,11 @@ import axios from 'axios';
 
 // VisitExpo Circular Logo
 const Logo = ({ className = "w-9 h-9" }) => (
-  <svg viewBox="0 0 100 100" className={className} xmlns="http://www.w3.org/2000/svg">
-    <circle cx="50" cy="50" r="48" fill="#FFCC00" stroke="#000000" strokeWidth="1" />
-    <text x="50" y="32" textAnchor="middle" fill="#000" fontSize="13" fontWeight="bold" fontFamily="system-ui, sans-serif">visit</text>
-    <text x="50" y="60" textAnchor="middle" fill="#000" fontSize="26" fontWeight="950" fontFamily="system-ui, sans-serif" fontStyle="italic">EXPO</text>
-    <text x="50" y="78" textAnchor="middle" fill="#000" fontSize="8" fontWeight="600" fontFamily="system-ui, sans-serif">visitexpo.in</text>
-  </svg>
+  <img
+    src="/logo.png"
+    alt="VisitExpo Logo"
+    className={`${className} object-contain`}
+  />
 );
 
 export default function LandingPage() {
@@ -185,14 +184,11 @@ export default function LandingPage() {
       {/* 1. HEADER                                                                 */}
       {/* ========================================================================= */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-zinc-150">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
           
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5">
-            <Logo className="h-8 w-8" />
-            <span className="font-extrabold text-lg tracking-tight text-zinc-900">
-              Visit<span className="text-amber-500">Expo</span>
-            </span>
+          <Link href="/" className="flex items-center group">
+            <Logo className="h-14 w-14 sm:h-16 sm:w-16 transition-transform duration-200 group-hover:scale-105 drop-shadow-xs" />
           </Link>
 
           {/* Navigation Links */}
@@ -229,12 +225,12 @@ export default function LandingPage() {
       <section className="pt-14 pb-16 md:pt-20 md:pb-24 border-b border-zinc-100 bg-gradient-to-b from-white via-zinc-50/40 to-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center space-y-6">
           
-          {/* WordPress Live Sync Badge */}
+          {/* Live Sync Badge */}
           <div className="inline-flex items-center gap-2 rounded-full bg-zinc-100 px-3.5 py-1 text-xs font-medium text-zinc-700">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
             <span>
               Connected to <strong className="text-zinc-900">visitexpo.in</strong>
-              {events.length > 0 && ` • ${events.length} Live WordPress Events`}
+              {events.length > 0 && ` • ${events.length} Live Events`}
             </span>
           </div>
 
@@ -246,107 +242,21 @@ export default function LandingPage() {
             Experience expos like never before — in-person or virtually. Connect directly with event organizers, book verified exhibitor booths, and register for digital passes.
           </p>
 
-          {/* Unified Search Pill Bar */}
-          <div className="pt-4 max-w-4xl mx-auto">
-            <div className="bg-white rounded-2xl md:rounded-full p-2 border border-zinc-200 shadow-lg shadow-zinc-100 flex flex-col md:flex-row md:items-center gap-2">
-              
-              {/* Keyword Input */}
-              <div className="flex-1 px-3 py-1.5 flex items-center gap-2 md:border-r border-zinc-200">
-                <Search className="h-4 w-4 text-zinc-400 shrink-0" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search live events from visitexpo.in..."
-                  className="w-full text-xs font-medium text-zinc-800 placeholder:text-zinc-400 bg-transparent focus:outline-none"
-                />
-                {searchQuery && (
-                  <button onClick={() => setSearchQuery('')} className="text-zinc-400 hover:text-zinc-600 text-xs">✕</button>
-                )}
-              </div>
-
-              {/* Location Select (Live from WP) */}
-              <div className="px-3 py-1.5 md:border-r border-zinc-200 min-w-[140px]">
-                <select
-                  value={selectedCity}
-                  onChange={(e) => setSelectedCity(e.target.value)}
-                  className="w-full text-xs font-medium text-zinc-700 bg-transparent focus:outline-none cursor-pointer"
-                >
-                  <option value="">All Cities ▾</option>
-                  {availableCities.map(city => (
-                    <option key={city} value={city}>{city}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Category Select (Live from WP) */}
-              <div className="px-3 py-1.5 min-w-[160px]">
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full text-xs font-medium text-zinc-700 bg-transparent focus:outline-none cursor-pointer"
-                >
-                  <option value="">All Categories ▾</option>
-                  {availableCategories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Search Button */}
-              <a
-                href="#events"
-                className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[#FF2E63] hover:bg-[#E82054] text-white font-bold px-6 py-2.5 text-xs transition-colors shadow-sm"
-              >
-                <Search className="h-3.5 w-3.5" />
-                <span>Search</span>
-              </a>
-
-            </div>
-
-            {/* Quick Pills */}
-            <div className="pt-4 flex flex-wrap items-center justify-center gap-2 text-xs font-medium text-zinc-600">
-              <span className="text-zinc-400 mr-1">Quick browse:</span>
-              <button
-                onClick={() => setQuickFilter(quickFilter === 'upcoming' ? 'all' : 'upcoming')}
-                className={`px-3 py-1 rounded-full border transition-colors ${
-                  quickFilter === 'upcoming' ? 'bg-amber-50 border-amber-300 text-amber-900 font-bold' : 'bg-white border-zinc-200 hover:bg-zinc-50'
-                }`}
-              >
-                Upcoming
-              </button>
-              <button
-                onClick={() => setQuickFilter(quickFilter === 'featured' ? 'all' : 'featured')}
-                className={`px-3 py-1 rounded-full border transition-colors ${
-                  quickFilter === 'featured' ? 'bg-pink-50 border-pink-300 text-[#FF2E63] font-bold' : 'bg-white border-zinc-200 hover:bg-zinc-50'
-                }`}
-              >
-                Featured
-              </button>
-              <button
-                onClick={() => setQuickFilter(quickFilter === 'free' ? 'all' : 'free')}
-                className={`px-3 py-1 rounded-full border transition-colors ${
-                  quickFilter === 'free' ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-bold' : 'bg-white border-zinc-200 hover:bg-zinc-50'
-                }`}
-              >
-                Free Passes
-              </button>
-              {(searchQuery || selectedCity || selectedCategory || quickFilter !== 'all' || activeCategoryTab !== 'all') && (
-                <button
-                  onClick={() => {
-                    setSearchQuery('');
-                    setSelectedCity('');
-                    setSelectedCategory('');
-                    setQuickFilter('all');
-                    setActiveCategoryTab('all');
-                  }}
-                  className="text-xs text-[#FF2E63] font-bold hover:underline ml-2"
-                >
-                  Clear Filters
-                </button>
-              )}
-            </div>
-
+          {/* Hero CTAs */}
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+            <a
+              href="#events"
+              className="inline-flex items-center gap-2 rounded-full bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold px-6 py-3 text-xs sm:text-sm transition-colors shadow-xs"
+            >
+              <span>Explore Exhibitions</span>
+              <ArrowRight className="h-4 w-4" />
+            </a>
+            <Link
+              href="/onboarding/organizer"
+              className="inline-flex items-center gap-2 rounded-full bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-800 font-bold px-6 py-3 text-xs sm:text-sm transition-colors shadow-2xs"
+            >
+              For Organizers
+            </Link>
           </div>
 
         </div>
@@ -443,7 +353,7 @@ export default function LandingPage() {
               <div className="flex items-center gap-2">
                 <h2 className="text-2xl font-bold tracking-tight text-zinc-900">Featured Exhibitions</h2>
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
-                  Live WordPress Feed
+                  Live Directory Feed
                 </span>
               </div>
               <p className="text-xs text-zinc-500 mt-0.5">

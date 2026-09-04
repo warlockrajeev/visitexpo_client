@@ -186,9 +186,11 @@ function ExhibitorOnboardingContent() {
       <header className="border-b border-border bg-card/60 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-primary to-blue-600 text-white font-extrabold shadow-md shadow-primary/20">
-              V
-            </div>
+            <img
+              src="/logo.png"
+              alt="VisitExpo Logo"
+              className="h-9 w-9 object-contain"
+            />
             <span className="text-lg font-bold tracking-tight text-foreground">
               Visit<span className="text-primary">Expo</span> <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">Exhibitor Portal</span>
             </span>

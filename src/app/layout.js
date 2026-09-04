@@ -16,6 +16,10 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "VisitExpo | Event Organizer Dashboard",
   description: "Enterprise SaaS Platform for Event Organizers. Build expos, track leads, and manage speakers.",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({ children }) {

@@ -117,8 +117,12 @@ export default function LoginPage() {
         </div>
 
         <div className="text-center space-y-2">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground font-extrabold text-xl shadow-lg shadow-primary/20">
-            VE
+          <div className="inline-flex items-center justify-center">
+            <img
+              src="/logo.png"
+              alt="VisitExpo Logo"
+              className="h-16 w-16 object-contain"
+            />
           </div>
           <h2 className="text-2xl font-bold text-zinc-50 tracking-tight">
             {isSignup ? 'Create an Account' : 'Welcome to VisitExpo'}

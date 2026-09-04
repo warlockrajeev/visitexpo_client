@@ -192,10 +192,12 @@ export default function DashboardLayout({ children }) {
       >
         {/* Logo Section */}
         <div className="flex h-16 items-center justify-between px-6 border-b border-border">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold shadow-md">
-              VE
-            </div>
+          <Link href="/dashboard" className="flex items-center gap-2.5">
+            <img
+              src="/logo.png"
+              alt="VisitExpo Logo"
+              className="h-9 w-9 object-contain"
+            />
             <span className="text-xl font-bold tracking-tight text-foreground">
               Visit<span className="text-primary">Expo</span>
             </span>
