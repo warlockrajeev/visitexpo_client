@@ -30,17 +30,9 @@ import {
   Loader2
 } from 'lucide-react';
 import axios from 'axios';
+import Navbar, { Logo } from '../components/Navbar.js';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-
-// VisitExpo Circular Logo
-const Logo = ({ className = "w-9 h-9" }) => (
-  <img
-    src="/logo.png"
-    alt="VisitExpo Logo"
-    className={`${className} object-contain`}
-  />
-);
 
 export default function LandingPage() {
   const { user, loading } = useAuth();
@@ -205,10 +197,13 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-zinc-900 font-sans antialiased selection:bg-[#FF2E63] selection:text-white">
 
+      {/* Fixed Navbar Component */}
+      <Navbar />
+
       {/* ========================================================================= */}
-      {/* 1 & 2. HERO & NAVBAR CONTAINER (Continuous Event Management Background)    */}
+      {/* 1 & 2. HERO CONTAINER (Continuous Event Management Background)           */}
       {/* ========================================================================= */}
-      <div className="relative overflow-hidden bg-zinc-950 border-b border-zinc-800">
+      <div className="relative overflow-hidden bg-zinc-950 border-b border-zinc-800 pt-20 sm:pt-24">
         
         {/* Continuous Background Image & Dark Overlays spanning Navbar & Hero */}
         <div className="absolute inset-0 z-0 pointer-events-none">
@@ -222,45 +217,8 @@ export default function LandingPage() {
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-950/40 via-transparent to-black/75" />
         </div>
 
-        {/* Navbar (Seamless over background image, no separate background, no bottom border) */}
-        <header className="relative z-20 w-full text-white">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 h-24 flex items-center justify-between">
-            
-            {/* Logo */}
-            <Link href="/" className="flex items-center group">
-              <Logo className="h-14 w-14 sm:h-16 sm:w-16 transition-transform duration-200 group-hover:scale-105 drop-shadow-md" />
-            </Link>
-
-            {/* Navigation Links */}
-            <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-zinc-200">
-              <a href="#events" className="hover:text-white transition-colors">Explore Events</a>
-              <Link href="/onboarding/organizer" className="hover:text-white transition-colors">For Organizers</Link>
-              <Link href="/onboarding/exhibitor" className="hover:text-white transition-colors">For Exhibitors</Link>
-              <a href="#claim" className="hover:text-white transition-colors">Claim Listing</a>
-              <a href="#contact" className="hover:text-white transition-colors">Contact</a>
-            </nav>
-
-            {/* Actions */}
-            <div className="flex items-center gap-3">
-              <Link
-                href="/login"
-                className="text-xs font-semibold text-zinc-300 hover:text-white px-3 py-1.5 transition-colors"
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/login?signup=true"
-                className="inline-flex items-center gap-1.5 rounded-full bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold px-4 py-2 text-xs transition-colors shadow-xs"
-              >
-                <span>Get Started</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-          </div>
-        </header>
-
         {/* Hero Content */}
-        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 pt-6 pb-20 md:pt-10 md:pb-28 text-center space-y-6">
+        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 pt-5 pb-14 md:pt-8 md:pb-18 text-center space-y-6">
           
           {/* Live Sync Badge */}
           <div className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-md px-4 py-1.5 text-xs font-medium text-white border border-white/20 shadow-lg">
@@ -280,7 +238,7 @@ export default function LandingPage() {
           </p>
 
           {/* Hero CTAs */}
-          <div className="pt-3 flex flex-wrap items-center justify-center gap-3.5">
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3.5">
             <a
               href="#events"
               className="inline-flex items-center gap-2 rounded-full bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold px-7 py-3 text-xs sm:text-sm transition-all shadow-md hover:scale-102"
@@ -302,7 +260,7 @@ export default function LandingPage() {
       {/* ========================================================================= */}
       {/* 3. THREE PERSONA ONBOARDING CARDS                                         */}
       {/* ========================================================================= */}
-      <section className="py-16 max-w-6xl mx-auto px-4 sm:px-6">
+      <section className="py-8 max-w-6xl mx-auto px-4 sm:px-6">
         <div className="text-center max-w-2xl mx-auto mb-10 space-y-2">
           <h2 className="text-2xl font-bold tracking-tight text-zinc-900">How would you like to participate?</h2>
           <p className="text-xs sm:text-sm text-zinc-500">VisitExpo bridges organizers, exhibitors, and trade visitors on a single platform.</p>
