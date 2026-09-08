@@ -3,15 +3,15 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
 import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 
-// Your web app's Firebase configuration
+// Web app's Firebase configuration loaded securely from environment variables
 const firebaseConfig = {
-  apiKey: "AIzaSyDsUe5cKDd_oyYTZ-R-54VhP5avyTn85oM",
-  authDomain: "visitexpo-93c80.firebaseapp.com",
-  projectId: "visitexpo-93c80",
-  storageBucket: "visitexpo-93c80.firebasestorage.app",
-  messagingSenderId: "780192056362",
-  appId: "1:780192056362:web:11d0e2c490d82362592f53",
-  measurementId: "G-68KPJGR90N"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase safely for Next.js
