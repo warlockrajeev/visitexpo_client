@@ -51,10 +51,10 @@ export default function Navbar() {
           <a href="#events" className="hover:text-white transition-colors">
             Explore Events
           </a>
-          <Link href="/onboarding/organizer" className="hover:text-white transition-colors">
+          <Link href="/login?role=organizer&signup=true" className="hover:text-white transition-colors">
             For Organizers
           </Link>
-          <Link href="/onboarding/exhibitor" className="hover:text-white transition-colors">
+          <Link href="/login?role=exhibitor&signup=true" className="hover:text-white transition-colors">
             For Exhibitors
           </Link>
           <a href="#claim" className="hover:text-white transition-colors">
@@ -113,14 +113,14 @@ export default function Navbar() {
               Explore Events
             </a>
             <Link
-              href="/onboarding/organizer"
+              href="/login?role=organizer&signup=true"
               onClick={() => setMobileMenuOpen(false)}
               className="hover:text-white py-1 transition-colors"
             >
               For Organizers
             </Link>
             <Link
-              href="/onboarding/exhibitor"
+              href="/login?role=exhibitor&signup=true"
               onClick={() => setMobileMenuOpen(false)}
               className="hover:text-white py-1 transition-colors"
             >

@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import Navbar, { Logo } from '../components/Navbar.js';
+import ActionDiscoveryBanner from '../components/ActionDiscoveryBanner.js';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -65,10 +66,16 @@ export default function LandingPage() {
   // FAQ State
   const [openFaq, setOpenFaq] = useState(null);
 
-  // Redirect if logged in
+  // Redirect to dashboard only for organizers if they land directly on root without hashes/params
   useEffect(() => {
-    if (!loading && user) {
-      router.push('/dashboard');
+    if (!loading && user && user.role !== 'visitor') {
+      if (typeof window !== 'undefined') {
+        const hasHash = Boolean(window.location.hash);
+        const hasSearch = Boolean(window.location.search);
+        if (!hasHash && !hasSearch) {
+          router.push('/dashboard');
+        }
+      }
     }
   }, [user, loading, router]);
 
@@ -186,6 +193,18 @@ export default function LandingPage() {
     setOpenFaq(openFaq === idx ? null : idx);
   };
 
+  const handleBannerKeywordClick = (item) => {
+    if (item.action === 'events') {
+      if (item.search && item.search !== 'upcoming') {
+        setSearchQuery(item.search);
+      }
+      const el = document.getElementById('events');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-white">
@@ -247,7 +266,7 @@ export default function LandingPage() {
               <ArrowRight className="h-4 w-4" />
             </a>
             <Link
-              href="/onboarding/organizer"
+              href="/login?role=organizer&signup=true"
               className="inline-flex items-center gap-2 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/30 text-white font-bold px-7 py-3 text-xs sm:text-sm transition-all shadow-sm hover:scale-102"
             >
               For Organizers
@@ -256,6 +275,11 @@ export default function LandingPage() {
 
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* 2.5 ACTION DISCOVERY BANNER (Find What Matters & Time to Act)             */}
+      {/* ========================================================================= */}
+      <ActionDiscoveryBanner onKeywordClick={handleBannerKeywordClick} />
 
       {/* ========================================================================= */}
       {/* 3. THREE PERSONA ONBOARDING CARDS                                         */}
@@ -281,7 +305,7 @@ export default function LandingPage() {
             </div>
             <div className="pt-6">
               <Link
-                href="/onboarding/organizer"
+                href="/login?role=organizer&signup=true"
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-600 hover:text-amber-700"
               >
                 <span>Onboard as Organizer</span>
@@ -303,7 +327,7 @@ export default function LandingPage() {
             </div>
             <div className="pt-6">
               <Link
-                href="/onboarding/exhibitor"
+                href="/login?role=exhibitor&signup=true"
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-[#FF2E63] hover:text-[#E82054]"
               >
                 <span>Register as Exhibitor</span>
@@ -508,7 +532,7 @@ export default function LandingPage() {
                       <div className="text-[10px] text-zinc-500 truncate">{m.venue}</div>
                     </div>
                     <Link
-                      href={`/onboarding/organizer?wp_slug=${encodeURIComponent(m.slug || '')}&wp_post_id=${m.wpPostId || ''}`}
+                      href={`/login?role=organizer&signup=true&wp_slug=${encodeURIComponent(m.slug || '')}&wp_post_id=${m.wpPostId || ''}`}
                       className="text-[11px] font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-md shrink-0 transition-colors"
                     >
                       Claim &rarr;
@@ -520,10 +544,10 @@ export default function LandingPage() {
 
             {!claimSearch && (
               <Link
-                href="/onboarding/organizer"
+                href="/login?role=organizer&signup=true"
                 className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white font-bold px-4 py-2 text-xs transition-colors"
               >
-                <span>Launch Organizer Onboarding</span>
+                <span>Launch Organizer Portal</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             )}
@@ -706,8 +730,8 @@ export default function LandingPage() {
             <span>• Powering trade exhibitions worldwide.</span>
           </div>
           <div className="flex items-center gap-6">
-            <Link href="/onboarding/organizer" className="hover:text-zinc-800">Organizers</Link>
-            <Link href="/onboarding/exhibitor" className="hover:text-zinc-800">Exhibitors</Link>
+            <Link href="/login?role=organizer&signup=true" className="hover:text-zinc-800">Organizers</Link>
+            <Link href="/login?role=exhibitor&signup=true" className="hover:text-zinc-800">Exhibitors</Link>
             <Link href="/login" className="hover:text-zinc-800">Dashboard</Link>
           </div>
         </div>

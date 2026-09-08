@@ -35,7 +35,14 @@ import {
   PlusCircle,
   Edit3,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  Ticket,
+  MapPin,
+  Printer,
+  QrCode,
+  Search,
+  ExternalLink,
+  User
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -257,6 +264,87 @@ export function OrganizerDashboardInner() {
           >
             <ShieldCheck className="h-4 w-4" /> Claim Event
           </Link>
+        </div>
+      </div>
+
+      {/* Organizer Quick Actions Hub */}
+      <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border">
+          <div className="flex items-center gap-2">
+            <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
+            <h3 className="text-sm font-bold text-foreground">Organizer Operations &amp; Profile Hub</h3>
+          </div>
+          <span className="text-[11px] text-muted-foreground">
+            Signed in as <strong className="text-foreground">{user?.email}</strong> • Organizer Portal
+          </span>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-4">
+          {/* Organizer Setup Card */}
+          <div className="rounded-xl border border-border bg-background/50 p-4 flex flex-col justify-between hover:border-amber-400/60 transition-all space-y-3">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-amber-500 text-xs font-bold">
+                <Building className="h-4 w-4" />
+                <span>Company Branding</span>
+              </div>
+              <h4 className="text-xs font-bold text-foreground">Complete Organization Profile</h4>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Add your official branding, business address, contact details, and GST registration.
+              </p>
+            </div>
+            <div className="pt-2 flex items-center gap-2">
+              <Link
+                href="/settings"
+                className="text-xs font-bold text-amber-500 hover:text-amber-400 hover:underline inline-flex items-center gap-1"
+              >
+                <span>Edit Profile &amp; Settings</span> &rarr;
+              </Link>
+            </div>
+          </div>
+
+          {/* New Event Wizard Card */}
+          <div className="rounded-xl border border-border bg-background/50 p-4 flex flex-col justify-between hover:border-primary/60 transition-all space-y-3">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-primary text-xs font-bold">
+                <Sparkles className="h-4 w-4" />
+                <span>Launch New Expo</span>
+              </div>
+              <h4 className="text-xs font-bold text-foreground">Multi-Step Event Wizard</h4>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Publish a new trade exhibition with ticketing tiers, hall floorplans, and registration gates.
+              </p>
+            </div>
+            <div className="pt-2">
+              <Link
+                href="/events/wizard"
+                className="text-xs font-bold text-primary hover:text-primary/80 hover:underline inline-flex items-center gap-1"
+              >
+                <span>Launch Wizard</span> &rarr;
+              </Link>
+            </div>
+          </div>
+
+          {/* Claim Directory Listing Card */}
+          <div className="rounded-xl border border-border bg-background/50 p-4 flex flex-col justify-between hover:border-emerald-400/60 transition-all space-y-3">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-emerald-500 text-xs font-bold">
+                <ShieldCheck className="h-4 w-4" />
+                <span>Directory Claim</span>
+              </div>
+              <h4 className="text-xs font-bold text-foreground">Claim Pre-loaded Expos</h4>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Connect and verify ownership of trade shows pre-indexed on the VisitExpo national directory.
+              </p>
+            </div>
+            <div className="pt-2">
+              <Link
+                href="/events/claim"
+                className="text-xs font-bold text-emerald-500 hover:text-emerald-400 hover:underline inline-flex items-center gap-1"
+              >
+                <span>Claim Existing Event</span> &rarr;
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -882,11 +970,543 @@ function ExhibitorDashboard() {
   );
 }
 
+/**
+ * @component VisitorDashboard
+ * @description Dedicated, distraction-free dashboard for Visitors to manage entry passes, QR badges, and discover expos.
+ */
+function VisitorDashboard() {
+  const { user, accessToken } = useAuth();
+  const [passes, setPasses] = useState([]);
+  const [loadingPasses, setLoadingPasses] = useState(true);
+  const [expos, setExpos] = useState([]);
+  const [loadingExpos, setLoadingExpos] = useState(true);
+  const [claimingEventId, setClaimingEventId] = useState(null);
+  const [claimSuccessMessage, setClaimSuccessMessage] = useState('');
+  const [claimError, setClaimError] = useState('');
+  const [selectedPassForBadge, setSelectedPassForBadge] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Fetch visitor's registered passes
+  const fetchMyPasses = async () => {
+    try {
+      setLoadingPasses(true);
+      const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+      const res = await axios.get(`${API_URL}/visitors/my-passes`, { headers });
+      if (res.data && res.data.success) {
+        setPasses(res.data.data.docs || []);
+      }
+    } catch (err) {
+      console.warn('Could not fetch visitor passes:', err);
+    } finally {
+      setLoadingPasses(false);
+    }
+  };
+
+  // Fetch upcoming exhibitions from backend API
+  const fetchExpos = async () => {
+    try {
+      setLoadingExpos(true);
+      const res = await axios.get(`${API_URL}/events?limit=12`);
+      if (res.data && res.data.success && res.data.data.docs) {
+        setExpos(res.data.data.docs);
+      } else {
+        const fallbackRes = await axios.get(`${API_URL}/wordpress/claimable-events?limit=8`);
+        if (fallbackRes.data && fallbackRes.data.success && fallbackRes.data.data.docs) {
+          setExpos(fallbackRes.data.data.docs);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch expos:', err);
+    } finally {
+      setLoadingExpos(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMyPasses();
+    fetchExpos();
+  }, [user, accessToken]);
+
+  // Handle 1-click pass booking
+  const handleClaimPass = async (event) => {
+    setClaimError('');
+    setClaimSuccessMessage('');
+    const eventId = event._id || event.id;
+    setClaimingEventId(eventId);
+
+    try {
+      const res = await axios.post(`${API_URL}/visitors/register`, {
+        eventId,
+        name: user?.name || user?.email?.split('@')[0] || 'Visitor',
+        email: user?.email,
+        phone: user?.phone || '+91-9999999999',
+        company: user?.organization?.name || 'Trade Attendee',
+        designation: 'Business Visitor',
+        country: 'India',
+        attendanceType: 'in_person'
+      });
+
+      if (res.data && res.data.success) {
+        setClaimSuccessMessage(`Pass confirmed for "${event.title}"! Your digital badge is ready below.`);
+        await fetchMyPasses();
+      }
+    } catch (err) {
+      const errMsg = err.response?.data?.error || 'Registration could not be completed. You may already be registered.';
+      setClaimError(errMsg);
+    } finally {
+      setClaimingEventId(null);
+    }
+  };
+
+  // Set of event IDs already claimed by this visitor
+  const registeredEventIds = new Set(
+    passes.map(p => {
+      if (p.event && typeof p.event === 'object') return p.event._id;
+      return p.event;
+    }).filter(Boolean)
+  );
+
+  const filteredExpos = expos.filter(exp => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      (exp.title && exp.title.toLowerCase().includes(q)) ||
+      (exp.city && exp.city.toLowerCase().includes(q)) ||
+      (exp.category && exp.category.toLowerCase().includes(q)) ||
+      (exp.venue && exp.venue.toLowerCase().includes(q))
+    );
+  });
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto pb-16 font-sans">
+      {/* Top Banner Header */}
+      <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary uppercase tracking-wider bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
+              <Ticket className="h-3.5 w-3.5" /> Visitor &amp; Buyer Hub
+            </span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+              <CheckCircle2 className="h-3 w-3" /> Verified Account
+            </span>
+          </div>
+          <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
+            Welcome, {user?.name || 'Visitor'}!
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Access your confirmed exhibition passes, show your digital QR entry badge at the gate, and discover upcoming trade shows.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <a
+            href="#explore-expos"
+            className="inline-flex items-center gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 text-xs font-bold transition-all shadow-md shadow-primary/10 cursor-pointer"
+          >
+            <Ticket className="h-4 w-4" /> Claim Passes Here
+          </a>
+          <Link
+            href="/expos"
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-secondary hover:bg-secondary/80 px-4 py-2.5 text-xs font-bold text-foreground transition-colors cursor-pointer"
+          >
+            <Calendar className="h-4 w-4" /> Browse Live Expos &rarr;
+          </Link>
+          <button
+            onClick={fetchMyPasses}
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-secondary hover:bg-secondary/80 px-3 py-2.5 text-xs font-bold text-foreground transition-colors cursor-pointer"
+            title="Refresh Passes"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Status Alerts */}
+      {claimSuccessMessage && (
+        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-bold flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4.5 w-4.5 shrink-0" />
+            <span>{claimSuccessMessage}</span>
+          </div>
+          <button onClick={() => setClaimSuccessMessage('')} className="text-xs hover:underline cursor-pointer">Dismiss</button>
+        </div>
+      )}
+
+      {claimError && (
+        <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-bold flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4.5 w-4.5 shrink-0" />
+            <span>{claimError}</span>
+          </div>
+          <button onClick={() => setClaimError('')} className="text-xs hover:underline cursor-pointer">Dismiss</button>
+        </div>
+      )}
+
+      {/* Visitor KPI Metrics Grid */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">My Confirmed Passes</span>
+            <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+              <Ticket className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-extrabold text-foreground tracking-tight">{passes.length}</div>
+          <p className="text-[11px] text-muted-foreground">Ready for gate check-in</p>
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Live Exhibitions</span>
+            <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">
+              <Calendar className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-extrabold text-foreground tracking-tight">{expos.length}</div>
+          <p className="text-[11px] text-muted-foreground">Upcoming trade shows</p>
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Gate Entry Badge</span>
+            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500">
+              <QrCode className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-extrabold text-foreground tracking-tight">QR Scan Ready</div>
+          <p className="text-[11px] text-muted-foreground">Instant digital badge verification</p>
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Attendee Profile</span>
+            <div className="p-2.5 rounded-xl bg-pink-500/10 text-pink-500">
+              <User className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-extrabold text-foreground tracking-tight">Trade Visitor</div>
+          <p className="text-[11px] text-muted-foreground">Full delegate &amp; buyer privileges</p>
+        </div>
+      </div>
+
+      {/* SECTION 1: My Confirmed Passes & Digital Entry Badges */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
+          <div>
+            <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+              <Ticket className="h-5 w-5 text-primary" /> My Event Passes &amp; Digital Badges
+            </h3>
+            <p className="text-xs text-muted-foreground">Show these QR badges at event entry checkpoints for instant paperless entry.</p>
+          </div>
+          <span className="text-xs font-semibold text-muted-foreground">
+            Total Passes: <strong className="text-foreground">{passes.length}</strong>
+          </span>
+        </div>
+
+        {loadingPasses ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground bg-card border border-border rounded-2xl">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-xs font-medium">Loading your passes and badges...</p>
+          </div>
+        ) : passes.length === 0 ? (
+          <div className="bg-card border border-dashed border-border rounded-2xl p-8 text-center space-y-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary mx-auto">
+              <Ticket className="h-8 w-8" />
+            </div>
+            <div className="max-w-md mx-auto space-y-1">
+              <h4 className="text-sm font-bold text-foreground">No Registered Passes Yet</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                You have not registered for any exhibition passes yet. Explore upcoming trade shows below to claim your free pass in 1 click!
+              </p>
+            </div>
+            <Link
+              href="/expos"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 text-xs font-bold transition-all cursor-pointer"
+            >
+              <Calendar className="h-3.5 w-3.5" /> Explore Expos &amp; Get Passes
+            </Link>
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {passes.map((pass) => {
+              const eventTitle = pass.event?.title || 'Trade Exhibition';
+              const eventVenue = pass.event?.venue || 'Main Convention Hall';
+              const eventCity = pass.event?.city || 'India';
+              const eventDates = pass.event?.startDate
+                ? `${new Date(pass.event.startDate).toLocaleDateString()} - ${new Date(pass.event.endDate || pass.event.startDate).toLocaleDateString()}`
+                : 'Upcoming';
+
+              const qrData = pass.qrCode || `VIS-${pass._id}`;
+              const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(qrData)}`;
+
+              return (
+                <div
+                  key={pass._id}
+                  className="rounded-2xl border border-border bg-card p-5 shadow-sm hover:border-primary/50 transition-all flex flex-col justify-between space-y-4 relative overflow-hidden"
+                >
+                  {/* Decorative top accent */}
+                  <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-primary via-amber-400 to-pink-500" />
+
+                  <div className="space-y-3 pt-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 uppercase">
+                          <CheckCircle2 className="h-3 w-3" /> {pass.registrationStatus || 'Confirmed'}
+                        </span>
+                        <h4 className="text-sm font-bold text-foreground leading-snug">{eventTitle}</h4>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
+                        <span className="truncate">{eventVenue}, {eventCity}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                        <span>{eventDates}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <User className="h-3.5 w-3.5 text-pink-500 shrink-0" />
+                        <span className="font-semibold text-foreground">{pass.name}</span>
+                        {pass.company && <span className="text-[11px]">• {pass.company}</span>}
+                      </div>
+                    </div>
+
+                    {/* QR Preview Snippet */}
+                    <div className="flex items-center gap-3 bg-secondary/50 p-3 rounded-xl border border-border/60">
+                      <img
+                        src={qrUrl}
+                        alt="QR Code"
+                        className="h-14 w-14 rounded-lg bg-white p-1 border border-border object-contain"
+                      />
+                      <div className="overflow-hidden space-y-0.5">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Badge Ref Code</span>
+                        <p className="text-xs font-mono font-bold text-foreground truncate">
+                          VIS-{pass._id.slice(-6).toUpperCase()}
+                        </p>
+                        <span className="text-[10px] text-muted-foreground block">
+                          Attendance: <strong className="capitalize text-foreground">{pass.attendanceType?.replace('_', ' ') || 'In-person'}</strong>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-border flex items-center justify-between gap-2">
+                    <button
+                      onClick={() => setSelectedPassForBadge(pass)}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground py-2 px-3 text-xs font-bold transition-all shadow-sm cursor-pointer"
+                    >
+                      <QrCode className="h-3.5 w-3.5" /> View QR Badge
+                    </button>
+                    <Link
+                      href="/expos"
+                      className="p-2 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      title="Explore Event Details"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 2: Explore & Claim Passes for Upcoming Trade Expos */}
+      <div id="explore-expos" className="space-y-4 pt-4 border-t border-border scroll-mt-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
+          <div>
+            <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-primary" /> Explore &amp; Claim Visitor Passes
+            </h3>
+            <p className="text-xs text-muted-foreground">Claim free entry passes for upcoming trade shows in 1 click.</p>
+          </div>
+
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search expos by title, city..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-4 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-all"
+            />
+          </div>
+        </div>
+
+        {loadingExpos ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground bg-card border border-border rounded-2xl">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-xs font-medium">Fetching upcoming exhibitions...</p>
+          </div>
+        ) : filteredExpos.length === 0 ? (
+          <div className="bg-card border border-border rounded-2xl p-8 text-center text-muted-foreground text-xs">
+            No trade shows found matching your search.
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredExpos.map((expo) => {
+              const expoId = expo._id || expo.id;
+              const isClaimed = registeredEventIds.has(expoId);
+              const isClaiming = claimingEventId === expoId;
+              const expoDates = expo.startDate
+                ? `${new Date(expo.startDate).toLocaleDateString()} - ${new Date(expo.endDate || expo.startDate).toLocaleDateString()}`
+                : 'Upcoming 2026';
+
+              return (
+                <div
+                  key={expoId}
+                  className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm hover:border-primary/50 transition-all flex flex-col justify-between"
+                >
+                  <div className="relative h-32 bg-zinc-900 overflow-hidden">
+                    {expo.banner ? (
+                      <img src={expo.banner} alt={expo.title} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="h-full w-full bg-gradient-to-tr from-zinc-900 via-zinc-800 to-zinc-900 flex items-center justify-center">
+                        <Calendar className="h-10 w-10 text-muted-foreground/30" />
+                      </div>
+                    )}
+                    <span className="absolute top-2.5 right-2.5 rounded-full bg-black/60 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-white border border-white/10">
+                      {expo.category || 'Trade Show'}
+                    </span>
+                  </div>
+
+                  <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
+                    <div className="space-y-1.5">
+                      <h4 className="text-sm font-bold text-foreground line-clamp-1">{expo.title}</h4>
+                      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                        {expo.shortDescription || expo.description || 'Join industry leaders and explore prime exhibits.'}
+                      </p>
+                      <div className="pt-1 space-y-1 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
+                          <span className="truncate">{expo.venue || 'Convention Center'}, {expo.city || 'India'}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                          <span>{expoDates}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-border">
+                      {isClaimed ? (
+                        <div className="w-full py-2 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-bold flex items-center justify-center gap-1.5">
+                          <CheckCircle2 className="h-4 w-4" /> Pass Confirmed
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleClaimPass(expo)}
+                          disabled={isClaiming}
+                          className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-2 text-xs transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                        >
+                          {isClaiming ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Issuing Badge...
+                            </>
+                          ) : (
+                            <>
+                              <Ticket className="h-3.5 w-3.5" /> Claim Free Visitor Pass
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* MODAL: Printable Digital QR Entry Badge */}
+      {selectedPassForBadge && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="relative w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-5 text-center">
+            {/* Close Button */}
+            <button
+              onClick={() => setSelectedPassForBadge(null)}
+              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground text-xs p-1 rounded-lg border border-border bg-secondary cursor-pointer"
+            >
+              ✕
+            </button>
+
+            {/* Badge Header */}
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20">
+                <Ticket className="h-3 w-3" /> VisitExpo Verified Badge
+              </div>
+              <h3 className="text-base font-extrabold text-foreground leading-tight pt-1">
+                {selectedPassForBadge.event?.title || 'Trade Exhibition'}
+              </h3>
+              <p className="text-[11px] text-muted-foreground">
+                {selectedPassForBadge.event?.venue}, {selectedPassForBadge.event?.city}
+              </p>
+            </div>
+
+            {/* Attendee Name & Role Banner */}
+            <div className="bg-secondary/70 border border-border rounded-2xl p-3.5 space-y-1">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Attendee</span>
+              <h2 className="text-lg font-extrabold text-foreground">{selectedPassForBadge.name}</h2>
+              <span className="inline-block text-[11px] font-bold text-amber-500 uppercase">
+                {selectedPassForBadge.company || 'Trade Visitor'}
+              </span>
+            </div>
+
+            {/* High-Resolution QR Code */}
+            <div className="flex flex-col items-center justify-center p-3 bg-white rounded-2xl border border-zinc-300 shadow-inner">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(selectedPassForBadge.qrCode || `VIS-${selectedPassForBadge._id}`)}`}
+                alt="Entry QR Code"
+                className="h-44 w-44 object-contain"
+              />
+              <span className="text-[10px] font-mono font-bold text-zinc-800 mt-2 tracking-widest">
+                VIS-{selectedPassForBadge._id.slice(-8).toUpperCase()}
+              </span>
+            </div>
+
+            <p className="text-[11px] text-muted-foreground">
+              Present this digital pass at the entrance scanner for instant check-in.
+            </p>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-2.5 text-xs shadow-md transition-all cursor-pointer"
+              >
+                <Printer className="h-4 w-4" /> Print Badge
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedPassForBadge(null)}
+                className="rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground font-bold py-2.5 px-4 text-xs transition-colors cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardHome() {
   const { user, isExhibitorView } = useAuth();
+
+  if (user && user.role === 'visitor') {
+    return <VisitorDashboard />;
+  }
 
   if (user && (user.role === 'exhibitor' || isExhibitorView)) {
     return <ExhibitorDashboard />;
   }
+
   return <OrganizerDashboardInner />;
 }

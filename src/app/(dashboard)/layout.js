@@ -47,7 +47,21 @@ export default function DashboardLayout({ children }) {
     }
   }, [user, loading, router]);
 
-  // Dynamically fetch live directory events from backend API for sidebar
+  // Strict role-based route protection: prevent visitors and exhibitors from accessing organizer features
+  useEffect(() => {
+    if (!loading && user) {
+      const organizerRoutes = ['/events', '/exhibitors', '/visitors', '/leads', '/campaigns', '/tickets'];
+      const isOrganizerRoute = organizerRoutes.some(route => pathname.startsWith(route));
+
+      if (user.role === 'visitor' && isOrganizerRoute) {
+        router.replace('/dashboard');
+      } else if (user.role === 'exhibitor' && !isExhibitorView && isOrganizerRoute) {
+        router.replace('/dashboard');
+      }
+    }
+  }, [user, loading, pathname, router, isExhibitorView]);
+
+  // Dynamically fetch live directory events from backend API for organizer sidebar only
   useEffect(() => {
     const fetchDynamicSidebarEvents = async () => {
       try {
@@ -60,10 +74,10 @@ export default function DashboardLayout({ children }) {
       }
     };
 
-    if (user && user.isVerified) {
+    if (user && user.isVerified && user.role !== 'visitor' && user.role !== 'exhibitor' && !isExhibitorView) {
       fetchDynamicSidebarEvents();
     }
-  }, [user]);
+  }, [user, isExhibitorView]);
 
   if (loading) {
     return (
@@ -145,7 +159,13 @@ export default function DashboardLayout({ children }) {
     );
   }
 
-  const navigation = (user.role === 'exhibitor' || isExhibitorView)
+  const navigation = user.role === 'visitor'
+    ? [
+        { name: 'My Passes & Badges', href: '/dashboard', icon: Ticket },
+        { name: 'Browse Live Expos', href: '/expos', icon: Calendar },
+        { name: 'My Profile & Settings', href: '/settings', icon: Settings },
+      ]
+    : (user.role === 'exhibitor' || isExhibitorView)
     ? [
         { name: 'Exhibitor Hub', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Settings', href: '/settings', icon: Settings },
@@ -164,14 +184,17 @@ export default function DashboardLayout({ children }) {
       ];
 
   const getPageTitle = (path) => {
-    if (path === '/dashboard') {
-      return (user.role === 'exhibitor' || isExhibitorView) ? 'Exhibitor Hub' : 'Organizer Dashboard Hub';
+    if (!path || path === '/dashboard') {
+      if (user?.role === 'visitor') return 'Visitor Pass & Expo Hub';
+      if (user?.role === 'exhibitor' || isExhibitorView) return 'Exhibitor Hub';
+      return 'Organizer Dashboard Hub';
     }
+    if (path === '/expos') return 'Live Exhibitions & Passes';
     if (path === '/events/wizard') return 'Event Onboarding Wizard';
     if (path === '/events/claim') return 'Claim Existing Event';
     if (path === '/events') return 'Event Management';
-    const clean = path.replace('/', '').replace(/-/g, ' ');
-    return clean.charAt(0).toUpperCase() + clean.slice(1);
+    const clean = (path || '').replace('/', '').replace(/-/g, ' ');
+    return clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : 'Dashboard';
   };
 
   return (
@@ -282,14 +305,26 @@ export default function DashboardLayout({ children }) {
               {user?.name?.slice(0, 2) || 'OR'}
             </div>
             <div className="flex-1 overflow-hidden">
-              <p className="text-xs font-bold truncate text-foreground">{user?.name || 'Expo Organizer'}</p>
+              <p className="text-xs font-bold truncate text-foreground">{user?.name || 'User'}</p>
               <span className="text-[10px] text-muted-foreground capitalize flex items-center gap-1">
-                <Building className="h-3 w-3 text-primary" /> {user?.role || 'Organizer'}
+                {user?.role === 'visitor' ? (
+                  <>
+                    <Ticket className="h-3 w-3 text-primary" /> Visitor / Attendee
+                  </>
+                ) : user?.role === 'exhibitor' ? (
+                  <>
+                    <Building className="h-3 w-3 text-amber-500" /> Exhibitor
+                  </>
+                ) : (
+                  <>
+                    <Building className="h-3 w-3 text-primary" /> {user?.role || 'Organizer'}
+                  </>
+                )}
               </span>
             </div>
             <button
               onClick={logout}
-              className="text-muted-foreground hover:text-destructive transition-colors p-1"
+              className="text-muted-foreground hover:text-destructive transition-colors p-1 cursor-pointer"
               title="Logout"
             >
               <LogOut className="h-4.5 w-4.5" />
@@ -315,39 +350,45 @@ export default function DashboardLayout({ children }) {
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            {hasExhibitorProfile && (
-              <button
-                onClick={() => setIsExhibitorView(!isExhibitorView)}
-                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all shadow-sm ${
-                  isExhibitorView
-                    ? 'bg-amber-500/10 border-amber-500/20 text-amber-500 hover:bg-amber-500/20'
-                    : 'bg-primary/10 border-primary/20 text-primary hover:bg-primary/20'
-                }`}
-              >
-                {isExhibitorView ? (
-                  <>
-                    <Building className="h-3.5 w-3.5" /> Switch to Organizer View
-                  </>
-                ) : (
-                  <>
-                    <LayoutDashboard className="h-3.5 w-3.5" /> Switch to Exhibitor View
-                  </>
-                )}
-              </button>
-            )}
-            {user.role !== 'exhibitor' && !isExhibitorView && (
+            {user?.role === 'visitor' ? (
               <Link
-                href="/events/wizard"
+                href="/expos"
                 className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"
               >
-                <Sparkles className="h-3.5 w-3.5" /> Start Onboarding
+                <Ticket className="h-3.5 w-3.5" /> Browse Live Expos
               </Link>
+            ) : (
+              <>
+                {hasExhibitorProfile && (
+                  <button
+                    onClick={() => setIsExhibitorView(!isExhibitorView)}
+                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all shadow-sm ${
+                      isExhibitorView
+                        ? 'bg-amber-500/10 border-amber-500/20 text-amber-500 hover:bg-amber-500/20'
+                        : 'bg-primary/10 border-primary/20 text-primary hover:bg-primary/20'
+                    }`}
+                  >
+                    {isExhibitorView ? (
+                      <>
+                        <Building className="h-3.5 w-3.5" /> Switch to Organizer View
+                      </>
+                    ) : (
+                      <>
+                        <LayoutDashboard className="h-3.5 w-3.5" /> Switch to Exhibitor View
+                      </>
+                    )}
+                  </button>
+                )}
+                {user.role !== 'exhibitor' && !isExhibitorView && (
+                  <Link
+                    href="/events/wizard"
+                    className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" /> Start Onboarding
+                  </Link>
+                )}
+              </>
             )}
-            {/* {user.role !== 'exhibitor' && !isExhibitorView && (
-              <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-500 ring-1 ring-inset ring-emerald-500/20">
-                Sync Active
-              </span>
-            )} */}
           </div>
         </header>
 

@@ -123,20 +123,36 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signup = async (name, email, password, orgName) => {
+  const signup = async (name, email, password, orgName, role = 'organizer') => {
     setLoading(true);
     try {
       const res = await axios.post(`${API_URL}/auth/signup`, {
         name,
         email,
         password,
-        organizationName: orgName
+        organizationName: orgName,
+        role
       });
       setUser(res.data.user);
       setAccessToken(res.data.accessToken);
       return { success: true };
     } catch (error) {
       const msg = error.response?.data?.error || 'Registration failed';
+      return { success: false, error: msg };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginWithGoogle = async (googlePayload) => {
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API_URL}/auth/google`, googlePayload);
+      setUser(res.data.user);
+      setAccessToken(res.data.accessToken);
+      return { success: true, user: res.data.user };
+    } catch (error) {
+      const msg = error.response?.data?.error || 'Google authentication failed';
       return { success: false, error: msg };
     } finally {
       setLoading(false);
@@ -167,6 +183,7 @@ export const AuthProvider = ({ children }) => {
       loading,
       login,
       signup,
+      loginWithGoogle,
       logout,
       updateUser: (updatedUser) => setUser(updatedUser),
       isExhibitorView,
