@@ -35,7 +35,8 @@ import {
   Lock,
   CheckCircle2,
   Tag,
-  Play
+  Play,
+  ArrowRight
 } from 'lucide-react';
 
 export default function EventDetailModal({
