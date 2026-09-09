@@ -50,7 +50,6 @@ import axios from 'axios';
 import Navbar, { Logo } from '../components/Navbar.js';
 import ActionDiscoveryBanner from '../components/ActionDiscoveryBanner.js';
 import GatedAuthModal from '../components/GatedAuthModal.js';
-import EventDetailModal from '../components/EventDetailModal.js';
 import AdvertiseModal from '../components/AdvertiseModal.js';
 import BrowseByCategory from '../components/BrowseByCategory.js';
 import BrowseByCity from '../components/BrowseByCity.js';
@@ -74,7 +73,6 @@ export default function LandingPage() {
   const [quickFilter, setQuickFilter] = useState('all');
 
   // 10times Unregistered & Gated Flow States
-  const [selectedEventDetail, setSelectedEventDetail] = useState(null);
   const [gatedAuthContext, setGatedAuthContext] = useState(null); // { action, event }
   const [showAdvertiseModal, setShowAdvertiseModal] = useState(false);
   const [savedEventIds, setSavedEventIds] = useState(new Set());
@@ -781,9 +779,9 @@ export default function LandingPage() {
 
                 <div className="space-y-3">
                   {trendingEvents.map((tr) => (
-                    <div
+                    <Link
                       key={tr.id}
-                      onClick={() => setSelectedEventDetail(tr)}
+                      href={`/expo/${tr.slug || tr.id}`}
                       className="group p-2 -mx-2 rounded-xl hover:bg-zinc-50 transition-colors flex items-center gap-3 cursor-pointer"
                     >
                       <img
@@ -807,7 +805,7 @@ export default function LandingPage() {
                           <span className="text-zinc-500">{tr.interestedCount.toLocaleString()}+ Going</span>
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
 
@@ -1016,7 +1014,10 @@ export default function LandingPage() {
                         className="bg-white border border-zinc-200 rounded-2xl overflow-hidden hover:border-zinc-300 hover:shadow-md transition-all flex flex-col justify-between group"
                       >
                         {/* Card Image Banner */}
-                        <div className="relative h-44 w-full bg-zinc-100 overflow-hidden">
+                        <Link
+                          href={`/expo/${expo.slug || expo.id}`}
+                          className="relative h-44 w-full bg-zinc-100 overflow-hidden block"
+                        >
                           <img
                             src={expo.image}
                             alt={expo.title}
@@ -1036,8 +1037,12 @@ export default function LandingPage() {
                           {/* Quick Bookmark Button */}
                           <button
                             type="button"
-                            onClick={() => handleTriggerGated('save', expo)}
-                            className="absolute bottom-3 right-3 p-2 rounded-full bg-white/90 hover:bg-white text-zinc-700 shadow-sm transition-transform active:scale-90 cursor-pointer"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleTriggerGated('save', expo);
+                            }}
+                            className="absolute bottom-3 right-3 p-2 rounded-full bg-white/90 hover:bg-white text-zinc-700 shadow-sm transition-transform active:scale-90 cursor-pointer z-10"
                             title={isSaved ? 'Remove Bookmark' : 'Save Event'}
                           >
                             <Bookmark
@@ -1046,7 +1051,7 @@ export default function LandingPage() {
                               }`}
                             />
                           </button>
-                        </div>
+                        </Link>
 
                         {/* Card Body */}
                         <div className="p-5 space-y-3 flex-1 flex flex-col justify-between">
@@ -1068,12 +1073,14 @@ export default function LandingPage() {
                             </div>
 
                             {/* Title */}
-                            <h3
-                              onClick={() => setSelectedEventDetail(expo)}
-                              className="font-extrabold text-sm text-zinc-900 line-clamp-1 hover:text-[#FF2E63] cursor-pointer transition-colors"
-                              title={expo.title}
-                            >
-                              {expo.title}
+                            <h3 className="font-extrabold text-sm text-zinc-900 line-clamp-1 hover:text-[#FF2E63] transition-colors">
+                              <Link
+                                href={`/expo/${expo.slug || expo.id}`}
+                                className="block"
+                                title={expo.title}
+                              >
+                                {expo.title}
+                              </Link>
                             </h3>
 
                             {/* Date & Venue */}
@@ -1092,13 +1099,12 @@ export default function LandingPage() {
 
                           {/* Card Action Bar */}
                           <div className="pt-3 border-t border-zinc-100 flex items-center justify-between gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedEventDetail(expo)}
+                            <Link
+                              href={`/expo/${expo.slug || expo.id}`}
                               className="text-xs font-bold text-zinc-700 hover:text-zinc-950 cursor-pointer"
                             >
                               View Details
-                            </button>
+                            </Link>
 
                             <div className="flex items-center gap-2">
                               <Link
@@ -1415,17 +1421,6 @@ export default function LandingPage() {
         onClose={() => setGatedAuthContext(null)}
         context={gatedAuthContext}
         onSuccess={handleAuthSuccess}
-      />
-
-      <EventDetailModal
-        isOpen={Boolean(selectedEventDetail)}
-        onClose={() => setSelectedEventDetail(null)}
-        event={selectedEventDetail}
-        isLoggedIn={Boolean(user)}
-        isSaved={selectedEventDetail ? savedEventIds.has(selectedEventDetail.id) : false}
-        onToggleSave={() => handleTriggerGated('save', selectedEventDetail)}
-        onTriggerGated={(action, ev) => handleTriggerGated(action, ev)}
-        onClaimTicketSuccess={(ev) => executeGatedAction('ticket', ev, user)}
       />
 
       <AdvertiseModal

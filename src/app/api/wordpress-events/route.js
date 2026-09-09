@@ -117,7 +117,7 @@ export async function GET(request) {
       return {
         id: evt._id || evt.id || `wp-${idx}`,
         title: evt.title || 'Exhibition Event',
-        slug: evt.slug || '',
+        slug: evt.slug || (evt.title ? evt.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : `event-${idx}`),
         description: (evt.description || '').replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&hellip;/g, '...'),
         category: category,
         city: cleanCity,
