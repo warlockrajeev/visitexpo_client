@@ -10,6 +10,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '../context/AuthContext.js';
 import {
   ArrowRight,
@@ -35,8 +36,10 @@ export const Logo = ({ className = "w-9 h-9" }) => (
   />
 );
 
-export default function Navbar() {
+export default function Navbar({ solid = false }) {
   const { user, logout } = useAuth();
+  const pathname = usePathname();
+  const isSolid = solid || (pathname && pathname !== '/');
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
@@ -94,11 +97,11 @@ export default function Navbar() {
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled || mobileMenuOpen
-          ? 'bg-zinc-950/90 backdrop-blur-md border-b border-zinc-800 shadow-lg shadow-black/20 py-3'
+        scrolled || mobileMenuOpen || isSolid
+          ? 'bg-zinc-950/95 backdrop-blur-md border-b border-zinc-800 shadow-lg shadow-black/20 py-3'
           : 'bg-transparent py-4 border-b-0'
       }`}
-      style={!scrolled && !mobileMenuOpen ? { borderBottom: 'none' } : undefined}
+      style={!scrolled && !mobileMenuOpen && !isSolid ? { borderBottom: 'none' } : undefined}
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between">
         {/* Logo */}

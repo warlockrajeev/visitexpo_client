@@ -265,7 +265,7 @@ export default function ExpoDetailsPage() {
   if (loading && !event) {
     return (
       <div className="min-h-screen bg-white">
-        <Navbar />
+        <Navbar solid={true} />
         <div className="flex items-center justify-center pt-32 pb-24">
           <div className="text-center space-y-3">
             <div className="h-10 w-10 border-3 border-[#FF2E63] border-t-transparent rounded-full animate-spin mx-auto" />
@@ -285,7 +285,7 @@ export default function ExpoDetailsPage() {
     <div className="min-h-screen bg-[#F6F7F9] text-zinc-900 font-sans antialiased selection:bg-[#FF2E63] selection:text-white pb-20">
       
       {/* Universal Navbar */}
-      <Navbar />
+      <Navbar solid={true} />
 
       {/* Main Container */}
       <main className="pt-20 sm:pt-24 max-w-7xl mx-auto px-4 sm:px-6 space-y-6">
