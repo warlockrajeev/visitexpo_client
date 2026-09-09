@@ -824,36 +824,6 @@ export default function LandingPage() {
                 </button>
               </div>
 
-              {/* ----------------------------------------------------------- */}
-              {/* ORGANIZER SOFTWARE / 10TIMES FLOOR SOLUTION CARD           */}
-              {/* ----------------------------------------------------------- */}
-              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-900 via-zinc-950 to-zinc-900 text-white p-5 border border-zinc-800 space-y-3.5 shadow-md">
-                <div className="flex items-center justify-between">
-                  <span className="text-[9px] font-extrabold tracking-wider uppercase px-2 py-0.5 rounded bg-purple-500/30 text-purple-300 border border-purple-400/30">
-                    Organizer Portal
-                  </span>
-                  <Layers className="h-4 w-4 text-purple-400" />
-                </div>
-
-                <div className="space-y-1.5">
-                  <h4 className="text-sm font-extrabold text-white leading-snug">
-                    Interactive 3D Floorplan &amp; QR Lead Scanner
-                  </h4>
-                  <p className="text-[11px] text-zinc-300 leading-relaxed">
-                    Automate stall allocations, sync live floor maps with visitexpo.in, and equip exhibitors with instant badge scanning tools.
-                  </p>
-                </div>
-
-                <div className="pt-1">
-                  <Link
-                    href="/login?role=organizer&signup=true"
-                    className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-3 rounded-xl bg-white hover:bg-zinc-100 text-zinc-950 text-xs font-bold transition-all shadow-xs"
-                  >
-                    <span>Launch Organizer Suite</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Link>
-                </div>
-              </div>
 
               {/* ----------------------------------------------------------- */}
               {/* VISITEXPO VISITOR GUARANTEE & BENEFITS                      */}
