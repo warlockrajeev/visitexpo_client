@@ -46,6 +46,8 @@ import ActionDiscoveryBanner from '../components/ActionDiscoveryBanner.js';
 import GatedAuthModal from '../components/GatedAuthModal.js';
 import EventDetailModal from '../components/EventDetailModal.js';
 import AdvertiseModal from '../components/AdvertiseModal.js';
+import BrowseByCategory from '../components/BrowseByCategory.js';
+import BrowseByCity from '../components/BrowseByCity.js';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -302,6 +304,39 @@ export default function LandingPage() {
     }
   };
 
+  const handleCategorySelect = (cat) => {
+    setSelectedCategory(cat.name);
+    const n = (cat.filterKey || cat.name || '').toLowerCase();
+    if (n.includes('tech') || n.includes('it')) setActiveCategoryTab('tech');
+    else if (n.includes('med') || n.includes('pharma') || n.includes('health')) setActiveCategoryTab('healthcare');
+    else if (n.includes('auto')) setActiveCategoryTab('automotive');
+    else if (n.includes('build') || n.includes('construct')) setActiveCategoryTab('construction');
+    else if (n.includes('logistics') || n.includes('cargo')) setActiveCategoryTab('logistics');
+    else setActiveCategoryTab('all');
+
+    const el = document.getElementById('events');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleCitySelect = (cityName) => {
+    setSelectedCity(cityName);
+    const el = document.getElementById('events');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleResetCategory = () => {
+    setSelectedCategory('');
+    setActiveCategoryTab('all');
+    const el = document.getElementById('events');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-white">
@@ -377,6 +412,24 @@ export default function LandingPage() {
       {/* 2.5 ACTION DISCOVERY BANNER (Find What Matters & Time to Act)             */}
       {/* ========================================================================= */}
       <ActionDiscoveryBanner onKeywordClick={handleBannerKeywordClick} />
+
+      {/* ========================================================================= */}
+      {/* 2.6 10TIMES BROWSE BY CATEGORY                                            */}
+      {/* ========================================================================= */}
+      <BrowseByCategory
+        activeCategory={selectedCategory}
+        onSelectCategory={handleCategorySelect}
+        onResetCategory={handleResetCategory}
+      />
+
+      {/* ========================================================================= */}
+      {/* 2.7 10TIMES BROWSE EVENTS BY CITY                                         */}
+      {/* ========================================================================= */}
+      <BrowseByCity
+        activeCity={selectedCity}
+        onSelectCity={handleCitySelect}
+        onResetCity={() => setSelectedCity('')}
+      />
 
       {/* ========================================================================= */}
       {/* 3. THREE PERSONA ONBOARDING CARDS                                         */}
