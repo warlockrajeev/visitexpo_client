@@ -435,27 +435,9 @@ export default function LandingPage() {
       <ActionDiscoveryBanner onKeywordClick={handleBannerKeywordClick} />
 
       {/* ========================================================================= */}
-      {/* 2.6 10TIMES BROWSE BY CATEGORY                                            */}
-      {/* ========================================================================= */}
-      <BrowseByCategory
-        activeCategory={selectedCategory}
-        onSelectCategory={handleCategorySelect}
-        onResetCategory={handleResetCategory}
-      />
-
-      {/* ========================================================================= */}
-      {/* 2.7 10TIMES BROWSE EVENTS BY CITY                                         */}
-      {/* ========================================================================= */}
-      <BrowseByCity
-        activeCity={selectedCity}
-        onSelectCity={handleCitySelect}
-        onResetCity={() => setSelectedCity('')}
-      />
-
-      {/* ========================================================================= */}
       {/* 3. THREE PERSONA ONBOARDING CARDS                                         */}
       {/* ========================================================================= */}
-      <section className="py-8 max-w-6xl mx-auto px-4 sm:px-6">
+      <section className="py-10 max-w-6xl mx-auto px-4 sm:px-6">
         <div className="text-center max-w-2xl mx-auto mb-10 space-y-2">
           <h2 className="text-2xl font-bold tracking-tight text-zinc-900">How would you like to participate?</h2>
           <p className="text-xs sm:text-sm text-zinc-500">VisitExpo bridges organizers, exhibitors, and trade visitors on a single platform.</p>
@@ -529,6 +511,25 @@ export default function LandingPage() {
             </div>
           </div>
 
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* 3.5 10TIMES BROWSE BY CATEGORY & BROWSE EVENTS BY CITY (DISCOVERY HUB)    */}
+      {/* ========================================================================= */}
+      <section className="py-12 bg-zinc-50/70 border-t border-zinc-200/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-10">
+          <BrowseByCategory
+            activeCategory={selectedCategory}
+            onSelectCategory={handleCategorySelect}
+            onResetCategory={handleResetCategory}
+          />
+
+          <BrowseByCity
+            activeCity={selectedCity}
+            onSelectCity={handleCitySelect}
+            onResetCity={() => setSelectedCity('')}
+          />
         </div>
       </section>
 
