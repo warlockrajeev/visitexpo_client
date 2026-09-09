@@ -38,7 +38,13 @@ import {
   TrendingUp,
   ShieldCheck,
   SlidersHorizontal,
-  Sliders
+  Sliders,
+  Headphones,
+  QrCode,
+  Award,
+  Send,
+  Check,
+  HelpCircle
 } from 'lucide-react';
 import axios from 'axios';
 import Navbar, { Logo } from '../components/Navbar.js';
@@ -81,6 +87,10 @@ export default function LandingPage() {
   const [entryTypeFilter, setEntryTypeFilter] = useState('all'); // 'all' | 'free'
   const [sortBy, setSortBy] = useState('upcoming'); // 'upcoming' | 'rating' | 'popularity'
   const [visibleEventCount, setVisibleEventCount] = useState(8);
+
+  // Newsletter & Sidebar Widgets State
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
 
   // Claim Quick Search State
   const [claimSearch, setClaimSearch] = useState('');
@@ -215,6 +225,19 @@ export default function LandingPage() {
   const displayedEvents = useMemo(() => {
     return filteredEvents.slice(0, visibleEventCount);
   }, [filteredEvents, visibleEventCount]);
+
+  // Top trending trade shows for sidebar discovery
+  const trendingEvents = useMemo(() => {
+    return [...enrichedEvents].sort((a, b) => b.interestedCount - a.interestedCount).slice(0, 3);
+  }, [enrichedEvents]);
+
+  const handleNewsletterSubmit = (e) => {
+    e.preventDefault();
+    if (!newsletterEmail.trim()) return;
+    setNewsletterSubscribed(true);
+    showToast('Subscribed! You will receive weekly exhibition alerts in your inbox.');
+    setNewsletterEmail('');
+  };
 
   // 10times Gated Action Handler
   const handleTriggerGated = (action, event) => {
@@ -738,6 +761,217 @@ export default function LandingPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* ----------------------------------------------------------- */}
+              {/* TOP RATED & TRENDING TRADE SHOWS WIDGET                    */}
+              {/* ----------------------------------------------------------- */}
+              <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-[#FF2E63]" />
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-900">
+                      Trending Exhibitions
+                    </h4>
+                  </div>
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                    High Demand
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {trendingEvents.map((tr) => (
+                    <div
+                      key={tr.id}
+                      onClick={() => setSelectedEventDetail(tr)}
+                      className="group p-2 -mx-2 rounded-xl hover:bg-zinc-50 transition-colors flex items-center gap-3 cursor-pointer"
+                    >
+                      <img
+                        src={tr.image}
+                        alt={tr.title}
+                        className="h-12 w-12 rounded-lg object-cover shrink-0 border border-zinc-200 group-hover:scale-103 transition-transform"
+                      />
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <div className="font-bold text-xs text-zinc-900 line-clamp-1 group-hover:text-[#FF2E63] transition-colors">
+                          {tr.title}
+                        </div>
+                        <div className="text-[10px] text-zinc-500 truncate">
+                          {tr.city} • {tr.dates}
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px]">
+                          <span className="font-bold text-amber-700 flex items-center gap-0.5">
+                            <Star className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />
+                            {tr.rating}
+                          </span>
+                          <span className="text-zinc-400">•</span>
+                          <span className="text-zinc-500">{tr.interestedCount.toLocaleString()}+ Going</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSortBy('popularity');
+                    const el = document.getElementById('events');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="w-full text-center text-xs font-bold text-[#FF2E63] hover:underline pt-1 block cursor-pointer"
+                >
+                  View All Trending Shows &rarr;
+                </button>
+              </div>
+
+              {/* ----------------------------------------------------------- */}
+              {/* ORGANIZER SOFTWARE / 10TIMES FLOOR SOLUTION CARD           */}
+              {/* ----------------------------------------------------------- */}
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-900 via-zinc-950 to-zinc-900 text-white p-5 border border-zinc-800 space-y-3.5 shadow-md">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-extrabold tracking-wider uppercase px-2 py-0.5 rounded bg-purple-500/30 text-purple-300 border border-purple-400/30">
+                    Organizer Portal
+                  </span>
+                  <Layers className="h-4 w-4 text-purple-400" />
+                </div>
+
+                <div className="space-y-1.5">
+                  <h4 className="text-sm font-extrabold text-white leading-snug">
+                    Interactive 3D Floorplan &amp; QR Lead Scanner
+                  </h4>
+                  <p className="text-[11px] text-zinc-300 leading-relaxed">
+                    Automate stall allocations, sync live floor maps with visitexpo.in, and equip exhibitors with instant badge scanning tools.
+                  </p>
+                </div>
+
+                <div className="pt-1">
+                  <Link
+                    href="/login?role=organizer&signup=true"
+                    className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-3 rounded-xl bg-white hover:bg-zinc-100 text-zinc-950 text-xs font-bold transition-all shadow-xs"
+                  >
+                    <span>Launch Organizer Suite</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              </div>
+
+              {/* ----------------------------------------------------------- */}
+              {/* VISITEXPO VISITOR GUARANTEE & BENEFITS                      */}
+              {/* ----------------------------------------------------------- */}
+              <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs space-y-3.5">
+                <div className="flex items-center gap-2 border-b border-zinc-100 pb-2.5">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-900">
+                    Trade Visitor Benefits
+                  </h4>
+                </div>
+
+                <div className="space-y-2.5 text-xs text-zinc-600">
+                  <div className="flex items-start gap-2.5">
+                    <div className="h-5 w-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                      <Ticket className="h-3 w-3" />
+                    </div>
+                    <div>
+                      <strong className="text-zinc-900 text-[11px] block">100% Free Visitor Passes</strong>
+                      <span className="text-[11px] text-zinc-500">Fast-track QR barcode badges for hassle-free venue entry.</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2.5">
+                    <div className="h-5 w-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                      <Users className="h-3 w-3" />
+                    </div>
+                    <div>
+                      <strong className="text-zinc-900 text-[11px] block">B2B Buyer Matchmaking</strong>
+                      <span className="text-[11px] text-zinc-500">Request meetings with confirmed exhibitors in advance.</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2.5">
+                    <div className="h-5 w-5 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
+                      <QrCode className="h-3 w-3" />
+                    </div>
+                    <div>
+                      <strong className="text-zinc-900 text-[11px] block">Digital Brochure Downloads</strong>
+                      <span className="text-[11px] text-zinc-500">Save product specs and catalogs directly to your mobile pass.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ----------------------------------------------------------- */}
+              {/* EXHIBITION CONCIERGE & STALL INQUIRIES DESK                 */}
+              {/* ----------------------------------------------------------- */}
+              <div className="bg-amber-50/60 border border-amber-200/80 rounded-2xl p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-7 w-7 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center">
+                    <Headphones className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-zinc-900">Exhibition Concierge Desk</h4>
+                    <span className="text-[10px] text-amber-800 font-semibold">Free Expert Advice</span>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-zinc-600 leading-relaxed">
+                  Need help booking custom exhibitor stalls, arranging delegation passes, or finding local hotel shuttles?
+                </p>
+
+                <div className="pt-1 flex items-center gap-2">
+                  <a
+                    href="#contact"
+                    className="flex-1 text-center py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs transition-colors"
+                  >
+                    Talk to Concierge
+                  </a>
+                  <a
+                    href="mailto:contact@visitexpo.in"
+                    className="py-2 px-3 rounded-lg bg-white border border-amber-300 text-amber-900 font-bold text-xs hover:bg-amber-50 transition-colors"
+                    title="Email Support"
+                  >
+                    <Mail className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+              </div>
+
+              {/* ----------------------------------------------------------- */}
+              {/* WEEKLY EXPO ALERTS NEWSLETTER WIDGET                        */}
+              {/* ----------------------------------------------------------- */}
+              <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs space-y-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-900">
+                    <Mail className="h-3.5 w-3.5 text-[#FF2E63]" />
+                    <span>Weekly Trade Expo Newsletter</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 leading-relaxed">
+                    Get newly announced exhibitions, delegate discount codes, and VIP passes delivered every Monday.
+                  </p>
+                </div>
+
+                {newsletterSubscribed ? (
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span>Subscribed! Check your inbox Monday.</span>
+                  </div>
+                ) : (
+                  <form onSubmit={handleNewsletterSubmit} className="space-y-2">
+                    <input
+                      type="email"
+                      required
+                      placeholder="Your corporate email..."
+                      value={newsletterEmail}
+                      onChange={(e) => setNewsletterEmail(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                    />
+                    <button
+                      type="submit"
+                      className="w-full py-2 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span>Get Free Weekly Alerts</span>
+                      <Send className="h-3 w-3" />
+                    </button>
+                  </form>
+                )}
               </div>
 
             </div>
