@@ -103,7 +103,7 @@ export default function LoginPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (!loading && user) {
-      router.push('/');
+      router.push(user.role === 'visitor' ? '/' : '/dashboard');
     }
   }, [user, loading, router]);
 

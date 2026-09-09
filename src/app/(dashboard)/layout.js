@@ -174,7 +174,7 @@ export default function DashboardLayout({ children }) {
         { name: 'Dashboard Hub', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Event Wizard', href: '/events/wizard', icon: Sparkles, badge: 'Onboarding' },
         { name: 'Claim Event', href: '/events/claim', icon: ShieldCheck },
-        { name: 'Manage Events', href: '/events', icon: Calendar },
+        { name: 'Manage Events', href: '/manage-events', icon: Calendar },
         { name: 'Exhibitors', href: '/exhibitors', icon: Building },
         { name: 'Visitor CRM', href: '/visitors', icon: Users },
         { name: 'Lead CRM', href: '/leads', icon: Target },
@@ -192,7 +192,7 @@ export default function DashboardLayout({ children }) {
     if (path === '/expos') return 'Live Exhibitions & Passes';
     if (path === '/events/wizard') return 'Event Onboarding Wizard';
     if (path === '/events/claim') return 'Claim Existing Event';
-    if (path === '/events') return 'Event Management';
+    if (path === '/manage-events') return 'Event Management';
     const clean = (path || '').replace('/', '').replace(/-/g, ' ');
     return clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : 'Dashboard';
   };

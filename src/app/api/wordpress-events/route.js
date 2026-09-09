@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import wpEventImages from '@/data/wordpress-event-images.json';
 
 const WORDPRESS_URL = process.env.WORDPRESS_URL || 'https://visitexpo.in';
 const WORDPRESS_API_KEY = process.env.WORDPRESS_API_KEY || 'visitexpo_custom_secret_key_12345';
@@ -7,20 +8,22 @@ const BACKEND_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:500
 // Helper: Infer industry category from title and description
 function inferCategory(title = '', desc = '') {
   const text = `${title} ${desc}`.toLowerCase();
-  if (text.includes('auto') || text.includes('vehicle') || text.includes('ev') || text.includes('mobility') || text.includes('motor')) return 'Automotive & EV';
-  if (text.includes('airport') || text.includes('aviation') || text.includes('rotorcraft') || text.includes('air') || text.includes('aerospace')) return 'Aerospace & Aviation';
-  if (text.includes('cargo') || text.includes('logistics') || text.includes('freight') || text.includes('transport') || text.includes('supply chain')) return 'Logistics & Cargo';
-  if (text.includes('health') || text.includes('med') || text.includes('cancer') || text.includes('doctor') || text.includes('hospital') || text.includes('surgical')) return 'Healthcare & Pharma';
-  if (text.includes('build') || text.includes('construction') || text.includes('cement') || text.includes('concrete') || text.includes('infrastructure') || text.includes('municipal')) return 'Construction & Infra';
-  if (text.includes('tech') || text.includes('ai') || text.includes('software') || text.includes('cyber') || text.includes('iot') || text.includes('cloud') || text.includes('digital') || text.includes('engineer')) return 'Technology & AI';
-  if (text.includes('textile') || text.includes('garment') || text.includes('fabric') || text.includes('yarn') || text.includes('fashion') || text.includes('apparel') || text.includes('dye')) return 'Textile & Fashion';
-  if (text.includes('rice') || text.includes('food') || text.includes('agriculture') || text.includes('bakery') || text.includes('crop') || text.includes('biofuel') || text.includes('grain')) return 'Agri & Food Tech';
-  if (text.includes('art') || text.includes('jewel') || text.includes('lifestyle') || text.includes('photo') || text.includes('handicraft')) return 'Art & Lifestyle';
+  if (/\b(travel|tourism|tourist|destination|hospitality|hotel|resort|leisure|flight|airline|cruise|mice|resa|iftm)\b/i.test(text)) return 'Travel & Tourism';
+  if (/\b(auto|automobile|automotive|vehicles?|motor|motors|ev|evs|electric vehicle|mobility)\b/i.test(text)) return 'Automotive & EV';
+  if (/\b(airport|aviation|rotorcraft|air|aerospace)\b/i.test(text)) return 'Aerospace & Aviation';
+  if (/\b(cargo|logistics|freight|transport|supply chain)\b/i.test(text)) return 'Logistics & Cargo';
+  if (/\b(health|med|medical|pharma|cancer|doctor|hospital|surgical)\b/i.test(text)) return 'Healthcare & Pharma';
+  if (/\b(build|building|construction|cement|concrete|infrastructure|municipal)\b/i.test(text)) return 'Construction & Infra';
+  if (/\b(tech|technology|ai|software|cyber|iot|cloud|digital)\b/i.test(text)) return 'Technology & AI';
+  if (/\b(textile|garment|fabric|yarn|fashion|apparel|dye)\b/i.test(text)) return 'Textile & Fashion';
+  if (/\b(rice|food|agriculture|bakery|crop|biofuel|grain|beverage|confectionery)\b/i.test(text)) return 'Agri & Food Tech';
+  if (/\b(art|jewel|jewellery|jewelry|lifestyle|photo|handicraft)\b/i.test(text)) return 'Art & Lifestyle';
   return 'Trade & Industry';
 }
 
 // Category image pool
 const CATEGORY_IMAGES = {
+  'Travel & Tourism': 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?q=80&w=800&auto=format&fit=crop',
   'Automotive & EV': 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?q=80&w=800&auto=format&fit=crop',
   'Aerospace & Aviation': 'https://images.unsplash.com/photo-1517976487588-468a356cb0b7?q=80&w=800&auto=format&fit=crop',
   'Logistics & Cargo': 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=800&auto=format&fit=crop',
@@ -112,7 +115,15 @@ export async function GET(request) {
     const cleanEvents = (rawEvents || []).map((evt, idx) => {
       const category = inferCategory(evt.title, evt.description);
       const cleanCity = extractCity(evt.venue, evt.city);
-      const image = evt.coverImage || evt.image || CATEGORY_IMAGES[category] || CATEGORY_IMAGES['Trade & Industry'];
+      const cleanSlug = evt.slug || (evt.title ? evt.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : `event-${idx}`);
+      const wpImage = wpEventImages[cleanSlug] || 
+                      wpEventImages[String(evt.id)] || 
+                      wpEventImages[String(evt._id)] || 
+                      wpEventImages[String(evt.wpPostId)] ||
+                      (evt.coverImage && !evt.coverImage.includes('unsplash') ? evt.coverImage : null) ||
+                      (evt.image && !evt.image.includes('unsplash') ? evt.image : null);
+
+      const image = wpImage || CATEGORY_IMAGES[category] || CATEGORY_IMAGES['Trade & Industry'];
 
       return {
         id: evt._id || evt.id || `wp-${idx}`,

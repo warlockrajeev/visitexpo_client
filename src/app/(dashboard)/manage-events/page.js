@@ -36,7 +36,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
-import { renderRichText, RichTextEditor, SPONSOR_TIER_GROUPS, PRESET_SPONSOR_TIERS, CATEGORY_SUBSECTORS } from './wizard/page.js';
+import { renderRichText, RichTextEditor, SPONSOR_TIER_GROUPS, PRESET_SPONSOR_TIERS, CATEGORY_SUBSECTORS } from '../events/wizard/page.js';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 

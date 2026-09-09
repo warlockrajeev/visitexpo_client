@@ -229,12 +229,25 @@ export default function LandingPage() {
     return [...enrichedEvents].sort((a, b) => b.interestedCount - a.interestedCount).slice(0, 3);
   }, [enrichedEvents]);
 
-  const handleNewsletterSubmit = (e) => {
+  const handleNewsletterSubmit = async (e) => {
     e.preventDefault();
     if (!newsletterEmail.trim()) return;
+    const emailToSubmit = newsletterEmail.trim();
     setNewsletterSubscribed(true);
     showToast('Subscribed! You will receive weekly exhibition alerts in your inbox.');
     setNewsletterEmail('');
+    try {
+      await axios.post(`${API_URL}/contact`, {
+        role: 'Subscriber',
+        name: 'Newsletter Subscriber',
+        email: emailToSubmit,
+        phone: '',
+        message: 'Subscribed to weekly exhibition alerts and trade updates from landing page newsletter form.',
+        source: 'newsletter'
+      });
+    } catch (err) {
+      console.warn('Newsletter API background sync notice:', err);
+    }
   };
 
   // 10times Gated Action Handler
@@ -247,6 +260,10 @@ export default function LandingPage() {
   };
 
   const executeGatedAction = (action, event, currentUser) => {
+    if (action === 'explore_events') {
+      router.push('/events');
+      return;
+    }
     if (action === 'ticket') {
       setIssuedTicketIds(prev => new Set(prev).add(event.id));
       showToast(`Pass Confirmed! Free Digital Badge reserved for "${event.title}".`);
@@ -297,7 +314,8 @@ export default function LandingPage() {
         name: contactName,
         email: contactEmail,
         phone: contactPhone,
-        message: contactMessage
+        message: contactMessage,
+        source: 'landing_contact'
       });
       setContactSubmitted(true);
     } catch (err) {
@@ -411,18 +429,29 @@ export default function LandingPage() {
 
           {/* Hero CTAs */}
           <div className="pt-2 flex flex-wrap items-center justify-center gap-3.5">
-            <a
-              href="#events"
-              className="inline-flex items-center gap-2 rounded-full bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold px-7 py-3 text-xs sm:text-sm transition-all shadow-md hover:scale-102"
+            <button
+              type="button"
+              onClick={() => {
+                if (!user) {
+                  setGatedAuthContext({
+                    action: 'explore_events',
+                    event: { title: '100+ Trade Shows & Exhibitions' },
+                    role: 'visitor'
+                  });
+                } else {
+                  router.push('/events');
+                }
+              }}
+              className="inline-flex items-center gap-2 rounded-full bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold px-7 py-3 text-xs sm:text-sm transition-all shadow-md hover:scale-102 cursor-pointer"
             >
               <span>Explore Exhibitions</span>
               <ArrowRight className="h-4 w-4" />
-            </a>
+            </button>
             <Link
-              href="/login?role=organizer&signup=true"
-              className="inline-flex items-center gap-2 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/30 text-white font-bold px-7 py-3 text-xs sm:text-sm transition-all shadow-sm hover:scale-102"
+              href={user ? '/dashboard' : '/login?role=organizer&signup=true'}
+              className="inline-flex items-center gap-2 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/30 text-white font-bold px-7 py-3 text-xs sm:text-sm transition-all shadow-sm hover:scale-102 cursor-pointer"
             >
-              For Organizers
+              {user ? (user.role === 'organizer' ? 'Organizer Dashboard' : 'My Dashboard') : 'For Organizers'}
             </Link>
           </div>
 
@@ -458,10 +487,10 @@ export default function LandingPage() {
             </div>
             <div className="pt-6">
               <Link
-                href="/login?role=organizer&signup=true"
+                href={user ? '/dashboard' : '/login?role=organizer&signup=true'}
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-600 hover:text-amber-700"
               >
-                <span>Onboard as Organizer</span>
+                <span>{user ? 'Open Organizer Hub' : 'Onboard as Organizer'}</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>
@@ -480,10 +509,10 @@ export default function LandingPage() {
             </div>
             <div className="pt-6">
               <Link
-                href="/login?role=exhibitor&signup=true"
+                href={user ? '/dashboard' : '/login?role=exhibitor&signup=true'}
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-[#FF2E63] hover:text-[#E82054]"
               >
-                <span>Register as Exhibitor</span>
+                <span>{user ? 'Open Exhibitor Hub' : 'Register as Exhibitor'}</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>
@@ -501,13 +530,13 @@ export default function LandingPage() {
               </p>
             </div>
             <div className="pt-6">
-              <a
-                href="#events"
+              <Link
+                href="/events"
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-800 hover:text-zinc-950"
               >
-                <span>Browse Free Passes</span>
+                <span>Explore All Events</span>
                 <ArrowRight className="h-3.5 w-3.5" />
-              </a>
+              </Link>
             </div>
           </div>
 
@@ -1141,29 +1170,35 @@ export default function LandingPage() {
                 </div>
               )}
 
-              {/* Load More Button */}
-              {visibleEventCount < filteredEvents.length && (
-                <div className="pt-4 flex justify-center">
-                  <button
-                    type="button"
-                    onClick={() => setVisibleEventCount(prev => prev + 6)}
-                    className="inline-flex items-center gap-2 rounded-full bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-800 font-bold px-6 py-2.5 text-xs transition-colors shadow-2xs cursor-pointer"
-                  >
-                    <span>Load More Exhibitions ({filteredEvents.length - visibleEventCount} remaining)</span>
-                  </button>
-                </div>
-              )}
+              {/* Dedicated View All Events CTA */}
+              <div className="pt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!user) {
+                      setGatedAuthContext({
+                        action: 'explore_events',
+                        event: { title: 'All 100+ Global Exhibitions' },
+                        role: 'visitor'
+                      });
+                    } else {
+                      router.push('/events');
+                    }
+                  }}
+                  className="inline-flex items-center gap-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold px-8 py-3.5 text-xs sm:text-sm transition-all shadow-md hover:scale-102 cursor-pointer group"
+                >
+                  <span>Explore All Events ({events.length || 100}+)</span>
+                  <ArrowRight className="h-4 w-4 text-[#FFCC00] group-hover:translate-x-1 transition-transform" />
+                </button>
 
-              {/* View All on visitexpo.in CTA */}
-              <div className="pt-2 flex justify-center">
                 <a
                   href="https://visitexpo.in"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-xs font-bold text-zinc-500 hover:text-zinc-800 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-600 hover:text-zinc-900 font-bold px-5 py-3 text-xs transition-colors shadow-2xs"
                 >
-                  <span>Explore Complete Directory on visitexpo.in</span>
-                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span>Directory on visitexpo.in</span>
+                  <ExternalLink className="h-3.5 w-3.5 text-zinc-400" />
                 </a>
               </div>
 
@@ -1299,9 +1334,9 @@ export default function LandingPage() {
                     </div>
                   </div>
 
-                  <div className="grid sm:grid-cols-2 gap-3">
+                  <div className="grid sm:grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Your Name</label>
+                      <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Your Name *</label>
                       <input
                         type="text"
                         required
@@ -1312,13 +1347,23 @@ export default function LandingPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Email Address</label>
+                      <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Email Address *</label>
                       <input
                         type="email"
                         required
                         placeholder="vikram@company.com"
                         value={contactEmail}
                         onChange={(e) => setContactEmail(e.target.value)}
+                        className="w-full rounded-lg border border-zinc-200 bg-white py-2 px-3 text-xs text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Phone / WhatsApp</label>
+                      <input
+                        type="tel"
+                        placeholder="+91 98765 43210"
+                        value={contactPhone}
+                        onChange={(e) => setContactPhone(e.target.value)}
                         className="w-full rounded-lg border border-zinc-200 bg-white py-2 px-3 text-xs text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
                       />
                     </div>

@@ -4,11 +4,12 @@
  * @file GatedAuthModal.js
  * @description 10times.com-style in-page Authentication Overlay (Screen C).
  * Triggered whenever an unregistered/guest user attempts a gated action
- * (e.g. Getting a Free Ticket, Saving an Event, Contacting Organizer, or Viewing Full Exhibitor Directory).
+ * (e.g. Exploring All Events, Getting a Free Ticket, Saving an Event, or Registering).
+ * Features a 3-role selector: Organizer, Exhibitor, Visitor.
  * Retains context and executes the deferred action upon successful login.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import {
   X,
@@ -20,6 +21,7 @@ import {
   Bookmark,
   MessageCircle,
   Building,
+  Briefcase,
   Loader2,
   ShieldCheck,
   Sparkles,
@@ -31,21 +33,58 @@ export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) 
   const { login, signup, loginWithGoogle } = useAuth();
 
   const [mode, setMode] = useState('login'); // 'login' | 'signup'
+  const [selectedRole, setSelectedRole] = useState('visitor'); // 'organizer' | 'exhibitor' | 'visitor'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [organizationName, setOrganizationName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Sync role if provided in context
+  useEffect(() => {
+    if (context?.role) {
+      setSelectedRole(context.role);
+    } else {
+      setSelectedRole('visitor');
+    }
+  }, [context]);
 
   if (!isOpen) return null;
 
   const eventTitle = context?.event?.title || 'this Exhibition';
   const actionType = context?.action || 'ticket';
 
-  // Context-specific messaging based on 10times flow
+  // Context-specific messaging based on selected role and action
   const getContextHeadline = () => {
+    if (selectedRole === 'organizer') {
+      return {
+        icon: <Building className="h-5 w-5 text-amber-500" />,
+        badge: 'Event Organizer Portal',
+        title: mode === 'signup' ? 'Create Organizer Account' : 'Sign in as Event Organizer',
+        desc: 'Access your organizer dashboard, claim official event listings, and manage registrations.'
+      };
+    }
+
+    if (selectedRole === 'exhibitor') {
+      return {
+        icon: <Briefcase className="h-5 w-5 text-indigo-500" />,
+        badge: 'Exhibitor & Brand Portal',
+        title: mode === 'signup' ? 'Create Exhibitor Account' : 'Sign in as Exhibitor',
+        desc: 'Book verified exhibition stalls, showcase products, and connect with trade buyers.'
+      };
+    }
+
+    // Default: Visitor role
     switch (actionType) {
+      case 'explore_events':
+        return {
+          icon: <Sparkles className="h-5 w-5 text-[#FFCC00]" />,
+          badge: 'All Events Directory Access',
+          title: mode === 'signup' ? 'Join to Explore All 100+ Events' : 'Sign in to Explore All 100+ Events',
+          desc: 'Create a free account or sign in to browse all verified trade expos, filter by city, and claim passes.'
+        };
       case 'ticket':
         return {
           icon: <Ticket className="h-5 w-5 text-[#FF2E63]" />,
@@ -101,7 +140,7 @@ export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) 
         photoURL: fbUser.photoURL,
         uid: fbUser.uid,
         idToken,
-        role: 'visitor'
+        role: selectedRole
       };
 
       const res = await loginWithGoogle(payload);
@@ -140,7 +179,12 @@ export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) 
           setLoading(false);
           return;
         }
-        const res = await signup(name, email, password, '', 'visitor');
+        if ((selectedRole === 'organizer' || selectedRole === 'exhibitor') && !organizationName.trim()) {
+          setError(selectedRole === 'exhibitor' ? 'Company / Exhibitor name is required.' : 'Organization name is required.');
+          setLoading(false);
+          return;
+        }
+        const res = await signup(name, email, password, organizationName.trim(), selectedRole);
         if (res.success) {
           if (onSuccess) onSuccess(res.user);
           onClose();
@@ -157,7 +201,7 @@ export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-zinc-200 overflow-hidden">
+      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-zinc-200 overflow-hidden max-h-[92vh] overflow-y-auto">
         
         {/* Top Accent Strip */}
         <div className="h-1.5 w-full bg-gradient-to-r from-[#FFCC00] via-[#FF2E63] to-purple-600" />
@@ -171,10 +215,10 @@ export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) 
           <X className="h-5 w-5" />
         </button>
 
-        <div className="p-6 sm:p-7 space-y-5">
+        <div className="p-6 sm:p-7 space-y-4">
           
           {/* Context Header */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-100 border border-zinc-200 text-xs font-semibold text-zinc-700">
               {info.icon}
               <span>{info.badge}</span>
@@ -187,6 +231,63 @@ export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) 
             </p>
           </div>
 
+          {/* 3-Role Segmented Switcher: Organizer, Exhibitor, Visitor */}
+          <div className="space-y-1 pt-1">
+            <div className="flex items-center justify-between text-[11px] font-bold text-zinc-500">
+              <span>Select Your Role:</span>
+              <span className="text-zinc-800 capitalize font-extrabold">{selectedRole}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-zinc-100 border border-zinc-200 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRole('organizer');
+                  setError('');
+                }}
+                className={`py-2 px-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  selectedRole === 'organizer'
+                    ? 'bg-zinc-900 text-white shadow-xs font-bold'
+                    : 'text-zinc-600 hover:text-zinc-950'
+                }`}
+              >
+                <Building className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                <span className="truncate">Organizer</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRole('exhibitor');
+                  setError('');
+                }}
+                className={`py-2 px-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  selectedRole === 'exhibitor'
+                    ? 'bg-zinc-900 text-white shadow-xs font-bold'
+                    : 'text-zinc-600 hover:text-zinc-950'
+                }`}
+              >
+                <Briefcase className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                <span className="truncate">Exhibitor</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRole('visitor');
+                  setError('');
+                }}
+                className={`py-2 px-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  selectedRole === 'visitor'
+                    ? 'bg-zinc-900 text-white shadow-xs font-bold'
+                    : 'text-zinc-600 hover:text-zinc-950'
+                }`}
+              >
+                <Ticket className="h-3.5 w-3.5 text-[#FF2E63] shrink-0" />
+                <span className="truncate">Visitor</span>
+              </button>
+            </div>
+          </div>
+
           {error && (
             <div className="p-3 text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-lg">
               {error}
@@ -194,7 +295,7 @@ export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) 
           )}
 
           {/* 1-Click Google Sign-In */}
-          <div>
+          <div className="pt-1">
             <button
               type="button"
               onClick={handleGoogleAuth}
@@ -223,7 +324,7 @@ export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) 
                   />
                 </svg>
               )}
-              <span>Continue with Google</span>
+              <span>Continue with Google as {selectedRole === 'organizer' ? 'Organizer' : selectedRole === 'exhibitor' ? 'Exhibitor' : 'Visitor'}</span>
             </button>
           </div>
 
@@ -248,6 +349,25 @@ export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) 
                     placeholder="Jane Doe"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-zinc-200 bg-zinc-50/50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                  />
+                </div>
+              </div>
+            )}
+
+            {mode === 'signup' && (selectedRole === 'organizer' || selectedRole === 'exhibitor') && (
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                  {selectedRole === 'exhibitor' ? 'Company / Brand Name *' : 'Organization Name *'}
+                </label>
+                <div className="relative">
+                  <Building className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400" />
+                  <input
+                    type="text"
+                    required
+                    placeholder={selectedRole === 'exhibitor' ? 'e.g. Apex Industrial Solutions Ltd' : 'e.g. Global Trade Expos Ltd'}
+                    value={organizationName}
+                    onChange={(e) => setOrganizationName(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-zinc-200 bg-zinc-50/50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
                   />
                 </div>
@@ -293,7 +413,11 @@ export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) 
                 <Loader2 className="h-4 w-4 animate-spin text-white" />
               ) : (
                 <>
-                  <span>{mode === 'login' ? 'Sign In & Continue' : 'Create Account & Continue'}</span>
+                  <span>
+                    {mode === 'login'
+                      ? `Sign In as ${selectedRole === 'organizer' ? 'Organizer' : selectedRole === 'exhibitor' ? 'Exhibitor' : 'Visitor'}`
+                      : `Create ${selectedRole === 'organizer' ? 'Organizer' : selectedRole === 'exhibitor' ? 'Exhibitor' : 'Visitor'} Account`}
+                  </span>
                   <ArrowRight className="h-3.5 w-3.5" />
                 </>
               )}
@@ -304,7 +428,7 @@ export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) 
           <div className="text-center pt-1 text-xs text-zinc-500">
             {mode === 'login' ? (
               <span>
-                Don't have a VisitExpo pass yet?{' '}
+                Don't have a VisitExpo account yet?{' '}
                 <button
                   type="button"
                   onClick={() => setMode('signup')}

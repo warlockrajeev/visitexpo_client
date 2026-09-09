@@ -18,9 +18,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import axios from 'axios';
+import wpEventImages from '@/data/wordpress-event-images.json';
 import { useAuth } from '../../../context/AuthContext.js';
 import Navbar from '../../../components/Navbar.js';
 import GatedAuthModal from '../../../components/GatedAuthModal.js';
+import InterestedAttendeesModal from '../../../components/InterestedAttendeesModal.js';
 import {
   Calendar,
   MapPin,
@@ -48,7 +50,15 @@ import {
   Layers,
   Lock,
   ThumbsUp,
-  MessageSquare
+  MessageSquare,
+  Bell,
+  BellRing,
+  UserPlus,
+  UserCheck,
+  Send,
+  Check,
+  Search,
+  Filter
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -75,6 +85,15 @@ export default function ExpoDetailsPage() {
   // Social & Interactive State
   const [isSaved, setIsSaved] = useState(false);
   const [isInterested, setIsInterested] = useState(false);
+  const [isFollowingExpo, setIsFollowingExpo] = useState(false);
+  const [showAttendeesModal, setShowAttendeesModal] = useState(false);
+  const [attendees, setAttendees] = useState([]);
+  const [followedAttendeeIds, setFollowedAttendeeIds] = useState(new Set());
+  const [attendeeFilter, setAttendeeFilter] = useState('all');
+  const [attendeeSearch, setAttendeeSearch] = useState('');
+  const [connectionModalUser, setConnectionModalUser] = useState(null);
+  const [connectionNote, setConnectionNote] = useState('');
+  const [connectionSent, setConnectionSent] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [gatedContext, setGatedContext] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
@@ -109,8 +128,16 @@ export default function ExpoDetailsPage() {
           });
           if (found) {
             const charSum = (found.title || '').split('').reduce((acc, char, i) => acc + char.charCodeAt(0), 19);
+            const resolvedImage =
+              wpEventImages[cleanSlug] ||
+              wpEventImages[String(found.id)] ||
+              wpEventImages[String(found.wpPostId)] ||
+              wpEventImages[found.slug] ||
+              found.image;
+
             setEvent({
               ...found,
+              image: resolvedImage || found.image,
               rating: found.rating || (4.5 + ((charSum % 5) * 0.1)).toFixed(1),
               reviewCount: found.reviewCount || (80 + (charSum % 180)),
               followersCount: found.followersCount || found.interestedCount || (1100 + (charSum % 2900)),
@@ -122,27 +149,30 @@ export default function ExpoDetailsPage() {
               format: found.format || (charSum % 4 === 0 ? 'Hybrid Expo' : 'In-Person Expo')
             });
           } else {
-            // Default synthesized event matching screenshot
+            // Default synthesized event matching slug
+            const resolvedFallbackImage =
+              wpEventImages[cleanSlug] ||
+              wpEventImages[slug] ||
+              'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=1200&auto=format&fit=crop';
             setEvent({
-              id: slug || 'bakery-china',
-              title: decodeURIComponent(slug).replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'Bakery China Autumn & China Home Baking Show',
+              id: slug || 'expo-event',
+              title: decodeURIComponent(slug).replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'International Trade Exhibition 2026',
               slug: slug,
-              category: 'Food & Beverages',
-              city: 'Wuhan',
-              state: 'Hubei',
-              country: 'China',
-              venue: 'Wuhan International Expo Center, Wuhan, China',
-              dates: '22 – 24 Oct 2026',
-              rating: '4.0',
-              reviewCount: 88,
-              followersCount: 1058,
-              edition: '11th Edition',
-              image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?q=80&w=1200&auto=format&fit=crop',
+              category: 'Trade Show',
+              city: 'Paris',
+              country: 'France',
+              venue: 'Exhibition Centre',
+              dates: 'Upcoming 2026',
+              rating: '4.8',
+              reviewCount: 120,
+              followersCount: 1420,
+              edition: 'Annual Edition',
+              image: resolvedFallbackImage,
               description:
-                'Bakery China Autumn, organized by China Association of Bakery and Confectionery Industry and Bakery China Exhibitions Co., Ltd., is China’s premier professional bakery expo and the region’s largest baking event in the second half of the year. Scheduled for 22-24 October 2026 at Wuhan International Expo Center, the event gathers global manufacturers, ingredient suppliers, packaging innovators, and commercial baking equipment brands.',
+                'Premier international trade exhibition featuring industry leaders, technology innovators, and global business delegates.',
               entryType: 'Free Ticket for Industry Professionals',
               boothCost: 'Starts from 145 USD / sqm',
-              turnout: '100,000+ Visitors • 2,000+ Exhibitors',
+              turnout: '50,000+ Visitors • 1,200+ Exhibitors',
               timings: '9:00 AM – 5:00 PM (General Admission)',
               featured: true
             });
@@ -158,6 +188,45 @@ export default function ExpoDetailsPage() {
     loadEvent();
   }, [slug]);
 
+  // Load Social Local Persistence
+  useEffect(() => {
+    if (typeof window !== 'undefined' && slug) {
+      try {
+        const savedInterested = localStorage.getItem(`visitexpo_interested_${slug}`);
+        if (savedInterested === 'true') setIsInterested(true);
+
+        const savedFollowExpo = localStorage.getItem(`visitexpo_follow_expo_${slug}`);
+        if (savedFollowExpo === 'true') setIsFollowingExpo(true);
+
+        const savedFollowedAtt = localStorage.getItem(`visitexpo_followed_att_${slug}`);
+        if (savedFollowedAtt) {
+          try {
+            setFollowedAttendeeIds(new Set(JSON.parse(savedFollowedAtt)));
+          } catch (_) {}
+        }
+      } catch (err) {
+        console.error('Error loading social state from localStorage:', err);
+      }
+    }
+  }, [slug]);
+
+  // Fetch verified attendees from Social API
+  useEffect(() => {
+    const fetchSocialData = async () => {
+      try {
+        const res = await axios.get(`/api/events/${slug}/social`);
+        if (res.data?.success && res.data?.data) {
+          if (Array.isArray(res.data.data.attendees)) {
+            setAttendees(res.data.data.attendees);
+          }
+        }
+      } catch (err) {
+        console.warn('Using fallback seed for social data:', err);
+      }
+    };
+    if (slug) fetchSocialData();
+  }, [slug]);
+
   // Gallery Photos Pool
   const mediaGallery = useMemo(() => {
     if (!event) return [];
@@ -165,7 +234,7 @@ export default function ExpoDetailsPage() {
       {
         type: 'image',
         url: event.image || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=800&auto=format&fit=crop',
-        caption: 'Main Exhibition Hall & Buyer Crowds'
+        caption: `${event.title || 'Exhibition'} • Official Exhibition Poster`
       },
       {
         type: 'video',
@@ -224,9 +293,80 @@ export default function ExpoDetailsPage() {
     if (!user) {
       setGatedContext({ action: 'ticket', event });
     } else {
-      setIsInterested(prev => !prev);
-      showToast(isInterested ? 'Removed from your interested list.' : 'Marked as Interested! Pass added to dashboard.');
+      const next = !isInterested;
+      setIsInterested(next);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`visitexpo_interested_${slug}`, String(next));
+      }
+      showToast(
+        next
+          ? 'Marked as Interested! Pass added to dashboard & attendee directory.'
+          : 'Removed from your interested list.'
+      );
     }
+  };
+
+  const handleToggleFollowExpo = () => {
+    if (!user) {
+      setGatedContext({ action: 'follow', event });
+      return;
+    }
+    const next = !isFollowingExpo;
+    setIsFollowingExpo(next);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`visitexpo_follow_expo_${slug}`, String(next));
+    }
+    showToast(
+      next
+        ? `You are now following ${event?.title}! Notifications enabled.`
+        : `Unfollowed ${event?.title}.`
+    );
+  };
+
+  const handleToggleFollowAttendee = (att) => {
+    if (!user) {
+      setGatedContext({ action: 'connect', event, attendee: att });
+      return;
+    }
+    setFollowedAttendeeIds((prev) => {
+      const updated = new Set(prev);
+      const isFollowing = updated.has(att.id);
+      if (isFollowing) {
+        updated.delete(att.id);
+        showToast(`Unfollowed ${att.name}`);
+      } else {
+        updated.add(att.id);
+        showToast(`Now following ${att.name} (${att.company})`);
+      }
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`visitexpo_followed_att_${slug}`, JSON.stringify(Array.from(updated)));
+      }
+      return updated;
+    });
+  };
+
+  const handleConnectAttendee = (att) => {
+    if (!user) {
+      setGatedContext({ action: 'connect', event, attendee: att });
+      return;
+    }
+    setConnectionModalUser(att);
+    setConnectionNote(
+      `Hi ${att.name}, I am also attending ${event?.title}. I would like to connect regarding ${
+        att.objective || 'mutual B2B opportunities'
+      }.`
+    );
+    setConnectionSent(false);
+  };
+
+  const handleSendConnectionNote = (e) => {
+    e.preventDefault();
+    setConnectionSent(true);
+    setTimeout(() => {
+      setConnectionModalUser(null);
+      setConnectionSent(false);
+      showToast(`Networking note sent to ${connectionModalUser?.name}!`);
+    }, 1200);
   };
 
   const handleSave = () => {
@@ -249,6 +389,9 @@ export default function ExpoDetailsPage() {
 
   const handleAuthSuccess = () => {
     setIsInterested(true);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`visitexpo_interested_${slug}`, 'true');
+    }
     showToast(`Welcome! You are registered as Interested in ${event?.title}.`);
   };
 
@@ -276,7 +419,8 @@ export default function ExpoDetailsPage() {
     );
   }
 
-  const followersCount = event?.followersCount || 1058;
+  const followersCount = (event?.followersCount || 1058) + (isFollowingExpo ? 1 : 0);
+  const interestedCount = (event?.interestedCount || (event?.followersCount ? Math.floor(event.followersCount * 0.86) : 920)) + (isInterested ? 1 : 0);
   const ratingValue = event?.rating || '4.0';
   const reviewsCount = event?.reviewCount || 88;
   const editionLabel = event?.edition || '11th Edition';
@@ -315,6 +459,9 @@ export default function ExpoDetailsPage() {
                   src={event?.image}
                   alt={event?.title}
                   className="w-full h-full object-contain rounded-lg"
+                  onError={(e) => {
+                    e.currentTarget.src = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=800&auto=format&fit=crop';
+                  }}
                 />
               </div>
 
@@ -367,44 +514,97 @@ export default function ExpoDetailsPage() {
                     <MapPin className="h-3.5 w-3.5 text-[#FF2E63]" />
                     {event?.city}, {event?.country || 'India'}
                   </span>
-                  <button
-                    type="button"
-                    onClick={handleInterested}
-                    className="text-[11px] font-bold text-[#FF2E63] bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-full transition-colors cursor-pointer"
-                  >
-                    Show Interest to see venue
-                  </button>
+                  {isInterested ? (
+                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                      <span>{event?.venue || `${event?.city} International Expo Center`}</span>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleInterested}
+                      className="text-[11px] font-bold text-[#FF2E63] bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-full transition-colors cursor-pointer"
+                    >
+                      Show Interest to see venue
+                    </button>
+                  )}
                 </div>
 
-                {/* Followers / Attendees Avatar Stack */}
-                <div className="pt-2 flex items-center gap-2.5">
+                {/* Followers / Attendees Avatar Stack (Clickable) */}
+                <div
+                  onClick={() => setShowAttendeesModal(true)}
+                  className="pt-2 flex items-center gap-3 cursor-pointer group w-fit"
+                  title="Click to view all interested attendees"
+                >
                   <div className="flex -space-x-2 overflow-hidden">
-                    {attendeeAvatars.map((src, idx) => (
+                    {isInterested && (
+                      <div
+                        className="inline-flex h-7 w-7 rounded-full bg-emerald-600 text-white font-black text-[10px] items-center justify-center ring-2 ring-white z-10 shadow-xs"
+                        title="You are marked as interested"
+                      >
+                        {user?.name?.charAt(0) || 'You'}
+                      </div>
+                    )}
+                    {(attendees.length > 0
+                      ? attendees.slice(0, isInterested ? 4 : 5)
+                      : attendeeAvatars.map((src, i) => ({ avatar: src, id: i }))
+                    ).map((att, idx) => (
                       <img
-                        key={idx}
-                        src={src}
+                        key={att.id || idx}
+                        src={att.avatar || att}
                         alt="Attendee"
-                        className="inline-block h-6 w-6 rounded-full ring-2 ring-white object-cover"
+                        className="inline-block h-7 w-7 rounded-full ring-2 ring-white object-cover group-hover:scale-105 transition-transform"
                       />
                     ))}
-                    <div className="h-6 w-6 rounded-full bg-zinc-900 text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-white">
+                    <div className="h-7 w-7 rounded-full bg-zinc-900 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white group-hover:bg-[#FF2E63] transition-colors">
                       +
                     </div>
                   </div>
-                  <span className="text-xs font-bold text-zinc-800">
-                    {followersCount.toLocaleString()} Followers
-                  </span>
+
+                  <div className="flex flex-col">
+                    <div className="text-xs font-extrabold text-zinc-900 group-hover:text-[#FF2E63] transition-colors flex items-center gap-1.5">
+                      <span>{interestedCount.toLocaleString()} Interested</span>
+                      <span className="text-zinc-300">•</span>
+                      <span className="text-zinc-600 font-semibold">{followersCount.toLocaleString()} Followers</span>
+                    </div>
+                    <span className="text-[11px] font-bold text-[#FF2E63] group-hover:underline flex items-center gap-0.5">
+                      View Attendee Directory &rarr;
+                    </span>
+                  </div>
                 </div>
 
               </div>
 
             </div>
 
-            {/* Right Side: Save / Share & CTAs */}
+            {/* Right Side: Save / Share / Follow & CTAs */}
             <div className="flex flex-col sm:flex-row lg:flex-col items-end justify-between gap-4 shrink-0">
               
-              {/* Save & Share Links */}
-              <div className="flex items-center gap-4 text-xs font-semibold text-zinc-600">
+              {/* Follow Expo, Save & Share Links */}
+              <div className="flex items-center gap-3.5 sm:gap-4 text-xs font-semibold text-zinc-600 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleToggleFollowExpo}
+                  className={`inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                    isFollowingExpo
+                      ? 'text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200'
+                      : 'hover:text-zinc-900'
+                  }`}
+                  title={isFollowingExpo ? 'You are following this expo' : 'Follow expo for updates'}
+                >
+                  {isFollowingExpo ? (
+                    <>
+                      <BellRing className="h-4 w-4 fill-emerald-600 text-emerald-600" />
+                      <span>Following</span>
+                    </>
+                  ) : (
+                    <>
+                      <Bell className="h-4 w-4" />
+                      <span>Follow Expo</span>
+                    </>
+                  )}
+                </button>
+
                 <button
                   type="button"
                   onClick={handleSave}
@@ -471,10 +671,11 @@ export default function ExpoDetailsPage() {
           <div className="flex items-center gap-6 sm:gap-8 overflow-x-auto text-xs sm:text-sm font-bold text-zinc-600 no-scrollbar">
             {[
               { id: 'about', label: 'About' },
+              { id: 'attendees', label: `Attendees (${(attendees.length || 8) + (isInterested ? 1 : 0)})` },
               { id: 'feed', label: 'Feed' },
               { id: 'exhibitors', label: 'Exhibitors' },
               { id: 'speakers', label: 'Speakers' },
-              { id: 'reviews', label: '2 Reviews' },
+              { id: 'reviews', label: `${reviewsCount || 2} Reviews` },
               { id: 'deals', label: 'Deals' }
             ].map((tab) => (
               <button
@@ -520,22 +721,253 @@ export default function ExpoDetailsPage() {
           {/* ----------------------------------------------------------------------- */}
           <div className="lg:col-span-8 space-y-6">
             
-            {/* White Container for Core Info */}
-            <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-7 shadow-xs space-y-6">
+            {activeTab === 'attendees' ? (
+              <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-7 shadow-xs space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 pb-5">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-[#FFCC00]/25 text-amber-950 border border-amber-300 flex items-center gap-1">
+                        <Users className="h-3 w-3 text-amber-900" />
+                        Live Network ({interestedCount.toLocaleString()})
+                      </span>
+                      <span className="text-xs text-zinc-500 font-semibold">
+                        Verified B2B Attendees &amp; Followers
+                      </span>
+                    </div>
+                    <h2 className="text-xl font-extrabold text-zinc-900 tracking-tight">
+                      Interested People &amp; Follower Directory
+                    </h2>
+                    <p className="text-xs text-zinc-500">
+                      Connect with trade buyers, exhibitors, and verified delegates attending {event?.title}.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleInterested}
+                    className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-xs transition-colors shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                      isInterested
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                        : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 ring-1 ring-amber-400'
+                    }`}
+                  >
+                    {isInterested ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <span>You are Confirmed ✓</span>
+                      </>
+                    ) : (
+                      <span>+ Mark Yourself Interested</span>
+                    )}
+                  </button>
+                </div>
+
+                {/* Confirmed user attendance banner */}
+                {isInterested && (
+                  <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-8 w-8 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs shrink-0">
+                        {user?.name?.charAt(0) || 'You'}
+                      </div>
+                      <div>
+                        <div className="text-xs font-extrabold text-emerald-900 flex items-center gap-1">
+                          <span>You are registered as Interested!</span>
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                        </div>
+                        <p className="text-[11px] text-emerald-700">
+                          Your profile is featured to verified buyers and exhibitors attending this expo.
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-extrabold uppercase bg-white text-emerald-800 px-2 py-0.5 rounded border border-emerald-300 shrink-0">
+                      Confirmed
+                    </span>
+                  </div>
+                )}
+
+                {/* Search & Filter pills */}
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                    <input
+                      type="text"
+                      placeholder="Search attendees by name, company, city, or sourcing objective..."
+                      value={attendeeSearch}
+                      onChange={(e) => setAttendeeSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-zinc-200 bg-zinc-50/70 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar text-xs font-semibold">
+                    {[
+                      { id: 'all', label: `All Attendees (${attendees.length})` },
+                      { id: 'Trade Buyer', label: 'Trade Buyers' },
+                      { id: 'Exhibitor & Brand', label: 'Exhibitors & Brands' },
+                      { id: 'VIP Delegate', label: 'VIP Delegates' },
+                      { id: 'following', label: `Following (${followedAttendeeIds.size})` }
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setAttendeeFilter(tab.id)}
+                        className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+                          attendeeFilter === tab.id
+                            ? 'bg-zinc-900 text-white font-bold shadow-xs'
+                            : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200/70'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Attendee Cards List */}
+                <div className="divide-y divide-zinc-100 space-y-3.5 pt-1">
+                  {attendees
+                    .filter((att) => {
+                      if (attendeeFilter === 'following') {
+                        if (!followedAttendeeIds.has(att.id)) return false;
+                      } else if (attendeeFilter !== 'all') {
+                        if (att.type !== attendeeFilter) return false;
+                      }
+                      if (attendeeSearch.trim()) {
+                        const q = attendeeSearch.toLowerCase();
+                        return (
+                          att.name.toLowerCase().includes(q) ||
+                          att.company.toLowerCase().includes(q) ||
+                          att.designation.toLowerCase().includes(q) ||
+                          att.city.toLowerCase().includes(q) ||
+                          att.country.toLowerCase().includes(q) ||
+                          att.objective.toLowerCase().includes(q)
+                        );
+                      }
+                      return true;
+                    })
+                    .map((att) => {
+                      const isFollowing = followedAttendeeIds.has(att.id);
+                      return (
+                        <div
+                          key={att.id}
+                          className="pt-3.5 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+                        >
+                          <div className="flex items-start gap-3.5 min-w-0">
+                            <div className="relative h-11 w-11 rounded-full overflow-hidden shrink-0 border border-zinc-200">
+                              <img src={att.avatar} alt={att.name} className="w-full h-full object-cover" />
+                              <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white" />
+                            </div>
+                            <div className="space-y-0.5 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-extrabold text-sm text-zinc-900">{att.name}</span>
+                                {att.verified && (
+                                  <ShieldCheck className="h-3.5 w-3.5 text-blue-600" title="Verified Trade Profile" />
+                                )}
+                                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                                  att.type === 'Trade Buyer'
+                                    ? 'bg-amber-100 text-amber-900'
+                                    : att.type === 'VIP Delegate'
+                                    ? 'bg-purple-100 text-purple-900'
+                                    : 'bg-blue-100 text-blue-900'
+                                }`}>
+                                  {att.type}
+                                </span>
+                              </div>
+                              <div className="text-xs font-semibold text-zinc-700 truncate">{att.designation}</div>
+                              <div className="flex items-center gap-2.5 text-[11px] text-zinc-500 flex-wrap">
+                                <span className="flex items-center gap-1">
+                                  <Building className="h-3 w-3 text-zinc-400" />
+                                  <span>{att.company}</span>
+                                </span>
+                                <span>•</span>
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3 text-[#FF2E63]" />
+                                  <span>{att.city}, {att.country}</span>
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-zinc-600 italic pt-0.5">
+                                "{att.objective}"
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleFollowAttendee(att)}
+                              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                                isFollowing
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                                  : 'bg-zinc-900 hover:bg-zinc-800 text-white shadow-2xs'
+                              }`}
+                            >
+                              {isFollowing ? (
+                                <>
+                                  <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
+                                  <span>Following</span>
+                                </>
+                              ) : (
+                                <>
+                                  <UserPlus className="h-3.5 w-3.5" />
+                                  <span>+ Follow</span>
+                                </>
+                              )}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleConnectAttendee(att)}
+                              className="p-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 transition-colors cursor-pointer"
+                              title="Send B2B matchmaking note"
+                            >
+                              <MessageSquare className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                {/* Bottom unlock note */}
+                <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 text-zinc-600">
+                    <Lock className="h-4 w-4 text-amber-600 shrink-0" />
+                    <span>Want to connect with all 1,000+ trade buyers? Unlock direct contact details with your free pass.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleInterested}
+                    className="px-4 py-1.5 rounded-lg bg-zinc-900 text-white font-bold text-xs hover:bg-zinc-800 shrink-0 cursor-pointer"
+                  >
+                    Claim Badge
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* White Container for Core Info */}
+                <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-7 shadow-xs space-y-6">
               
               {/* Media Gallery Carousel */}
-              <div className="relative rounded-xl overflow-hidden bg-zinc-100 border border-zinc-200 group">
-                <div className="relative h-64 sm:h-80 w-full overflow-hidden">
+              <div className="relative rounded-xl overflow-hidden bg-zinc-950 border border-zinc-200 group shadow-xs">
+                <div className="relative h-72 sm:h-96 w-full overflow-hidden flex items-center justify-center bg-zinc-950">
+                  {/* Ambient blurred backdrop */}
+                  <img
+                    src={mediaGallery[currentMediaIdx]?.url}
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute inset-0 w-full h-full object-cover blur-xl opacity-35 scale-110"
+                  />
+                  {/* Crisp centered poster/photo */}
                   <img
                     src={mediaGallery[currentMediaIdx]?.url}
                     alt={mediaGallery[currentMediaIdx]?.caption || 'Expo Media'}
-                    className="w-full h-full object-cover"
+                    className="relative z-10 max-h-full max-w-full w-auto h-auto object-contain drop-shadow-md transition-all duration-300"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/25 pointer-events-none z-10" />
 
                   {/* Video Play Overlay if video */}
                   {mediaGallery[currentMediaIdx]?.type === 'video' && (
-                    <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="absolute inset-0 flex items-center justify-center z-20">
                       <div className="h-14 w-14 rounded-full bg-white/90 text-zinc-900 flex items-center justify-center shadow-lg backdrop-blur-xs cursor-pointer hover:scale-108 transition-transform">
                         <Play className="h-6 w-6 fill-zinc-900 ml-1" />
                       </div>
@@ -543,9 +975,9 @@ export default function ExpoDetailsPage() {
                   )}
 
                   {/* Bottom Caption & Counter */}
-                  <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-white text-xs font-semibold">
-                    <span>{mediaGallery[currentMediaIdx]?.caption}</span>
-                    <span className="bg-black/60 px-2 py-0.5 rounded-full text-[10px]">
+                  <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-white text-xs font-semibold z-20">
+                    <span className="drop-shadow">{mediaGallery[currentMediaIdx]?.caption}</span>
+                    <span className="bg-black/60 backdrop-blur-xs px-2.5 py-0.5 rounded-full text-[11px] font-bold">
                       {currentMediaIdx + 1} / {mediaGallery.length}
                     </span>
                   </div>
@@ -555,7 +987,8 @@ export default function ExpoDetailsPage() {
                     onClick={() =>
                       setCurrentMediaIdx((prev) => (prev === 0 ? mediaGallery.length - 1 : prev - 1))
                     }
-                    className="absolute left-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/80 hover:bg-white text-zinc-900 shadow-md transition-all cursor-pointer"
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/85 hover:bg-white text-zinc-900 shadow-md transition-all cursor-pointer z-20 hover:scale-105"
+                    aria-label="Previous slide"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
@@ -563,20 +996,21 @@ export default function ExpoDetailsPage() {
                     onClick={() =>
                       setCurrentMediaIdx((prev) => (prev === mediaGallery.length - 1 ? 0 : prev + 1))
                     }
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/80 hover:bg-white text-zinc-900 shadow-md transition-all cursor-pointer"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/85 hover:bg-white text-zinc-900 shadow-md transition-all cursor-pointer z-20 hover:scale-105"
+                    aria-label="Next slide"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>
                 </div>
 
                 {/* Thumbnails Row */}
-                <div className="grid grid-cols-4 gap-2 p-2.5 bg-zinc-50 border-t border-zinc-200">
+                <div className="grid grid-cols-4 gap-2 p-2.5 bg-zinc-900/60 border-t border-zinc-800">
                   {mediaGallery.map((med, i) => (
                     <div
                       key={i}
                       onClick={() => setCurrentMediaIdx(i)}
-                      className={`relative h-14 sm:h-16 rounded-lg overflow-hidden border-2 cursor-pointer transition-all ${
-                        currentMediaIdx === i ? 'border-[#FF2E63] scale-102' : 'border-transparent opacity-70 hover:opacity-100'
+                      className={`relative h-14 sm:h-16 rounded-lg overflow-hidden border-2 cursor-pointer transition-all bg-zinc-950 ${
+                        currentMediaIdx === i ? 'border-[#FFCC00] scale-102 ring-1 ring-[#FFCC00]/50' : 'border-transparent opacity-60 hover:opacity-100'
                       }`}
                     >
                       <img src={med.url} alt="Thumb" className="w-full h-full object-cover" />
@@ -625,7 +1059,7 @@ export default function ExpoDetailsPage() {
                     <span className="font-bold block mb-1">Popular among visitors for:</span>
                     <div className="flex flex-wrap gap-1.5 pt-0.5">
                       <span className="px-2.5 py-1 rounded-md bg-white border border-amber-300 text-[11px] font-bold text-amber-950 shadow-2xs">
-                        Top 100 in Food &amp; Beverages in China
+                        Top 100 in {event?.category || 'Trade & Industry'} in {event?.country || event?.city || 'Global'}
                       </span>
                       <span className="px-2.5 py-1 rounded-md bg-white border border-amber-300 text-[11px] font-bold text-amber-950 shadow-2xs">
                         Quality of Participants &amp; Buyers
@@ -633,6 +1067,105 @@ export default function ExpoDetailsPage() {
                     </div>
                   </li>
                 </ul>
+              </div>
+
+              {/* ============================================================= */}
+              {/* WHO'S ATTENDING / INTERESTED ATTENDEES PREVIEW                */}
+              {/* ============================================================= */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-extrabold text-zinc-900 uppercase tracking-wider">
+                        Interested Trade Attendees &amp; Followers
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 text-[#FF2E63] border border-rose-200">
+                        {interestedCount.toLocaleString()} confirmed
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500">
+                      Connect with trade buyers and exhibitors registered for this edition.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAttendeesModal(true)}
+                    className="text-xs font-extrabold text-[#FF2E63] hover:underline flex items-center gap-1 shrink-0 cursor-pointer"
+                  >
+                    <span>View All ({interestedCount.toLocaleString()})</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                {/* 4 Cards Grid */}
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {(attendees.length > 0 ? attendees.slice(0, 4) : []).map((att) => {
+                    const isFollowing = followedAttendeeIds.has(att.id);
+                    return (
+                      <div
+                        key={att.id}
+                        className="p-3.5 rounded-xl border border-zinc-200 bg-zinc-50/60 hover:bg-white hover:border-zinc-300 transition-all space-y-2.5 shadow-2xs group"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <div className="relative h-10 w-10 rounded-full overflow-hidden shrink-0 border border-zinc-200">
+                              <img src={att.avatar} alt={att.name} className="w-full h-full object-cover" />
+                              <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-xs font-extrabold text-zinc-900 truncate flex items-center gap-1">
+                                <span>{att.name}</span>
+                                {att.verified && <ShieldCheck className="h-3 w-3 text-blue-600 shrink-0" />}
+                              </div>
+                              <div className="text-[11px] font-semibold text-zinc-700 truncate">{att.designation}</div>
+                              <div className="text-[10px] text-zinc-500 truncate">{att.company} • {att.city}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Objective */}
+                        <div className="text-[10px] text-zinc-600 bg-white px-2 py-1 rounded border border-zinc-200/80 italic line-clamp-1">
+                          "{att.objective}"
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-zinc-100">
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            att.type === 'Trade Buyer'
+                              ? 'bg-amber-100 text-amber-900'
+                              : att.type === 'VIP Delegate'
+                              ? 'bg-purple-100 text-purple-900'
+                              : 'bg-blue-100 text-blue-900'
+                          }`}>
+                            {att.type}
+                          </span>
+
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleFollowAttendee(att)}
+                              className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                                isFollowing
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-zinc-900 hover:bg-zinc-800 text-white'
+                              }`}
+                            >
+                              {isFollowing ? 'Following ✓' : '+ Follow'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleConnectAttendee(att)}
+                              className="p-1 rounded-lg border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 cursor-pointer"
+                              title="Connect note"
+                            >
+                              <MessageSquare className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* ============================================================= */}
@@ -645,7 +1178,7 @@ export default function ExpoDetailsPage() {
                 <div className="flex flex-wrap gap-1.5">
                   <span className="px-3 py-1 rounded-lg bg-zinc-100 border border-zinc-200 text-xs font-bold text-zinc-900 flex items-center gap-1">
                     <Tag className="h-3 w-3 text-zinc-500" />
-                    Food &amp; Beverages
+                    {event?.category || 'Trade Show'}
                   </span>
                   {listedInTags.map((tag, idx) => (
                     <span
@@ -805,6 +1338,8 @@ export default function ExpoDetailsPage() {
               </div>
 
             </div>
+            </>
+          )}
 
           </div>
 
@@ -850,7 +1385,7 @@ export default function ExpoDetailsPage() {
                   Event Matchmaking
                 </div>
                 <h4 className="text-base font-extrabold text-zinc-900 leading-tight">
-                  Don't go alone! {followersCount} attendees are in — find your event partner!
+                  Don't go alone! {interestedCount.toLocaleString()} attendees are interested — find your event partner!
                 </h4>
               </div>
 
@@ -865,11 +1400,43 @@ export default function ExpoDetailsPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={handleInterested}
-                  className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                  onClick={() => setShowAttendeesModal(true)}
+                  className="w-full py-2.5 rounded-lg bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-extrabold text-xs shadow-xs transition-colors cursor-pointer"
                 >
-                  Find Out
+                  Explore Interested ({interestedCount.toLocaleString()})
                 </button>
+              </div>
+
+              {/* Mini Preview of Top 2 Interested Attendees with Follow */}
+              <div className="pt-1 space-y-2.5">
+                <div className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
+                  Recently Interested
+                </div>
+                {(attendees.length > 0 ? attendees.slice(0, 2) : []).map((att) => {
+                  const isFollowing = followedAttendeeIds.has(att.id);
+                  return (
+                    <div key={att.id} className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-200/80 flex items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <img src={att.avatar} alt={att.name} className="h-8 w-8 rounded-full object-cover shrink-0 border border-zinc-200" />
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-zinc-900 truncate">{att.name}</div>
+                          <div className="text-[10px] text-zinc-500 truncate">{att.company}</div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleFollowAttendee(att)}
+                        className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition-colors shrink-0 cursor-pointer ${
+                          isFollowing
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-zinc-900 hover:bg-zinc-800 text-white'
+                        }`}
+                      >
+                        {isFollowing ? 'Following ✓' : '+ Follow'}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -914,6 +1481,94 @@ export default function ExpoDetailsPage() {
       {/* ========================================================================= */}
       {/* 4. MODALS & TOASTS                                                        */}
       {/* ========================================================================= */}
+      {/* Interested Attendees Modal */}
+      <InterestedAttendeesModal
+        isOpen={showAttendeesModal}
+        onClose={() => setShowAttendeesModal(false)}
+        event={event}
+        attendees={attendees}
+        followedAttendeeIds={followedAttendeeIds}
+        onToggleFollowAttendee={handleToggleFollowAttendee}
+        isUserInterested={isInterested}
+        currentUser={user}
+        onTriggerGated={(action, attendee) => setGatedContext({ action, event, attendee })}
+        onConnectAttendee={handleConnectAttendee}
+      />
+
+      {/* Connection Note Modal */}
+      {connectionModalUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-zinc-200 p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <img
+                  src={connectionModalUser.avatar}
+                  alt={connectionModalUser.name}
+                  className="h-11 w-11 rounded-full object-cover border border-zinc-200"
+                />
+                <div>
+                  <h3 className="text-sm font-extrabold text-zinc-900 flex items-center gap-1">
+                    <span>{connectionModalUser.name}</span>
+                    {connectionModalUser.verified && (
+                      <ShieldCheck className="h-3.5 w-3.5 text-blue-600" />
+                    )}
+                  </h3>
+                  <p className="text-xs text-zinc-500">{connectionModalUser.designation}</p>
+                  <p className="text-[11px] font-semibold text-zinc-700">{connectionModalUser.company}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConnectionModalUser(null)}
+                className="text-zinc-400 hover:text-zinc-600 p-1 cursor-pointer font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {connectionSent ? (
+              <div className="text-center py-6 space-y-2">
+                <CheckCircle2 className="h-8 w-8 text-emerald-600 mx-auto" />
+                <p className="text-xs font-bold text-zinc-900">Networking Note Sent!</p>
+                <p className="text-[11px] text-zinc-500">{connectionModalUser.name} has been notified via their VisitExpo inbox.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSendConnectionNote} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 mb-1">
+                    Personalized Message / B2B Matchmaking Note
+                  </label>
+                  <textarea
+                    rows={4}
+                    required
+                    value={connectionNote}
+                    onChange={(e) => setConnectionNote(e.target.value)}
+                    className="w-full p-2.5 text-xs rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                    placeholder="Introduce yourself and specify products or cooperation you'd like to discuss..."
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setConnectionModalUser(null)}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-600 hover:bg-zinc-100 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    <span>Send Request</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
       <GatedAuthModal
         isOpen={Boolean(gatedContext)}
         onClose={() => setGatedContext(null)}
