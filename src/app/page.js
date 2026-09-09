@@ -66,18 +66,6 @@ export default function LandingPage() {
   // FAQ State
   const [openFaq, setOpenFaq] = useState(null);
 
-  // Redirect to dashboard only for organizers if they land directly on root without hashes/params
-  useEffect(() => {
-    if (!loading && user && user.role !== 'visitor') {
-      if (typeof window !== 'undefined') {
-        const hasHash = Boolean(window.location.hash);
-        const hasSearch = Boolean(window.location.search);
-        if (!hasHash && !hasSearch) {
-          router.push('/dashboard');
-        }
-      }
-    }
-  }, [user, loading, router]);
 
   // Fetch events directly from WordPress website via route handler
   useEffect(() => {

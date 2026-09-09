@@ -103,7 +103,7 @@ export default function LoginPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (!loading && user) {
-      router.push('/dashboard');
+      router.push('/');
     }
   }, [user, loading, router]);
 
@@ -132,13 +132,13 @@ export default function LoginPage() {
         role: userRole
       };
 
-      // Visitors can immediately proceed to dashboard without organization form
+      // Visitors can immediately proceed to website with active session
       if (userRole === 'visitor') {
         const res = await loginWithGoogle(basePayload);
         if (!res.success) {
           setFormError(res.error || 'Google login failed.');
         } else {
-          router.push('/dashboard');
+          router.push('/');
         }
         return;
       }
@@ -156,7 +156,7 @@ export default function LoginPage() {
           if (!res.success) {
             setFormError(res.error || 'Google login failed.');
           } else {
-            router.push('/dashboard');
+            router.push('/');
           }
           return;
         }
@@ -229,7 +229,7 @@ export default function LoginPage() {
       if (!res.success) {
         setFormError(res.error || 'Registration failed. Please try again.');
       } else {
-        router.push('/dashboard');
+        router.push('/');
       }
     } catch (err) {
       console.error('Google details submission error:', err);
@@ -271,7 +271,7 @@ export default function LoginPage() {
         if (!res.success) {
           setFormError(res.error || 'Registration failed.');
         } else {
-          router.push('/dashboard');
+          router.push('/');
         }
       } else {
         if (!formData.email || !formData.password) {
@@ -283,7 +283,7 @@ export default function LoginPage() {
         if (!res.success) {
           setFormError(res.error || 'Invalid credentials.');
         } else {
-          router.push('/dashboard');
+          router.push('/');
         }
       }
     } catch (err) {
