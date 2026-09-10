@@ -7,6 +7,7 @@
  */
 
 import React from 'react';
+import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 
 const VENUES = [
@@ -85,13 +86,9 @@ export default function ExploreVenues({ onSelectVenue }) {
       {/* 3-Column Clean Cards Grid (2 rows of 3 = 6 venues) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
         {VENUES.map((venue) => (
-          <div
+          <Link
             key={venue.id}
-            onClick={() => {
-              if (onSelectVenue) {
-                onSelectVenue(venue.searchTerm || venue.city);
-              }
-            }}
+            href={`/venue/${venue.id.replace(/_/g, '-')}`}
             className="bg-white border border-zinc-200/90 hover:border-zinc-300 rounded-xl p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between group relative"
           >
             <div>
@@ -122,7 +119,7 @@ export default function ExploreVenues({ onSelectVenue }) {
                 {venue.upcomingEvents}
               </span>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </section>

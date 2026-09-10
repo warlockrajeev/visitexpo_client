@@ -5,19 +5,26 @@ const WORDPRESS_URL = process.env.WORDPRESS_URL || 'https://visitexpo.in';
 const WORDPRESS_API_KEY = process.env.WORDPRESS_API_KEY || 'visitexpo_custom_secret_key_12345';
 const BACKEND_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
+// In-memory cache to ensure lightning fast response times (sub-5ms after warm-up)
+let memoryCache = {
+  events: null,
+  timestamp: 0,
+  ttl: 5 * 60 * 1000 // 5 minutes cache
+};
+
 // Helper: Infer industry category from title and description
 function inferCategory(title = '', desc = '') {
   const text = `${title} ${desc}`.toLowerCase();
   if (/\b(travel|tourism|tourist|destination|hospitality|hotel|resort|leisure|flight|airline|cruise|mice|resa|iftm)\b/i.test(text)) return 'Travel & Tourism';
-  if (/\b(auto|automobile|automotive|vehicles?|motor|motors|ev|evs|electric vehicle|mobility)\b/i.test(text)) return 'Automotive & EV';
+  if (/\b(auto|automobile|automotive|vehicles?|motor|motors|ev|evs|electric vehicle|mobility|tyre|tire)\b/i.test(text)) return 'Automotive & EV';
   if (/\b(airport|aviation|rotorcraft|air|aerospace)\b/i.test(text)) return 'Aerospace & Aviation';
-  if (/\b(cargo|logistics|freight|transport|supply chain)\b/i.test(text)) return 'Logistics & Cargo';
-  if (/\b(health|med|medical|pharma|cancer|doctor|hospital|surgical)\b/i.test(text)) return 'Healthcare & Pharma';
-  if (/\b(build|building|construction|cement|concrete|infrastructure|municipal)\b/i.test(text)) return 'Construction & Infra';
-  if (/\b(tech|technology|ai|software|cyber|iot|cloud|digital)\b/i.test(text)) return 'Technology & AI';
-  if (/\b(textile|garment|fabric|yarn|fashion|apparel|dye)\b/i.test(text)) return 'Textile & Fashion';
-  if (/\b(rice|food|agriculture|bakery|crop|biofuel|grain|beverage|confectionery)\b/i.test(text)) return 'Agri & Food Tech';
-  if (/\b(art|jewel|jewellery|jewelry|lifestyle|photo|handicraft)\b/i.test(text)) return 'Art & Lifestyle';
+  if (/\b(cargo|logistics|freight|transport|supply chain|warehousing|innotrans)\b/i.test(text)) return 'Logistics & Cargo';
+  if (/\b(health|med|medical|pharma|cancer|doctor|hospital|surgical|pharmaexpo|iranpharma)\b/i.test(text)) return 'Healthcare & Pharma';
+  if (/\b(build|building|construction|cement|concrete|infrastructure|municipal|architecture|foaid)\b/i.test(text)) return 'Construction & Infra';
+  if (/\b(tech|technology|ai|software|cyber|iot|cloud|digital|broadcast|bes)\b/i.test(text)) return 'Technology & AI';
+  if (/\b(textile|garment|fabric|yarn|fashion|apparel|dye|bisutex|clothing)\b/i.test(text)) return 'Textile & Fashion';
+  if (/\b(rice|food|agriculture|bakery|crop|biofuel|grain|beverage|confectionery|agritech)\b/i.test(text)) return 'Agri & Food Tech';
+  if (/\b(art|jewel|jewellery|jewelry|lifestyle|photo|handicraft|madridjoya)\b/i.test(text)) return 'Art & Lifestyle';
   return 'Trade & Industry';
 }
 
@@ -39,17 +46,41 @@ const CATEGORY_IMAGES = {
 // Helper: Extract clean city from venue/city string
 function extractCity(venue = '', city = '') {
   const combined = `${venue} ${city}`;
-  if (combined.includes('New Delhi') || combined.includes('Pragati Maidan') || combined.includes('Bharat Mandapam') || combined.includes('Dwarka')) return 'New Delhi';
-  if (combined.includes('Greater Noida') || combined.includes('India Expo')) return 'Greater Noida';
-  if (combined.includes('Mumbai') || combined.includes('BKC') || combined.includes('NESCO') || combined.includes('Jio')) return 'Mumbai';
-  if (combined.includes('Bengaluru') || combined.includes('BIEC')) return 'Bengaluru';
-  if (combined.includes('Chennai') || combined.includes('IIT Madras') || combined.includes('Trade Centre')) return 'Chennai';
-  if (combined.includes('Hyderabad') || combined.includes('HITEX')) return 'Hyderabad';
-  if (combined.includes('Kolkata') || combined.includes('Biswa Bangla')) return 'Kolkata';
-  if (combined.includes('Pune')) return 'Pune';
-  if (combined.includes('Ahmedabad') || combined.includes('Gandhinagar')) return 'Ahmedabad';
-  if (combined.includes('Dhaka') || combined.includes('Bangladesh')) return 'Dhaka';
-  if (combined.includes('Colombo') || combined.includes('Sri Lanka') || combined.includes('BMICH')) return 'Colombo';
+  // Major Indian Exhibition Hubs
+  if (/new delhi|pragati maidan|bharat mandapam|dwarka|yashobhoomi|delhi/i.test(combined)) return 'New Delhi';
+  if (/greater noida|india expo/i.test(combined)) return 'Greater Noida';
+  if (/mumbai|bombay|bkc|nesco|jio world/i.test(combined)) return 'Mumbai';
+  if (/bengaluru|bangalore|biec/i.test(combined)) return 'Bengaluru';
+  if (/chennai|madras|trade centre/i.test(combined)) return 'Chennai';
+  if (/hyderabad|hitex/i.test(combined)) return 'Hyderabad';
+  if (/kolkata|calcutta|biswa bangla/i.test(combined)) return 'Kolkata';
+  if (/pune/i.test(combined)) return 'Pune';
+  if (/ahmedabad|gandhinagar|hec/i.test(combined)) return 'Ahmedabad';
+  if (/jaipur|jecc/i.test(combined)) return 'Jaipur';
+  if (/kochi|cochin/i.test(combined)) return 'Kochi';
+  if (/goa/i.test(combined)) return 'Goa';
+  if (/indore/i.test(combined)) return 'Indore';
+  if (/coimbatore|codissia/i.test(combined)) return 'Coimbatore';
+  if (/surat/i.test(combined)) return 'Surat';
+  if (/lucknow/i.test(combined)) return 'Lucknow';
+  if (/chandigarh/i.test(combined)) return 'Chandigarh';
+  // Major International Exhibition Hubs
+  if (/dubai|uae|world trade centre dubai/i.test(combined)) return 'Dubai';
+  if (/riyadh/i.test(combined)) return 'Riyadh';
+  if (/jeddah/i.test(combined)) return 'Jeddah';
+  if (/saudi arabia/i.test(combined)) return 'Saudi Arabia';
+  if (/paris/i.test(combined)) return 'Paris';
+  if (/london/i.test(combined)) return 'London';
+  if (/frankfurt|berlin|munich|cologne|dusseldorf|germany/i.test(combined)) return 'Germany';
+  if (/singapore/i.test(combined)) return 'Singapore';
+  if (/bangkok|thailand/i.test(combined)) return 'Bangkok';
+  if (/dhaka|bangladesh/i.test(combined)) return 'Dhaka';
+  if (/colombo|sri lanka/i.test(combined)) return 'Colombo';
+  if (/marseille|france/i.test(combined)) return 'France';
+  if (/madrid|barcelona|spain/i.test(combined)) return 'Spain';
+  if (/milan|bologna|italy/i.test(combined)) return 'Italy';
+  if (/tehran|iran/i.test(combined)) return 'Tehran';
+  if (/dushanbe|tajikistan/i.test(combined)) return 'Dushanbe';
   return city || 'India';
 }
 
@@ -75,30 +106,90 @@ function formatDateRange(startDate, endDate) {
 
 export async function GET(request) {
   try {
-    // 1. Fetch directly from WordPress live REST API
-    let rawEvents = [];
-    let source = 'wordpress_direct';
+    // 0. Check in-memory cache first for near-instant response
+    const now = Date.now();
+    if (memoryCache.events && (now - memoryCache.timestamp < memoryCache.ttl)) {
+      return NextResponse.json({
+        success: true,
+        count: memoryCache.events.length,
+        source: 'memory_cache',
+        events: memoryCache.events
+      });
+    }
 
+    let rawEvents = [];
+    let source = 'wordpress_inspect_meta';
+
+    // 1. Fetch ALL WordPress events from the custom inspect-event-meta endpoint (supports posts_per_page: -1)
     try {
-      const wpRes = await fetch(`${WORDPRESS_URL}/wp-json/visitexpo/v1/claimable-events`, {
+      const wpInspectRes = await fetch(`${WORDPRESS_URL}/wp-json/visitexpo/v1/inspect-event-meta`, {
         headers: {
           'X-VisitExpo-Key': WORDPRESS_API_KEY
         },
-        next: { revalidate: 60 } // Cache for 60s
+        next: { revalidate: 300 } // Cache for 5 minutes
       });
 
-      if (wpRes.ok) {
-        const wpData = await wpRes.json();
-        rawEvents = wpData.data?.docs || wpData.data || [];
+      if (wpInspectRes.ok) {
+        const wpData = await wpInspectRes.json();
+        const docs = wpData.data?.docs || [];
+
+        if (Array.isArray(docs) && docs.length > 0) {
+          rawEvents = docs.map((d, idx) => {
+            if (d.meta) {
+              const m = d.meta;
+              const startTs = m.ovaem_date_start_time?.[0];
+              const endTs = m.ovaem_date_end_time?.[0];
+              const venue = m.ovaem_address_event?.[0] || m.ovaem_venue?.[0] || m.ovaem_address?.[0] || 'Exhibition Center';
+              const rawDesc = m.yoast_wpseo_metadesc?.[0] || m.ovaem_desc_event?.[0] || m.ovaem_org_desc?.[0] || (m.content?.[0] ? m.content[0].slice(0, 300) : '') || '';
+              const org = m.ovaem_org_name?.[0] || 'Verified Organizer';
+
+              return {
+                id: String(d.id || `wp-${idx}`),
+                _id: String(d.id || `wp-${idx}`),
+                wpPostId: d.id,
+                title: d.title || 'Exhibition Event',
+                slug: d.slug,
+                description: rawDesc,
+                startDate: startTs && parseInt(startTs) > 0 ? new Date(parseInt(startTs) * 1000).toISOString() : null,
+                endDate: endTs && parseInt(endTs) > 0 ? new Date(parseInt(endTs) * 1000).toISOString() : null,
+                venue: venue,
+                city: m.ovaem_city?.[0] || '',
+                organizer: org,
+                isClaimed: false
+              };
+            }
+            return d;
+          });
+        }
       }
     } catch (wpError) {
-      console.warn('Direct WordPress fetch failed, trying backend fallback:', wpError.message);
+      console.warn('Direct WordPress inspect-event-meta fetch failed, trying claimable-events:', wpError.message);
     }
 
-    // 2. Fallback to Express backend if needed
+    // 2. Fallback to claimable-events if inspect-event-meta is unavailable
     if (!rawEvents || rawEvents.length === 0) {
       try {
-        const backendRes = await fetch(`${BACKEND_API_URL}/wordpress/claimable-events?limit=100`, {
+        const wpClaimRes = await fetch(`${WORDPRESS_URL}/wp-json/visitexpo/v1/claimable-events`, {
+          headers: {
+            'X-VisitExpo-Key': WORDPRESS_API_KEY
+          },
+          next: { revalidate: 60 }
+        });
+
+        if (wpClaimRes.ok) {
+          const wpData = await wpClaimRes.json();
+          rawEvents = wpData.data?.docs || wpData.data || [];
+          source = 'wordpress_claimable';
+        }
+      } catch (claimErr) {
+        console.warn('WordPress claimable-events fetch failed:', claimErr.message);
+      }
+    }
+
+    // 3. Fallback to Express backend if needed
+    if (!rawEvents || rawEvents.length === 0) {
+      try {
+        const backendRes = await fetch(`${BACKEND_API_URL}/wordpress/claimable-events?limit=2500`, {
           cache: 'no-store'
         });
         if (backendRes.ok) {
@@ -111,7 +202,7 @@ export async function GET(request) {
       }
     }
 
-    // 3. Format and enrich events
+    // 4. Format and enrich all events
     const cleanEvents = (rawEvents || []).map((evt, idx) => {
       const category = inferCategory(evt.title, evt.description);
       const cleanCity = extractCity(evt.venue, evt.city);
@@ -128,7 +219,7 @@ export async function GET(request) {
       return {
         id: evt._id || evt.id || `wp-${idx}`,
         title: evt.title || 'Exhibition Event',
-        slug: evt.slug || (evt.title ? evt.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : `event-${idx}`),
+        slug: cleanSlug,
         description: (evt.description || '').replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&hellip;/g, '...'),
         category: category,
         city: cleanCity,
@@ -142,12 +233,21 @@ export async function GET(request) {
         featured: idx < 6,
         upcoming: true,
         entryType: 'Free Visitor Pass',
-        organizer: 'Verified Organizer',
+        organizer: evt.organizer || 'Verified Organizer',
         image: image,
         wpPostId: evt.wpPostId || evt.id || null,
-        wpUrl: evt.wpUrl || `${WORDPRESS_URL}/${evt.slug || ''}`
+        wpUrl: evt.wpUrl || `${WORDPRESS_URL}/event/${cleanSlug}/`
       };
     });
+
+    // 5. Update memory cache if events were successfully fetched
+    if (cleanEvents.length > 0) {
+      memoryCache = {
+        events: cleanEvents,
+        timestamp: Date.now(),
+        ttl: 5 * 60 * 1000 // 5 minutes
+      };
+    }
 
     return NextResponse.json({
       success: true,

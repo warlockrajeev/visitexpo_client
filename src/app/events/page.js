@@ -169,10 +169,17 @@ export default function EventsDirectoryPage() {
         };
         return parseTurnout(b.attendees) - parseTurnout(a.attendees);
       }
-      // Default: upcoming startDate
-      const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
-      const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
-      return dateA - dateB;
+      // Default: upcoming startDate (upcoming events chronologically first, then past events)
+      const now = Date.now();
+      const timeA = a.startDate ? new Date(a.startDate).getTime() : 0;
+      const timeB = b.startDate ? new Date(b.startDate).getTime() : 0;
+      const isFutureA = timeA >= now;
+      const isFutureB = timeB >= now;
+
+      if (isFutureA && !isFutureB) return -1;
+      if (!isFutureA && isFutureB) return 1;
+      if (isFutureA && isFutureB) return timeA - timeB; // soonest upcoming first
+      return timeB - timeA; // past: most recent first
     });
 
     return list;
@@ -257,7 +264,7 @@ export default function EventsDirectoryPage() {
           <div className="max-w-3xl space-y-3">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-xs font-bold text-[#FFCC00]">
               <Sparkles className="h-3.5 w-3.5" />
-              <span>100+ Verified Global Exhibitions &amp; Expos</span>
+              <span>{events.length > 0 ? `${events.length.toLocaleString()}+ Verified Global Exhibitions & Expos` : 'Verified Global Exhibitions & Expos'}</span>
             </div>
             <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight">
               Explore Global Trade Shows &amp; Exhibitions
@@ -388,7 +395,7 @@ export default function EventsDirectoryPage() {
                 {filteredEvents.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0}–
                 {Math.min(currentPage * ITEMS_PER_PAGE, filteredEvents.length)}
               </strong>{' '}
-              of <strong className="text-zinc-900 font-extrabold">{filteredEvents.length}</strong> events
+              of <strong className="text-zinc-900 font-extrabold">{filteredEvents.length.toLocaleString()}</strong> events
             </div>
           </div>
         </div>
@@ -581,7 +588,7 @@ export default function EventsDirectoryPage() {
           <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-zinc-200">
             <div className="text-xs text-zinc-500 font-medium">
               Page <strong className="text-zinc-900">{currentPage}</strong> of{' '}
-              <strong className="text-zinc-900">{totalPages}</strong> ({filteredEvents.length} total exhibitions)
+              <strong className="text-zinc-900">{totalPages}</strong> ({filteredEvents.length.toLocaleString()} total exhibitions)
             </div>
 
             <div className="flex items-center gap-1.5">

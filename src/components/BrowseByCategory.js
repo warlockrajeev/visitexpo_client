@@ -4,9 +4,11 @@
  * @file BrowseByCategory.js
  * @description 10times.com-style "Browse By Category" section matching user reference screenshot.
  * Renders quick category cards with circular sector icons, titles, event counts, and a warm peach "View All" card.
+ * Each card is directly clickable and links to its dedicated Category Events Page (/category/[slug]).
  */
 
 import React from 'react';
+import Link from 'next/link';
 import {
   GraduationCap,
   BriefcaseMedical,
@@ -19,6 +21,7 @@ import {
 const CATEGORIES = [
   {
     id: 'education',
+    slug: 'education',
     name: 'Education & Training',
     count: '334.5k Events',
     icon: <GraduationCap className="h-4 w-4" />,
@@ -26,6 +29,7 @@ const CATEGORIES = [
   },
   {
     id: 'medical',
+    slug: 'medical-pharma',
     name: 'Medical & Pharma',
     count: '139.4k Events',
     icon: <BriefcaseMedical className="h-4 w-4" />,
@@ -33,13 +37,15 @@ const CATEGORIES = [
   },
   {
     id: 'it_tech',
+    slug: 'it-technology',
     name: 'IT & Technology',
-    count: '139.4k Events',
+    count: '180.8k Events',
     icon: <Monitor className="h-4 w-4" />,
     filterKey: 'Technology & AI'
   },
   {
     id: 'finance',
+    slug: 'banking-finance',
     name: 'Banking & Finance',
     count: '81.0k Events',
     icon: <DollarSign className="h-4 w-4" />,
@@ -47,6 +53,7 @@ const CATEGORIES = [
   },
   {
     id: 'business',
+    slug: 'business-services',
     name: 'Business Services',
     count: '117.6k Events',
     icon: <Briefcase className="h-4 w-4" />,
@@ -81,10 +88,14 @@ export default function BrowseByCategory({ onSelectCategory, activeCategory, onR
           const isSelected = activeCategory === cat.filterKey || activeCategory === cat.name;
 
           return (
-            <button
+            <Link
               key={cat.id}
-              type="button"
-              onClick={() => onSelectCategory(cat)}
+              href={`/category/${cat.slug}`}
+              onClick={() => {
+                if (onSelectCategory) {
+                  onSelectCategory(cat);
+                }
+              }}
               className={`text-left p-4 sm:p-4.5 rounded-xl border transition-all duration-200 cursor-pointer flex flex-col justify-between h-28 sm:h-32 group ${
                 isSelected
                   ? 'bg-zinc-950 text-white border-zinc-950 shadow-md ring-2 ring-[#FFCC00]'
@@ -119,21 +130,20 @@ export default function BrowseByCategory({ onSelectCategory, activeCategory, onR
                   {cat.count}
                 </div>
               </div>
-            </button>
+            </Link>
           );
         })}
 
         {/* 6th Card: "View All" in Warm Peach / Coral (Matching Screenshot) */}
-        <button
-          type="button"
-          onClick={onResetCategory}
+        <Link
+          href="/category/it-technology"
           className="p-4 sm:p-4.5 rounded-xl bg-[#FFF9F2] hover:bg-[#FFF2E5] border border-[#FFE7D4] hover:border-[#FFD5B3] shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex items-center justify-center text-center h-28 sm:h-32 group"
         >
           <span className="font-extrabold text-sm sm:text-base text-[#FF5A36] group-hover:scale-105 transition-transform flex items-center justify-center gap-1.5">
             <span>View All</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </span>
-        </button>
+        </Link>
       </div>
     </div>
   );
