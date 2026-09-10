@@ -53,6 +53,9 @@ import GatedAuthModal from '../components/GatedAuthModal.js';
 import AdvertiseModal from '../components/AdvertiseModal.js';
 import BrowseByCategory from '../components/BrowseByCategory.js';
 import BrowseByCity from '../components/BrowseByCity.js';
+import ExploreVenues from '../components/ExploreVenues.js';
+import FeaturedOrganizers from '../components/FeaturedOrganizers.js';
+import PeoplesReviews from '../components/PeoplesReviews.js';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -376,13 +379,21 @@ export default function LandingPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-white">
-        <Logo className="h-12 w-12 animate-pulse" />
-      </div>
-    );
-  }
+  const handleOrganizerSelect = (organizerQuery) => {
+    setSearchQuery(organizerQuery);
+    const el = document.getElementById('events');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleVenueSelect = (venueQuery) => {
+    setSearchQuery(venueQuery);
+    const el = document.getElementById('events');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white text-zinc-900 font-sans antialiased selection:bg-[#FF2E63] selection:text-white">
@@ -547,7 +558,7 @@ export default function LandingPage() {
       {/* 3.5 10TIMES BROWSE BY CATEGORY & BROWSE EVENTS BY CITY (DISCOVERY HUB)    */}
       {/* ========================================================================= */}
       <section className="py-12 bg-zinc-50/70 border-t border-zinc-200/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-12">
           <BrowseByCategory
             activeCategory={selectedCategory}
             onSelectCategory={handleCategorySelect}
@@ -559,6 +570,16 @@ export default function LandingPage() {
             onSelectCity={handleCitySelect}
             onResetCity={() => setSelectedCity('')}
           />
+
+          {/* Featured Trade Show Organizers */}
+          <div className="pt-8 border-t border-zinc-200/70">
+            <FeaturedOrganizers onSelectOrganizer={handleOrganizerSelect} />
+          </div>
+
+          {/* Explored Convention & Exhibition Venues */}
+          <div className="pt-8 border-t border-zinc-200/70">
+            <ExploreVenues onSelectVenue={handleVenueSelect} />
+          </div>
         </div>
       </section>
 
@@ -1206,6 +1227,15 @@ export default function LandingPage() {
 
           </div>
 
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* 4.5 PEOPLE'S REVIEWS ON EVENTS (ATTENDEE & EXHIBITOR SOCIAL PROOF)        */}
+      {/* ========================================================================= */}
+      <section className="py-16 bg-white border-t border-zinc-200/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <PeoplesReviews />
         </div>
       </section>
 
