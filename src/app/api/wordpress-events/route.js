@@ -16,32 +16,116 @@ let memoryCache = {
 function inferCategory(title = '', desc = '') {
   const text = `${title} ${desc}`.toLowerCase();
   if (/\b(travel|tourism|tourist|destination|hospitality|hotel|resort|leisure|flight|airline|cruise|mice|resa|iftm)\b/i.test(text)) return 'Travel & Tourism';
-  if (/\b(auto|automobile|automotive|vehicles?|motor|motors|ev|evs|electric vehicle|mobility|tyre|tire)\b/i.test(text)) return 'Automotive & EV';
-  if (/\b(airport|aviation|rotorcraft|air|aerospace)\b/i.test(text)) return 'Aerospace & Aviation';
-  if (/\b(cargo|logistics|freight|transport|supply chain|warehousing|innotrans)\b/i.test(text)) return 'Logistics & Cargo';
-  if (/\b(health|med|medical|pharma|cancer|doctor|hospital|surgical|pharmaexpo|iranpharma)\b/i.test(text)) return 'Healthcare & Pharma';
-  if (/\b(build|building|construction|cement|concrete|infrastructure|municipal|architecture|foaid)\b/i.test(text)) return 'Construction & Infra';
-  if (/\b(tech|technology|ai|software|cyber|iot|cloud|digital|broadcast|bes)\b/i.test(text)) return 'Technology & AI';
-  if (/\b(textile|garment|fabric|yarn|fashion|apparel|dye|bisutex|clothing)\b/i.test(text)) return 'Textile & Fashion';
-  if (/\b(rice|food|agriculture|bakery|crop|biofuel|grain|beverage|confectionery|agritech)\b/i.test(text)) return 'Agri & Food Tech';
-  if (/\b(art|jewel|jewellery|jewelry|lifestyle|photo|handicraft|madridjoya)\b/i.test(text)) return 'Art & Lifestyle';
+  if (/\b(auto|automobile|automotive|vehicles?|motor|motors|ev|evs|electric vehicle|mobility|tyre|tire|truck|trucks|transport|rodeo|car|cars)\b/i.test(text)) return 'Automotive & EV';
+  if (/\b(airport|aviation|rotorcraft|air|aerospace|drone|aircraft|flight)\b/i.test(text)) return 'Aerospace & Aviation';
+  if (/\b(cargo|logistics|freight|transport|supply chain|warehousing|innotrans|shipping|maritime)\b/i.test(text)) return 'Logistics & Cargo';
+  if (/\b(health|med|medical|pharma|cancer|doctor|hospital|surgical|pharmaexpo|iranpharma|dent|dental|biotech|clinical|nurse)\b/i.test(text)) return 'Healthcare & Pharma';
+  if (/\b(build|building|construction|cement|concrete|infrastructure|municipal|architecture|foaid|real estate|property|housing|realty|urban land|flooring|roofing)\b/i.test(text)) return 'Construction & Infra';
+  if (/\b(tech|technology|ai|software|cyber|iot|cloud|digital|broadcast|bes|lighting|led|electronics|semiconductor|smart|startup|startupx|it|data|telecom)\b/i.test(text)) return 'Technology & AI';
+  if (/\b(textile|garment|fabric|yarn|fashion|apparel|dye|bisutex|clothing|leather|tailor|sewing|knit|hometextile)\b/i.test(text)) return 'Textile & Fashion';
+  if (/\b(rice|food|agriculture|bakery|crop|biofuel|grain|beverage|confectionery|agritech|dairy|ice cream|seafood|agro|farming|spice|organic|sugar)\b/i.test(text)) return 'Agri & Food Tech';
+  if (/\b(art|jewel|jewellery|jewelry|lifestyle|photo|handicraft|madridjoya|wedding|bridal|marriage|decor|interior|gift|gifts|luxury|pet|pets|cosmetics|beauty|hair|salon)\b/i.test(text)) return 'Art & Lifestyle';
+  if (/\b(energy|solar|power|water|environment|waste|clean|renewable|sustainability|storage|battery|oil|gas|wind)\b/i.test(text)) return 'Energy & Environment';
   return 'Trade & Industry';
 }
 
-// Category image pool
-const CATEGORY_IMAGES = {
-  'Travel & Tourism': 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?q=80&w=800&auto=format&fit=crop',
-  'Automotive & EV': 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?q=80&w=800&auto=format&fit=crop',
-  'Aerospace & Aviation': 'https://images.unsplash.com/photo-1517976487588-468a356cb0b7?q=80&w=800&auto=format&fit=crop',
-  'Logistics & Cargo': 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=800&auto=format&fit=crop',
-  'Healthcare & Pharma': 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?q=80&w=800&auto=format&fit=crop',
-  'Construction & Infra': 'https://images.unsplash.com/photo-1541888946425-d0fbb186156a?q=80&w=800&auto=format&fit=crop',
-  'Technology & AI': 'https://images.unsplash.com/photo-1511578314322-379afb476865?q=80&w=800&auto=format&fit=crop',
-  'Textile & Fashion': 'https://images.unsplash.com/photo-1558769132-cb1aea458c5e?q=80&w=800&auto=format&fit=crop',
-  'Agri & Food Tech': 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?q=80&w=800&auto=format&fit=crop',
-  'Art & Lifestyle': 'https://images.unsplash.com/photo-1536924940846-227afb31e2a5?q=80&w=800&auto=format&fit=crop',
-  'Trade & Industry': 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=800&auto=format&fit=crop'
+// Diverse, high-resolution exhibition image pools per category (never generic duplicates)
+const CATEGORY_POOLS = {
+  'Travel & Tourism': [
+    'https://images.unsplash.com/photo-1488646953014-85cb44e25828?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=800&auto=format&fit=crop'
+  ],
+  'Automotive & EV': [
+    'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1563720223185-11003d516935?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1617788138017-80ad40651399?q=80&w=800&auto=format&fit=crop'
+  ],
+  'Aerospace & Aviation': [
+    'https://images.unsplash.com/photo-1517976487588-468a356cb0b7?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=800&auto=format&fit=crop'
+  ],
+  'Logistics & Cargo': [
+    'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1578575437130-527eed3abbec?q=80&w=800&auto=format&fit=crop'
+  ],
+  'Healthcare & Pharma': [
+    'https://images.unsplash.com/photo-1579684385127-1ef15d508118?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?q=80&w=800&auto=format&fit=crop'
+  ],
+  'Construction & Infra': [
+    'https://images.unsplash.com/photo-1541888946425-d0fbb186156a?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=800&auto=format&fit=crop'
+  ],
+  'Technology & AI': [
+    'https://images.unsplash.com/photo-1511578314322-379afb476865?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1531482615713-2afd69097998?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?q=80&w=800&auto=format&fit=crop'
+  ],
+  'Textile & Fashion': [
+    'https://images.unsplash.com/photo-1558769132-cb1aea458c5e?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=800&auto=format&fit=crop'
+  ],
+  'Agri & Food Tech': [
+    'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=800&auto=format&fit=crop'
+  ],
+  'Art & Lifestyle': [
+    'https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1536924940846-227afb31e2a5?q=80&w=800&auto=format&fit=crop'
+  ],
+  'Energy & Environment': [
+    'https://images.unsplash.com/photo-1497435334941-8c899ee9e8e9?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?q=80&w=800&auto=format&fit=crop'
+  ],
+  'Trade & Industry': [
+    'https://images.unsplash.com/photo-1511578314322-379afb476865?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1587825140708-dfaf72ae4b04?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?q=80&w=800&auto=format&fit=crop'
+  ]
 };
+
+function getCategoryFallback(category, title = '') {
+  const pool = CATEGORY_POOLS[category] || CATEGORY_POOLS['Trade & Industry'];
+  const hash = (title || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  return pool[Math.abs(hash) % pool.length];
+}
+
+// Helper to look up genuine WordPress featured image from backend dataset
+function findWpImage(slug, id, wpPostId, title) {
+  if (!slug && !id && !title && !wpPostId) return null;
+
+  // 1. Direct key match (by slug, ID, or wpPostId)
+  if (slug && wpEventImages[slug]) return wpEventImages[slug];
+  if (id && wpEventImages[String(id)]) return wpEventImages[String(id)];
+  if (wpPostId && wpEventImages[String(wpPostId)]) return wpEventImages[String(wpPostId)];
+
+  // 2. Normalized slug match
+  if (slug) {
+    const normSlug = slug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    if (wpEventImages[normSlug]) return wpEventImages[normSlug];
+  }
+
+  // 3. Title-derived slug and fuzzy keyword match
+  if (title) {
+    const titleSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    if (wpEventImages[titleSlug]) return wpEventImages[titleSlug];
+
+    const lowerTitle = title.toLowerCase();
+    for (const [k, url] of Object.entries(wpEventImages)) {
+      if (k.length > 5 && isNaN(Number(k))) {
+        const readableKey = k.replace(/-/g, ' ');
+        if (lowerTitle.includes(readableKey) || (readableKey.length > 10 && readableKey.includes(lowerTitle))) {
+          return url;
+        }
+      }
+    }
+  }
+
+  return null;
+}
 
 // Helper: Extract clean city from venue/city string
 function extractCity(venue = '', city = '') {
@@ -106,9 +190,12 @@ function formatDateRange(startDate, endDate) {
 
 export async function GET(request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const forceRefresh = searchParams.get('refresh') === 'true';
+
     // 0. Check in-memory cache first for near-instant response
     const now = Date.now();
-    if (memoryCache.events && (now - memoryCache.timestamp < memoryCache.ttl)) {
+    if (!forceRefresh && memoryCache.events && (now - memoryCache.timestamp < memoryCache.ttl)) {
       return NextResponse.json({
         success: true,
         count: memoryCache.events.length,
@@ -225,19 +312,18 @@ export async function GET(request) {
       }
     }
 
-    // 4. Format and enrich all events
+    // 4. Format and enrich all events with real images
     const cleanEvents = (rawEvents || []).map((evt, idx) => {
       const category = inferCategory(evt.title, evt.description);
       const cleanCity = extractCity(evt.venue, evt.city);
       const cleanSlug = evt.slug || (evt.title ? evt.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : `event-${idx}`);
-      const wpImage = wpEventImages[cleanSlug] || 
-                      wpEventImages[String(evt.id)] || 
-                      wpEventImages[String(evt._id)] || 
-                      wpEventImages[String(evt.wpPostId)] ||
-                      (evt.coverImage && !evt.coverImage.includes('unsplash') ? evt.coverImage : null) ||
-                      (evt.image && !evt.image.includes('unsplash') ? evt.image : null);
+      const wpImage = findWpImage(cleanSlug, evt.id, evt.wpPostId, evt.title) ||
+                      (evt.image && !evt.image.includes('unsplash') ? evt.image : null) ||
+                      (evt.banner && !evt.banner.includes('unsplash') ? evt.banner : null) ||
+                      (evt.coverImage && !evt.coverImage.includes('unsplash') ? evt.coverImage : null);
 
-      const image = wpImage || CATEGORY_IMAGES[category] || CATEGORY_IMAGES['Trade & Industry'];
+      const fallbackImage = getCategoryFallback(category, evt.title);
+      const image = wpImage || fallbackImage;
 
       return {
         id: evt._id || evt.id || `wp-${idx}`,
@@ -258,6 +344,8 @@ export async function GET(request) {
         entryType: 'Free Visitor Pass',
         organizer: evt.organizer || 'Verified Organizer',
         image: image,
+        fallbackImage: fallbackImage,
+        isRealImage: !!wpImage,
         wpPostId: evt.wpPostId || evt.id || null,
         wpUrl: evt.wpUrl || `${WORDPRESS_URL}/event/${cleanSlug}/`
       };

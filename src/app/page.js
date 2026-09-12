@@ -1115,6 +1115,11 @@ export default function LandingPage() {
                             src={expo.image}
                             alt={expo.title}
                             className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
+                            onError={(e) => {
+                              if (expo.fallbackImage && e.currentTarget.src !== expo.fallbackImage) {
+                                e.currentTarget.src = expo.fallbackImage;
+                              }
+                            }}
                           />
                           
                           {/* Category Tag */}
