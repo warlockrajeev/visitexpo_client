@@ -1319,13 +1319,13 @@ export default function LandingPage() {
                 </div>
                 <div className="flex items-center gap-2.5">
                   <Phone className="h-4 w-4 text-zinc-400" />
-                  <a href="tel:+919876543210" className="font-semibold hover:text-[#FF2E63]">+91 (0) 11 4987 6543</a>
+                  <a href="tel:+919323677688" className="font-semibold hover:text-[#FF2E63]">+91 93236 77688</a>
                 </div>
               </div>
 
               <div className="pt-3">
                 <a
-                  href="https://wa.me/919876543210"
+                  href="https://wa.me/919323677688?text=Hi%20VisitExpo%20Team%2C%20I%20would%20like%20to%20inquire%20about%20trade%20shows%2C%20booth%20booking%2C%20and%20event%20services."
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 text-xs transition-colors"
@@ -1391,7 +1391,7 @@ export default function LandingPage() {
                       <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Phone / WhatsApp</label>
                       <input
                         type="tel"
-                        placeholder="+91 98765 43210"
+                        placeholder="+91 93236 77688"
                         value={contactPhone}
                         onChange={(e) => setContactPhone(e.target.value)}
                         className="w-full rounded-lg border border-zinc-200 bg-white py-2 px-3 text-xs text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"

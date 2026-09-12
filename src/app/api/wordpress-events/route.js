@@ -126,7 +126,7 @@ export async function GET(request) {
         headers: {
           'X-VisitExpo-Key': WORDPRESS_API_KEY
         },
-        next: { revalidate: 300 } // Cache for 5 minutes
+        cache: 'no-store'
       });
 
       if (wpInspectRes.ok) {
@@ -173,7 +173,7 @@ export async function GET(request) {
           headers: {
             'X-VisitExpo-Key': WORDPRESS_API_KEY
           },
-          next: { revalidate: 60 }
+          cache: 'no-store'
         });
 
         if (wpClaimRes.ok) {
