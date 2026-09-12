@@ -23,7 +23,6 @@ import {
   MessageSquare,
   ChevronRight,
   ClipboardList,
-  Sparkles,
   UserCheck,
   Check
 } from 'lucide-react';

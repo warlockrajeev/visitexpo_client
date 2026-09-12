@@ -24,7 +24,7 @@ import {
   Briefcase,
   Loader2,
   ShieldCheck,
-  Sparkles,
+  CheckCircle2,
   ArrowRight
 } from 'lucide-react';
 import { auth, googleProvider, signInWithPopup } from '../lib/firebase.js';
@@ -80,7 +80,7 @@ export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) 
     switch (actionType) {
       case 'explore_events':
         return {
-          icon: <Sparkles className="h-5 w-5 text-[#FFCC00]" />,
+          icon: <CheckCircle2 className="h-5 w-5 text-[#FFCC00]" />,
           badge: 'All Events Directory Access',
           title: mode === 'signup' ? 'Join to Explore All 100+ Events' : 'Sign in to Explore All 100+ Events',
           desc: 'Create a free account or sign in to browse all verified trade expos, filter by city, and claim passes.'
@@ -458,7 +458,7 @@ export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) 
             </span>
             <span>•</span>
             <span className="flex items-center gap-1">
-              <Sparkles className="h-3 w-3 text-[#FFCC00]" /> Verified Expos
+              <CheckCircle2 className="h-3 w-3 text-[#FFCC00]" /> Verified Expos
             </span>
             <span>•</span>
             <span>Privacy Protected</span>

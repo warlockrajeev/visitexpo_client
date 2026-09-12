@@ -27,7 +27,6 @@ import {
   SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
-  Sparkles,
   ShieldCheck,
   Tag,
   Bookmark,
@@ -263,7 +262,7 @@ export default function EventsDirectoryPage() {
           {/* Heading */}
           <div className="max-w-3xl space-y-3">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-xs font-bold text-[#FFCC00]">
-              <Sparkles className="h-3.5 w-3.5" />
+              <ShieldCheck className="h-3.5 w-3.5" />
               <span>{events.length > 0 ? `${events.length.toLocaleString()}+ Verified Global Exhibitions & Expos` : 'Verified Global Exhibitions & Expos'}</span>
             </div>
             <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight">
@@ -371,7 +370,7 @@ export default function EventsDirectoryPage() {
                     : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100'
                 }`}
               >
-                <Sparkles className="h-3.5 w-3.5" />
+                <Tag className="h-3.5 w-3.5" />
                 <span>Featured Only</span>
               </button>
 

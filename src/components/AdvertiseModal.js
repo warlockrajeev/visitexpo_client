@@ -19,7 +19,6 @@ import {
   Mail,
   Phone,
   User,
-  Sparkles,
   ArrowRight,
   ShieldCheck
 } from 'lucide-react';

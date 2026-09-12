@@ -27,7 +27,6 @@ import {
   Share2,
   ShieldCheck,
   Clock,
-  Sparkles,
   ExternalLink,
   ChevronRight,
   ChevronLeft,

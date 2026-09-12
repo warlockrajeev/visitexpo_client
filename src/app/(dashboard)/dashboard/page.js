@@ -19,7 +19,6 @@ import {
   CheckCircle,
   Clock,
   Building,
-  Sparkles,
   ArrowRight,
   ShieldCheck,
   Plus,
@@ -240,7 +239,7 @@ export function OrganizerDashboardInner() {
         <div>
           <div className="flex items-center gap-2 mb-2">
             <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-500 uppercase tracking-wider bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
-              <Sparkles className="h-3.5 w-3.5" /> Sync Active
+              <Activity className="h-3.5 w-3.5" /> Sync Active
             </span>
           </div>
           <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
@@ -306,7 +305,7 @@ export function OrganizerDashboardInner() {
           <div className="rounded-xl border border-border bg-background/50 p-4 flex flex-col justify-between hover:border-primary/60 transition-all space-y-3">
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-primary text-xs font-bold">
-                <Sparkles className="h-4 w-4" />
+                <PlusCircle className="h-4 w-4" />
                 <span>Launch New Expo</span>
               </div>
               <h4 className="text-xs font-bold text-foreground">Multi-Step Event Wizard</h4>

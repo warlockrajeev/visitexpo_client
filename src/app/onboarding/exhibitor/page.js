@@ -22,7 +22,6 @@ import {
   ArrowRight,
   ArrowLeft,
   Loader2,
-  Sparkles,
   Search,
   Check
 } from 'lucide-react';

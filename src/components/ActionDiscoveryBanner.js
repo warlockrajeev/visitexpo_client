@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 export default function ActionDiscoveryBanner({ onKeywordClick }) {
   // Category filter state for "different keywords and labels"
@@ -66,7 +66,6 @@ export default function ActionDiscoveryBanner({ onKeywordClick }) {
       <div className="bg-[#f0eee9] border-b border-zinc-200/80 px-4 sm:px-6 py-2.5">
         <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-1.5 text-zinc-600 font-medium">
-            <Sparkles className="h-3.5 w-3.5 text-[#FF2E63]" />
             <span className="text-[11px] uppercase tracking-wider font-bold text-zinc-700">Explore Keywords &amp; Labels:</span>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">

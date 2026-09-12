@@ -18,7 +18,7 @@ import {
   ChevronRight,
   X,
   Loader2,
-  Sparkles,
+  ShieldCheck,
   Receipt,
   RefreshCw,
   AlertCircle,
@@ -1014,7 +1014,7 @@ export default function TicketingPage() {
                       >
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-bold text-foreground flex items-center gap-1">
-                            {isAdmin && <Sparkles className="h-3 w-3 text-primary" />}
+                            {isAdmin && <ShieldCheck className="h-3 w-3 text-primary" />}
                             {resp.senderName} <span className="text-[10px] font-semibold text-muted-foreground">({resp.senderRole})</span>
                           </span>
                           <span className="text-[10px] text-muted-foreground">
@@ -1297,7 +1297,7 @@ export default function TicketingPage() {
                     </>
                   ) : (
                     <>
-                      <Sparkles className="h-4 w-4" /> Simulate Payment
+                      <CheckCircle className="h-4 w-4" /> Simulate Payment
                     </>
                   )}
                 </button>

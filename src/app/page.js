@@ -31,7 +31,6 @@ import {
   Star,
   Users,
   Bookmark,
-  Sparkles,
   Filter,
   Megaphone,
   CheckCircle2,
@@ -44,7 +43,8 @@ import {
   Award,
   Send,
   Check,
-  HelpCircle
+  HelpCircle,
+  X
 } from 'lucide-react';
 import axios from 'axios';
 import Navbar, { Logo } from '../components/Navbar.js';
@@ -179,6 +179,7 @@ export default function LandingPage() {
           item.category?.toLowerCase().includes(q) ||
           item.city?.toLowerCase().includes(q) ||
           item.venue?.toLowerCase().includes(q) ||
+          item.organizer?.toLowerCase().includes(q) ||
           item.description?.toLowerCase().includes(q);
         if (!matches) return false;
       }
@@ -423,7 +424,10 @@ export default function LandingPage() {
           
           {/* Live Sync Badge */}
           <div className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-md px-4 py-1.5 text-xs font-medium text-white border border-white/20 shadow-lg">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="relative flex h-3 w-3 items-center justify-center">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00FF66] opacity-90" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#00FF66] shadow-[0_0_10px_#00FF66,0_0_18px_#10b981] ring-2 ring-emerald-200" />
+            </span>
             <span>
               Connected to <strong className="text-white">visitexpo.in</strong>
               {events.length > 0 && ` • ${events.length} Live Events`}
@@ -573,7 +577,7 @@ export default function LandingPage() {
 
           {/* Featured Trade Show Organizers */}
           <div className="pt-8 border-t border-zinc-200/70">
-            <FeaturedOrganizers onSelectOrganizer={handleOrganizerSelect} />
+            <FeaturedOrganizers onSelectOrganizer={handleOrganizerSelect} activeOrganizer={searchQuery} />
           </div>
 
           {/* Explored Convention & Exhibition Venues */}
@@ -646,7 +650,7 @@ export default function LandingPage() {
                     <Filter className="h-4 w-4 text-[#FF2E63]" />
                     <span>Search Filters</span>
                   </div>
-                  {(dateRangeFilter !== 'all' || formatFilter !== 'all' || entryTypeFilter !== 'all' || selectedCity || activeCategoryTab !== 'all') && (
+                  {(dateRangeFilter !== 'all' || formatFilter !== 'all' || entryTypeFilter !== 'all' || selectedCity || activeCategoryTab !== 'all' || searchQuery) && (
                     <button
                       onClick={() => {
                         setDateRangeFilter('all');
@@ -663,8 +667,47 @@ export default function LandingPage() {
                   )}
                 </div>
 
+                {/* Manual Search Option */}
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-zinc-400">
+                    Search Events
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Search title, venue, city, keyword..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-8.5 pr-8 py-2 text-xs bg-zinc-50 hover:bg-zinc-100/70 focus:bg-white border border-zinc-200 focus:border-[#FF2E63] rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-[#FF2E63]/20 transition-all font-medium"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 p-0.5 rounded-full hover:bg-zinc-200 transition-colors"
+                        title="Clear search"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                  {searchQuery && (
+                    <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-0.5 px-0.5">
+                      <span className="truncate">Filtering for: <strong className="text-zinc-900 font-bold">"{searchQuery}"</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="text-[#FF2E63] hover:underline font-bold ml-1 shrink-0"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 {/* Date Filter */}
-                <div className="space-y-2">
+                <div className="space-y-2 pt-2 border-t border-zinc-100">
                   <label className="block text-[11px] font-extrabold uppercase tracking-wider text-zinc-400">
                     Date Range
                   </label>
@@ -757,7 +800,6 @@ export default function LandingPage() {
                   <span className="text-[9px] font-extrabold tracking-wider uppercase px-2 py-0.5 rounded bg-amber-400 text-zinc-950">
                     Promote Your Event
                   </span>
-                  <Sparkles className="h-4 w-4 text-amber-300" />
                 </div>
 
                 <div className="space-y-1.5">

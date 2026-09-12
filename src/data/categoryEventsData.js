@@ -380,6 +380,127 @@ export const CATEGORIES_CONFIG = {
         logo: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=120&auto=format&fit=crop'
       }
     ]
+  },
+  'technology-ai': {
+    slug: 'technology-ai',
+    id: 'technology_ai',
+    name: 'Technology & AI Events',
+    shortName: 'Technology & AI',
+    followersCount: '450+ Followers',
+    eventsCount: '301 Events',
+    heroBanner: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=1600&auto=format&fit=crop',
+    description: 'Premier artificial intelligence, enterprise SaaS, cloud infrastructure, IoT, and cybersecurity trade shows.',
+    events: []
+  },
+  'healthcare-pharma': {
+    slug: 'healthcare-pharma',
+    id: 'healthcare_pharma',
+    name: 'Healthcare & Pharma Events',
+    shortName: 'Healthcare & Pharma',
+    followersCount: '380+ Followers',
+    eventsCount: '117 Events',
+    heroBanner: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?q=80&w=1600&auto=format&fit=crop',
+    description: 'Medical devices, pharmaceuticals, hospital infrastructure, biotechnology research, and diagnostics.',
+    events: []
+  },
+  'construction-infra': {
+    slug: 'construction-infra',
+    id: 'construction_infra',
+    name: 'Construction & Infra Events',
+    shortName: 'Construction & Infra',
+    followersCount: '290+ Followers',
+    eventsCount: '134 Events',
+    heroBanner: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=1600&auto=format&fit=crop',
+    description: 'Heavy infrastructure machinery, smart urban planning, precast cement, architectural hardware, and civil engineering.',
+    events: []
+  },
+  'trade-industry': {
+    slug: 'trade-industry',
+    id: 'trade_industry',
+    name: 'Trade & Industry Events',
+    shortName: 'Trade & Industry',
+    followersCount: '650+ Followers',
+    eventsCount: '904 Events',
+    heroBanner: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=1600&auto=format&fit=crop',
+    description: 'Multi-sector commercial exhibitions, manufacturing conventions, industrial engineering, and export councils.',
+    events: []
+  },
+  'automotive-ev': {
+    slug: 'automotive-ev',
+    id: 'automotive_ev',
+    name: 'Automotive & EV Events',
+    shortName: 'Automotive & EV',
+    followersCount: '410+ Followers',
+    eventsCount: '103 Events',
+    heroBanner: 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?q=80&w=1600&auto=format&fit=crop',
+    description: 'Electric mobility expos, lithium battery technology, auto components, commercial fleets, and charging infrastructure.',
+    events: []
+  },
+  'travel-tourism': {
+    slug: 'travel-tourism',
+    id: 'travel_tourism',
+    name: 'Travel & Tourism Events',
+    shortName: 'Travel & Tourism',
+    followersCount: '320+ Followers',
+    eventsCount: '109 Events',
+    heroBanner: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?q=80&w=1600&auto=format&fit=crop',
+    description: 'Destination showcases, luxury hospitality marts, airline summits, MICE conclaves, and tourism boards.',
+    events: []
+  },
+  'textile-fashion': {
+    slug: 'textile-fashion',
+    id: 'textile_fashion',
+    name: 'Textile & Fashion Events',
+    shortName: 'Textile & Fashion',
+    followersCount: '260+ Followers',
+    eventsCount: '74 Events',
+    heroBanner: 'https://images.unsplash.com/photo-1558769132-cb1aea458c5e?q=80&w=1600&auto=format&fit=crop',
+    description: 'Garment manufacturing machinery, luxury fabrics, yarns, technical textiles, and apparel sourcing shows.',
+    events: []
+  },
+  'agri-food-tech': {
+    slug: 'agri-food-tech',
+    id: 'agri_food_tech',
+    name: 'Agri & Food Tech Events',
+    shortName: 'Agri & Food Tech',
+    followersCount: '310+ Followers',
+    eventsCount: '66 Events',
+    heroBanner: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?q=80&w=1600&auto=format&fit=crop',
+    description: 'Farm mechanization, precision irrigation, food processing, dairy & poultry equipment, and culinary expos.',
+    events: []
+  },
+  'art-lifestyle': {
+    slug: 'art-lifestyle',
+    id: 'art_lifestyle',
+    name: 'Art & Lifestyle Events',
+    shortName: 'Art & Lifestyle',
+    followersCount: '190+ Followers',
+    eventsCount: '50 Events',
+    heroBanner: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?q=80&w=1600&auto=format&fit=crop',
+    description: 'Contemporary fine art fairs, precious gems & jewelry, luxury home decor, and high-end lifestyle showcases.',
+    events: []
+  },
+  'logistics-cargo': {
+    slug: 'logistics-cargo',
+    id: 'logistics_cargo',
+    name: 'Logistics & Cargo Events',
+    shortName: 'Logistics & Cargo',
+    followersCount: '230+ Followers',
+    eventsCount: '39 Events',
+    heroBanner: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=1600&auto=format&fit=crop',
+    description: 'Supply chain management, maritime freight, warehousing robotics, cold-chain systems, and multimodal cargo transport.',
+    events: []
+  },
+  'aerospace-aviation': {
+    slug: 'aerospace-aviation',
+    id: 'aerospace_aviation',
+    name: 'Aerospace & Aviation Events',
+    shortName: 'Aerospace & Aviation',
+    followersCount: '180+ Followers',
+    eventsCount: '27 Events',
+    heroBanner: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=1600&auto=format&fit=crop',
+    description: 'Commercial aviation, defense aerospace, unmanned aerial drones (UAVs), avionics, rotorcraft, and air shows.',
+    events: []
   }
 };
 
@@ -387,19 +508,27 @@ export const CATEGORIES_CONFIG = {
  * Get category config by slug or alias
  */
 export function getCategoryBySlug(slug) {
-  if (!slug) return CATEGORIES_CONFIG['it-technology'];
+  if (!slug) return CATEGORIES_CONFIG['technology-ai'] || CATEGORIES_CONFIG['it-technology'];
   const s = String(slug).toLowerCase().trim();
 
   if (CATEGORIES_CONFIG[s]) return CATEGORIES_CONFIG[s];
 
-  // Aliases
-  if (s.includes('tech') || s.includes('it')) return CATEGORIES_CONFIG['it-technology'];
-  if (s.includes('med') || s.includes('pharma') || s.includes('health')) return CATEGORIES_CONFIG['medical-pharma'];
+  // Specific 11 backend slugs
+  if (s.includes('tech') || s.includes('ai') || s.includes('it')) return CATEGORIES_CONFIG['technology-ai'] || CATEGORIES_CONFIG['it-technology'];
+  if (s.includes('med') || s.includes('pharma') || s.includes('health')) return CATEGORIES_CONFIG['healthcare-pharma'] || CATEGORIES_CONFIG['medical-pharma'];
+  if (s.includes('build') || s.includes('construct') || s.includes('infra')) return CATEGORIES_CONFIG['construction-infra'] || CATEGORIES_CONFIG['building-construction'];
+  if (s.includes('trade') || s.includes('industry')) return CATEGORIES_CONFIG['trade-industry'];
+  if (s.includes('auto') || s.includes('motor') || s.includes('ev')) return CATEGORIES_CONFIG['automotive-ev'];
+  if (s.includes('travel') || s.includes('tour')) return CATEGORIES_CONFIG['travel-tourism'];
+  if (s.includes('textile') || s.includes('fashion')) return CATEGORIES_CONFIG['textile-fashion'];
+  if (s.includes('agri') || s.includes('food')) return CATEGORIES_CONFIG['agri-food-tech'];
+  if (s.includes('art') || s.includes('lifestyle')) return CATEGORIES_CONFIG['art-lifestyle'];
+  if (s.includes('logistics') || s.includes('cargo')) return CATEGORIES_CONFIG['logistics-cargo'];
+  if (s.includes('aero') || s.includes('aviation')) return CATEGORIES_CONFIG['aerospace-aviation'];
   if (s.includes('edu')) return CATEGORIES_CONFIG['education'];
   if (s.includes('fin') || s.includes('bank')) return CATEGORIES_CONFIG['banking-finance'];
-  if (s.includes('build') || s.includes('construct')) return CATEGORIES_CONFIG['building-construction'];
   if (s.includes('business') || s.includes('service')) return CATEGORIES_CONFIG['business-services'];
 
   // Default fallback
-  return CATEGORIES_CONFIG['it-technology'];
+  return CATEGORIES_CONFIG['trade-industry'] || CATEGORIES_CONFIG['technology-ai'];
 }

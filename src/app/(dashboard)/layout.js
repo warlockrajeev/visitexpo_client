@@ -25,7 +25,7 @@ import {
   Sun,
   Moon,
   Building,
-  Sparkles,
+  Wand2,
   ShieldCheck
 } from 'lucide-react';
 
@@ -172,7 +172,7 @@ export default function DashboardLayout({ children }) {
       ]
     : [
         { name: 'Dashboard Hub', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'Event Wizard', href: '/events/wizard', icon: Sparkles, badge: 'Onboarding' },
+        { name: 'Event Wizard', href: '/events/wizard', icon: Wand2, badge: 'Onboarding' },
         { name: 'Claim Event', href: '/events/claim', icon: ShieldCheck },
         { name: 'Manage Events', href: '/manage-events', icon: Calendar },
         { name: 'Exhibitors', href: '/exhibitors', icon: Building },
@@ -384,7 +384,7 @@ export default function DashboardLayout({ children }) {
                     href="/events/wizard"
                     className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"
                   >
-                    <Sparkles className="h-3.5 w-3.5" /> Start Onboarding
+                    <Wand2 className="h-3.5 w-3.5" /> Start Onboarding
                   </Link>
                 )}
               </>

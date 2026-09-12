@@ -29,7 +29,6 @@ import {
   MapPin,
   Globe,
   CheckCircle2,
-  Sparkles,
   ShieldCheck
 } from 'lucide-react';
 import { auth, googleProvider, signInWithPopup } from '../../lib/firebase.js';
@@ -347,7 +346,7 @@ export default function LoginPage() {
 
             <div className="text-center space-y-1">
               <h2 className="text-xl font-bold text-zinc-100 tracking-tight flex items-center justify-center gap-2">
-                <Sparkles className="h-5 w-5 text-amber-400" />
+                <ShieldCheck className="h-5 w-5 text-amber-400" />
                 Complete {googleDetailsForm.role === 'exhibitor' ? 'Exhibitor' : 'Organizer'} Registration
               </h2>
               <p className="text-xs text-zinc-400">

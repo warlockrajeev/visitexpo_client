@@ -21,7 +21,6 @@ import { useAuth } from '../../../../context/AuthContext.js';
 import axios from 'axios';
 import { validateEventImage } from '../../../../utils/imageValidation.js';
 import {
-  Sparkles,
   Calendar,
   MapPin,
   Building,
@@ -1157,9 +1156,6 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
       <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/80 pb-4">
           <div>
-            {/* <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary uppercase tracking-wider bg-primary/10 px-2.5 py-1 rounded-full mb-1">
-              <Sparkles className="h-3.5 w-3.5" /> 10times Style Onboarding Wizard
-            </span> */}
             <h2 className="text-2xl font-bold tracking-tight text-foreground">
               Event & Organizer Onboarding
             </h2>
@@ -1254,7 +1250,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold shadow-md">
-                    <Sparkles className="h-6 w-6" />
+                    <Plus className="h-6 w-6" />
                   </div>
                   <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">
                     Recommended
@@ -1310,15 +1306,6 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 </h3>
                 <p className="text-xs text-muted-foreground">Provide core identity and taxonomy for your expo.</p>
               </div>
-              {/* <button
-                type="button"
-                onClick={generateAiDescription}
-                disabled={isAiGenerating}
-                className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 px-3.5 py-2 text-xs font-bold text-white shadow-md hover:opacity-90 transition-all"
-              >
-                <Sparkles className={`h-4 w-4 ${isAiGenerating ? 'animate-spin' : ''}`} />
-                {isAiGenerating ? 'Generating AI Description...' : 'AI Assist: Generate Description'}
-              </button> */}
             </div>
 
             <div className="grid gap-6 sm:grid-cols-2">

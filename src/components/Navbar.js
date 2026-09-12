@@ -24,8 +24,7 @@ import {
   LogOut,
   ChevronDown,
   Building,
-  ShieldCheck,
-  Sparkles
+  ShieldCheck
 } from 'lucide-react';
 
 export const Logo = ({ className = "w-9 h-9" }) => (

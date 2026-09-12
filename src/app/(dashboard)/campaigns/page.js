@@ -15,7 +15,6 @@ import {
   Users,
   BarChart3,
   TrendingUp,
-  Sparkles,
   Trash2,
   Clock,
   X,

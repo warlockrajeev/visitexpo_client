@@ -120,50 +120,73 @@ export async function GET(request) {
     let rawEvents = [];
     let source = 'wordpress_inspect_meta';
 
-    // 1. Fetch ALL WordPress events from the custom inspect-event-meta endpoint (supports posts_per_page: -1)
+    // 1. Fetch from unified events directory endpoint on Express port 5000
     try {
-      const wpInspectRes = await fetch(`${WORDPRESS_URL}/wp-json/visitexpo/v1/inspect-event-meta`, {
-        headers: {
-          'X-VisitExpo-Key': WORDPRESS_API_KEY
-        },
+      const dirRes = await fetch(`${BACKEND_API_URL}/events/directory`, {
         cache: 'no-store'
       });
-
-      if (wpInspectRes.ok) {
-        const wpData = await wpInspectRes.json();
-        const docs = wpData.data?.docs || [];
-
-        if (Array.isArray(docs) && docs.length > 0) {
-          rawEvents = docs.map((d, idx) => {
-            if (d.meta) {
-              const m = d.meta;
-              const startTs = m.ovaem_date_start_time?.[0];
-              const endTs = m.ovaem_date_end_time?.[0];
-              const venue = m.ovaem_address_event?.[0] || m.ovaem_venue?.[0] || m.ovaem_address?.[0] || 'Exhibition Center';
-              const rawDesc = m.yoast_wpseo_metadesc?.[0] || m.ovaem_desc_event?.[0] || m.ovaem_org_desc?.[0] || (m.content?.[0] ? m.content[0].slice(0, 300) : '') || '';
-              const org = m.ovaem_org_name?.[0] || 'Verified Organizer';
-
-              return {
-                id: String(d.id || `wp-${idx}`),
-                _id: String(d.id || `wp-${idx}`),
-                wpPostId: d.id,
-                title: d.title || 'Exhibition Event',
-                slug: d.slug,
-                description: rawDesc,
-                startDate: startTs && parseInt(startTs) > 0 ? new Date(parseInt(startTs) * 1000).toISOString() : null,
-                endDate: endTs && parseInt(endTs) > 0 ? new Date(parseInt(endTs) * 1000).toISOString() : null,
-                venue: venue,
-                city: m.ovaem_city?.[0] || '',
-                organizer: org,
-                isClaimed: false
-              };
-            }
-            return d;
-          });
+      if (dirRes.ok) {
+        const dirJson = await dirRes.json();
+        const orgs = dirJson.data?.organizers || [];
+        const allEvts = [];
+        orgs.forEach((o) => {
+          (o.events || []).forEach((e) => allEvts.push(e));
+        });
+        if (allEvts.length > 0) {
+          rawEvents = allEvts;
+          source = 'unified_directory_sync';
         }
       }
-    } catch (wpError) {
-      console.warn('Direct WordPress inspect-event-meta fetch failed, trying claimable-events:', wpError.message);
+    } catch (dirErr) {
+      console.warn('Unified directory fetch failed, trying direct WordPress inspect-event-meta:', dirErr.message);
+    }
+
+    // 2. Direct WordPress inspect-event-meta fallback
+    if (!rawEvents || rawEvents.length === 0) {
+      try {
+        const wpInspectRes = await fetch(`${WORDPRESS_URL}/wp-json/visitexpo/v1/inspect-event-meta`, {
+          headers: {
+            'X-VisitExpo-Key': WORDPRESS_API_KEY
+          },
+          cache: 'no-store'
+        });
+
+        if (wpInspectRes.ok) {
+          const wpData = await wpInspectRes.json();
+          const docs = wpData.data?.docs || [];
+
+          if (Array.isArray(docs) && docs.length > 0) {
+            rawEvents = docs.map((d, idx) => {
+              if (d.meta) {
+                const m = d.meta;
+                const startTs = m.ovaem_date_start_time?.[0];
+                const endTs = m.ovaem_date_end_time?.[0];
+                const venue = m.ovaem_address_event?.[0] || m.ovaem_venue?.[0] || m.ovaem_address?.[0] || 'Exhibition Center';
+                const rawDesc = m.yoast_wpseo_metadesc?.[0] || m.ovaem_desc_event?.[0] || m.ovaem_org_desc?.[0] || (m.content?.[0] ? m.content[0].slice(0, 300) : '') || '';
+                const org = (m.ovaem_org_name?.[0] || '').trim() || 'Verified Organizer';
+
+                return {
+                  id: String(d.id || `wp-${idx}`),
+                  _id: String(d.id || `wp-${idx}`),
+                  wpPostId: d.id,
+                  title: d.title || 'Exhibition Event',
+                  slug: d.slug,
+                  description: rawDesc,
+                  startDate: startTs && parseInt(startTs) > 0 ? new Date(parseInt(startTs) * 1000).toISOString() : null,
+                  endDate: endTs && parseInt(endTs) > 0 ? new Date(parseInt(endTs) * 1000).toISOString() : null,
+                  venue: venue,
+                  city: m.ovaem_city?.[0] || '',
+                  organizer: org,
+                  isClaimed: false
+                };
+              }
+              return d;
+            });
+          }
+        }
+      } catch (wpError) {
+        console.warn('Direct WordPress inspect-event-meta fetch failed, trying claimable-events:', wpError.message);
+      }
     }
 
     // 2. Fallback to claimable-events if inspect-event-meta is unavailable

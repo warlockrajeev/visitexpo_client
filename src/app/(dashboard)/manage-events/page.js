@@ -24,7 +24,6 @@ import {
   X,
   AlertCircle,
   Loader2,
-  Sparkles,
   ExternalLink,
   Info,
   ShieldCheck,
@@ -603,7 +602,7 @@ export default function EventsPage() {
             href="/events/wizard"
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-all"
           >
-            <Sparkles className="h-4 w-4" /> Start Visitexpo Wizard
+            <Plus className="h-4 w-4" /> Start Visitexpo Wizard
           </Link>
           <button
             onClick={openCreateModal}
@@ -666,7 +665,7 @@ export default function EventsPage() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 shadow-xs">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400">
-              <Sparkles className="h-5 w-5" />
+              <Clock className="h-5 w-5" />
             </div>
             <div>
               <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400">Unsaved Wizard Draft Detected</p>
@@ -703,7 +702,7 @@ export default function EventsPage() {
             href="/events/wizard"
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-all mt-2"
           >
-            <Sparkles className="h-4 w-4" /> Launch Onboarding Wizard
+            <Plus className="h-4 w-4" /> Launch Onboarding Wizard
           </Link>
         </div>
       ) : (
@@ -720,7 +719,7 @@ export default function EventsPage() {
                     <img src={evt.banner} alt={evt.title} className="h-full w-full object-cover" />
                   ) : (
                     <div className="h-full w-full bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center">
-                      <Sparkles className="h-8 w-8 text-primary/40" />
+                      <ImageIcon className="h-8 w-8 text-primary/40" />
                     </div>
                   )}
                   {/* Status Badge */}

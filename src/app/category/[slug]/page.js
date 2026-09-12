@@ -25,7 +25,6 @@ import {
   ChevronUp,
   Filter,
   Layers,
-  Sparkles,
   ArrowRight,
   Lock,
   ExternalLink,
@@ -546,7 +545,7 @@ export default function CategoryEventsPage() {
                   <span className="block font-bold">Top 100 Events</span>
                   <span className="text-[11px] text-zinc-500 font-normal">Discover and track top events</span>
                 </div>
-                <Sparkles className="h-4 w-4 text-orange-500" />
+                <ArrowRight className="h-4 w-4 text-orange-500" />
               </Link>
             </div>
 

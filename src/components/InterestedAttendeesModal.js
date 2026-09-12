@@ -17,7 +17,6 @@ import {
   MapPin,
   ShieldCheck,
   CheckCircle2,
-  Sparkles,
   MessageSquare,
   Lock,
   ArrowRight,
