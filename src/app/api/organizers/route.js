@@ -296,14 +296,16 @@ let cacheTime = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export async function GET(request) {
-  const url = new URL(request?.url || 'http://localhost:3000/api/organizers');
+  const clientBase = process.env.NEXT_PUBLIC_CLIENT_URL || process.env.CLIENT_URL || 'http://localhost:3000';
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://api.visitexpo.in/api';
+  const url = new URL(request?.url || `${clientBase}/api/organizers`);
   const forceRefresh = url.searchParams.get('refresh') === 'true' || url.searchParams.has('t');
 
   // Fetch deleted organizers from Express backend
   let deletedNames = new Set();
   let deletedSlugIds = new Set();
   try {
-    const delRes = await fetch('http://localhost:5000/api/events/deleted-organizers', {
+    const delRes = await fetch(`${apiBase}/events/deleted-organizers`, {
       cache: 'no-store'
     });
     if (delRes.ok) {
@@ -361,9 +363,9 @@ export async function GET(request) {
 
   let events = [];
 
-  // 1. Fetch internal wordpress-events route on port 3000
+  // 1. Fetch internal wordpress-events route
   try {
-    const res = await fetch('http://localhost:3000/api/wordpress-events', {
+    const res = await fetch(`${clientBase}/api/wordpress-events`, {
       next: { revalidate: 300 }
     });
     if (res.ok) {
@@ -376,10 +378,10 @@ export async function GET(request) {
     console.warn('[api/organizers] Fetch from internal api/wordpress-events failed:', err.message);
   }
 
-  // 2. Fallback to Express backend on port 5000 if needed
+  // 2. Fallback to Express backend if needed
   if (events.length === 0) {
     try {
-      const serverRes = await fetch('http://localhost:5000/api/events?limit=2000', {
+      const serverRes = await fetch(`${apiBase}/events?limit=2000`, {
         signal: AbortSignal.timeout(6000)
       });
       if (serverRes.ok) {
@@ -388,7 +390,7 @@ export async function GET(request) {
         events = docs;
       }
     } catch (sErr) {
-      console.warn('[api/organizers] Fetch from port 5000 fallback note:', sErr.message);
+      console.warn('[api/organizers] Fetch from backend fallback note:', sErr.message);
     }
   }
   const activeMetadata = ORGANIZERS_METADATA.filter((org) => !isDeleted(org));

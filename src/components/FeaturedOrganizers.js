@@ -10,6 +10,8 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, CheckCircle2, Globe } from 'lucide-react';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 // Baseline verified organizers loaded immediately for zero layout shift
 const BASELINE_ORGANIZERS = [
   {
@@ -411,7 +413,7 @@ export default function FeaturedOrganizers({ onSelectOrganizer, activeOrganizer 
       try {
         const [res, delRes] = await Promise.all([
           fetch(`/api/organizers?t=${Date.now()}&refresh=true`, { cache: 'no-store' }),
-          fetch('http://localhost:5000/api/events/deleted-organizers', { cache: 'no-store' }).catch(() => null)
+          fetch(`${API_URL}/events/deleted-organizers`, { cache: 'no-store' }).catch(() => null)
         ]);
 
         let deletedNames = new Set();

@@ -178,10 +178,12 @@ export async function GET() {
   }
 
   let events = [];
+  const clientBase = process.env.NEXT_PUBLIC_CLIENT_URL || process.env.CLIENT_URL || 'http://localhost:3000';
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://api.visitexpo.in/api';
 
   // Try fetching internal wordpress-events route
   try {
-    const res = await fetch('http://localhost:3000/api/wordpress-events', {
+    const res = await fetch(`${clientBase}/api/wordpress-events`, {
       next: { revalidate: 300 }
     });
     if (res.ok) {
@@ -194,10 +196,10 @@ export async function GET() {
     console.warn('[client-dashboard/api/categories] Fetch from internal api/wordpress-events failed:', err.message);
   }
 
-  // Fallback to Express backend on port 5000
+  // Fallback to Express backend
   if (events.length === 0) {
     try {
-      const serverRes = await fetch('http://localhost:5000/api/events?limit=2000', {
+      const serverRes = await fetch(`${apiBase}/events?limit=2000`, {
         signal: AbortSignal.timeout(6000)
       });
       if (serverRes.ok) {
@@ -206,7 +208,7 @@ export async function GET() {
         events = docs;
       }
     } catch (sErr) {
-      console.warn('[client-dashboard/api/categories] Fetch from port 5000 fallback note:', sErr.message);
+      console.warn('[client-dashboard/api/categories] Fetch from backend fallback note:', sErr.message);
     }
   }
 
