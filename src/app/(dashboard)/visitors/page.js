@@ -24,7 +24,11 @@ import {
   AlertCircle,
   Loader2,
   Video,
-  Trash2
+  Trash2,
+  UserCheck,
+  Bell,
+  Bookmark,
+  ExternalLink
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -36,6 +40,11 @@ export default function VisitorsCRMPage() {
   const [visitors, setVisitors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // Tab Switcher State: Gate passes vs Interested/Followers
+  const [viewTab, setViewTab] = useState('registrations'); // 'registrations' | 'engagements'
+  const [engagements, setEngagements] = useState([]);
+  const [loadingEngagements, setLoadingEngagements] = useState(false);
   
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
@@ -118,6 +127,29 @@ export default function VisitorsCRMPage() {
   useEffect(() => {
     fetchVisitors();
   }, [selectedEventId, accessToken]);
+
+  // Fetch interested & followers for selected event or platform-wide
+  useEffect(() => {
+    const fetchEngagements = async () => {
+      try {
+        setLoadingEngagements(true);
+        const selEvent = events.find(e => e._id === selectedEventId);
+        const url = selEvent?.slug
+          ? `${API_URL}/engagements/event/${selEvent.slug}`
+          : `${API_URL}/engagements/all`;
+        const res = await axios.get(url);
+        if (res.data && res.data.success) {
+          const docs = res.data.data?.attendees || res.data.data?.engagements || [];
+          setEngagements(docs);
+        }
+      } catch (err) {
+        console.warn('Could not fetch engagements in visitors page:', err);
+      } finally {
+        setLoadingEngagements(false);
+      }
+    };
+    if (events.length > 0) fetchEngagements();
+  }, [selectedEventId, events]);
 
   // 3. Handle Physical Check-In
   const handlePhysicalCheckIn = async (qrCode) => {
@@ -283,41 +315,196 @@ export default function VisitorsCRMPage() {
         ))}
       </div>
 
+      {/* Directory Tab Switcher */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setViewTab('registrations')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+            viewTab === 'registrations'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'bg-card border border-border text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <QrCode className="h-4 w-4" />
+          <span>Registered Gate Passes ({totalRegistered})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setViewTab('engagements')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+            viewTab === 'engagements'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'bg-card border border-border text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <UserCheck className="h-4 w-4" />
+          <span>Interested People &amp; Followers ({engagements.length})</span>
+        </button>
+      </div>
+
       {/* Registry Table */}
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        {/* Table Filters */}
-        <div className="flex flex-col gap-4 border-b border-border p-5 md:flex-row md:items-center md:justify-between">
-          <div className="flex border border-border rounded-lg p-0.5 bg-muted/20 w-fit">
-            {[
-              { id: 'all', label: 'All Channels' },
-              { id: 'in_person', label: 'In-Person' },
-              { id: 'virtual', label: 'Virtual' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setAttendanceFilter(tab.id)}
-                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                  attendanceFilter === tab.id
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+        {viewTab === 'engagements' ? (
+          <div className="space-y-4 p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <UserCheck className="h-4.5 w-4.5 text-primary" /> Event Interest &amp; Follower Leads
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  People who marked Interest or are Following this event on the VisitExpo platform.
+                </p>
+              </div>
 
-          <div className="relative md:w-80">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search by name, company, email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-            />
+              <div className="relative md:w-80">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Filter by name, email, company..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-4 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+            </div>
+
+            {loadingEngagements ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm">Fetching interested people &amp; followers...</p>
+              </div>
+            ) : engagements.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground gap-2">
+                <UserCheck className="h-10 w-10 text-muted-foreground/40" />
+                <h4 className="font-semibold text-xs text-foreground">No Engagement Records Yet</h4>
+                <p className="text-xs max-w-sm">When users click Interested or Follow this event on VisitExpo, they will show up here live.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto -mx-5 -mb-5">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/20 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3.5">Delegate Profile</th>
+                      <th className="px-6 py-3.5">Company Details</th>
+                      <th className="px-6 py-3.5">Event Associated</th>
+                      <th className="px-6 py-3.5">Engagement Status</th>
+                      <th className="px-6 py-3.5 text-right">Date Added</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {engagements
+                      .filter((e) => {
+                        if (!searchTerm) return true;
+                        const q = searchTerm.toLowerCase();
+                        return (
+                          e.userName?.toLowerCase().includes(q) ||
+                          e.userEmail?.toLowerCase().includes(q) ||
+                          e.userCompany?.toLowerCase().includes(q) ||
+                          e.eventTitle?.toLowerCase().includes(q)
+                        );
+                      })
+                      .map((eng) => (
+                        <tr key={eng._id} className="hover:bg-secondary/40 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={eng.userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(eng.userName)}&background=FF2E63&color=fff`}
+                                alt={eng.userName}
+                                className="h-9 w-9 rounded-full object-cover border border-border shrink-0"
+                              />
+                              <div>
+                                <p className="font-semibold text-foreground flex items-center gap-1.5">
+                                  <span>{eng.userName}</span>
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                    Live User
+                                  </span>
+                                </p>
+                                <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                                  <Mail className="h-3 w-3" /> {eng.userEmail}
+                                </span>
+                                {eng.userPhone && (
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Phone className="h-3 w-3" /> {eng.userPhone}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="px-6 py-4">
+                            <p className="font-semibold text-foreground">{eng.userCompany || 'Independent Professional'}</p>
+                            <p className="text-xs text-muted-foreground">{eng.userDesignation || 'Trade Visitor'}</p>
+                          </td>
+
+                          <td className="px-6 py-4">
+                            <Link
+                              href={`/expo/${eng.eventSlug}`}
+                              className="font-semibold text-primary hover:underline block truncate max-w-xs"
+                            >
+                              {eng.eventTitle}
+                            </Link>
+                            <span className="text-xs text-muted-foreground">{eng.eventCity || 'India'}</span>
+                          </td>
+
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              eng.type === 'both'
+                                ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
+                                : eng.type === 'follower'
+                                ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                                : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                            }`}>
+                              {eng.type === 'both' ? 'Interested & Following' : eng.type === 'follower' ? 'Following' : 'Marked Interested'}
+                            </span>
+                          </td>
+
+                          <td className="px-6 py-4 text-right text-xs text-muted-foreground whitespace-nowrap">
+                            {eng.createdAt ? new Date(eng.createdAt).toLocaleDateString() : 'Recent'}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        </div>
+        ) : (
+          <>
+            {/* Table Filters */}
+            <div className="flex flex-col gap-4 border-b border-border p-5 md:flex-row md:items-center md:justify-between">
+              <div className="flex border border-border rounded-lg p-0.5 bg-muted/20 w-fit">
+                {[
+                  { id: 'all', label: 'All Channels' },
+                  { id: 'in_person', label: 'In-Person' },
+                  { id: 'virtual', label: 'Virtual' }
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setAttendanceFilter(tab.id)}
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                      attendanceFilter === tab.id
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative md:w-80">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search by name, company, email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+            </div>
 
         {/* Content Render */}
         {loading ? (
@@ -456,6 +643,8 @@ export default function VisitorsCRMPage() {
               </tbody>
             </table>
           </div>
+        )}
+          </>
         )}
       </div>
 

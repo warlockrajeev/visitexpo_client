@@ -123,22 +123,75 @@ const SEED_ATTENDEES = [
   }
 ];
 
+const SERVER_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 export async function GET(request, { params }) {
   try {
     const slug = (await params)?.slug || 'default';
-    
+    const cleanSlug = slug.toLowerCase().trim();
+    const { searchParams } = new URL(request.url);
+    const email = searchParams.get('email') || '';
+    const userId = searchParams.get('userId') || '';
+
     // Deterministic base counts based on slug string
-    const charSum = slug.split('').reduce((acc, c) => acc + c.charCodeAt(0), 1058);
-    const baselineFollowers = 1050 + (charSum % 1400);
-    const baselineInterested = 920 + (charSum % 1200);
+    const charSum = cleanSlug.split('').reduce((acc, c) => acc + c.charCodeAt(0), 1058);
+    let baselineFollowers = 1050 + (charSum % 1400);
+    let baselineInterested = 920 + (charSum % 1200);
+
+    let realAttendees = [];
+    let userStatus = { isInterested: false, isFollower: false, engagement: null };
+
+    // Fetch real engagements from Express backend
+    try {
+      const queryParams = new URLSearchParams();
+      if (email) queryParams.set('email', email);
+      if (userId) queryParams.set('userId', userId);
+
+      const res = await fetch(`${SERVER_API_URL}/engagements/event/${cleanSlug}?${queryParams.toString()}`, {
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.success && json?.data) {
+          if (Array.isArray(json.data.attendees) && json.data.attendees.length > 0) {
+            realAttendees = json.data.attendees.map(a => ({
+              id: String(a._id || a.userId || a.userEmail),
+              name: a.userName,
+              designation: a.userDesignation || 'Trade Visitor',
+              company: a.userCompany || 'Registered Professional',
+              city: a.eventCity || 'India',
+              country: a.eventCountry || 'India',
+              avatar: a.userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(a.userName)}&background=FF2E63&color=fff`,
+              type: a.type === 'both' ? 'Interested & Following' : a.type === 'follower' ? 'Event Follower' : 'Trade Buyer',
+              objective: a.objective || 'Networking and product sourcing.',
+              verified: true,
+              isRealUser: true,
+              registeredDaysAgo: 'Live Registered'
+            }));
+            baselineInterested += json.data.counts?.interested || 0;
+            baselineFollowers += json.data.counts?.followers || 0;
+          }
+          if (json.data.userStatus) {
+            userStatus = json.data.userStatus;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Backend engagements fetch error:', e.message);
+    }
+
+    // Combine real registered users at top with baseline attendees
+    const combinedAttendees = [...realAttendees, ...SEED_ATTENDEES];
 
     return NextResponse.json({
       success: true,
       data: {
-        slug,
+        slug: cleanSlug,
         followersCount: baselineFollowers,
         interestedCount: baselineInterested,
-        attendees: SEED_ATTENDEES
+        attendees: combinedAttendees,
+        realCount: realAttendees.length,
+        userStatus
       }
     });
   } catch (error) {
@@ -149,15 +202,41 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   try {
     const body = await request.json();
-    const { action, attendeeId, user } = body;
     const slug = (await params)?.slug || 'default';
+    const cleanSlug = slug.toLowerCase().trim();
+    const { action, actionType, attendeeId, user, eventTitle, eventCity, eventVenue, eventDates, eventCategory } = body;
+
+    // Forward to real backend Express engagement endpoint
+    try {
+      const res = await fetch(`${SERVER_API_URL}/engagements/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventSlug: cleanSlug,
+          actionType: action || actionType || 'interested',
+          eventTitle: eventTitle || cleanSlug.replace(/-/g, ' ').toUpperCase(),
+          eventCity,
+          eventVenue,
+          eventDates,
+          eventCategory,
+          user: user || {}
+        })
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        return NextResponse.json(json);
+      }
+    } catch (e) {
+      console.warn('Forwarding to /api/engagements/toggle failed, falling back:', e.message);
+    }
 
     return NextResponse.json({
       success: true,
-      message: `Action ${action} processed successfully for event ${slug}`,
+      message: `Action ${action || actionType} processed for event ${cleanSlug}`,
       data: {
-        slug,
-        action,
+        slug: cleanSlug,
+        action: action || actionType,
         attendeeId: attendeeId || null,
         timestamp: new Date().toISOString()
       }

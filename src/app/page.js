@@ -44,7 +44,8 @@ import {
   Send,
   Check,
   HelpCircle,
-  X
+  X,
+  Bell
 } from 'lucide-react';
 import axios from 'axios';
 import Navbar, { Logo } from '../components/Navbar.js';
@@ -79,6 +80,7 @@ export default function LandingPage() {
   const [gatedAuthContext, setGatedAuthContext] = useState(null); // { action, event }
   const [showAdvertiseModal, setShowAdvertiseModal] = useState(false);
   const [savedEventIds, setSavedEventIds] = useState(new Set());
+  const [followedEventSlugs, setFollowedEventSlugs] = useState(new Set());
   const [issuedTicketIds, setIssuedTicketIds] = useState(new Set());
   const [toastMessage, setToastMessage] = useState(null);
 
@@ -126,6 +128,22 @@ export default function LandingPage() {
     };
     fetchWordPressEvents();
   }, []);
+
+  // Fetch followed exhibitions for logged-in user
+  useEffect(() => {
+    if (user?.email) {
+      axios.get(`/api/engagements/user/${encodeURIComponent(user.email)}`)
+        .then(res => {
+          if (res.data?.success && res.data?.data?.followedEvents) {
+            const slugs = res.data.data.followedEvents.map(e => (e.eventSlug || e.slug || '').toLowerCase().trim()).filter(Boolean);
+            if (slugs.length > 0) {
+              setFollowedEventSlugs(new Set(slugs));
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user]);
 
   // Distinct cities list from live WordPress events
   const availableCities = useMemo(() => {
@@ -287,6 +305,36 @@ export default function LandingPage() {
       showToast(`Contact request initiated for "${event.title}". Organizers notified.`);
     } else if (action === 'exhibitors') {
       showToast(`Exhibitor directory unlocked for "${event.title}".`);
+    } else if (action === 'follow') {
+      const slug = (event.slug || event.id || '').toLowerCase().trim();
+      if (slug) {
+        setFollowedEventSlugs(prev => {
+          const next = new Set(prev);
+          if (next.has(slug)) {
+            next.delete(slug);
+            showToast(`Unfollowed "${event.title}".`);
+          } else {
+            next.add(slug);
+            showToast(`Now following "${event.title}"! Notifications active.`);
+          }
+          return next;
+        });
+        axios.post(`/api/events/${encodeURIComponent(slug)}/social`, {
+          actionType: 'follower',
+          eventTitle: event.title,
+          eventCity: event.city,
+          eventVenue: event.venue,
+          eventDates: event.dates,
+          eventCategory: event.category,
+          eventImage: event.image,
+          user: {
+            id: (currentUser || user)?.id || (currentUser || user)?._id,
+            name: (currentUser || user)?.name,
+            email: (currentUser || user)?.email,
+            role: (currentUser || user)?.role
+          }
+        }).catch(() => {});
+      }
     }
   };
 
@@ -1132,23 +1180,42 @@ export default function LandingPage() {
                             {expo.edition}
                           </span>
 
-                          {/* Quick Bookmark Button */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleTriggerGated('save', expo);
-                            }}
-                            className="absolute bottom-3 right-3 p-2 rounded-full bg-white/90 hover:bg-white text-zinc-700 shadow-sm transition-transform active:scale-90 cursor-pointer z-10"
-                            title={isSaved ? 'Remove Bookmark' : 'Save Event'}
-                          >
-                            <Bookmark
-                              className={`h-3.5 w-3.5 ${
-                                isSaved ? 'fill-[#FF2E63] text-[#FF2E63]' : 'text-zinc-600'
+                          {/* Quick Follow & Bookmark Buttons */}
+                          <div className="absolute bottom-3 right-3 flex items-center gap-1.5 z-10">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleTriggerGated('follow', expo);
+                              }}
+                              className={`p-2 rounded-full backdrop-blur-xs transition-transform active:scale-90 cursor-pointer shadow-sm ${
+                                followedEventSlugs.has((expo.slug || expo.id || '').toLowerCase().trim())
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-white/90 hover:bg-white text-zinc-700'
                               }`}
-                            />
-                          </button>
+                              title={followedEventSlugs.has((expo.slug || expo.id || '').toLowerCase().trim()) ? 'Following' : 'Follow Event'}
+                            >
+                              <Bell className={`h-3.5 w-3.5 ${followedEventSlugs.has((expo.slug || expo.id || '').toLowerCase().trim()) ? 'fill-white text-white' : 'text-zinc-700'}`} />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleTriggerGated('save', expo);
+                              }}
+                              className="p-2 rounded-full bg-white/90 hover:bg-white text-zinc-700 shadow-sm transition-transform active:scale-90 cursor-pointer"
+                              title={isSaved ? 'Remove Bookmark' : 'Save Event'}
+                            >
+                              <Bookmark
+                                className={`h-3.5 w-3.5 ${
+                                  isSaved ? 'fill-[#FF2E63] text-[#FF2E63]' : 'text-zinc-600'
+                                }`}
+                              />
+                            </button>
+                          </div>
                         </Link>
 
                         {/* Card Body */}
@@ -1205,6 +1272,21 @@ export default function LandingPage() {
                             </Link>
 
                             <div className="flex items-center gap-2">
+                              {/* Follow Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleTriggerGated('follow', expo)}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs ${
+                                  followedEventSlugs.has((expo.slug || expo.id || '').toLowerCase().trim())
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200/80'
+                                }`}
+                                title={followedEventSlugs.has((expo.slug || expo.id || '').toLowerCase().trim()) ? 'You are following this event' : 'Follow this event'}
+                              >
+                                <Bell className={`h-3 w-3 ${followedEventSlugs.has((expo.slug || expo.id || '').toLowerCase().trim()) ? 'fill-white' : ''}`} />
+                                <span>{followedEventSlugs.has((expo.slug || expo.id || '').toLowerCase().trim()) ? 'Following' : 'Follow'}</span>
+                              </button>
+
                               <Link
                                 href={`/onboarding/exhibitor?wp_slug=${encodeURIComponent(expo.slug || '')}&wp_post_id=${expo.wpPostId || ''}`}
                                 className="text-xs font-bold text-[#FF2E63] hover:underline"

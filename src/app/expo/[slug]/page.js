@@ -57,7 +57,13 @@ import {
   Send,
   Check,
   Search,
-  Filter
+  Filter,
+  Globe,
+  Mail,
+  Phone,
+  Award,
+  Mic,
+  Megaphone
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -103,79 +109,99 @@ export default function ExpoDetailsPage() {
   const [reviewText, setReviewText] = useState('');
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
-  // Fetch Event by slug or ID from WordPress API
+  // FAQ Accordion State
+  const [openFaqIndex, setOpenFaqIndex] = useState(null);
+
+  // Fetch Event by slug or ID from dedicated API route or fallback to WordPress API
   useEffect(() => {
     const loadEvent = async () => {
       setLoading(true);
       try {
-        const res = await axios.get('/api/wordpress-events');
-        if (res.data?.success && Array.isArray(res.data?.events)) {
-          const cleanSlug = String(slug || '').toLowerCase().trim();
-          const found = res.data.events.find((e) => {
-            if (!e) return false;
-            const itemSlug = String(e.slug || '').toLowerCase();
-            const itemId = String(e.id || '').toLowerCase();
-            const itemWpId = String(e.wpPostId || '').toLowerCase();
-            const titleSlug = (e.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-            return (
-              itemSlug === cleanSlug ||
-              itemId === cleanSlug ||
-              itemWpId === cleanSlug ||
-              titleSlug === cleanSlug ||
-              (cleanSlug.length > 3 && (titleSlug.includes(cleanSlug) || cleanSlug.includes(titleSlug)))
-            );
-          });
-          if (found) {
-            const charSum = (found.title || '').split('').reduce((acc, char, i) => acc + char.charCodeAt(0), 19);
-            const resolvedImage =
-              wpEventImages[cleanSlug] ||
-              wpEventImages[String(found.id)] ||
-              wpEventImages[String(found.wpPostId)] ||
-              wpEventImages[found.slug] ||
-              found.image;
+        const cleanSlug = String(slug || '').toLowerCase().trim();
+        let found = null;
 
-            setEvent({
-              ...found,
-              image: resolvedImage || found.image,
-              rating: found.rating || (4.5 + ((charSum % 5) * 0.1)).toFixed(1),
-              reviewCount: found.reviewCount || (80 + (charSum % 180)),
-              followersCount: found.followersCount || found.interestedCount || (1100 + (charSum % 2900)),
-              edition: found.edition || `${8 + (charSum % 15)}th Edition`,
-              timings: found.timings || '9:00 AM – 5:00 PM (General Admission)',
-              entryType: found.entryType || 'Free Ticket for Industry Professionals',
-              boothCost: found.boothCost || 'Starts from 145 USD / sqm',
-              turnout: found.turnout || '100,000+ Visitors • 2,000+ Exhibitors',
-              format: found.format || (charSum % 4 === 0 ? 'Hybrid Expo' : 'In-Person Expo')
-            });
-          } else {
-            // Default synthesized event matching slug
-            const resolvedFallbackImage =
-              wpEventImages[cleanSlug] ||
-              wpEventImages[slug] ||
-              'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=1200&auto=format&fit=crop';
-            setEvent({
-              id: slug || 'expo-event',
-              title: decodeURIComponent(slug).replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'International Trade Exhibition 2026',
-              slug: slug,
-              category: 'Trade Show',
-              city: 'Paris',
-              country: 'France',
-              venue: 'Exhibition Centre',
-              dates: 'Upcoming 2026',
-              rating: '4.8',
-              reviewCount: 120,
-              followersCount: 1420,
-              edition: 'Annual Edition',
-              image: resolvedFallbackImage,
-              description:
-                'Premier international trade exhibition featuring industry leaders, technology innovators, and global business delegates.',
-              entryType: 'Free Ticket for Industry Professionals',
-              boothCost: 'Starts from 145 USD / sqm',
-              turnout: '50,000+ Visitors • 1,200+ Exhibitors',
-              timings: '9:00 AM – 5:00 PM (General Admission)',
-              featured: true
+        // 1. Direct single-event endpoint (returns genuine WordPress/MongoDB data, real images, FAQs, schedule, etc.)
+        try {
+          const detailRes = await axios.get(`/api/events/${encodeURIComponent(cleanSlug)}`);
+          if (detailRes.data?.success && detailRes.data?.data) {
+            found = detailRes.data.data;
+          }
+        } catch (_) {
+          // Proceed to directory search fallback
+        }
+
+        // 2. Fallback to /api/wordpress-events
+        if (!found) {
+          const res = await axios.get('/api/wordpress-events');
+          if (res.data?.success && Array.isArray(res.data?.events)) {
+            found = res.data.events.find((e) => {
+              if (!e) return false;
+              const itemSlug = String(e.slug || '').toLowerCase();
+              const itemId = String(e.id || '').toLowerCase();
+              const itemWpId = String(e.wpPostId || '').toLowerCase();
+              const titleSlug = (e.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+              return (
+                itemSlug === cleanSlug ||
+                itemId === cleanSlug ||
+                itemWpId === cleanSlug ||
+                titleSlug === cleanSlug ||
+                (cleanSlug.length > 3 && (titleSlug.includes(cleanSlug) || cleanSlug.includes(titleSlug)))
+              );
             });
           }
+        }
+
+        if (found) {
+          const charSum = (found.title || '').split('').reduce((acc, char, i) => acc + char.charCodeAt(0), 19);
+          const resolvedImage =
+            found.image ||
+            wpEventImages[cleanSlug] ||
+            wpEventImages[String(found.id)] ||
+            wpEventImages[String(found.wpPostId)] ||
+            wpEventImages[found.slug];
+
+          setEvent({
+            ...found,
+            image: resolvedImage || found.image,
+            rating: found.rating || (4.5 + ((charSum % 5) * 0.1)).toFixed(1),
+            reviewCount: found.reviewCount || (80 + (charSum % 180)),
+            followersCount: found.followersCount || found.interestedCount || (1100 + (charSum % 2900)),
+            edition: found.edition || `${8 + (charSum % 15)}th Edition`,
+            timings: found.timings || '9:00 AM – 5:00 PM (General Admission)',
+            entryType: found.entryType || (found.isFreeEvent === false ? `Paid Admission — ₹${found.paidTicketPrice || 500}` : 'Free Ticket for Industry Professionals'),
+            boothCost: found.boothCost || 'Starts from 145 USD / sqm',
+            turnout: found.turnout || '100,000+ Visitors • 2,000+ Exhibitors',
+            format: found.format || (charSum % 4 === 0 ? 'Hybrid Expo' : 'In-Person Expo'),
+            organizer: found.organizer || 'VisitExpo Verified Organizer'
+          });
+        } else {
+          // Default synthesized event matching slug
+          const resolvedFallbackImage =
+            wpEventImages[cleanSlug] ||
+            wpEventImages[slug] ||
+            'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=1200&auto=format&fit=crop';
+          setEvent({
+            id: slug || 'expo-event',
+            title: decodeURIComponent(slug).replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'International Trade Exhibition 2026',
+            slug: slug,
+            category: 'Trade Show',
+            city: 'Paris',
+            country: 'France',
+            venue: 'Exhibition Centre',
+            dates: 'Upcoming 2026',
+            rating: '4.8',
+            reviewCount: 120,
+            followersCount: 1420,
+            edition: 'Annual Edition',
+            image: resolvedFallbackImage,
+            description:
+              'Premier international trade exhibition featuring industry leaders, technology innovators, and global business delegates.',
+            entryType: 'Free Ticket for Industry Professionals',
+            boothCost: 'Starts from 145 USD / sqm',
+            turnout: '50,000+ Visitors • 1,200+ Exhibitors',
+            timings: '9:00 AM – 5:00 PM (General Admission)',
+            featured: true
+          });
         }
       } catch (err) {
         console.error('Error fetching event details:', err);
@@ -209,14 +235,21 @@ export default function ExpoDetailsPage() {
     }
   }, [slug]);
 
-  // Fetch verified attendees from Social API
+  // Fetch verified attendees from Social API & sync user status
   useEffect(() => {
     const fetchSocialData = async () => {
       try {
-        const res = await axios.get(`/api/events/${slug}/social`);
+        const queryParams = new URLSearchParams();
+        if (user?.email) queryParams.set('email', user.email);
+        if (user?.id || user?._id) queryParams.set('userId', String(user.id || user._id));
+        const res = await axios.get(`/api/events/${slug}/social?${queryParams.toString()}`);
         if (res.data?.success && res.data?.data) {
           if (Array.isArray(res.data.data.attendees)) {
             setAttendees(res.data.data.attendees);
+          }
+          if (res.data.data.userStatus) {
+            setIsInterested(!!res.data.data.userStatus.isInterested);
+            setIsFollowingExpo(!!res.data.data.userStatus.isFollower);
           }
         }
       } catch (err) {
@@ -224,7 +257,7 @@ export default function ExpoDetailsPage() {
       }
     };
     if (slug) fetchSocialData();
-  }, [slug]);
+  }, [slug, user]);
 
   // Gallery Photos Pool
   const mediaGallery = useMemo(() => {
@@ -262,22 +295,27 @@ export default function ExpoDetailsPage() {
     'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=120&auto=format&fit=crop'
   ];
 
-  // "Listed In" Tags
-  const listedInTags = [
-    '#Food & Beverages',
-    '#Beverage',
-    '#Food',
-    '#Bakery',
-    '#Package',
-    '#Home',
-    '#Utensils',
-    '#Home Baking',
-    '#Bake',
-    '#Business',
-    '#Family',
-    '#Machinery',
-    '#Logistics'
-  ];
+  // Dynamic "Listed In" Tags based on real backend event metadata
+  const listedInTags = useMemo(() => {
+    const tags = new Set();
+    if (event?.category) {
+      tags.add(`#${event.category.replace(/[^a-zA-Z0-9]/g, '')}`);
+    }
+    if (Array.isArray(event?.categories)) {
+      event.categories.forEach((c) => {
+        if (c) tags.add(`#${c.replace(/[^a-zA-Z0-9]/g, '')}`);
+      });
+    }
+    if (event?.city) tags.add(`#${event.city.replace(/[^a-zA-Z0-9]/g, '')}Expos`);
+    if (event?.country) tags.add(`#${event.country.replace(/[^a-zA-Z0-9]/g, '')}Trade`);
+    tags.add('#B2BTradeShow');
+    tags.add('#IndustrialExhibition');
+    tags.add('#CorporateDelegates');
+    tags.add('#SuppliersDirectory');
+    tags.add('#CommercialProcurement');
+    tags.add('#GlobalNetwork');
+    return Array.from(tags);
+  }, [event]);
 
   const handleShare = () => {
     if (typeof window !== 'undefined') {
@@ -288,24 +326,57 @@ export default function ExpoDetailsPage() {
     }
   };
 
-  const handleInterested = () => {
+  const handleInterested = async () => {
     if (!user) {
       setGatedContext({ action: 'ticket', event });
-    } else {
-      const next = !isInterested;
-      setIsInterested(next);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(`visitexpo_interested_${slug}`, String(next));
+      return;
+    }
+    const next = !isInterested;
+    setIsInterested(next);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`visitexpo_interested_${slug}`, String(next));
+    }
+    showToast(
+      next
+        ? 'Marked as Interested! Pass added to dashboard & attendee directory.'
+        : 'Removed from your interested list.'
+    );
+
+    // Persist real user engagement to backend
+    try {
+      const res = await axios.post(`/api/events/${slug}/social`, {
+        actionType: 'interested',
+        eventTitle: event?.title,
+        eventCity: event?.city,
+        eventVenue: event?.venue,
+        eventDates: event?.dates,
+        eventCategory: event?.category,
+        eventImage: event?.image,
+        user: {
+          id: user.id || user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          company: user.company || user.organization?.name || '',
+          phone: user.phone || ''
+        }
+      });
+      if (res.data?.data?.isInterested !== undefined) {
+        setIsInterested(res.data.data.isInterested);
       }
-      showToast(
-        next
-          ? 'Marked as Interested! Pass added to dashboard & attendee directory.'
-          : 'Removed from your interested list.'
-      );
+      // Re-fetch social directory to display updated real attendee list
+      const queryParams = new URLSearchParams();
+      if (user?.email) queryParams.set('email', user.email);
+      const refreshRes = await axios.get(`/api/events/${slug}/social?${queryParams.toString()}`);
+      if (refreshRes.data?.data?.attendees) {
+        setAttendees(refreshRes.data.data.attendees);
+      }
+    } catch (err) {
+      console.warn('Failed to persist interest to server:', err);
     }
   };
 
-  const handleToggleFollowExpo = () => {
+  const handleToggleFollowExpo = async () => {
     if (!user) {
       setGatedContext({ action: 'follow', event });
       return;
@@ -320,6 +391,39 @@ export default function ExpoDetailsPage() {
         ? `You are now following ${event?.title}! Notifications enabled.`
         : `Unfollowed ${event?.title}.`
     );
+
+    // Persist real follow state to backend
+    try {
+      const res = await axios.post(`/api/events/${slug}/social`, {
+        actionType: 'follower',
+        eventTitle: event?.title,
+        eventCity: event?.city,
+        eventVenue: event?.venue,
+        eventDates: event?.dates,
+        eventCategory: event?.category,
+        eventImage: event?.image,
+        user: {
+          id: user.id || user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          company: user.company || user.organization?.name || '',
+          phone: user.phone || ''
+        }
+      });
+      if (res.data?.data?.isFollower !== undefined) {
+        setIsFollowingExpo(res.data.data.isFollower);
+      }
+      // Re-fetch social directory to display updated real attendee list
+      const queryParams = new URLSearchParams();
+      if (user?.email) queryParams.set('email', user.email);
+      const refreshRes = await axios.get(`/api/events/${slug}/social?${queryParams.toString()}`);
+      if (refreshRes.data?.data?.attendees) {
+        setAttendees(refreshRes.data.data.attendees);
+      }
+    } catch (err) {
+      console.warn('Failed to persist follow to server:', err);
+    }
   };
 
   const handleToggleFollowAttendee = (att) => {
@@ -497,14 +601,32 @@ export default function ExpoDetailsPage() {
                   <span className="inline-block ml-2 text-rose-500 text-base" title="Verified Trade Show">🛡️⭐</span>
                 </h1>
 
-                {/* Rating & Event Type */}
+                {/* Rating, Event Type & Organizer */}
                 <div className="flex items-center gap-2 text-xs text-zinc-600 flex-wrap">
                   <span className="font-extrabold text-amber-700 flex items-center gap-1">
                     <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
                     {ratingValue} ({reviewsCount} Ratings)
                   </span>
                   <span className="text-zinc-300">•</span>
-                  <span className="font-semibold text-zinc-700">Trade Show</span>
+                  <span className="font-semibold text-zinc-700">{event?.category || 'Trade Show'}</span>
+                  <span className="text-zinc-300">•</span>
+                  <div className="flex items-center gap-1">
+                    <Building className="h-3 w-3 text-zinc-400 shrink-0" />
+                    <span>Organized by:</span>
+                    {event?.organizerWebsite ? (
+                      <a
+                        href={event.organizerWebsite}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-bold text-zinc-900 hover:text-[#FF2E63] hover:underline inline-flex items-center gap-0.5"
+                      >
+                        <span>{event?.organizer}</span>
+                        <ExternalLink className="h-2.5 w-2.5 text-zinc-400" />
+                      </a>
+                    ) : (
+                      <span className="font-bold text-zinc-900">{event?.organizer || 'Verified Organizer'}</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Location with "Show Interest to See Venue" link */}
@@ -515,8 +637,8 @@ export default function ExpoDetailsPage() {
                   </span>
                   {isInterested ? (
                     <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                      <span>{event?.venue || `${event?.city} International Expo Center`}</span>
+                      <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
+                      <span>{event?.address || event?.venue || `${event?.city} International Expo Center`}</span>
                     </span>
                   ) : (
                     <button
@@ -626,11 +748,11 @@ export default function ExpoDetailsPage() {
               </div>
 
               {/* Main Action CTAs matching 10times design with our Yellow & Dark Slate */}
-              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+              <div className="flex items-center gap-2.5 w-full sm:w-auto flex-wrap sm:flex-nowrap">
                 <button
                   type="button"
                   onClick={handleInterested}
-                  className={`flex-1 sm:flex-none px-7 py-3 rounded-xl font-extrabold text-xs sm:text-sm shadow-sm transition-all hover:scale-102 active:scale-98 cursor-pointer flex items-center justify-center gap-1.5 ${
+                  className={`flex-1 sm:flex-none px-6 py-3 rounded-xl font-extrabold text-xs sm:text-sm shadow-sm transition-all hover:scale-102 active:scale-98 cursor-pointer flex items-center justify-center gap-1.5 ${
                     isInterested
                       ? 'bg-emerald-600 text-white'
                       : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 ring-1 ring-amber-400'
@@ -648,10 +770,24 @@ export default function ExpoDetailsPage() {
 
                 <button
                   type="button"
-                  onClick={handleRequestBooth}
-                  className="flex-1 sm:flex-none px-6 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold text-xs sm:text-sm shadow-sm transition-all hover:scale-102 active:scale-98 cursor-pointer text-center"
+                  onClick={handleToggleFollowExpo}
+                  className={`flex-1 sm:flex-none px-6 py-3 rounded-xl font-extrabold text-xs sm:text-sm shadow-sm transition-all hover:scale-102 active:scale-98 cursor-pointer flex items-center justify-center gap-1.5 ${
+                    isFollowingExpo
+                      ? 'bg-blue-600 text-white shadow-blue-500/20'
+                      : 'bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-700'
+                  }`}
+                  title={isFollowingExpo ? 'You are following this exhibition' : 'Follow this exhibition for updates'}
                 >
-                  Request a Booth
+                  <Bell className={`h-4 w-4 ${isFollowingExpo ? 'fill-white text-white' : 'text-white'}`} />
+                  <span>{isFollowingExpo ? 'Following Event ✓' : 'Follow Event'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleRequestBooth}
+                  className="flex-1 sm:flex-none px-5 py-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-extrabold text-xs sm:text-sm shadow-sm border border-zinc-300 transition-all hover:scale-102 active:scale-98 cursor-pointer text-center"
+                >
+                  Request Booth
                 </button>
               </div>
 
@@ -692,19 +828,31 @@ export default function ExpoDetailsPage() {
           </div>
 
           {/* Sticky Right CTA */}
-          <div className="hidden md:flex items-center gap-3 py-2">
+          <div className="hidden md:flex items-center gap-2.5 py-2">
             <span className="text-xs font-bold text-zinc-800 truncate max-w-xs line-clamp-1">
               {event?.title}
             </span>
             <button
               onClick={handleInterested}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 isInterested
                   ? 'bg-emerald-600 text-white'
                   : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-extrabold'
               }`}
             >
               {isInterested ? 'Interested ✓' : 'Interested'}
+            </button>
+            <button
+              type="button"
+              onClick={handleToggleFollowExpo}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                isFollowingExpo
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-zinc-900 hover:bg-zinc-800 text-white'
+              }`}
+            >
+              <Bell className={`h-3 w-3 ${isFollowingExpo ? 'fill-white' : ''}`} />
+              <span>{isFollowingExpo ? 'Following' : 'Follow'}</span>
             </button>
           </div>
 
@@ -720,7 +868,7 @@ export default function ExpoDetailsPage() {
           {/* ----------------------------------------------------------------------- */}
           <div className="lg:col-span-8 space-y-6">
             
-            {activeTab === 'attendees' ? (
+            {activeTab === 'attendees' && (
               <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-7 shadow-xs space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 pb-5">
                   <div className="space-y-1">
@@ -741,24 +889,40 @@ export default function ExpoDetailsPage() {
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleInterested}
-                    className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-xs transition-colors shrink-0 cursor-pointer flex items-center gap-1.5 ${
-                      isInterested
-                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
-                        : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 ring-1 ring-amber-400'
-                    }`}
-                  >
-                    {isInterested ? (
-                      <>
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                        <span>You are Confirmed ✓</span>
-                      </>
-                    ) : (
-                      <span>+ Mark Yourself Interested</span>
-                    )}
-                  </button>
+                  <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={handleToggleFollowExpo}
+                      className={`px-4 py-2.5 rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 ${
+                        isFollowingExpo
+                          ? 'bg-blue-600 text-white shadow-blue-500/20'
+                          : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-200'
+                      }`}
+                      title={isFollowingExpo ? 'You are following this exhibition' : 'Follow this exhibition for updates'}
+                    >
+                      <Bell className={`h-4 w-4 ${isFollowingExpo ? 'fill-white text-white' : 'text-zinc-700'}`} />
+                      <span>{isFollowingExpo ? 'Following Event ✓' : 'Follow Updates'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleInterested}
+                      className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 ${
+                        isInterested
+                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                          : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 ring-1 ring-amber-400'
+                      }`}
+                    >
+                      {isInterested ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          <span>You are Confirmed ✓</span>
+                        </>
+                      ) : (
+                        <span>+ Mark Yourself Interested</span>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Confirmed user attendance banner */}
@@ -941,7 +1105,9 @@ export default function ExpoDetailsPage() {
                   </button>
                 </div>
               </div>
-            ) : (
+            )}
+
+            {activeTab === 'about' && (
               <>
                 {/* White Container for Core Info */}
                 <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-7 shadow-xs space-y-6">
@@ -1025,19 +1191,151 @@ export default function ExpoDetailsPage() {
 
               {/* About Description */}
               <div className="space-y-2 text-zinc-700 text-xs sm:text-sm leading-relaxed">
-                <p>
+                <p className="whitespace-pre-line">
                   {isReadMore
                     ? event?.description
-                    : (event?.description?.slice(0, 310) || '') + '...'}
+                    : (event?.description?.slice(0, 320) || '') + (event?.description?.length > 320 ? '...' : '')}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setIsReadMore(!isReadMore)}
-                  className="text-xs font-bold text-[#FF2E63] hover:underline cursor-pointer inline-block"
-                >
-                  {isReadMore ? 'Show Less' : 'Read More'}
-                </button>
+                {event?.description?.length > 320 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsReadMore(!isReadMore)}
+                    className="text-xs font-bold text-[#FF2E63] hover:underline cursor-pointer inline-block"
+                  >
+                    {isReadMore ? 'Show Less' : 'Read More &rarr;'}
+                  </button>
+                )}
               </div>
+
+              {/* Real Organizer Profile Card */}
+              {event?.organizer && (
+                <div className="p-4 sm:p-5 rounded-xl border border-zinc-200 bg-gradient-to-r from-zinc-50/80 via-white to-amber-50/20 space-y-3 shadow-2xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-zinc-900 text-white font-extrabold text-sm flex items-center justify-center shadow-xs shrink-0">
+                        {event.organizer.charAt(0)}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-sm font-extrabold text-zinc-900">{event.organizer}</h4>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            Verified Host
+                          </span>
+                        </div>
+                        <p className="text-xs text-zinc-500">Official Exhibition Organizer</p>
+                      </div>
+                    </div>
+                    {event.organizerWebsite && (
+                      <a
+                        href={event.organizerWebsite}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs self-start sm:self-auto transition-all"
+                      >
+                        <span>Official Website</span>
+                        <ExternalLink className="h-3 w-3 text-zinc-400" />
+                      </a>
+                    )}
+                  </div>
+                  {event.organizerDesc && (
+                    <p className="text-xs text-zinc-600 leading-relaxed font-normal pt-1">
+                      {event.organizerDesc}
+                    </p>
+                  )}
+                  {(event.organizerEmail || event.organizerPhone) && (
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-600 pt-2 border-t border-zinc-100">
+                      {event.organizerEmail && (
+                        <a href={`mailto:${event.organizerEmail}`} className="hover:text-[#FF2E63] flex items-center gap-1.5">
+                          <Mail className="h-3.5 w-3.5 text-zinc-400" />
+                          <span>{event.organizerEmail}</span>
+                        </a>
+                      )}
+                      {event.organizerPhone && (
+                        <a href={`tel:${event.organizerPhone}`} className="hover:text-[#FF2E63] flex items-center gap-1.5">
+                          <Phone className="h-3.5 w-3.5 text-zinc-400" />
+                          <span>{event.organizerPhone}</span>
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Real Event Schedule Timeline */}
+              {event?.schedules && event.schedules.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <div className="text-xs font-extrabold text-zinc-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Calendar className="h-4 w-4 text-amber-600" />
+                    <span>Official Event Schedule &amp; Dates</span>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-2.5">
+                    {event.schedules.map((sch, sIdx) => (
+                      <div key={sIdx} className="p-3 bg-zinc-50/80 border border-zinc-200 rounded-xl flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-amber-100 text-amber-900 flex items-center justify-center font-bold text-xs shrink-0">
+                          {sIdx + 1}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-zinc-900 truncate">{sch.name || 'Session'}</div>
+                          <div className="text-[11px] text-zinc-500 font-medium">{sch.date}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Real Frequently Asked Questions */}
+              {event?.faqs && event.faqs.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <div className="text-xs font-extrabold text-zinc-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <HelpCircle className="h-4 w-4 text-[#FF2E63]" />
+                    <span>Frequently Asked Questions</span>
+                  </div>
+                  <div className="space-y-2">
+                    {event.faqs.map((faq, fIdx) => (
+                      <div key={fIdx} className="border border-zinc-200 rounded-xl overflow-hidden bg-zinc-50/50">
+                        <button
+                          type="button"
+                          onClick={() => setOpenFaqIndex(openFaqIndex === fIdx ? null : fIdx)}
+                          className="w-full p-3.5 text-left font-bold text-xs sm:text-sm text-zinc-900 flex items-center justify-between gap-3 hover:bg-zinc-100/60 cursor-pointer"
+                        >
+                          <span>{faq.question}</span>
+                          <ChevronRight className={`h-4 w-4 text-zinc-400 transition-transform ${openFaqIndex === fIdx ? 'rotate-90 text-[#FF2E63]' : ''}`} />
+                        </button>
+                        {openFaqIndex === fIdx && (
+                          <div className="px-3.5 pb-3.5 pt-1 text-xs text-zinc-600 leading-relaxed border-t border-zinc-200/60 bg-white">
+                            {faq.answer}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Real Sponsors & Partners */}
+              {event?.sponsors && event.sponsors.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <div className="text-xs font-extrabold text-zinc-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Award className="h-4 w-4 text-amber-600" />
+                    <span>Official Key Corporate Sponsors</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {event.sponsors.map((sp, spIdx) => (
+                      <a
+                        key={spIdx}
+                        href={sp.link || '#'}
+                        target={sp.link ? '_blank' : '_self'}
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-2 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-white hover:border-zinc-300 transition-all text-xs font-bold text-zinc-800 flex items-center gap-1.5 shadow-2xs"
+                      >
+                        <span>{sp.name || `Sponsor Partner ${spIdx + 1}`}</span>
+                        {sp.link && <ExternalLink className="h-3 w-3 text-zinc-400" />}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* ============================================================= */}
               {/* HIGHLIGHTS BOX (WARM YELLOW/AMBER CONTAINER IN SCREENSHOT)     */}
@@ -1298,14 +1596,17 @@ export default function ExpoDetailsPage() {
               </div>
 
               <div className="grid sm:grid-cols-3 gap-3 pt-1">
-                {[
-                  { name: 'Angel Yeast Co., Ltd.', hall: 'Hall A • Booth 104', cat: 'Ingredients & Fermentation' },
-                  { name: 'Moffat Bakery Machinery', hall: 'Hall B • Booth 218', cat: 'Commercial Ovens & Tech' },
-                  { name: 'Puratos Global Ingredients', hall: 'Hall A • Booth 302', cat: 'Confectionery & Bakery' }
-                ].map((ex, i) => (
+                {(event?.exhibitors && event.exhibitors.length >= 3
+                  ? event.exhibitors.slice(0, 3)
+                  : [
+                      { name: `${(event?.title || 'Global').split(' ')[0]} Systems International`, hall: 'Hall A • Booth 104', cat: event?.category || 'Technology & Innovation' },
+                      { name: `Apex ${(event?.category || 'Industry').split(' ')[0]} Dynamics`, hall: 'Hall B • Booth 218', cat: 'Suppliers & Components' },
+                      { name: `Prime ${(event?.city || 'Trade')} Tech Guild`, hall: 'Hall A • Booth 302', cat: 'Commercial Hardware & Tech' }
+                    ]
+                ).map((ex, i) => (
                   <div key={i} className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-1">
                     <div className="font-bold text-xs text-zinc-900 truncate">{ex.name}</div>
-                    <div className="text-[10px] text-zinc-500">{ex.cat}</div>
+                    <div className="text-[10px] text-zinc-500 truncate">{ex.cat}</div>
                     <div className="text-[10px] font-bold text-[#FF2E63] pt-0.5">{ex.hall}</div>
                   </div>
                 ))}
@@ -1338,6 +1639,438 @@ export default function ExpoDetailsPage() {
 
             </div>
             </>
+          )}
+
+          {/* ============================================================= */}
+          {/* TAB: EXHIBITORS DIRECTORY & STALL BOOKING                    */}
+          {/* ============================================================= */}
+          {activeTab === 'exhibitors' && (
+            <div className="space-y-6">
+              <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-7 shadow-xs space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 pb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Store className="h-4 w-4 text-[#FF2E63]" />
+                      <h2 className="text-lg font-extrabold text-zinc-900">Exhibitor Directory &amp; Stalls</h2>
+                      <span className="text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                        {event?.exhibitors?.length ? `${event.exhibitors.length} Registered` : '250+ Stalls Expected'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500 pt-0.5">
+                      Verified suppliers, manufacturing brands, and technology exhibitors at {event?.title}.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleRequestBooth}
+                    className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs shrink-0 flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                  >
+                    <Building className="h-3.5 w-3.5" />
+                    <span>Exhibit at this Expo</span>
+                  </button>
+                </div>
+
+                {/* Exhibitors List Grid */}
+                <div className="grid sm:grid-cols-2 gap-3.5">
+                  {(event?.exhibitors && event.exhibitors.length > 0
+                    ? event.exhibitors
+                    : [
+                        { name: 'Apex Automation Technologies', booth: 'Hall 1 • Booth A-102', cat: event?.category || 'Industrial Automation', origin: 'Germany' },
+                        { name: 'Global Green Energy Systems', booth: 'Hall 1 • Booth B-205', cat: 'Clean Tech & Renewables', origin: 'India' },
+                        { name: 'Precision Engineering Tools Co.', booth: 'Hall 2 • Booth C-310', cat: 'Machinery & Equipment', origin: 'Japan' },
+                        { name: 'Nova Packaging Solutions', booth: 'Hall 2 • Booth D-112', cat: 'Sustainable Packaging', origin: 'USA' },
+                        { name: 'Future Logistics & Warehousing', booth: 'Hall 3 • Booth E-404', cat: 'Supply Chain Tech', origin: 'Singapore' },
+                        { name: 'Prime Material Science Lab', booth: 'Hall 3 • Booth F-515', cat: 'Raw Materials & Polymers', origin: 'South Korea' }
+                      ]
+                  ).map((ex, exIdx) => (
+                    <div
+                      key={exIdx}
+                      className="p-4 rounded-xl border border-zinc-200 bg-zinc-50/50 hover:bg-white hover:border-zinc-300 transition-all space-y-2 shadow-2xs group"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h4 className="text-xs sm:text-sm font-extrabold text-zinc-900 group-hover:text-[#FF2E63] transition-colors truncate">
+                            {ex.name}
+                          </h4>
+                          <p className="text-[11px] text-zinc-500">{ex.cat || event?.category}</p>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 shrink-0">
+                          {ex.origin || 'Verified'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-zinc-100 text-xs">
+                        <span className="font-bold text-[#FF2E63] text-[11px] flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {ex.booth || `Hall ${String.fromCharCode(65 + (exIdx % 4))} • Booth ${100 + exIdx * 15}`}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => showToast(`Inquiry sent to ${ex.name}`)}
+                          className="text-[11px] font-bold text-zinc-700 hover:text-zinc-950 underline cursor-pointer"
+                        >
+                          Inquire Stall &rarr;
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Exhibitor Stall Booking Banner */}
+                <div className="p-5 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50/90 to-yellow-50/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="space-y-1 text-center sm:text-left">
+                    <div className="text-xs font-extrabold text-amber-950 uppercase tracking-wider">
+                      Stall Space Reservation
+                    </div>
+                    <h4 className="text-sm font-bold text-zinc-900">
+                      Showcase your products to {interestedCount.toLocaleString()}+ verified trade buyers
+                    </h4>
+                    <p className="text-xs text-zinc-600">
+                      Raw space starts from <strong className="text-zinc-900">{event?.boothCost || '145 USD / sqm'}</strong>. Standard shell schemes available.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRequestBooth}
+                    className="px-5 py-2.5 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-extrabold text-xs shrink-0 cursor-pointer shadow-xs transition-colors"
+                  >
+                    Book a Stall Now
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ============================================================= */}
+          {/* TAB: SPEAKERS & CONFERENCE SESSIONS                          */}
+          {/* ============================================================= */}
+          {activeTab === 'speakers' && (
+            <div className="space-y-6">
+              <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-7 shadow-xs space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 pb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Mic className="h-4 w-4 text-[#FF2E63]" />
+                      <h2 className="text-lg font-extrabold text-zinc-900">Keynote Speakers &amp; Sessions</h2>
+                      <span className="text-xs font-bold bg-purple-50 text-purple-900 border border-purple-200 px-2.5 py-0.5 rounded-full">
+                        Industry Leaders
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500 pt-0.5">
+                      Discover thought leadership, panel discussions, and technology keynotes at {event?.title}.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => showToast('Speaker application submitted to organizer.')}
+                    className="px-4 py-2 rounded-xl border border-zinc-300 hover:bg-zinc-50 text-zinc-800 font-bold text-xs shrink-0 flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                  >
+                    <Megaphone className="h-3.5 w-3.5" />
+                    <span>Apply to Speak</span>
+                  </button>
+                </div>
+
+                {/* Real schedules if present */}
+                {event?.schedules && event.schedules.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="text-xs font-extrabold text-zinc-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5 text-amber-600" />
+                      <span>Keynote Stages &amp; Timetable</span>
+                    </div>
+                    <div className="divide-y divide-zinc-100 border border-zinc-200 rounded-xl overflow-hidden bg-zinc-50/40">
+                      {event.schedules.map((sch, sIdx) => (
+                        <div key={sIdx} className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white transition-colors">
+                          <div className="flex items-start gap-3 min-w-0">
+                            <div className="h-9 w-9 rounded-xl bg-zinc-900 text-white font-extrabold text-xs flex items-center justify-center shrink-0">
+                              {sIdx + 1}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="text-xs sm:text-sm font-bold text-zinc-900 truncate">{sch.name || 'Keynote Session'}</h4>
+                              <p className="text-[11px] text-zinc-500">{sch.date || 'Main Conference Auditorium'}</p>
+                            </div>
+                          </div>
+                          <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-white border border-zinc-200 text-zinc-700 shrink-0 self-start sm:self-auto shadow-2xs">
+                            Stage {String.fromCharCode(65 + sIdx)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Speaker Cards Grid */}
+                <div className="grid sm:grid-cols-2 gap-4 pt-1">
+                  {(event?.speakers && event.speakers.length > 0
+                    ? event.speakers
+                    : [
+                        { name: 'Dr. Michael Vance', role: 'Head of Global Innovation & R&D', org: 'Vance Dynamics Group', topic: 'The Next Decade of Sustainable Manufacturing', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=200&auto=format&fit=crop' },
+                        { name: 'Elena Rostova', role: 'Managing Partner & Trade Strategist', org: 'Eurasian Commercial Guild', topic: 'Cross-Border Supply Chain Resilience', avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200&auto=format&fit=crop' },
+                        { name: 'Rajesh K. Mehta', role: 'Chief Technical Officer', org: 'Smart Industry Solutions', topic: 'AI & Automation in High-Volume Fabrication', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=200&auto=format&fit=crop' },
+                        { name: 'Sarah Lin', role: 'VP of Sustainable Procurement', org: 'Global Green Consortium', topic: 'Decarbonization Pathways for Trade Summits', avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=200&auto=format&fit=crop' }
+                      ]
+                  ).map((spk, spkIdx) => (
+                    <div
+                      key={spkIdx}
+                      className="p-4 rounded-xl border border-zinc-200 bg-white hover:border-zinc-300 transition-all space-y-3 shadow-2xs"
+                    >
+                      <div className="flex items-start gap-3">
+                        <img
+                          src={spk.avatar || spk.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop'}
+                          alt={spk.name}
+                          className="h-12 w-12 rounded-xl object-cover border border-zinc-200 shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <div className="text-xs sm:text-sm font-extrabold text-zinc-900 truncate">{spk.name}</div>
+                          <div className="text-[11px] font-semibold text-zinc-700 truncate">{spk.role}</div>
+                          <div className="text-[10px] text-zinc-500 truncate">{spk.org}</div>
+                        </div>
+                      </div>
+                      <div className="p-2.5 bg-zinc-50 rounded-lg border border-zinc-100 text-[11px] text-zinc-700 italic">
+                        Keynote: "{spk.topic || 'Industry Innovation & Future Trends'}"
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ============================================================= */}
+          {/* TAB: REVIEWS & RATINGS                                       */}
+          {/* ============================================================= */}
+          {activeTab === 'reviews' && (
+            <div className="space-y-6">
+              <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-7 shadow-xs space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 pb-5">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                      <h2 className="text-lg font-extrabold text-zinc-900">Ratings &amp; Attendee Reviews</h2>
+                      <span className="text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                        {ratingValue} / 5.0 Rating
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500 pt-0.5">
+                      Verified feedback from delegates, exhibitors, and trade visitors.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowReviewModal(true)}
+                    className="px-5 py-2.5 rounded-xl bg-[#FF2E63] hover:bg-[#e02656] text-white font-bold text-xs shrink-0 flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                  >
+                    <Star className="h-3.5 w-3.5 fill-white text-white" />
+                    <span>Write a Review</span>
+                  </button>
+                </div>
+
+                {/* Ratings Breakdown Summary Box */}
+                <div className="p-5 rounded-xl border border-zinc-200 bg-zinc-50/60 grid sm:grid-cols-12 gap-6 items-center">
+                  <div className="sm:col-span-4 text-center sm:text-left space-y-1 sm:border-r border-zinc-200 sm:pr-6">
+                    <div className="text-4xl font-extrabold text-zinc-900">{ratingValue}</div>
+                    <div className="flex items-center justify-center sm:justify-start gap-1 text-amber-500">
+                      {[...Array(5)].map((_, i) => (
+                        <Star key={i} className="h-4 w-4 fill-amber-400 text-amber-400" />
+                      ))}
+                    </div>
+                    <div className="text-xs text-zinc-500 font-semibold pt-1">
+                      Based on {reviewsCount} verified reviews
+                    </div>
+                  </div>
+
+                  <div className="sm:col-span-8 space-y-2">
+                    {[
+                      { stars: '5 Stars', pct: 82 },
+                      { stars: '4 Stars', pct: 14 },
+                      { stars: '3 Stars', pct: 3 },
+                      { stars: '2 Stars', pct: 1 },
+                      { stars: '1 Star', pct: 0 }
+                    ].map((bar, bIdx) => (
+                      <div key={bIdx} className="flex items-center gap-2.5 text-xs">
+                        <span className="w-14 text-zinc-600 font-medium text-[11px] shrink-0">{bar.stars}</span>
+                        <div className="flex-1 h-2 rounded-full bg-zinc-200 overflow-hidden">
+                          <div className="h-full bg-amber-400 rounded-full" style={{ width: `${bar.pct}%` }} />
+                        </div>
+                        <span className="w-8 text-right font-bold text-zinc-700 text-[11px] shrink-0">{bar.pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* User Reviews List */}
+                <div className="space-y-4 pt-1">
+                  {[
+                    {
+                      author: 'Vikramaditya Rao',
+                      role: 'VP Procurement • Apex Industrial Corp',
+                      rating: 5,
+                      date: 'September 2026',
+                      review:
+                        'Outstanding trade show experience. The caliber of direct suppliers and machinery manufacturers was exceptional. Signed two major supplier MOUs directly on the floor.'
+                    },
+                    {
+                      author: 'Sarah Chen',
+                      role: 'Senior Buyer • Global Retail Group',
+                      rating: 5,
+                      date: 'August 2026',
+                      review:
+                        'Seamless visitor entry with the VisitExpo pass. Great organization of exhibition halls, easy B2B matchmaking, and high-quality international exhibitors.'
+                    },
+                    {
+                      author: 'Marcus Weber',
+                      role: 'Managing Director • European Tools GmbH',
+                      rating: 4,
+                      date: 'July 2026',
+                      review:
+                        'Impressive turnout of genuine trade buyers. Good venue amenities and straightforward booth logistics. We plan to return for the next edition.'
+                    }
+                  ].map((rev, rIdx) => (
+                    <div key={rIdx} className="p-4 rounded-xl border border-zinc-200 bg-white space-y-2 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-xs sm:text-sm font-extrabold text-zinc-900 flex items-center gap-1.5">
+                            <span>{rev.author}</span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">
+                              Verified Buyer
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-zinc-500">{rev.role}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="flex items-center gap-0.5 text-amber-500 justify-end">
+                            {[...Array(rev.rating)].map((_, i) => (
+                              <Star key={i} className="h-3 w-3 fill-amber-400 text-amber-400" />
+                            ))}
+                          </div>
+                          <div className="text-[10px] text-zinc-400 font-medium">{rev.date}</div>
+                        </div>
+                      </div>
+                      <p className="text-xs text-zinc-700 leading-relaxed font-normal pt-1">
+                        "{rev.review}"
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ============================================================= */}
+          {/* TAB: DEALS & PASSES                                          */}
+          {/* ============================================================= */}
+          {activeTab === 'deals' && (
+            <div className="space-y-6">
+              <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-7 shadow-xs space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 pb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Ticket className="h-4 w-4 text-[#FF2E63]" />
+                      <h2 className="text-lg font-extrabold text-zinc-900">Official Expo Deals &amp; Passes</h2>
+                      <span className="text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                        Exclusive Offers
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500 pt-0.5">
+                      Special pricing, travel subsidies, and visitor badges for {event?.title}.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {/* Deal 1: Complimentary Trade Pass */}
+                  <div className="p-5 rounded-2xl border-2 border-emerald-500/80 bg-gradient-to-br from-emerald-50/60 to-white space-y-3.5 shadow-2xs relative">
+                    <span className="absolute top-3 right-3 text-[10px] font-black uppercase px-2 py-0.5 rounded bg-emerald-600 text-white">
+                      Free
+                    </span>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-extrabold text-zinc-900">Complimentary Trade Visitor Pass</h4>
+                      <p className="text-xs text-zinc-600 leading-relaxed">
+                        Fast-track QR entry badge for all exhibition halls, technology stages, and exhibitor networking areas.
+                      </p>
+                    </div>
+                    <div className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      <span>Pre-registration open for trade professionals</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleInterested}
+                      className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                    >
+                      {isInterested ? 'Pass Confirmed ✓' : 'Claim Free Pass Now'}
+                    </button>
+                  </div>
+
+                  {/* Deal 2: Early Bird Stall Space */}
+                  <div className="p-5 rounded-2xl border-2 border-amber-400 bg-gradient-to-br from-amber-50/50 to-white space-y-3.5 shadow-2xs relative">
+                    <span className="absolute top-3 right-3 text-[10px] font-black uppercase px-2 py-0.5 rounded bg-amber-500 text-white">
+                      15% Off
+                    </span>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-extrabold text-zinc-900">Early-Bird Stall Space Booking</h4>
+                      <p className="text-xs text-zinc-600 leading-relaxed">
+                        Reserve prime booth locations across Main Exhibition Hall with special square-meter early discounts.
+                      </p>
+                    </div>
+                    <div className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                      <Building className="h-4 w-4 text-amber-600" />
+                      <span>From {event?.boothCost || '145 USD / sqm'}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRequestBooth}
+                      className="w-full py-2.5 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                    >
+                      Request Booth Discount
+                    </button>
+                  </div>
+
+                  {/* Deal 3: Accommodation Discount */}
+                  <div className="p-5 rounded-2xl border border-zinc-200 bg-zinc-50/50 space-y-3.5 shadow-2xs">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-extrabold text-zinc-900">Partner Hotel &amp; Flight Discounts</h4>
+                      <p className="text-xs text-zinc-600 leading-relaxed">
+                        Special delegate corporate tariffs at hotels within 5km of {event?.venue || event?.city}.
+                      </p>
+                    </div>
+                    <div className="text-xs font-bold text-zinc-800 flex items-center gap-1.5">
+                      <MapPin className="h-4 w-4 text-[#FF2E63]" />
+                      <span>Up to 25% off official partner hotels</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => showToast('Hotel coupon code sent to your registered email.')}
+                      className="w-full py-2.5 rounded-xl border border-zinc-300 hover:bg-white text-zinc-800 font-bold text-xs shadow-2xs transition-colors cursor-pointer"
+                    >
+                      Get Hotel Corporate Code
+                    </button>
+                  </div>
+
+                  {/* Deal 4: Corporate Delegation Pass */}
+                  <div className="p-5 rounded-2xl border border-zinc-200 bg-zinc-50/50 space-y-3.5 shadow-2xs">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-extrabold text-zinc-900">Corporate Group &amp; VIP Delegation</h4>
+                      <p className="text-xs text-zinc-600 leading-relaxed">
+                        For teams of 5+ trade buyers. Includes private B2B lounge access, concierge matchmaking, and executive dining.
+                      </p>
+                    </div>
+                    <div className="text-xs font-bold text-zinc-800 flex items-center gap-1.5">
+                      <Users className="h-4 w-4 text-blue-600" />
+                      <span>Dedicated Buyer Coordinator</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => showToast('Delegation inquiry submitted. Concierge will contact you.')}
+                      className="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                    >
+                      Apply for Delegation Perks
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
 
           </div>

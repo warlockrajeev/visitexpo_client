@@ -36,7 +36,9 @@ import {
   Globe,
   Store,
   Layers,
-  Award
+  Award,
+  Bell,
+  BellRing
 } from 'lucide-react';
 
 const CATEGORIES = [
@@ -71,9 +73,10 @@ export default function EventsDirectoryPage() {
   const [featuredOnly, setFeaturedOnly] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Gated Auth & Save State
+  // Gated Auth, Save & Follow State
   const [gatedContext, setGatedContext] = useState(null);
   const [savedEventIds, setSavedEventIds] = useState(new Set());
+  const [followedSlugs, setFollowedSlugs] = useState(new Set());
   const [claimedPassIds, setClaimedPassIds] = useState(new Set());
   const [toastMessage, setToastMessage] = useState(null);
 
@@ -95,15 +98,37 @@ export default function EventsDirectoryPage() {
     fetchEvents();
   }, []);
 
-  // Load saved bookmarks from localStorage
+  // Load saved bookmarks and followed events from localStorage & backend
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem('visitexpo_saved_events');
         if (saved) setSavedEventIds(new Set(JSON.parse(saved)));
+        const followed = localStorage.getItem('visitexpo_followed_events');
+        if (followed) setFollowedSlugs(new Set(JSON.parse(followed)));
       } catch (_) {}
     }
-  }, []);
+
+    if (user?.email) {
+      axios.get(`/api/engagements/user/${encodeURIComponent(user.email)}`)
+        .then(res => {
+          if (res.data?.success && res.data?.data) {
+            const followedList = res.data.data.followedEvents || [];
+            if (followedList.length > 0) {
+              setFollowedSlugs(prev => {
+                const merged = new Set(prev);
+                followedList.forEach(e => {
+                  const s = (e.eventSlug || e.slug || e.id || '').toLowerCase().trim();
+                  if (s) merged.add(s);
+                });
+                return merged;
+              });
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -208,6 +233,57 @@ export default function EventsDirectoryPage() {
     setSavedEventIds(next);
     if (typeof window !== 'undefined') {
       localStorage.setItem('visitexpo_saved_events', JSON.stringify(Array.from(next)));
+    }
+  };
+
+  const handleToggleFollow = async (evt) => {
+    const slug = (evt.slug || evt.id || '').toLowerCase().trim();
+    if (!slug) return;
+
+    if (!user) {
+      setGatedContext({ action: 'follow', event: evt });
+      return;
+    }
+
+    const isFollowing = followedSlugs.has(slug);
+    const nextFollowing = !isFollowing;
+
+    setFollowedSlugs(prev => {
+      const next = new Set(prev);
+      if (nextFollowing) next.add(slug);
+      else next.delete(slug);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('visitexpo_followed_events', JSON.stringify(Array.from(next)));
+      }
+      return next;
+    });
+
+    showToast(
+      nextFollowing
+        ? `Now following ${evt.title}! Notifications active.`
+        : `Unfollowed ${evt.title}.`
+    );
+
+    try {
+      await axios.post(`/api/events/${encodeURIComponent(slug)}/social`, {
+        actionType: 'follower',
+        eventTitle: evt.title,
+        eventCity: evt.city,
+        eventVenue: evt.venue,
+        eventDates: evt.dates,
+        eventCategory: evt.category,
+        eventImage: evt.image,
+        user: {
+          id: user.id || user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          company: user.company || user.organization?.name || '',
+          phone: user.phone || ''
+        }
+      });
+    } catch (err) {
+      console.warn('Failed to sync follow state to server:', err);
     }
   };
 
@@ -431,6 +507,7 @@ export default function EventsDirectoryPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {paginatedEvents.map((evt, idx) => {
               const eventSlug = evt.slug || evt.id;
+              const isFollowing = followedSlugs.has((evt.slug || evt.id || '').toLowerCase().trim());
               const isSaved = savedEventIds.has(evt.id);
               const isClaimed = claimedPassIds.has(evt.id);
               const charSum = (evt.title || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 17);
@@ -464,7 +541,7 @@ export default function EventsDirectoryPage() {
                       className="relative z-10 max-h-full max-w-full w-auto h-auto object-contain transition-transform duration-300 group-hover:scale-103"
                       onError={(e) => {
                         e.currentTarget.src =
-                          'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=800&auto=format&fit=crop';
+                          evt.fallbackImage || 'https://visitexpo.in/wp-content/uploads/2026/08/Refining-India-2026.jpg';
                       }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none z-10" />
@@ -475,18 +552,38 @@ export default function EventsDirectoryPage() {
                         {evt.category || 'Trade Show'}
                       </span>
 
-                      <button
-                        type="button"
-                        onClick={() => handleToggleSave(evt.id)}
-                        className={`p-2 rounded-full backdrop-blur-xs transition-colors cursor-pointer ${
-                          isSaved
-                            ? 'bg-rose-500 text-white shadow-sm'
-                            : 'bg-black/50 text-white hover:bg-black/80'
-                        }`}
-                        aria-label="Save exhibition"
-                      >
-                        <Bookmark className={`h-3.5 w-3.5 ${isSaved ? 'fill-white' : ''}`} />
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleToggleFollow(evt);
+                          }}
+                          className={`p-2 rounded-full backdrop-blur-xs transition-all cursor-pointer ${
+                            isFollowing
+                              ? 'bg-blue-600 text-white shadow-md ring-2 ring-white/40'
+                              : 'bg-black/50 text-white hover:bg-black/80'
+                          }`}
+                          title={isFollowing ? 'Following event updates' : 'Follow this event'}
+                          aria-label="Follow exhibition"
+                        >
+                          <Bell className={`h-3.5 w-3.5 ${isFollowing ? 'fill-white' : ''}`} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSave(evt.id)}
+                          className={`p-2 rounded-full backdrop-blur-xs transition-colors cursor-pointer ${
+                            isSaved
+                              ? 'bg-rose-500 text-white shadow-sm'
+                              : 'bg-black/50 text-white hover:bg-black/80'
+                          }`}
+                          aria-label="Save exhibition"
+                        >
+                          <Bookmark className={`h-3.5 w-3.5 ${isSaved ? 'fill-white' : ''}`} />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Bottom Edition Pill */}
@@ -543,12 +640,20 @@ export default function EventsDirectoryPage() {
                       </Link>
 
                       <div className="flex items-center gap-2">
-                        <Link
-                          href={`/login?role=exhibitor&event=${encodeURIComponent(evt.title)}`}
-                          className="text-[11px] font-extrabold text-[#FF2E63] hover:underline"
+                        {/* Follow Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleFollow(evt)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+                            isFollowing
+                              ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/20'
+                              : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200/80'
+                          }`}
+                          title={isFollowing ? 'You are following this event' : 'Follow this event'}
                         >
-                          Exhibit
-                        </Link>
+                          <Bell className={`h-3 w-3 ${isFollowing ? 'fill-white' : ''}`} />
+                          <span>{isFollowing ? 'Following' : 'Follow'}</span>
+                        </button>
 
                         <button
                           type="button"
@@ -684,13 +789,34 @@ export default function EventsDirectoryPage() {
           action={gatedContext.action}
           event={gatedContext.event}
           onSuccess={() => {
-            if (gatedContext.event?.id) {
+            if (gatedContext.action === 'follow' && gatedContext.event) {
+              const slug = (gatedContext.event.slug || gatedContext.event.id || '').toLowerCase().trim();
+              if (slug) {
+                setFollowedSlugs(prev => new Set(prev).add(slug));
+                showToast(`Welcome! You are now following ${gatedContext.event.title}!`);
+                axios.post(`/api/events/${encodeURIComponent(slug)}/social`, {
+                  actionType: 'follower',
+                  eventTitle: gatedContext.event.title,
+                  eventCity: gatedContext.event.city,
+                  eventVenue: gatedContext.event.venue,
+                  eventDates: gatedContext.event.dates,
+                  eventCategory: gatedContext.event.category,
+                  eventImage: gatedContext.event.image,
+                  user: {
+                    id: user?.id || user?._id,
+                    name: user?.name,
+                    email: user?.email,
+                    role: user?.role
+                  }
+                }).catch(() => {});
+              }
+            } else if (gatedContext.event?.id) {
               const next = new Set(claimedPassIds);
               next.add(gatedContext.event.id);
               setClaimedPassIds(next);
+              showToast('Welcome! Your pass has been issued.');
             }
             setGatedContext(null);
-            showToast('Welcome! Your pass has been issued.');
           }}
         />
       )}

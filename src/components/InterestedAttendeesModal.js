@@ -230,6 +230,12 @@ export default function InterestedAttendeesModal({
                       {att.verified && (
                         <ShieldCheck className="h-3.5 w-3.5 text-blue-600" title="Verified Trade Profile" />
                       )}
+                      {att.isRealUser && (
+                        <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-300 flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          Live Registered
+                        </span>
+                      )}
                       <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
                         att.type === 'Trade Buyer'
                           ? 'bg-amber-100 text-amber-900'

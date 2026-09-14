@@ -41,7 +41,10 @@ import {
   QrCode,
   Search,
   ExternalLink,
-  User
+  User,
+  UserCheck,
+  Bell,
+  Bookmark
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -73,6 +76,8 @@ export function OrganizerDashboardInner() {
   const [recentEvents, setRecentEvents] = useState([]);
   const [visitors, setVisitors] = useState([]);
   const [leads, setLeads] = useState([]);
+  const [engagements, setEngagements] = useState([]);
+  const [loadingEngagements, setLoadingEngagements] = useState(true);
 
   useEffect(() => {
     if (!user) return;
@@ -88,17 +93,19 @@ export function OrganizerDashboardInner() {
           : `${API_URL}/events?organizerId=${orgId || userId}`;
 
 
-        const [eventsRes, visitorsRes, exhibitorsRes, leadsRes] = await Promise.allSettled([
+        const [eventsRes, visitorsRes, exhibitorsRes, leadsRes, engRes] = await Promise.allSettled([
           axios.get(eventsUrl, { headers }),
           axios.get(`${API_URL}/visitors`, { headers }),
           axios.get(`${API_URL}/exhibitors`, { headers }),
-          axios.get(`${API_URL}/leads`, { headers })
+          axios.get(`${API_URL}/leads`, { headers }),
+          axios.get(`${API_URL}/engagements/all`)
         ]);
 
         const events = eventsRes.status === 'fulfilled' && eventsRes.value.data.success ? eventsRes.value.data.data.docs || [] : [];
         const visitorsDocs = visitorsRes.status === 'fulfilled' && visitorsRes.value.data.success ? visitorsRes.value.data.data.docs || [] : [];
         const exhibitors = exhibitorsRes.status === 'fulfilled' && exhibitorsRes.value.data.success ? exhibitorsRes.value.data.data.docs || [] : [];
         const leadsDocs = leadsRes.status === 'fulfilled' && leadsRes.value.data.success ? leadsRes.value.data.data.docs || [] : [];
+        const engDocs = engRes.status === 'fulfilled' && engRes.value.data.success ? engRes.value.data.data?.engagements || [] : [];
 
         setDashboardStats({
           totalEvents: events.length || 0,
@@ -109,6 +116,7 @@ export function OrganizerDashboardInner() {
 
         setVisitors(visitorsDocs);
         setLeads(leadsDocs);
+        setEngagements(engDocs);
 
         if (visitorsDocs.length > 0) {
           setRecentVisitors(visitorsDocs.slice(0, 5));
@@ -120,6 +128,7 @@ export function OrganizerDashboardInner() {
         console.error('Error loading dynamic dashboard stats:', err);
       } finally {
         setLoading(false);
+        setLoadingEngagements(false);
       }
     };
 
@@ -505,6 +514,117 @@ export function OrganizerDashboardInner() {
                       <Users className="h-8 w-8 text-muted-foreground/30 mx-auto" />
                       <p className="font-semibold text-xs text-foreground">No Visitor Registrations Found</p>
                       <p className="text-[10px]">When attendees register or check in to your events, they will show up here live.</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Real-Time Event Interest & Follower Leads Table */}
+      <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <UserCheck className="h-4.5 w-4.5 text-primary" /> Event Interest &amp; Follower Insights
+              </h3>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                {engagements.length} Live Delegates
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Verified buyers, trade delegates, and visitors who have clicked Interested or Followed your trade exhibitions.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground font-semibold">
+              Total Engaged: <strong className="text-foreground">{engagements.length}</strong>
+            </span>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-muted/30 text-muted-foreground uppercase text-[10px] font-bold">
+              <tr>
+                <th className="p-3 rounded-l-xl">Delegate Name</th>
+                <th className="p-3">Email &amp; Phone</th>
+                <th className="p-3">Company &amp; Role</th>
+                <th className="p-3">Event Associated</th>
+                <th className="p-3">Engagement Status</th>
+                <th className="p-3 rounded-r-xl text-right">Registered</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/50 text-foreground">
+              {loadingEngagements ? (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto mb-2" />
+                    <span className="text-xs font-semibold">Loading delegate insights...</span>
+                  </td>
+                </tr>
+              ) : engagements.length > 0 ? (
+                engagements.map((eng) => (
+                  <tr key={eng._id} className="hover:bg-muted/10 transition-colors">
+                    <td className="p-3">
+                      <div className="flex items-center gap-2.5">
+                        <img
+                          src={eng.userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(eng.userName)}&background=FF2E63&color=fff`}
+                          alt={eng.userName}
+                          className="h-8 w-8 rounded-full object-cover border border-border shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <span className="font-bold text-foreground block truncate">{eng.userName}</span>
+                          <span className="text-[10px] text-muted-foreground block truncate">{eng.userDesignation || 'Trade Delegate'}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      <div className="text-xs text-foreground">{eng.userEmail}</div>
+                      <div className="text-[10px] text-muted-foreground">{eng.userPhone || '—'}</div>
+                    </td>
+                    <td className="p-3">
+                      <div className="font-semibold text-foreground truncate max-w-xs">{eng.userCompany || 'Independent Buyer'}</div>
+                      <div className="text-[10px] text-muted-foreground capitalize">{eng.userRole || 'visitor'}</div>
+                    </td>
+                    <td className="p-3">
+                      <Link
+                        href={`/expo/${eng.eventSlug}`}
+                        className="font-bold text-primary hover:underline block truncate max-w-xs"
+                      >
+                        {eng.eventTitle}
+                      </Link>
+                      <span className="text-[10px] text-muted-foreground block">
+                        {eng.eventCity} • {eng.eventDates}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        eng.type === 'both'
+                          ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
+                          : eng.type === 'follower'
+                          ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                          : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                      }`}>
+                        {eng.type === 'both' ? 'Interested & Following' : eng.type === 'follower' ? 'Following Event' : 'Marked Interested'}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right text-muted-foreground text-[11px] whitespace-nowrap">
+                      {eng.createdAt ? new Date(eng.createdAt).toLocaleDateString() : 'Recent'}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <UserCheck className="h-8 w-8 text-muted-foreground/30 mx-auto" />
+                      <p className="font-semibold text-xs text-foreground">No Event Engagements Yet</p>
+                      <p className="text-[10px]">When trade buyers or visitors mark interest or follow your exhibitions, their profiles will appear here.</p>
                     </div>
                   </td>
                 </tr>
@@ -984,6 +1104,26 @@ function VisitorDashboard() {
   const [claimError, setClaimError] = useState('');
   const [selectedPassForBadge, setSelectedPassForBadge] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [engagements, setEngagements] = useState({ all: [], interestedEvents: [], followedEvents: [] });
+  const [loadingEngagements, setLoadingEngagements] = useState(true);
+  const [engagementTab, setEngagementTab] = useState('all');
+
+  // Fetch visitor's marked interested and followed events
+  const fetchMyEngagements = async () => {
+    if (!user?.email && !user?.id && !user?._id) return;
+    try {
+      setLoadingEngagements(true);
+      const identifier = user.email || user.id || user._id;
+      const res = await axios.get(`${API_URL}/engagements/user/${encodeURIComponent(identifier)}`);
+      if (res.data && res.data.success && res.data.data) {
+        setEngagements(res.data.data);
+      }
+    } catch (err) {
+      console.warn('Could not fetch visitor engagements:', err);
+    } finally {
+      setLoadingEngagements(false);
+    }
+  };
 
   // Fetch visitor's registered passes
   const fetchMyPasses = async () => {
@@ -1024,6 +1164,7 @@ function VisitorDashboard() {
   useEffect(() => {
     fetchMyPasses();
     fetchExpos();
+    fetchMyEngagements();
   }, [user, accessToken]);
 
   // Handle 1-click pass booking
@@ -1310,6 +1451,156 @@ function VisitorDashboard() {
               );
             })}
           </div>
+        )}
+      </div>
+
+      {/* SECTION 1.5: My Followed & Interested Trade Shows */}
+      <div className="space-y-4 pt-4 border-t border-border">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                <Bookmark className="h-5 w-5 text-amber-500" /> My Followed &amp; Interested Expos
+              </h3>
+              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                {engagements.total || 0} Saved Shows
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Trade exhibitions you are actively tracking for updates, visitor badges, and stall announcements.
+            </p>
+          </div>
+
+          {/* Engagement Tabs */}
+          <div className="flex items-center gap-1.5 p-1 bg-secondary rounded-xl border border-border">
+            <button
+              type="button"
+              onClick={() => setEngagementTab('all')}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                engagementTab === 'all'
+                  ? 'bg-card text-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              All ({engagements.total || 0})
+            </button>
+            <button
+              type="button"
+              onClick={() => setEngagementTab('interested')}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                engagementTab === 'interested'
+                  ? 'bg-card text-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Interested ({engagements.interestedEvents?.length || 0})
+            </button>
+            <button
+              type="button"
+              onClick={() => setEngagementTab('followed')}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                engagementTab === 'followed'
+                  ? 'bg-card text-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Following ({engagements.followedEvents?.length || 0})
+            </button>
+          </div>
+        </div>
+
+        {loadingEngagements ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground bg-card border border-border rounded-2xl">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-xs font-medium">Loading your followed trade shows...</p>
+          </div>
+        ) : (
+          (() => {
+            const displayList =
+              engagementTab === 'interested'
+                ? engagements.interestedEvents || []
+                : engagementTab === 'followed'
+                ? engagements.followedEvents || []
+                : engagements.all || [];
+
+            if (displayList.length === 0) {
+              return (
+                <div className="bg-card border border-dashed border-border rounded-2xl p-6 text-center space-y-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-500 mx-auto">
+                    <Bookmark className="h-6 w-6" />
+                  </div>
+                  <div className="max-w-md mx-auto space-y-1">
+                    <h4 className="text-xs font-bold text-foreground">No Followed Expos in this Category</h4>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Click the "Interested" or "Follow" button on any exhibition page to receive real-time notifications and add it to this list.
+                    </p>
+                  </div>
+                  <a
+                    href="#explore-expos"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-secondary hover:bg-secondary/80 border border-border text-foreground px-3 py-1.5 text-xs font-bold transition-all cursor-pointer"
+                  >
+                    Browse Trade Shows Below &darr;
+                  </a>
+                </div>
+              );
+            }
+
+            return (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {displayList.map((item) => (
+                  <div
+                    key={item._id}
+                    className="rounded-2xl border border-border bg-card p-4 shadow-sm hover:border-primary/50 transition-all flex flex-col justify-between space-y-3"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-secondary border border-border text-muted-foreground">
+                          {item.eventCategory || 'Trade Show'}
+                        </span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          item.type === 'both'
+                            ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
+                            : item.type === 'follower'
+                            ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                            : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                        }`}>
+                          {item.type === 'both' ? 'Interested & Following' : item.type === 'follower' ? 'Following' : 'Marked Interested'}
+                        </span>
+                      </div>
+
+                      <Link
+                        href={`/expo/${item.eventSlug}`}
+                        className="text-sm font-bold text-foreground hover:text-primary transition-colors block line-clamp-1"
+                      >
+                        {item.eventTitle}
+                      </Link>
+
+                      <div className="space-y-1 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1.5 text-[11px]">
+                          <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
+                          <span className="truncate">{item.eventCity} • {item.eventVenue || 'Exhibition Center'}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px]">
+                          <Calendar className="h-3 w-3 text-muted-foreground shrink-0" />
+                          <span>{item.eventDates || '2026 Edition'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-border flex items-center justify-between gap-2">
+                      <Link
+                        href={`/expo/${item.eventSlug}`}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground py-2 px-3 text-xs font-bold transition-all shadow-xs"
+                      >
+                        <span>View Expo Details</span>
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()
         )}
       </div>
 

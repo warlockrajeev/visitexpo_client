@@ -29,61 +29,69 @@ function inferCategory(title = '', desc = '') {
   return 'Trade & Industry';
 }
 
-// Diverse, high-resolution exhibition image pools per category (never generic duplicates)
+// Diverse, high-resolution genuine WordPress exhibition image pools per category (from visitexpo.in)
 const CATEGORY_POOLS = {
   'Travel & Tourism': [
-    'https://images.unsplash.com/photo-1488646953014-85cb44e25828?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=800&auto=format&fit=crop'
+    'https://visitexpo.in/wp-content/uploads/2026/08/Hotel-Data-Conference-2.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/07/Empowering-Women-Expo-Culture-Entrepreneurship_re.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/08/The-Wedding-Collective-Expo.jpg'
   ],
   'Automotive & EV': [
-    'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1563720223185-11003d516935?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1617788138017-80ad40651399?q=80&w=800&auto=format&fit=crop'
+    'https://visitexpo.in/wp-content/uploads/2026/08/Rush-Administrative-Services-Inc.-Annual-Trucks-Centers-and-Skills-Rodeo-1.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/07/Bharat-Mobility-Global-Expo_new.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/09/India-International-EV-Show-2026_new.jpg'
   ],
   'Aerospace & Aviation': [
-    'https://images.unsplash.com/photo-1517976487588-468a356cb0b7?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=800&auto=format&fit=crop'
+    'https://visitexpo.in/wp-content/uploads/2026/08/Refining-India-2026.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/09/Scotland-Manufacturing-and-Supply-Chain-Conference-Exhibition-2026_new.jpg'
   ],
   'Logistics & Cargo': [
-    'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1578575437130-527eed3abbec?q=80&w=800&auto=format&fit=crop'
+    'https://visitexpo.in/wp-content/uploads/2026/08/Rush-Administrative-Services-Inc.-Annual-Trucks-Centers-and-Skills-Rodeo-1.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/09/Scotland-Manufacturing-and-Supply-Chain-Conference-Exhibition-2026_new.jpg'
   ],
   'Healthcare & Pharma': [
-    'https://images.unsplash.com/photo-1579684385127-1ef15d508118?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?q=80&w=800&auto=format&fit=crop'
+    'https://visitexpo.in/wp-content/uploads/2026/08/48th-edition-Medicall-Expo-New-Delhi-2026_new.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/06/India-Med-Expo-Hyderabad-1.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/08/Medicall-Expo-2026.jpg'
   ],
   'Construction & Infra': [
-    'https://images.unsplash.com/photo-1541888946425-d0fbb186156a?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=800&auto=format&fit=crop'
+    'https://visitexpo.in/wp-content/uploads/2026/07/Build-Bangladesh-Expo-31st-Edition.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/07/Bangladesh-Buildcon-International-Expo.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/07/Water-Environment-Expo.jpg'
   ],
   'Technology & AI': [
-    'https://images.unsplash.com/photo-1511578314322-379afb476865?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1531482615713-2afd69097998?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?q=80&w=800&auto=format&fit=crop'
+    'https://visitexpo.in/wp-content/uploads/2026/08/ET-TECH-X-2026_new.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/07/led.png',
+    'https://visitexpo.in/wp-content/uploads/2026/09/FINETECH-JAPAN_new.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/09/ITEX-IRAQ_new.jpg'
   ],
   'Textile & Fashion': [
-    'https://images.unsplash.com/photo-1558769132-cb1aea458c5e?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=800&auto=format&fit=crop'
+    'https://visitexpo.in/wp-content/uploads/2026/07/Sutraa-The-Indian-Fashion-Exhibition.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/07/gte.png',
+    'https://visitexpo.in/wp-content/uploads/2026/07/DyeChem-Bangladesh-Expo-53rd-Edition.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/09/Interfabric-Russia_new.jpg'
   ],
   'Agri & Food Tech': [
-    'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=800&auto=format&fit=crop'
+    'https://visitexpo.in/wp-content/uploads/2026/08/Food-Connoisseurs-India-Convention-2026.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/06/12.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/07/icecream-social-for-pets.jpg'
   ],
   'Art & Lifestyle': [
-    'https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1536924940846-227afb31e2a5?q=80&w=800&auto=format&fit=crop'
+    'https://visitexpo.in/wp-content/uploads/2026/08/Couture-India-Show-2026-New-Delhi.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/08/The-Wedding-Collective-Expo.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/09/Cosmobeaute-Indonesia_new.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/09/Watch-Jewellery-Middle-East-Show_new.jpg'
   ],
   'Energy & Environment': [
-    'https://images.unsplash.com/photo-1497435334941-8c899ee9e8e9?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?q=80&w=800&auto=format&fit=crop'
+    'https://visitexpo.in/wp-content/uploads/2026/07/Water-Environment-Expo.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/08/9th-India-International-Water-Week-2026.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/07/Water-Bangladesh-Intl-Expo-8th-Edition.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/06/Global-Recycling-Expo-Summit-GREENS.jpg'
   ],
   'Trade & Industry': [
-    'https://images.unsplash.com/photo-1511578314322-379afb476865?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1587825140708-dfaf72ae4b04?q=80&w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?q=80&w=800&auto=format&fit=crop'
+    'https://visitexpo.in/wp-content/uploads/2026/08/Refining-India-2026.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/09/Scotland-Manufacturing-and-Supply-Chain-Conference-Exhibition-2026_new.jpg',
+    'https://visitexpo.in/wp-content/uploads/2026/09/Feria-Habitat-Valencia_new.jpg'
   ]
 };
 
@@ -93,36 +101,61 @@ function getCategoryFallback(category, title = '') {
   return pool[Math.abs(hash) % pool.length];
 }
 
+function isValidWpImage(url) {
+  return url && typeof url === 'string' && url.includes('wp-content/uploads') && !url.includes('unsplash') && !url.includes('cropped-Untitled');
+}
+
 // Helper to look up genuine WordPress featured image from backend dataset
 function findWpImage(slug, id, wpPostId, title) {
   if (!slug && !id && !title && !wpPostId) return null;
 
   // 1. Direct key match (by slug, ID, or wpPostId)
-  if (slug && wpEventImages[slug]) return wpEventImages[slug];
-  if (id && wpEventImages[String(id)]) return wpEventImages[String(id)];
-  if (wpPostId && wpEventImages[String(wpPostId)]) return wpEventImages[String(wpPostId)];
+  if (slug && isValidWpImage(wpEventImages[slug])) return wpEventImages[slug];
+  if (id && isValidWpImage(wpEventImages[String(id)])) return wpEventImages[String(id)];
+  if (wpPostId && isValidWpImage(wpEventImages[String(wpPostId)])) return wpEventImages[String(wpPostId)];
 
   // 2. Normalized slug match
   if (slug) {
     const normSlug = slug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    if (wpEventImages[normSlug]) return wpEventImages[normSlug];
+    if (isValidWpImage(wpEventImages[normSlug])) return wpEventImages[normSlug];
   }
 
   // 3. Title-derived slug and fuzzy keyword match
   if (title) {
     const titleSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    if (wpEventImages[titleSlug]) return wpEventImages[titleSlug];
+    if (isValidWpImage(wpEventImages[titleSlug])) return wpEventImages[titleSlug];
 
     const lowerTitle = title.toLowerCase();
     for (const [k, url] of Object.entries(wpEventImages)) {
       if (k.length > 5 && isNaN(Number(k))) {
         const readableKey = k.replace(/-/g, ' ');
         if (lowerTitle.includes(readableKey) || (readableKey.length > 10 && readableKey.includes(lowerTitle))) {
-          return url;
+          if (isValidWpImage(url)) return url;
         }
       }
     }
   }
+
+  // 4. Live disk check if harvester has added new mappings in background
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const filePath = path.join(process.cwd(), 'src/data/wordpress-event-images.json');
+    if (fs.existsSync(filePath)) {
+      const liveData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      if (slug && isValidWpImage(liveData[slug])) return liveData[slug];
+      if (id && isValidWpImage(liveData[String(id)])) return liveData[String(id)];
+      if (wpPostId && isValidWpImage(liveData[String(wpPostId)])) return liveData[String(wpPostId)];
+      if (slug) {
+        const normSlug = slug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        if (isValidWpImage(liveData[normSlug])) return liveData[normSlug];
+      }
+      if (title) {
+        const titleSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        if (isValidWpImage(liveData[titleSlug])) return liveData[titleSlug];
+      }
+    }
+  } catch {}
 
   return null;
 }
