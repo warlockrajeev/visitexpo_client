@@ -33,7 +33,11 @@ import {
 } from 'lucide-react';
 import { auth, googleProvider, signInWithPopup } from '../../lib/firebase.js';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== 'undefined' && window.location.hostname.includes('visitexpo.in')
+    ? 'https://api.visitexpo.in/api'
+    : 'http://localhost:5000/api');
 
 const INDUSTRY_OPTIONS = [
   'Information Technology & Software',

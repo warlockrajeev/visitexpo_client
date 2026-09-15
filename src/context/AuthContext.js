@@ -13,7 +13,11 @@ axios.defaults.withCredentials = true;
 
 const AuthContext = createContext();
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== 'undefined' && window.location.hostname.includes('visitexpo.in')
+    ? 'https://api.visitexpo.in/api'
+    : 'http://localhost:5000/api');
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);

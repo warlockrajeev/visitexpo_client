@@ -66,7 +66,11 @@ import ExploreVenues from '../components/ExploreVenues.js';
 import FeaturedOrganizers from '../components/FeaturedOrganizers.js';
 import PeoplesReviews from '../components/PeoplesReviews.js';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== 'undefined' && window.location.hostname.includes('visitexpo.in')
+    ? 'https://api.visitexpo.in/api'
+    : 'http://localhost:5000/api');
 
 export default function LandingPage() {
   const { user, loading } = useAuth();
