@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { parseWpLocation } from '../../wordpress-events/route.js';
 
 const WORDPRESS_URL = process.env.WORDPRESS_URL || 'https://visitexpo.in';
 const WORDPRESS_API_KEY = process.env.WORDPRESS_API_KEY || 've_wp_sync_secret_2026_secure';
@@ -93,27 +94,7 @@ function parsePhpSponsors(str) {
   return items;
 }
 
-function extractCity(venue = '', city = '') {
-  const combined = `${venue} ${city}`;
-  if (/new delhi|pragati maidan|bharat mandapam|dwarka|yashobhoomi|delhi/i.test(combined)) return 'New Delhi';
-  if (/greater noida|india expo/i.test(combined)) return 'Greater Noida';
-  if (/mumbai|bombay|bkc|nesco|jio world/i.test(combined)) return 'Mumbai';
-  if (/bengaluru|bangalore|biec/i.test(combined)) return 'Bengaluru';
-  if (/chennai|madras|trade centre/i.test(combined)) return 'Chennai';
-  if (/hyderabad|hitex/i.test(combined)) return 'Hyderabad';
-  if (/kolkata|calcutta|biswa bangla/i.test(combined)) return 'Kolkata';
-  if (/pune/i.test(combined)) return 'Pune';
-  if (/ahmedabad|gandhinagar|hec/i.test(combined)) return 'Ahmedabad';
-  if (/jaipur|jecc/i.test(combined)) return 'Jaipur';
-  if (/dubai|uae|world trade centre dubai/i.test(combined)) return 'Dubai';
-  if (/riyadh/i.test(combined)) return 'Riyadh';
-  if (/paris/i.test(combined)) return 'Paris';
-  if (/london/i.test(combined)) return 'London';
-  if (/frankfurt|berlin|munich|germany/i.test(combined)) return 'Germany';
-  if (/singapore/i.test(combined)) return 'Singapore';
-  if (/bangkok|thailand/i.test(combined)) return 'Bangkok';
-  return city || 'India';
-}
+
 
 function getStoredImage(slug, id, title) {
   try {
@@ -189,6 +170,43 @@ async function fetchRealWpImage(slug) {
   return null;
 }
 
+export function decodeHtmlEntities(str) {
+  if (!str || typeof str !== 'string') return '';
+  return str
+    .replace(/&#038;/g, '&')
+    .replace(/&amp;/g, '&')
+    .replace(/&#8217;/g, "'")
+    .replace(/&#8216;/g, "'")
+    .replace(/&#8220;/g, '"')
+    .replace(/&#8221;/g, '"')
+    .replace(/&#8211;/g, '–')
+    .replace(/&#8212;/g, '—')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
+
+function formatDateRange(startDate, endDate) {
+  if (!startDate) return 'Upcoming 2026';
+  try {
+    const s = new Date(startDate);
+    const sStr = s.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    if (!endDate) return sStr;
+    const e = new Date(endDate);
+    const eDay = e.toLocaleDateString('en-US', { day: 'numeric' });
+    const eMonth = e.toLocaleDateString('en-US', { month: 'short' });
+    const sMonth = s.toLocaleDateString('en-US', { month: 'short' });
+    if (sMonth === eMonth) {
+      return `${sMonth} ${s.getDate()} – ${eDay}, ${s.getFullYear()}`;
+    }
+    return `${sMonth} ${s.getDate()} – ${eMonth} ${e.getDate()}, ${s.getFullYear()}`;
+  } catch {
+    return 'Upcoming 2026';
+  }
+}
+
 export async function GET(request, { params }) {
   try {
     const { slug } = await params;
@@ -204,55 +222,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ success: true, data: cached.data });
     }
 
-    // 2. Try native MongoDB backend first
-    try {
-      const mongoRes = await fetch(`${BACKEND_API_URL}/events/${cleanSlug}`, {
-        cache: 'no-store'
-      });
-      if (mongoRes.ok) {
-        const mongoJson = await mongoRes.json();
-        if (mongoJson.success && mongoJson.event) {
-          const e = mongoJson.event;
-          const formatted = {
-            id: String(e._id || e.id),
-            title: e.title,
-            slug: e.slug,
-            description: e.description,
-            venue: e.venue,
-            city: e.city,
-            country: e.country || 'India',
-            startDate: e.startDate,
-            endDate: e.endDate,
-            timings: e.timings || '9:00 AM – 6:00 PM',
-            category: Array.isArray(e.categories) && e.categories[0] ? e.categories[0] : 'Trade & Industry',
-            categories: e.categories || [],
-            image: e.banner || (e.gallery && e.gallery[0]) || null,
-            gallery: e.gallery || [],
-            organizer: e.orgName || (e.organizer && e.organizer.name) || 'VisitExpo Verified Organizer',
-            organizerWebsite: e.orgWebsite || (e.organizer && e.organizer.website) || '',
-            organizerDesc: e.orgDesc || (e.organizer && e.organizer.description) || '',
-            organizerEmail: e.orgEmail || (e.organizer && e.organizer.email) || '',
-            organizerPhone: e.orgPhone || (e.organizer && e.organizer.phone) || '',
-            isFreeEvent: e.isFreeEvent,
-            paidTicketPrice: e.paidTicketPrice,
-            schedules: e.schedules || [],
-            faqs: (e.faqsList || []).map(f => ({ question: f.question, answer: f.answer })),
-            sponsors: e.sponsorsList || [],
-            speakers: e.speakers || [],
-            exhibitors: e.exhibitors || [],
-            status: e.status || 'published',
-            isWordPress: false,
-            isRealImage: !!(e.banner || (e.gallery && e.gallery[0]))
-          };
-          singleEventCache.set(cleanSlug, { data: formatted, timestamp: Date.now() });
-          return NextResponse.json({ success: true, data: formatted });
-        }
-      }
-    } catch (mErr) {
-      // Proceed to WordPress lookup
-    }
-
-    // 3. WordPress Event Lookup via cached docs
+    // 2. Prioritize WordPress Event Lookup via cached docs
     let wpDoc = null;
     try {
       const docs = await getWpDocs();
@@ -270,8 +240,10 @@ export async function GET(request, { params }) {
       const m = wpDoc.meta || {};
       const startTs = m.ovaem_date_start_time?.[0];
       const endTs = m.ovaem_date_end_time?.[0];
-      const venue = m.ovaem_address_event?.[0] || m.ovaem_venue?.[0] || m.ovaem_address?.[0] || 'International Exhibition Center';
-      const cleanCity = extractCity(venue, m.ovaem_city?.[0]);
+      const rawLoc = m.ovaem_address_event?.[0] || m.ovaem_event_map_address?.[0] || m.ovaem_event_map_name?.[0] || m.ovaem_address?.[0] || m.ovaem_venue?.[0] || '';
+      const loc = parseWpLocation(rawLoc, m.ovaem_city?.[0]);
+      const mapLat = m.ovaem_event_map_lat?.[0] || null;
+      const mapLng = m.ovaem_event_map_lng?.[0] || null;
       
       const rawDesc = m.content?.[0] || m.yoast_wpseo_metadesc?.[0] || m.ovaem_desc_event?.[0] || m.ovaem_org_desc?.[0] || '';
       const cleanDesc = rawDesc
@@ -298,8 +270,8 @@ export async function GET(request, { params }) {
       const faqTitles = parsePhpSerializedArray(rawFaqTitles);
       const faqDescs = parsePhpSerializedArray(rawFaqDescs);
       const faqs = faqTitles.map((q, i) => ({
-        question: q,
-        answer: faqDescs[i] || ''
+        question: decodeHtmlEntities(q),
+        answer: decodeHtmlEntities(faqDescs[i] || '')
       })).filter(f => f.question && f.answer);
 
       // Parse Schedule
@@ -317,27 +289,40 @@ export async function GET(request, { params }) {
       const orgEmail = m.ovaem_org_email?.[0] || '';
       const orgPhone = m.ovaem_org_phone?.[0] || '';
 
+      const startDateIso = startTs && parseInt(startTs) > 0 ? new Date(parseInt(startTs) * 1000).toISOString() : null;
+      const endDateIso = endTs && parseInt(endTs) > 0 ? new Date(parseInt(endTs) * 1000).toISOString() : null;
+
+      // Optional: Check MongoDB for platform-specific flags (claimed status, tickets)
+      let mongoEvent = null;
+      try {
+        const mongoRes = await fetch(`${BACKEND_API_URL}/events/${cleanSlug}`, { cache: 'no-store' });
+        if (mongoRes.ok) {
+          const mongoJson = await mongoRes.json();
+          if (mongoJson.success && mongoJson.event) {
+            mongoEvent = mongoJson.event;
+          }
+        }
+      } catch (_) {}
+
       const formatted = {
-        id: String(wpDoc.id),
+        id: mongoEvent?._id ? String(mongoEvent._id) : String(wpDoc.id),
         wpPostId: String(wpDoc.id),
-        title: wpDoc.title,
+        title: decodeHtmlEntities(wpDoc.title),
         slug: wpDoc.slug,
         description: cleanDesc,
-        venue: venue,
-        address: venue,
-        city: cleanCity,
-        country: venue.includes('United States') || venue.includes('USA') ? 'United States' :
-                 venue.includes('Germany') ? 'Germany' :
-                 venue.includes('France') ? 'France' :
-                 venue.includes('UAE') || venue.includes('Dubai') ? 'United Arab Emirates' :
-                 venue.includes('UK') || venue.includes('London') ? 'United Kingdom' : 'India',
-        startDate: startTs && parseInt(startTs) > 0 ? new Date(parseInt(startTs) * 1000).toISOString() : null,
-        endDate: endTs && parseInt(endTs) > 0 ? new Date(parseInt(endTs) * 1000).toISOString() : null,
-        dates: startTs
-          ? new Date(parseInt(startTs) * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-          : 'Upcoming 2026',
+        venue: loc.venue,
+        address: loc.address,
+        location: loc.location,
+        city: loc.city,
+        country: loc.country,
+        state: loc.state,
+        mapCoordinates: (mapLat && mapLng) ? { lat: parseFloat(mapLat), lng: parseFloat(mapLng) } : null,
+        mapUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc.address || loc.venue || `${loc.city} ${loc.country}`)}`,
+        startDate: startDateIso,
+        endDate: endDateIso,
+        dates: formatDateRange(startDateIso, endDateIso),
         timings: '9:00 AM – 5:00 PM (General Admission)',
-        category: 'Trade Show',
+        category: 'Healthcare & Pharma',
         organizer: orgName,
         organizerWebsite: orgWebsite,
         organizerDesc: orgDesc,
@@ -348,12 +333,72 @@ export async function GET(request, { params }) {
         faqs: faqs,
         schedules: schedules,
         sponsors: sponsors,
+        isFreeEvent: mongoEvent?.isFreeEvent !== undefined ? mongoEvent.isFreeEvent : true,
+        paidTicketPrice: mongoEvent?.paidTicketPrice || 0,
+        isClaimed: !!mongoEvent?.isClaimed,
+        claimedBy: mongoEvent?.claimedBy || null,
         isWordPress: true,
         wpUrl: `https://visitexpo.in/event/${wpDoc.slug}/`
       };
 
       singleEventCache.set(cleanSlug, { data: formatted, timestamp: Date.now() });
       return NextResponse.json({ success: true, data: formatted });
+    }
+
+    // 3. Fallback to native MongoDB backend for platform-only events
+    try {
+      const mongoRes = await fetch(`${BACKEND_API_URL}/events/${cleanSlug}`, {
+        cache: 'no-store'
+      });
+      if (mongoRes.ok) {
+        const mongoJson = await mongoRes.json();
+        if (mongoJson.success && mongoJson.event) {
+          const e = mongoJson.event;
+          const rawLoc = (e.venue === 'Exhibition Center' && e.address) ? e.address : (e.venue || e.address || '');
+          const mongoLoc = parseWpLocation(rawLoc, e.city);
+          const formatted = {
+            id: String(e._id || e.id),
+            wpPostId: e.wpPostId || null,
+            title: decodeHtmlEntities(e.title),
+            slug: e.slug,
+            description: e.description,
+            venue: mongoLoc.venue === 'Exhibition Center' ? '' : mongoLoc.venue,
+            address: mongoLoc.address,
+            location: mongoLoc.location,
+            city: mongoLoc.city,
+            country: mongoLoc.country,
+            state: mongoLoc.state,
+            mapUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mongoLoc.address || mongoLoc.venue || `${mongoLoc.city} ${mongoLoc.country}`)}`,
+            startDate: e.startDate,
+            endDate: e.endDate,
+            dates: formatDateRange(e.startDate, e.endDate),
+            timings: e.timings || '9:00 AM – 6:00 PM',
+            category: Array.isArray(e.categories) && e.categories[0] ? e.categories[0] : 'Trade & Industry',
+            categories: e.categories || [],
+            image: e.banner || (e.gallery && e.gallery[0]) || null,
+            gallery: e.gallery || [],
+            organizer: e.orgName || (e.organizer && e.organizer.name) || 'VisitExpo Verified Organizer',
+            organizerWebsite: e.orgWebsite || (e.organizer && e.organizer.website) || '',
+            organizerDesc: e.orgDesc || (e.organizer && e.organizer.description) || '',
+            organizerEmail: e.orgEmail || (e.organizer && e.organizer.email) || '',
+            organizerPhone: e.orgPhone || (e.organizer && e.organizer.phone) || '',
+            isFreeEvent: e.isFreeEvent,
+            paidTicketPrice: e.paidTicketPrice,
+            schedules: e.schedules || [],
+            faqs: (e.faqsList || []).map(f => ({ question: decodeHtmlEntities(f.question), answer: decodeHtmlEntities(f.answer) })),
+            sponsors: e.sponsorsList || [],
+            speakers: e.speakers || [],
+            exhibitors: e.exhibitors || [],
+            status: e.status || 'published',
+            isWordPress: !!e.wpPostId,
+            isRealImage: !!(e.banner || (e.gallery && e.gallery[0]))
+          };
+          singleEventCache.set(cleanSlug, { data: formatted, timestamp: Date.now() });
+          return NextResponse.json({ success: true, data: formatted });
+        }
+      }
+    } catch (mErr) {
+      console.warn('MongoDB fallback lookup failed:', mErr.message);
     }
 
     return NextResponse.json({ success: false, error: 'Event not found' }, { status: 404 });

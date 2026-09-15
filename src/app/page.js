@@ -45,8 +45,16 @@ import {
   Check,
   HelpCircle,
   X,
-  Bell
+  Bell,
+  LocateFixed,
+  Navigation
 } from 'lucide-react';
+import {
+  calculateDistanceKm,
+  resolveEventCoordinates,
+  detectUserLocation,
+  formatDistance
+} from '../utils/geoUtils.js';
 import axios from 'axios';
 import Navbar, { Logo } from '../components/Navbar.js';
 import ActionDiscoveryBanner from '../components/ActionDiscoveryBanner.js';
@@ -90,6 +98,12 @@ export default function LandingPage() {
   const [entryTypeFilter, setEntryTypeFilter] = useState('all'); // 'all' | 'free'
   const [sortBy, setSortBy] = useState('upcoming'); // 'upcoming' | 'rating' | 'popularity'
   const [visibleEventCount, setVisibleEventCount] = useState(8);
+
+  // Proximity / Nearby State
+  const [isNearbyActive, setIsNearbyActive] = useState(false);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+  const [userCityName, setUserCityName] = useState('');
 
   // Newsletter & Sidebar Widgets State
   const [newsletterEmail, setNewsletterEmail] = useState('');
@@ -231,15 +245,31 @@ export default function LandingPage() {
       return true;
     });
 
-    // 10times Sorting
-    if (sortBy === 'rating') {
-      result = [...result].sort((a, b) => parseFloat(b.rating) - parseFloat(a.rating));
-    } else if (sortBy === 'popularity') {
-      result = [...result].sort((a, b) => b.interestedCount - a.interestedCount);
+    // Proximity / Nearby Distance Calculation & Sorting
+    if (isNearbyActive && userLocation) {
+      result = result.map((item) => {
+        const coords = resolveEventCoordinates(item);
+        const distanceKm = coords ? calculateDistanceKm(userLocation.lat, userLocation.lng, coords.lat, coords.lng) : null;
+        return { ...item, distanceKm };
+      });
+
+      result.sort((a, b) => {
+        if (a.distanceKm == null && b.distanceKm == null) return 0;
+        if (a.distanceKm == null) return 1;
+        if (b.distanceKm == null) return -1;
+        return a.distanceKm - b.distanceKm;
+      });
+    } else {
+      // 10times Sorting
+      if (sortBy === 'rating') {
+        result = [...result].sort((a, b) => parseFloat(b.rating) - parseFloat(a.rating));
+      } else if (sortBy === 'popularity') {
+        result = [...result].sort((a, b) => b.interestedCount - a.interestedCount);
+      }
     }
 
     return result;
-  }, [enrichedEvents, searchQuery, selectedCity, selectedCategory, activeCategoryTab, quickFilter, formatFilter, entryTypeFilter, sortBy]);
+  }, [enrichedEvents, searchQuery, selectedCity, selectedCategory, activeCategoryTab, quickFilter, formatFilter, entryTypeFilter, sortBy, isNearbyActive, userLocation]);
 
   // Displayed slice
   const displayedEvents = useMemo(() => {
@@ -441,6 +471,31 @@ export default function LandingPage() {
     const el = document.getElementById('events');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleToggleNearby = async () => {
+    if (isNearbyActive) {
+      setIsNearbyActive(false);
+      return;
+    }
+
+    setIsDetectingLocation(true);
+    try {
+      const loc = await detectUserLocation();
+      setUserLocation({ lat: loc.lat, lng: loc.lng });
+      setUserCityName(loc.city || 'Your Location');
+      setIsNearbyActive(true);
+      showToast(`Showing exhibitions closest to ${loc.city || 'your location'}!`);
+      const el = document.getElementById('events');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
+    } catch (err) {
+      console.error('Failed to get location:', err);
+      showToast('Could not detect location. Using nearest exhibition hub.');
+    } finally {
+      setIsDetectingLocation(false);
     }
   };
 
@@ -657,8 +712,33 @@ export default function LandingPage() {
               </p>
             </div>
 
-            {/* Quick Sort Dropdown & Advertise CTA */}
-            <div className="flex items-center gap-3">
+            {/* Quick Sort Dropdown, Nearby Toggle & Advertise CTA */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              {/* Nearby Events Button */}
+              <button
+                type="button"
+                onClick={handleToggleNearby}
+                disabled={isDetectingLocation}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+                  isNearbyActive
+                    ? 'bg-[#FF2E63] text-white border-[#FF2E63] shadow-xs'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300'
+                }`}
+                title="Show exhibitions closest to your location"
+              >
+                {isDetectingLocation ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-500" />
+                ) : (
+                  <LocateFixed className={`h-3.5 w-3.5 ${isNearbyActive ? 'text-white' : 'text-[#FF2E63]'}`} />
+                )}
+                <span>Nearby</span>
+                {isNearbyActive && userCityName && (
+                  <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-md font-semibold">
+                    {userCityName}
+                  </span>
+                )}
+              </button>
+
               <div className="flex items-center gap-2 text-xs font-semibold text-zinc-600 bg-white border border-zinc-200 px-3 py-1.5 rounded-xl shadow-2xs">
                 <span>Sort:</span>
                 <select
@@ -683,6 +763,30 @@ export default function LandingPage() {
             </div>
           </div>
 
+          {/* Proximity Filter Active Banner */}
+          {isNearbyActive && (
+            <div className="bg-gradient-to-r from-rose-50 to-amber-50/60 border border-rose-200/90 rounded-2xl p-3.5 px-4 flex flex-wrap items-center justify-between gap-3 text-xs text-rose-950 shadow-2xs">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-[#FF2E63] text-white">
+                  <Navigation className="h-3.5 w-3.5" />
+                </div>
+                <div>
+                  <span className="font-extrabold text-zinc-900">Nearby Exhibitions Active:</span>{' '}
+                  <span>
+                    Showing verified expos sorted by shortest distance to <strong className="text-[#FF2E63]">{userCityName || 'your detected location'}</strong>.
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNearbyActive(false)}
+                className="px-3 py-1 rounded-xl bg-white border border-rose-200 hover:bg-rose-100/50 text-[#FF2E63] font-bold transition-all shadow-2xs cursor-pointer text-xs"
+              >
+                Show All Locations (Reset)
+              </button>
+            </div>
+          )}
+
           {/* TWO-COLUMN 10TIMES LAYOUT: SIDEBAR (FILTERS & ADS) + MAIN FEED */}
           <div className="grid lg:grid-cols-12 gap-8 items-start">
             
@@ -698,7 +802,7 @@ export default function LandingPage() {
                     <Filter className="h-4 w-4 text-[#FF2E63]" />
                     <span>Search Filters</span>
                   </div>
-                  {(dateRangeFilter !== 'all' || formatFilter !== 'all' || entryTypeFilter !== 'all' || selectedCity || activeCategoryTab !== 'all' || searchQuery) && (
+                  {(dateRangeFilter !== 'all' || formatFilter !== 'all' || entryTypeFilter !== 'all' || selectedCity || activeCategoryTab !== 'all' || searchQuery || isNearbyActive) && (
                     <button
                       onClick={() => {
                         setDateRangeFilter('all');
@@ -707,6 +811,7 @@ export default function LandingPage() {
                         setSelectedCity('');
                         setActiveCategoryTab('all');
                         setSearchQuery('');
+                        setIsNearbyActive(false);
                       }}
                       className="text-[11px] font-bold text-[#FF2E63] hover:underline cursor-pointer"
                     >
@@ -1254,9 +1359,26 @@ export default function LandingPage() {
                                 <Calendar className="h-3.5 w-3.5 text-amber-600 shrink-0" />
                                 <span>{expo.dates}</span>
                               </div>
-                              <div className="flex items-center gap-1 text-zinc-500">
-                                <MapPin className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-                                <span className="truncate">{expo.venue}</span>
+                              <div className="flex items-center justify-between gap-2 text-zinc-500" title={expo.address || expo.venue}>
+                                <div className="flex items-center gap-1 truncate">
+                                  <MapPin className="h-3.5 w-3.5 shrink-0 text-[#FF2E63]" />
+                                  <span className="truncate">
+                                    {expo.venue && expo.venue.toLowerCase() !== expo.city?.toLowerCase() && expo.venue.toLowerCase() !== 'exhibition center' ? (
+                                      <>
+                                        <span className="font-semibold text-zinc-700">{expo.venue}</span>
+                                        {expo.city && <span className="text-zinc-400 font-normal"> • {expo.city}</span>}
+                                      </>
+                                    ) : (
+                                      `${expo.city}${expo.state && expo.state !== expo.city ? `, ${expo.state}` : ''}`
+                                    )}
+                                  </span>
+                                </div>
+                                {isNearbyActive && expo.distanceKm != null && (
+                                  <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 text-[#FF2E63] border border-rose-200">
+                                    <Navigation className="h-2.5 w-2.5" />
+                                    {formatDistance(expo.distanceKm)}
+                                  </span>
+                                )}
                               </div>
                             </div>
 

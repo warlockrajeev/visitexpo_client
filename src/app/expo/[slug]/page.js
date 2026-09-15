@@ -63,10 +63,29 @@ import {
   Phone,
   Award,
   Mic,
-  Megaphone
+  Megaphone,
+  Navigation
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+function decodeHtmlEntities(str) {
+  if (!str || typeof str !== 'string') return '';
+  return str
+    .replace(/&#038;/g, '&')
+    .replace(/&amp;/g, '&')
+    .replace(/&#8217;/g, "'")
+    .replace(/&#8216;/g, "'")
+    .replace(/&#8220;/g, '"')
+    .replace(/&#8221;/g, '"')
+    .replace(/&#8211;/g, '–')
+    .replace(/&#8212;/g, '—')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
 
 export default function ExpoDetailsPage() {
   const params = useParams();
@@ -162,6 +181,7 @@ export default function ExpoDetailsPage() {
 
           setEvent({
             ...found,
+            title: decodeHtmlEntities(found.title),
             image: resolvedImage || found.image,
             rating: found.rating || (4.5 + ((charSum % 5) * 0.1)).toFixed(1),
             reviewCount: found.reviewCount || (80 + (charSum % 180)),
@@ -182,7 +202,7 @@ export default function ExpoDetailsPage() {
             'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=1200&auto=format&fit=crop';
           setEvent({
             id: slug || 'expo-event',
-            title: decodeURIComponent(slug).replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'International Trade Exhibition 2026',
+            title: decodeHtmlEntities(decodeURIComponent(slug).replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())) || 'International Trade Exhibition 2026',
             slug: slug,
             category: 'Trade Show',
             city: 'Paris',
@@ -629,26 +649,36 @@ export default function ExpoDetailsPage() {
                   </div>
                 </div>
 
-                {/* Location with "Show Interest to See Venue" link */}
-                <div className="flex items-center gap-2 text-xs text-zinc-600 flex-wrap">
-                  <span className="flex items-center gap-1 font-medium text-zinc-800">
-                    <MapPin className="h-3.5 w-3.5 text-[#FF2E63]" />
-                    {event?.city}, {event?.country || 'India'}
-                  </span>
-                  {isInterested ? (
-                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
-                      <span>{event?.address || event?.venue || `${event?.city} International Expo Center`}</span>
+                {/* Authentic WordPress Location & Venue Display */}
+                <div className="flex items-center gap-2 text-xs text-zinc-600 flex-wrap pt-0.5">
+                  <div className="inline-flex items-center gap-1.5 font-extrabold text-zinc-900 bg-zinc-100 px-2.5 py-1 rounded-lg border border-zinc-200 shadow-2xs">
+                    <MapPin className="h-3.5 w-3.5 text-[#FF2E63] shrink-0" />
+                    <span>
+                      {event?.venue && event?.venue.toLowerCase() !== event?.city?.toLowerCase() && event?.venue.toLowerCase() !== 'exhibition center'
+                        ? event.venue
+                        : (event?.city ? `${event.city}${event.state && event.state !== event.city ? `, ${event.state}` : ''}` : 'Exhibition Location')}
                     </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleInterested}
-                      className="text-[11px] font-bold text-[#FF2E63] bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-full transition-colors cursor-pointer"
-                    >
-                      Show Interest to see venue
-                    </button>
+                  </div>
+                  <span className="font-semibold text-zinc-700">
+                    {event?.venue && event?.venue.toLowerCase() !== event?.city?.toLowerCase() && event?.venue.toLowerCase() !== 'exhibition center'
+                      ? `${event.city}${event.country && event.country !== event.city ? `, ${event.country}` : ''}`
+                      : (event?.country || 'India')}
+                  </span>
+                  {event?.address && event?.address !== event?.venue && event?.address !== event?.city && (
+                    <span className="text-[11px] text-zinc-500 hidden md:inline truncate max-w-sm" title={event?.address}>
+                      • {event?.address}
+                    </span>
                   )}
+                  <a
+                    href={event?.mapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event?.address || event?.venue || `${event?.city} ${event?.country}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-bold text-[#FF2E63] hover:text-[#E82054] hover:underline inline-flex items-center gap-1 ml-0.5"
+                    title="Open in Google Maps"
+                  >
+                    <span>View Map</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
                 </div>
 
                 {/* Followers / Attendees Avatar Stack (Clickable) */}
@@ -1260,6 +1290,124 @@ export default function ExpoDetailsPage() {
                   )}
                 </div>
               )}
+
+              {/* Dedicated WordPress Event Venue & Location Card */}
+              <div className="p-5 rounded-2xl border border-zinc-200/90 bg-white space-y-4 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 pb-3.5">
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-lg bg-rose-50 text-[#FF2E63] flex items-center justify-center shrink-0 border border-rose-100">
+                      <Building className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-extrabold text-zinc-900">Convention Venue &amp; Event Location</h3>
+                      <p className="text-[11px] text-zinc-500">Official host facility &amp; physical location</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <a
+                      href={event?.mapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event?.address || event?.venue || `${event?.city} ${event?.country}`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-bold text-[#FF2E63] hover:text-[#E82054] hover:underline inline-flex items-center gap-1 bg-rose-50/70 border border-rose-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                      title="Open in Google Maps"
+                    >
+                      <Navigation className="h-3 w-3" />
+                      <span>Open Maps</span>
+                      <ExternalLink className="h-2.5 w-2.5 opacity-70" />
+                    </a>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {/* Venue Name & City Badge */}
+                  <div className="space-y-1">
+                    <div className="text-base sm:text-lg font-black text-zinc-900 leading-snug">
+                      {event?.venue && event?.venue.toLowerCase() !== event?.city?.toLowerCase() && event?.venue.toLowerCase() !== 'exhibition center'
+                        ? event.venue
+                        : `${event?.city || 'Exhibition Facility'}${event?.state && event?.state !== event?.city ? `, ${event.state}` : ''}`}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                      <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-zinc-100 text-zinc-800 border border-zinc-200">
+                        📍 {event?.city}
+                      </span>
+                      {event?.state && event?.state !== event?.city && (
+                        <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-zinc-100 text-zinc-800 border border-zinc-200">
+                          🏛️ {event?.state}
+                        </span>
+                      )}
+                      {event?.country && (
+                        <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-zinc-100 text-zinc-800 border border-zinc-200">
+                          🌐 {event?.country}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Full Street Address Box */}
+                  <div className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200/80 flex items-start gap-3">
+                    <MapPin className="h-4 w-4 text-[#FF2E63] shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-bold text-zinc-900">Official Physical Address</div>
+                      <p className="text-xs text-zinc-600 leading-relaxed font-normal pt-0.5">
+                        {event?.address || `${event?.city}, ${event?.state ? `${event.state}, ` : ''}${event?.country || 'India'}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Interactive Google Map Preview */}
+                  <div className="relative w-full h-64 sm:h-80 rounded-xl overflow-hidden border border-zinc-200/90 bg-zinc-100 shadow-2xs group">
+                    <iframe
+                      title={`Interactive Map Preview for ${event?.venue || event?.title || 'Event Venue'}`}
+                      width="100%"
+                      height="100%"
+                      className="w-full h-full border-0"
+                      loading="lazy"
+                      allowFullScreen
+                      referrerPolicy="no-referrer-when-downgrade"
+                      src={`https://maps.google.com/maps?q=${encodeURIComponent(
+                        (event?.mapCoordinates?.lat && event?.mapCoordinates?.lng)
+                          ? `${event.mapCoordinates.lat},${event.mapCoordinates.lng}`
+                          : (event?.address || event?.venue || `${event?.city || ''} ${event?.country || ''}`)
+                      )}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                    />
+                    <a
+                      href={event?.mapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event?.address || event?.venue || `${event?.city} ${event?.country}`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute bottom-3 right-3 px-3 py-1.5 rounded-lg bg-zinc-900/90 hover:bg-zinc-900 text-white text-[11px] font-bold inline-flex items-center gap-1.5 backdrop-blur-xs shadow-md transition-all cursor-pointer opacity-90 group-hover:opacity-100"
+                      title="Open full interactive map in Google Maps"
+                    >
+                      <Navigation className="h-3 w-3" />
+                      <span>Full Map</span>
+                      <ExternalLink className="h-2.5 w-2.5 text-zinc-300" />
+                    </a>
+                  </div>
+
+                  {/* Actions: Google Maps Directions & External Link */}
+                  <div className="pt-1 flex flex-wrap items-center gap-3">
+                    <a
+                      href={event?.mapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event?.address || event?.venue || `${event?.city} ${event?.country}`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold inline-flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+                    >
+                      <Navigation className="h-3.5 w-3.5" />
+                      <span>Get Directions on Google Maps</span>
+                      <ExternalLink className="h-3 w-3 text-zinc-400" />
+                    </a>
+
+                    <a
+                      href={`https://www.google.com/travel/hotels?q=hotels+near+${encodeURIComponent(event?.venue || event?.city)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2 rounded-xl bg-white border border-zinc-300 hover:bg-zinc-50 text-zinc-800 text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                    >
+                      <span>Nearby Hotels</span>
+                      <ExternalLink className="h-3 w-3 text-zinc-400" />
+                    </a>
+                  </div>
+                </div>
+              </div>
 
               {/* Real Event Schedule Timeline */}
               {event?.schedules && event.schedules.length > 0 && (

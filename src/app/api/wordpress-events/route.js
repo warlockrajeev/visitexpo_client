@@ -160,45 +160,197 @@ function findWpImage(slug, id, wpPostId, title) {
   return null;
 }
 
-// Helper: Extract clean city from venue/city string
-function extractCity(venue = '', city = '') {
-  const combined = `${venue} ${city}`;
-  // Major Indian Exhibition Hubs
-  if (/new delhi|pragati maidan|bharat mandapam|dwarka|yashobhoomi|delhi/i.test(combined)) return 'New Delhi';
-  if (/greater noida|india expo/i.test(combined)) return 'Greater Noida';
-  if (/mumbai|bombay|bkc|nesco|jio world/i.test(combined)) return 'Mumbai';
-  if (/bengaluru|bangalore|biec/i.test(combined)) return 'Bengaluru';
-  if (/chennai|madras|trade centre/i.test(combined)) return 'Chennai';
-  if (/hyderabad|hitex/i.test(combined)) return 'Hyderabad';
-  if (/kolkata|calcutta|biswa bangla/i.test(combined)) return 'Kolkata';
-  if (/pune/i.test(combined)) return 'Pune';
-  if (/ahmedabad|gandhinagar|hec/i.test(combined)) return 'Ahmedabad';
-  if (/jaipur|jecc/i.test(combined)) return 'Jaipur';
-  if (/kochi|cochin/i.test(combined)) return 'Kochi';
-  if (/goa/i.test(combined)) return 'Goa';
-  if (/indore/i.test(combined)) return 'Indore';
-  if (/coimbatore|codissia/i.test(combined)) return 'Coimbatore';
-  if (/surat/i.test(combined)) return 'Surat';
-  if (/lucknow/i.test(combined)) return 'Lucknow';
-  if (/chandigarh/i.test(combined)) return 'Chandigarh';
-  // Major International Exhibition Hubs
-  if (/dubai|uae|world trade centre dubai/i.test(combined)) return 'Dubai';
-  if (/riyadh/i.test(combined)) return 'Riyadh';
-  if (/jeddah/i.test(combined)) return 'Jeddah';
-  if (/saudi arabia/i.test(combined)) return 'Saudi Arabia';
-  if (/paris/i.test(combined)) return 'Paris';
-  if (/london/i.test(combined)) return 'London';
-  if (/frankfurt|berlin|munich|cologne|dusseldorf|germany/i.test(combined)) return 'Germany';
-  if (/singapore/i.test(combined)) return 'Singapore';
-  if (/bangkok|thailand/i.test(combined)) return 'Bangkok';
-  if (/dhaka|bangladesh/i.test(combined)) return 'Dhaka';
-  if (/colombo|sri lanka/i.test(combined)) return 'Colombo';
-  if (/marseille|france/i.test(combined)) return 'France';
-  if (/madrid|barcelona|spain/i.test(combined)) return 'Spain';
-  if (/milan|bologna|italy/i.test(combined)) return 'Italy';
-  if (/tehran|iran/i.test(combined)) return 'Tehran';
-  if (/dushanbe|tajikistan/i.test(combined)) return 'Dushanbe';
-  return city || 'India';
+// Known venue slugs mapping to full names and verified addresses
+const KNOWN_VENUE_SLUGS = {
+  'jio-world-convention-centre': { name: 'Jio World Convention Centre', city: 'Mumbai', country: 'India', address: 'Bandra Kurla Complex (BKC), Bandra East, Mumbai, Maharashtra 400051' },
+  'bharat-mandapam-pragati-maidan-new-delhi': { name: 'Bharat Mandapam (IECC)', city: 'New Delhi', country: 'India', address: 'Pragati Maidan, Mathura Road, New Delhi 110001' },
+  'yashobhoomi-iicc-dwarka': { name: 'Yashobhoomi (IICC)', city: 'New Delhi', country: 'India', address: 'Sector 25, Dwarka, New Delhi 110077' },
+  'india-expo-centre-greater-noida': { name: 'India Expo Centre & Mart', city: 'Greater Noida', country: 'India', address: 'Plot No. 23-25, Knowledge Park II, Greater Noida, UP 201306' },
+  'bombay-exhibition-centre-nesco-mumbai': { name: 'Bombay Exhibition Centre (NESCO)', city: 'Mumbai', country: 'India', address: 'Western Express Hwy, Goregaon East, Mumbai 400063' },
+  'hitex-exhibition-centre-hyderabad': { name: 'HITEX Exhibition Centre', city: 'Hyderabad', country: 'India', address: 'Izzat Nagar, Madhapur, Hyderabad, Telangana 500084' },
+  'bangalore-international-exhibition-centre-biec': { name: 'Bangalore International Exhibition Centre (BIEC)', city: 'Bengaluru', country: 'India', address: '10th Mile, Tumkur Road, Madavara Post, Bengaluru 562123' },
+  'chennai-trade-centre': { name: 'Chennai Trade Centre', city: 'Chennai', country: 'India', address: 'Nandambakkam, Chennai, Tamil Nadu 600089' },
+  'biswa-bangla-mela-prangan-kolkata': { name: 'Biswa Bangla Mela Prangan', city: 'Kolkata', country: 'India', address: 'JBS Haldane Ave, Kolkata, West Bengal 700046' },
+  'codissia-trade-fair-complex-coimbatore': { name: 'CODISSIA Trade Fair Complex', city: 'Coimbatore', country: 'India', address: 'G.V. Fair Grounds, Coimbatore, Tamil Nadu 641014' },
+  'helipad-exhibition-centre-gandhinagar': { name: 'Helipad Exhibition Centre (HEC)', city: 'Ahmedabad', country: 'India', address: 'Sector 17, Gandhinagar, Gujarat 382016' }
+};
+
+// Helper: Parse genuine WordPress event location, venue, address, city & country
+export function parseWpLocation(rawLocation = '', rawCity = '') {
+  const rawLoc = (rawLocation || '').trim();
+  
+  if (KNOWN_VENUE_SLUGS[rawLoc]) {
+    const v = KNOWN_VENUE_SLUGS[rawLoc];
+    return {
+      venue: v.name,
+      address: `${v.name}, ${v.address}`,
+      location: `${v.name}, ${v.address}`,
+      city: v.city,
+      country: v.country,
+      state: v.city === 'New Delhi' || v.city === 'Greater Noida' ? 'Delhi NCR' : v.city
+    };
+  }
+
+  if (!rawLoc && !rawCity) {
+    return {
+      venue: 'Exhibition Center',
+      address: 'Exhibition Center, India',
+      location: 'Exhibition Center, India',
+      city: 'India',
+      country: 'India',
+      state: 'India'
+    };
+  }
+
+  const parts = rawLoc.split(',').map(p => p.trim()).filter(Boolean);
+  
+  // 1. Determine City
+  let city = '';
+  const cityList = [
+    'New Delhi', 'Delhi', 'Greater Noida', 'Noida', 'Mumbai', 'Bengaluru', 'Bangalore',
+    'Chennai', 'Hyderabad', 'Kolkata', 'Pune', 'Ahmedabad', 'Gandhinagar', 'Jaipur',
+    'Kochi', 'Goa', 'Indore', 'Coimbatore', 'Surat', 'Lucknow', 'Chandigarh',
+    'Santa Barbara', 'New York', 'Chicago', 'Las Vegas', 'Los Angeles', 'San Francisco', 'Orlando',
+    'Copenhagen', 'Toronto', 'Glasgow', 'London', 'Birmingham', 'Frankfurt', 'Munich', 'Berlin',
+    'Cologne', 'Dusseldorf', 'Paris', 'Madrid', 'Barcelona', 'Valencia', 'Milan', 'Bologna', 'Dubai',
+    'Sharjah', 'Abu Dhabi', 'Riyadh', 'Jeddah', 'Singapore', 'Bangkok', 'Dhaka', 'Colombo',
+    'Tangerang', 'Jakarta', 'Tokyo', 'Chiba', 'Baghdad', 'Kuala Lumpur', 'Tehran', 'Lagos', 'Dushanbe', 'Phnom Penh', 'Doha'
+  ];
+
+  for (const c of cityList) {
+    if (new RegExp('\\b' + c + '\\b', 'i').test(rawLoc) || (rawCity && new RegExp('\\b' + c + '\\b', 'i').test(rawCity))) {
+      city = c === 'Bangalore' ? 'Bengaluru' : (c === 'Delhi' ? 'New Delhi' : (c === 'Noida' ? 'Greater Noida' : c));
+      break;
+    }
+  }
+
+  if (!city && parts.length >= 3) {
+    city = parts[parts.length - 2].replace(/[0-9\-\s]+/g, ' ').trim();
+  }
+  if (!city && parts.length >= 2) {
+    city = parts[1].replace(/[0-9\-\s]+/g, ' ').trim();
+  }
+  if (!city) city = rawCity && rawCity !== 'India' ? rawCity : 'India';
+
+  // 2. Determine State
+  let state = '';
+  const stateMap = {
+    'Maharashtra': /maharashtra/i,
+    'Karnataka': /karnataka/i,
+    'Tamil Nadu': /tamil nadu/i,
+    'Gujarat': /gujarat/i,
+    'Telangana': /telangana/i,
+    'West Bengal': /west bengal/i,
+    'Rajasthan': /rajasthan/i,
+    'Uttar Pradesh': /uttar pradesh/i,
+    'Haryana': /haryana/i,
+    'Kerala': /kerala/i,
+    'Madhya Pradesh': /madhya pradesh/i,
+    'Punjab': /punjab/i,
+    'Goa': /goa/i,
+    'Delhi NCR': /delhi|noida|gurgaon|gurugram/i,
+    'California': /california|ca\b/i,
+    'Florida': /florida|fl\b/i,
+    'Illinois': /illinois|il\b/i,
+    'Nevada': /nevada|nv\b/i,
+    'Texas': /texas|tx\b/i,
+    'New York': /new york|ny\b/i,
+    'Scotland': /scotland/i,
+    'Greater London': /london/i,
+    'Dhaka Division': /dhaka/i,
+    'Western Province': /colombo/i
+  };
+
+  for (const [stName, stRegex] of Object.entries(stateMap)) {
+    if (stRegex.test(rawLoc)) {
+      state = stName;
+      break;
+    }
+  }
+
+  if (!state) {
+    if (city === 'Mumbai' || city === 'Pune') state = 'Maharashtra';
+    else if (city === 'Bengaluru') state = 'Karnataka';
+    else if (city === 'Chennai' || city === 'Coimbatore') state = 'Tamil Nadu';
+    else if (city === 'Hyderabad') state = 'Telangana';
+    else if (city === 'Ahmedabad' || city === 'Gandhinagar' || city === 'Surat') state = 'Gujarat';
+    else if (city === 'Kolkata') state = 'West Bengal';
+    else if (city === 'New Delhi' || city === 'Greater Noida') state = 'Delhi NCR';
+    else if (city === 'Jaipur') state = 'Rajasthan';
+    else if (city === 'Lucknow') state = 'Uttar Pradesh';
+    else if (city === 'Indore') state = 'Madhya Pradesh';
+    else if (city === 'Kochi') state = 'Kerala';
+    else if (city === 'Santa Barbara') state = 'California';
+    else if (city === 'Chicago') state = 'Illinois';
+    else if (city === 'Orlando') state = 'Florida';
+    else if (city === 'Las Vegas') state = 'Nevada';
+    else if (city === 'Glasgow') state = 'Scotland';
+    else if (city === 'Dhaka') state = 'Dhaka Division';
+    else if (city === 'Colombo') state = 'Western Province';
+    else state = city;
+  }
+
+  // 3. Determine Country
+  let country = parts.length > 1 ? parts[parts.length - 1] : (rawCity || 'India');
+  country = country.replace(/[0-9\-\s]+/g, ' ').trim() || 'India';
+
+  const indianHubs = /delhi|mumbai|bengaluru|bangalore|chennai|hyderabad|pune|ahmedabad|gandhinagar|kolkata|jaipur|lucknow|indore|coimbatore|surat|kochi|goa|chandigarh|maharashtra|gujarat|karnataka/i;
+  const usHubs = /santa barbara|new york|chicago|las vegas|los angeles|san francisco|orlando|texas|california|san antonio/i;
+  const ukHubs = /london|glasgow|birmingham|manchester|scotland/i;
+  const germanyHubs = /frankfurt|munich|berlin|cologne|dusseldorf/i;
+  const uaeHubs = /dubai|abu dhabi|sharjah/i;
+
+  if (indianHubs.test(rawLoc) || indianHubs.test(rawCity) || indianHubs.test(city)) country = 'India';
+  else if (usHubs.test(rawLoc) || usHubs.test(rawCity) || usHubs.test(city)) country = 'United States';
+  else if (ukHubs.test(rawLoc) || ukHubs.test(rawCity) || ukHubs.test(city)) country = 'United Kingdom';
+  else if (germanyHubs.test(rawLoc) || germanyHubs.test(rawCity) || germanyHubs.test(city)) country = 'Germany';
+  else if (uaeHubs.test(rawLoc) || uaeHubs.test(rawCity) || uaeHubs.test(city)) country = 'United Arab Emirates';
+  else if (/usa|united states|america/i.test(country) || /united states/i.test(rawLoc)) country = 'United States';
+  else if (/uk|united kingdom|england|scotland|wales/i.test(country) || /united kingdom/i.test(rawLoc)) country = 'United Kingdom';
+  else if (/denmark/i.test(country) || /denmark/i.test(rawLoc)) country = 'Denmark';
+  else if (/canada/i.test(country) || /canada/i.test(rawLoc)) country = 'Canada';
+  else if (/indonesia/i.test(country) || /indonesia/i.test(rawLoc)) country = 'Indonesia';
+  else if (/japan/i.test(country) || /japan/i.test(rawLoc)) country = 'Japan';
+  else if (/malaysia/i.test(country) || /malaysia/i.test(rawLoc)) country = 'Malaysia';
+  else if (/iraq/i.test(country) || /iraq/i.test(rawLoc)) country = 'Iraq';
+  else if (/spain/i.test(country) || /spain/i.test(rawLoc)) country = 'Spain';
+  else if (/france/i.test(country) || /france/i.test(rawLoc)) country = 'France';
+  else if (/germany/i.test(country) || /germany/i.test(rawLoc)) country = 'Germany';
+  else if (/italy/i.test(country) || /italy/i.test(rawLoc)) country = 'Italy';
+  else if (/russia/i.test(country) || /russia/i.test(rawLoc)) country = 'Russia';
+  else if (/saudi arabia/i.test(country) || /saudi arabia/i.test(rawLoc)) country = 'Saudi Arabia';
+  else if (/singapore/i.test(country) || /singapore/i.test(rawLoc)) country = 'Singapore';
+  else if (/thailand/i.test(country) || /thailand/i.test(rawLoc)) country = 'Thailand';
+  else if (/bangladesh/i.test(country) || /bangladesh/i.test(rawLoc)) country = 'Bangladesh';
+  else if (/sri lanka/i.test(country) || /sri lanka/i.test(rawLoc)) country = 'Sri Lanka';
+  else if (/nigeria/i.test(country) || /nigeria/i.test(rawLoc)) country = 'Nigeria';
+  else if (/cambodia/i.test(country) || /cambodia/i.test(rawLoc)) country = 'Cambodia';
+  else if (/qatar/i.test(country) || /qatar/i.test(rawLoc)) country = 'Qatar';
+  else if (/tajikistan/i.test(country) || /tajikistan/i.test(rawLoc)) country = 'Tajikistan';
+  if (country === city) country = 'India';
+
+  // 4. Distinguish specific venue facility from city/state-level address
+  const firstPart = (parts[0] || '').trim();
+  const isCityOnly = parts.length <= 3 && (
+    firstPart.toLowerCase() === city.toLowerCase() ||
+    firstPart.toLowerCase() === (state || '').toLowerCase() ||
+    firstPart.toLowerCase() === (country || '').toLowerCase() ||
+    cityList.some(cl => cl.toLowerCase() === firstPart.toLowerCase()) ||
+    firstPart.toLowerCase() === 'exhibition center'
+  );
+
+  const venueName = isCityOnly ? '' : firstPart;
+  const fullAddress = rawLoc || (venueName ? `${venueName}, ${city}, ${country}` : `${city}, ${state ? `${state}, ` : ''}${country}`);
+
+  return {
+    venue: venueName,
+    address: fullAddress,
+    location: fullAddress,
+    city: city,
+    country: country,
+    state: state,
+    mapUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`
+  };
 }
 
 // Format date range
@@ -345,10 +497,10 @@ export async function GET(request) {
       }
     }
 
-    // 4. Format and enrich all events with real images
+    // 4. Format and enrich all events with real images & authentic WordPress locations
     const cleanEvents = (rawEvents || []).map((evt, idx) => {
       const category = inferCategory(evt.title, evt.description);
-      const cleanCity = extractCity(evt.venue, evt.city);
+      const loc = parseWpLocation(evt.venue, evt.city);
       const cleanSlug = evt.slug || (evt.title ? evt.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : `event-${idx}`);
       const wpImage = findWpImage(cleanSlug, evt.id, evt.wpPostId, evt.title) ||
                       (evt.image && !evt.image.includes('unsplash') ? evt.image : null) ||
@@ -364,9 +516,12 @@ export async function GET(request) {
         slug: cleanSlug,
         description: (evt.description || '').replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&hellip;/g, '...'),
         category: category,
-        city: cleanCity,
-        state: cleanCity === 'New Delhi' || cleanCity === 'Greater Noida' ? 'Delhi NCR' : cleanCity,
-        venue: evt.venue || 'Exhibition Center',
+        city: loc.city,
+        country: loc.country,
+        state: loc.state,
+        venue: loc.venue,
+        address: loc.address,
+        location: loc.location,
         startDate: evt.startDate || null,
         endDate: evt.endDate || null,
         dates: formatDateRange(evt.startDate, evt.endDate),
@@ -380,7 +535,8 @@ export async function GET(request) {
         fallbackImage: fallbackImage,
         isRealImage: !!wpImage,
         wpPostId: evt.wpPostId || evt.id || null,
-        wpUrl: evt.wpUrl || `${WORDPRESS_URL}/event/${cleanSlug}/`
+        wpUrl: evt.wpUrl || `${WORDPRESS_URL}/event/${cleanSlug}/`,
+        mapUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc.address || loc.venue)}`
       };
     });
 

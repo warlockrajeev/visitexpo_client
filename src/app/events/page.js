@@ -38,8 +38,17 @@ import {
   Layers,
   Award,
   Bell,
-  BellRing
+  BellRing,
+  LocateFixed,
+  Navigation,
+  Loader2
 } from 'lucide-react';
+import {
+  calculateDistanceKm,
+  resolveEventCoordinates,
+  detectUserLocation,
+  formatDistance
+} from '../../utils/geoUtils.js';
 
 const CATEGORIES = [
   'All',
@@ -72,6 +81,12 @@ export default function EventsDirectoryPage() {
   const [sortBy, setSortBy] = useState('upcoming'); // 'upcoming' | 'rating' | 'turnout' | 'title'
   const [featuredOnly, setFeaturedOnly] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Proximity / Nearby State
+  const [isNearbyActive, setIsNearbyActive] = useState(false);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+  const [userCityName, setUserCityName] = useState('');
 
   // Gated Auth, Save & Follow State
   const [gatedContext, setGatedContext] = useState(null);
@@ -155,7 +170,9 @@ export default function EventsDirectoryPage() {
         (e) =>
           (e.title && e.title.toLowerCase().includes(q)) ||
           (e.venue && e.venue.toLowerCase().includes(q)) ||
+          (e.address && e.address.toLowerCase().includes(q)) ||
           (e.city && e.city.toLowerCase().includes(q)) ||
+          (e.country && e.country.toLowerCase().includes(q)) ||
           (e.category && e.category.toLowerCase().includes(q)) ||
           (e.description && e.description.toLowerCase().includes(q))
       );
@@ -176,43 +193,60 @@ export default function EventsDirectoryPage() {
       list = list.filter((e) => e.featured);
     }
 
-    // Sorting
-    list.sort((a, b) => {
-      if (sortBy === 'rating') {
-        const rA = parseFloat(a.rating) || 4.0;
-        const rB = parseFloat(b.rating) || 4.0;
-        return rB - rA;
-      }
-      if (sortBy === 'title') {
-        return (a.title || '').localeCompare(b.title || '');
-      }
-      if (sortBy === 'turnout') {
-        const parseTurnout = (t = '') => {
-          const m = String(t).match(/(\d+[\d,]*)/);
-          return m ? parseInt(m[1].replace(/,/g, ''), 10) : 0;
-        };
-        return parseTurnout(b.attendees) - parseTurnout(a.attendees);
-      }
-      // Default: upcoming startDate (upcoming events chronologically first, then past events)
-      const now = Date.now();
-      const timeA = a.startDate ? new Date(a.startDate).getTime() : 0;
-      const timeB = b.startDate ? new Date(b.startDate).getTime() : 0;
-      const isFutureA = timeA >= now;
-      const isFutureB = timeB >= now;
+    // Proximity / Nearby Distance Calculation & Sorting
+    if (isNearbyActive && userLocation) {
+      list = list.map((e) => {
+        const coords = resolveEventCoordinates(e);
+        const distanceKm = coords ? calculateDistanceKm(userLocation.lat, userLocation.lng, coords.lat, coords.lng) : null;
+        return { ...e, distanceKm };
+      });
 
-      if (isFutureA && !isFutureB) return -1;
-      if (!isFutureA && isFutureB) return 1;
-      if (isFutureA && isFutureB) return timeA - timeB; // soonest upcoming first
-      return timeB - timeA; // past: most recent first
-    });
+      // Sort closest first
+      list.sort((a, b) => {
+        if (a.distanceKm == null && b.distanceKm == null) return 0;
+        if (a.distanceKm == null) return 1;
+        if (b.distanceKm == null) return -1;
+        return a.distanceKm - b.distanceKm;
+      });
+    } else {
+      // Standard Sorting
+      list.sort((a, b) => {
+        if (sortBy === 'rating') {
+          const rA = parseFloat(a.rating) || 4.0;
+          const rB = parseFloat(b.rating) || 4.0;
+          return rB - rA;
+        }
+        if (sortBy === 'title') {
+          return (a.title || '').localeCompare(b.title || '');
+        }
+        if (sortBy === 'turnout') {
+          const parseTurnout = (t = '') => {
+            const m = String(t).match(/(\d+[\d,]*)/);
+            return m ? parseInt(m[1].replace(/,/g, ''), 10) : 0;
+          };
+          return parseTurnout(b.attendees) - parseTurnout(a.attendees);
+        }
+        // Default: upcoming startDate (upcoming events chronologically first, then past events)
+        const now = Date.now();
+        const timeA = a.startDate ? new Date(a.startDate).getTime() : 0;
+        const timeB = b.startDate ? new Date(b.startDate).getTime() : 0;
+        const isFutureA = timeA >= now;
+        const isFutureB = timeB >= now;
+
+        if (isFutureA && !isFutureB) return -1;
+        if (!isFutureA && isFutureB) return 1;
+        if (isFutureA && isFutureB) return timeA - timeB; // soonest upcoming first
+        return timeB - timeA; // past: most recent first
+      });
+    }
 
     return list;
-  }, [events, searchQuery, selectedCategory, selectedCity, sortBy, featuredOnly]);
+  }, [events, searchQuery, selectedCategory, selectedCity, sortBy, featuredOnly, isNearbyActive, userLocation]);
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedCategory, selectedCity, sortBy, featuredOnly]);
+  }, [searchQuery, selectedCategory, selectedCity, sortBy, featuredOnly, isNearbyActive]);
 
   // Pagination calculation
   const totalPages = Math.ceil(filteredEvents.length / ITEMS_PER_PAGE) || 1;
@@ -298,12 +332,34 @@ export default function EventsDirectoryPage() {
     }
   };
 
+  const handleToggleNearby = async () => {
+    if (isNearbyActive) {
+      setIsNearbyActive(false);
+      return;
+    }
+
+    setIsDetectingLocation(true);
+    try {
+      const loc = await detectUserLocation();
+      setUserLocation({ lat: loc.lat, lng: loc.lng });
+      setUserCityName(loc.city || 'Your Location');
+      setIsNearbyActive(true);
+      showToast(`Showing exhibitions closest to ${loc.city || 'your location'}!`);
+    } catch (err) {
+      console.error('Failed to get location:', err);
+      showToast('Could not detect location. Using default exhibition hub.');
+    } finally {
+      setIsDetectingLocation(false);
+    }
+  };
+
   const handleResetFilters = () => {
     setSearchQuery('');
     setSelectedCategory('All');
     setSelectedCity('all');
     setSortBy('upcoming');
     setFeaturedOnly(false);
+    setIsNearbyActive(false);
     setCurrentPage(1);
   };
 
@@ -312,7 +368,8 @@ export default function EventsDirectoryPage() {
     selectedCategory !== 'All' ||
     selectedCity !== 'all' ||
     sortBy !== 'upcoming' ||
-    featuredOnly;
+    featuredOnly ||
+    isNearbyActive;
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-zinc-900 font-sans antialiased selection:bg-[#FF2E63] selection:text-white pb-24">
@@ -436,6 +493,31 @@ export default function EventsDirectoryPage() {
                 </select>
               </div>
 
+              {/* Nearby Proximity Toggle Button */}
+              <button
+                type="button"
+                onClick={handleToggleNearby}
+                disabled={isDetectingLocation}
+                className={`px-3 py-2 rounded-xl border font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+                  isNearbyActive
+                    ? 'bg-[#FF2E63] text-white border-[#FF2E63] shadow-xs'
+                    : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100 hover:border-zinc-300'
+                }`}
+                title="Show exhibitions closest to your location"
+              >
+                {isDetectingLocation ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-500" />
+                ) : (
+                  <LocateFixed className={`h-3.5 w-3.5 ${isNearbyActive ? 'text-white' : 'text-[#FF2E63]'}`} />
+                )}
+                <span>Nearby</span>
+                {isNearbyActive && userCityName && (
+                  <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-md font-semibold">
+                    {userCityName}
+                  </span>
+                )}
+              </button>
+
               {/* Featured Only Toggle */}
               <button
                 type="button"
@@ -474,6 +556,30 @@ export default function EventsDirectoryPage() {
             </div>
           </div>
         </div>
+
+        {/* Proximity Filter Active Banner */}
+        {isNearbyActive && (
+          <div className="bg-gradient-to-r from-rose-50 to-amber-50/60 border border-rose-200/90 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 text-xs text-rose-950 shadow-2xs">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-[#FF2E63] text-white">
+                <Navigation className="h-3.5 w-3.5" />
+              </div>
+              <div>
+                <span className="font-extrabold text-zinc-900">Nearby Exhibitions Active:</span>{' '}
+                <span>
+                  Showing verified expos sorted by shortest distance to <strong className="text-[#FF2E63]">{userCityName || 'your detected location'}</strong>.
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsNearbyActive(false)}
+              className="px-3 py-1 rounded-xl bg-white border border-rose-200 hover:bg-rose-100/50 text-[#FF2E63] font-bold transition-all shadow-2xs cursor-pointer text-xs"
+            >
+              Show All Locations (Reset)
+            </button>
+          </div>
+        )}
 
         {/* ========================================================================= */}
         {/* EVENTS GRID                                                               */}
@@ -610,10 +716,27 @@ export default function EventsDirectoryPage() {
                         </Link>
                       </h2>
 
-                      {/* Location */}
-                      <div className="flex items-center gap-1.5 text-xs text-zinc-600 truncate">
-                        <MapPin className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
-                        <span className="truncate">{evt.venue || evt.city}, {evt.city}</span>
+                      {/* Authentic WordPress Location & Proximity Badge */}
+                      <div className="flex items-center justify-between gap-2 text-xs text-zinc-600">
+                        <div className="flex items-center gap-1.5 truncate" title={evt.address || evt.venue || evt.city}>
+                          <MapPin className="h-3.5 w-3.5 text-[#FF2E63] shrink-0" />
+                          <span className="truncate">
+                            {evt.venue && evt.venue.toLowerCase() !== evt.city?.toLowerCase() && evt.venue.toLowerCase() !== 'exhibition center' ? (
+                              <>
+                                <span className="font-semibold text-zinc-800">{evt.venue}</span>
+                                <span className="text-zinc-400 font-normal"> • {evt.city}{evt.country && evt.country !== evt.city ? `, ${evt.country}` : ''}</span>
+                              </>
+                            ) : (
+                              `${evt.city}${evt.state && evt.state !== evt.city ? `, ${evt.state}` : ''}${evt.country ? `, ${evt.country}` : ''}`
+                            )}
+                          </span>
+                        </div>
+                        {isNearbyActive && evt.distanceKm != null && (
+                          <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 text-[#FF2E63] border border-rose-200">
+                            <Navigation className="h-2.5 w-2.5" />
+                            {formatDistance(evt.distanceKm)}
+                          </span>
+                        )}
                       </div>
 
                       {/* Rating & Turnout */}
