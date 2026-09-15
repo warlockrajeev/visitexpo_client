@@ -4,8 +4,10 @@ import path from 'path';
 import { parseWpLocation } from '../../wordpress-events/route.js';
 
 const WORDPRESS_URL = process.env.WORDPRESS_URL || 'https://visitexpo.in';
-const WORDPRESS_API_KEY = process.env.WORDPRESS_API_KEY || 've_wp_sync_secret_2026_secure';
-const BACKEND_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const BACKEND_API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.SERVER_URL ||
+  (process.env.NODE_ENV === 'production' ? 'https://api.visitexpo.in/api' : 'http://localhost:5000/api');
 
 // Cache for single event details
 const singleEventCache = new Map();

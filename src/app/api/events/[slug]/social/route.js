@@ -123,7 +123,10 @@ const SEED_ATTENDEES = [
   }
 ];
 
-const SERVER_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const SERVER_API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.SERVER_URL ||
+  (process.env.NODE_ENV === 'production' ? 'https://api.visitexpo.in/api' : 'http://localhost:5000/api');
 
 export async function GET(request, { params }) {
   try {

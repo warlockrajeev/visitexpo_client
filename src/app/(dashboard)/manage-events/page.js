@@ -37,7 +37,11 @@ import {
 
 import { renderRichText, RichTextEditor, SPONSOR_TIER_GROUPS, PRESET_SPONSOR_TIERS, CATEGORY_SUBSECTORS } from '../events/wizard/page.js';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== 'undefined' && window.location.hostname.includes('visitexpo.in')
+    ? 'https://api.visitexpo.in/api'
+    : 'http://localhost:5000/api');
 
 export default function EventsPage() {
   const { user, accessToken } = useAuth();
