@@ -65,12 +65,40 @@ import BrowseByCity from '../components/BrowseByCity.js';
 import ExploreVenues from '../components/ExploreVenues.js';
 import FeaturedOrganizers from '../components/FeaturedOrganizers.js';
 import PeoplesReviews from '../components/PeoplesReviews.js';
+import Footer from '../components/Footer.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   (typeof window !== 'undefined' && window.location.hostname.includes('visitexpo.in')
     ? 'https://api.visitexpo.in/api'
     : 'http://localhost:5000/api');
+
+const FALLBACK_FAQS = [
+  {
+    _id: 'faq_1',
+    question: 'How do I claim or publish an event on VisitExpo?',
+    answer: 'Organizers can search for their event on the directory or click "Onboard as Organizer". Once your business email is verified, you gain instant dashboard access to manage schedules, tickets, and floorplans.',
+    category: 'Organizers'
+  },
+  {
+    _id: 'faq_2',
+    question: 'How can exhibitors book booths and collect visitor leads?',
+    answer: 'Exhibitors can click "Register as Exhibitor" on any listed expo. Once approved, your team receives an Exhibitor Hub login with QR lead scanner capabilities.',
+    category: 'Exhibitors'
+  },
+  {
+    _id: 'faq_3',
+    question: 'Are visitor entry passes complimentary?',
+    answer: 'Yes! Most trade exhibitions on VisitExpo offer free digital entry passes for industry professionals and trade buyers. Simply register to receive your instant digital badge.',
+    category: 'Visitors'
+  },
+  {
+    _id: 'faq_4',
+    question: 'What is the VisitExpo Global Network?',
+    answer: 'VisitExpo is an enterprise exhibition discovery and event management platform connecting trade buyers, verified organizers, and global exhibitors across industrial sectors worldwide.',
+    category: 'General'
+  }
+];
 
 export default function LandingPage() {
   const { user, loading } = useAuth();
@@ -127,6 +155,38 @@ export default function LandingPage() {
 
   // FAQ State
   const [openFaq, setOpenFaq] = useState(null);
+  const [faqsList, setFaqsList] = useState([]);
+  const [faqCategories, setFaqCategories] = useState(['All']);
+  const [activeFaqCategory, setActiveFaqCategory] = useState('All');
+  const [loadingFaqs, setLoadingFaqs] = useState(true);
+
+  // Fetch dynamic FAQs from server
+  useEffect(() => {
+    const fetchFaqs = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/faqs`);
+        if (res.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
+          setFaqsList(res.data.data);
+          if (Array.isArray(res.data.categories) && res.data.categories.length > 0) {
+            setFaqCategories(res.data.categories);
+          }
+        }
+      } catch (err) {
+        console.log('Using default FAQs fallback:', err?.message);
+      } finally {
+        setLoadingFaqs(false);
+      }
+    };
+    fetchFaqs();
+  }, []);
+
+  const displayedFaqs = useMemo(() => {
+    const source = faqsList.length > 0 ? faqsList : FALLBACK_FAQS;
+    if (activeFaqCategory === 'All') return source;
+    return source.filter(
+      (f) => (f.category || '').toLowerCase() === activeFaqCategory.toLowerCase()
+    );
+  }, [faqsList, activeFaqCategory]);
 
   // Fetch events directly from WordPress website via route handler
   useEffect(() => {
@@ -1688,61 +1748,100 @@ export default function LandingPage() {
       </section>
 
       {/* ========================================================================= */}
-      {/* 7. FAQ ACCORDION                                                          */}
+      {/* 7. FAQ ACCORDION (Dynamic from Server / Admin)                            */}
       {/* ========================================================================= */}
-      <section className="py-16 max-w-3xl mx-auto px-4 sm:px-6 space-y-6">
-        <h2 className="text-xl font-bold text-zinc-900 text-center">Frequently Asked Questions</h2>
-        
-        <div className="space-y-2 text-xs">
-          {[
-            {
-              q: "How do I claim or publish an event on VisitExpo?",
-              a: "Organizers can search for their event above or click 'Onboard as Organizer'. Once your business email is verified, you gain instant dashboard access to manage schedules, tickets, and floorplans."
-            },
-            {
-              q: "How can exhibitors book booths and collect visitor leads?",
-              a: "Exhibitors can click 'Register as Exhibitor' on any listed expo. Once approved, your team receives an Exhibitor Hub login with QR lead scanner capabilities."
-            },
-            {
-              q: "Are visitor entry passes complimentary?",
-              a: "Yes! Most trade exhibitions on VisitExpo offer free digital entry passes for industry professionals and trade buyers. Simply register to receive your instant digital badge."
-            }
-          ].map((item, idx) => (
-            <div key={idx} className="border border-zinc-200 rounded-xl overflow-hidden bg-white">
+      <section className="py-16 max-w-4xl mx-auto px-4 sm:px-6 space-y-6">
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
+            <HelpCircle className="h-3.5 w-3.5 text-amber-600" />
+            <span>Got Questions? We have Answers</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 tracking-tight">
+            Frequently Asked Questions
+          </h2>
+          <p className="text-xs sm:text-sm text-zinc-500 max-w-xl mx-auto">
+            Everything you need to know about registering as an attendee, publishing expos as an organizer, or exhibiting with VisitExpo.
+          </p>
+        </div>
+
+        {/* FAQ Category Filter Pills */}
+        {faqCategories.length > 1 && (
+          <div className="flex items-center justify-center gap-2 flex-wrap pt-2">
+            {faqCategories.map((cat) => (
               <button
-                onClick={() => toggleFaq(idx)}
-                className="w-full px-4 py-3 text-left flex items-center justify-between font-bold text-zinc-800 hover:text-zinc-950 cursor-pointer"
+                key={cat}
+                type="button"
+                onClick={() => {
+                  setActiveFaqCategory(cat);
+                  setOpenFaq(null);
+                }}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  activeFaqCategory === cat
+                    ? 'bg-zinc-900 text-white shadow-xs scale-102'
+                    : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                }`}
               >
-                <span>{item.q}</span>
-                <ChevronDown className={`h-4 w-4 text-zinc-400 transition-transform ${openFaq === idx ? 'rotate-180' : ''}`} />
+                {cat}
               </button>
-              {openFaq === idx && (
-                <p className="px-4 pb-3 pt-1 text-zinc-600 leading-relaxed border-t border-zinc-100">
-                  {item.a}
-                </p>
-              )}
+            ))}
+          </div>
+        )}
+
+        {/* Accordion Questions */}
+        <div className="space-y-3 pt-2">
+          {displayedFaqs.length === 0 ? (
+            <div className="text-center py-8 text-zinc-500 text-xs">
+              No questions found under {activeFaqCategory}. Check "All" for more answers.
             </div>
-          ))}
+          ) : (
+            displayedFaqs.map((item, idx) => {
+              const isOpen = openFaq === idx;
+              return (
+                <div
+                  key={item._id || idx}
+                  className={`border rounded-2xl overflow-hidden transition-all duration-200 ${
+                    isOpen
+                      ? 'border-[#FF2E63]/40 bg-white shadow-sm ring-1 ring-[#FF2E63]/20'
+                      : 'border-zinc-200 bg-white hover:border-zinc-300'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleFaq(idx)}
+                    className="w-full px-5 py-4 text-left flex items-center justify-between gap-4 font-bold text-zinc-900 cursor-pointer text-xs sm:text-sm"
+                  >
+                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                      {item.category && item.category !== 'General' && (
+                        <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-600 border border-zinc-200 shrink-0">
+                          {item.category}
+                        </span>
+                      )}
+                      <span className="truncate sm:whitespace-normal">{item.question || item.q}</span>
+                    </div>
+                    <div
+                      className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                        isOpen ? 'bg-[#FF2E63] text-white rotate-180' : 'bg-zinc-100 text-zinc-500'
+                      }`}
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </div>
+                  </button>
+                  {isOpen && (
+                    <div className="px-5 pb-4 pt-1 text-xs text-zinc-600 leading-relaxed border-t border-zinc-100 animate-in fade-in duration-150">
+                      {item.answer || item.a}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       </section>
 
       {/* ========================================================================= */}
-      {/* 8. FOOTER                                                                 */}
+      {/* 8. FOOTER COMPONENT                                                       */}
       {/* ========================================================================= */}
-      <footer className="border-t border-zinc-200 bg-zinc-50 py-10 text-xs text-zinc-500">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Logo className="h-6 w-6" />
-            <span className="font-bold text-zinc-800">VisitExpo</span>
-            <span>• Powering trade exhibitions worldwide.</span>
-          </div>
-          <div className="flex items-center gap-6">
-            <Link href="/login?role=organizer&signup=true" className="hover:text-zinc-800">Organizers</Link>
-            <Link href="/login?role=exhibitor&signup=true" className="hover:text-zinc-800">Exhibitors</Link>
-            <Link href="/login" className="hover:text-zinc-800">Dashboard</Link>
-          </div>
-        </div>
-      </footer>
+      <Footer />
 
       {/* ========================================================================= */}
       {/* 9. 10TIMES MODALS: GATED AUTH, EDP MODAL, ADVERTISE MODAL & TOAST         */}

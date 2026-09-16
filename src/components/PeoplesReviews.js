@@ -3,11 +3,12 @@
 /**
  * @file PeoplesReviews.js
  * @description People's Reviews on Events component with a 3-review slider.
- * Shows 3 reviews at a time with left/right slider arrows, helpful upvoting,
- * and an interactive "Write a Review" submission modal.
+ * Fetches admin-approved reviews from the API, falls back to hardcoded data.
+ * "Write a Review" modal submits to the backend for admin moderation.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   Star,
   ChevronLeft,
@@ -20,7 +21,13 @@ import {
   Plus
 } from 'lucide-react';
 
-const INITIAL_REVIEWS = [
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== 'undefined' && window.location.hostname.includes('visitexpo.in')
+    ? 'https://api.visitexpo.in/api'
+    : 'http://localhost:5000/api');
+
+const FALLBACK_REVIEWS = [
   {
     id: 1,
     name: 'Rajesh Singhania',
@@ -125,8 +132,35 @@ const INITIAL_REVIEWS = [
   }
 ];
 
+// Convert API review to display format
+function formatApiReview(r) {
+  const createdDate = r.createdAt ? new Date(r.createdAt) : new Date();
+  const daysDiff = Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+  let dateLabel = 'Just now';
+  if (daysDiff >= 30) dateLabel = `${Math.floor(daysDiff / 30)} month${Math.floor(daysDiff / 30) > 1 ? 's' : ''} ago`;
+  else if (daysDiff >= 7) dateLabel = `${Math.floor(daysDiff / 7)} week${Math.floor(daysDiff / 7) > 1 ? 's' : ''} ago`;
+  else if (daysDiff >= 1) dateLabel = `${daysDiff} day${daysDiff > 1 ? 's' : ''} ago`;
+
+  return {
+    id: r._id || r.id,
+    name: r.name,
+    role: r.role || 'Verified Trade Buyer',
+    title: r.title || 'Trade Professional',
+    company: r.company || '',
+    avatar: r.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=FF2E63&color=fff&size=140`,
+    eventTitle: r.eventTitle,
+    venue: r.venue || 'Major Convention Centre',
+    rating: r.rating || 5,
+    date: dateLabel,
+    headline: r.headline || 'Great experience at the event!',
+    review: r.review,
+    helpfulCount: r.helpfulCount || 0,
+    tags: Array.isArray(r.tags) && r.tags.length > 0 ? r.tags : ['Verified Attendee']
+  };
+}
+
 export default function PeoplesReviews() {
-  const [reviews, setReviews] = useState(INITIAL_REVIEWS);
+  const [reviews, setReviews] = useState(FALLBACK_REVIEWS);
   const [startIndex, setStartIndex] = useState(0);
   const [helpfulVoted, setHelpfulVoted] = useState({});
 
@@ -143,7 +177,25 @@ export default function PeoplesReviews() {
     review: '',
     tags: ''
   });
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewSubmittedToast, setReviewSubmittedToast] = useState(false);
+
+  // Fetch featured reviews from API on mount
+  useEffect(() => {
+    const fetchFeaturedReviews = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/reviews/featured`);
+        if (res.data?.success && Array.isArray(res.data?.data) && res.data.data.length > 0) {
+          setReviews(res.data.data.map(formatApiReview));
+        }
+        // If no featured reviews from API, keep the fallback data
+      } catch (err) {
+        // Silently keep fallback reviews
+        console.log('Using fallback reviews:', err?.message);
+      }
+    };
+    fetchFeaturedReviews();
+  }, []);
 
   const visibleCount = 3;
   const maxIndex = Math.max(0, reviews.length - visibleCount);
@@ -156,7 +208,7 @@ export default function PeoplesReviews() {
     setStartIndex((prev) => (prev >= maxIndex ? 0 : prev + 1));
   };
 
-  const handleHelpfulClick = (reviewId) => {
+  const handleHelpfulClick = async (reviewId) => {
     if (helpfulVoted[reviewId]) return;
     setHelpfulVoted((prev) => ({ ...prev, [reviewId]: true }));
     setReviews((prev) =>
@@ -164,48 +216,55 @@ export default function PeoplesReviews() {
         r.id === reviewId ? { ...r, helpfulCount: r.helpfulCount + 1 } : r
       )
     );
+    // Fire API call to persist helpful count (fire-and-forget)
+    try {
+      await axios.post(`${API_URL}/reviews/${reviewId}/helpful`);
+    } catch (_) {
+      // Silently ignore
+    }
   };
 
-  const handleCreateReview = (e) => {
+  const handleCreateReview = async (e) => {
     e.preventDefault();
     if (!newReview.name || !newReview.review || !newReview.eventTitle) return;
 
-    const created = {
-      id: Date.now(),
-      name: newReview.name.trim(),
-      role: newReview.role,
-      title: newReview.title.trim() || 'Trade Professional',
-      company: newReview.company.trim() || 'Verified Corporation',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=140&auto=format&fit=crop',
-      eventTitle: newReview.eventTitle.trim(),
-      venue: 'Major Convention Centre',
-      rating: newReview.rating,
-      date: 'Just now',
-      headline: newReview.headline.trim() || 'Great experience at the event!',
-      review: newReview.review.trim(),
-      helpfulCount: 0,
-      tags: newReview.tags ? newReview.tags.split(',').map((t) => t.trim()) : ['Verified Attendee']
-    };
+    setReviewSubmitting(true);
+    try {
+      await axios.post(`${API_URL}/reviews`, {
+        name: newReview.name.trim(),
+        role: newReview.role,
+        title: newReview.title.trim() || 'Trade Professional',
+        company: newReview.company.trim() || '',
+        eventTitle: newReview.eventTitle.trim(),
+        rating: newReview.rating,
+        headline: newReview.headline.trim() || '',
+        review: newReview.review.trim(),
+        tags: newReview.tags ? newReview.tags.split(',').map((t) => t.trim()).filter(Boolean) : []
+      });
 
-    setReviews([created, ...reviews]);
-    setStartIndex(0);
-    setShowReviewModal(false);
-    setNewReview({
-      name: '',
-      role: 'Verified Trade Buyer',
-      title: '',
-      company: '',
-      eventTitle: '',
-      rating: 5,
-      headline: '',
-      review: '',
-      tags: ''
-    });
+      setShowReviewModal(false);
+      setNewReview({
+        name: '',
+        role: 'Verified Trade Buyer',
+        title: '',
+        company: '',
+        eventTitle: '',
+        rating: 5,
+        headline: '',
+        review: '',
+        tags: ''
+      });
 
-    setReviewSubmittedToast(true);
-    setTimeout(() => {
-      setReviewSubmittedToast(false);
-    }, 4000);
+      setReviewSubmittedToast(true);
+      setTimeout(() => {
+        setReviewSubmittedToast(false);
+      }, 4000);
+    } catch (err) {
+      console.error('Error submitting review:', err);
+      alert('Failed to submit review. Please try again.');
+    } finally {
+      setReviewSubmitting(false);
+    }
   };
 
   // Slice exactly 3 reviews for display
@@ -217,7 +276,7 @@ export default function PeoplesReviews() {
       {reviewSubmittedToast && (
         <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-300">
           <CheckCircle2 className="h-4 w-4" />
-          <span>Review submitted successfully! Thank you for sharing your experience.</span>
+          <span>Review submitted successfully! It will appear after admin approval.</span>
         </div>
       )}
 
@@ -292,7 +351,7 @@ export default function PeoplesReviews() {
                         <CheckCircle2 className="h-3.5 w-3.5 text-blue-600 shrink-0" title="Verified Attendee" />
                       </div>
                       <p className="text-[11px] text-zinc-500 font-medium truncate max-w-[170px]">
-                        {item.title}, {item.company}
+                        {item.title}{item.company ? `, ${item.company}` : ''}
                       </p>
                     </div>
                   </div>
@@ -535,10 +594,11 @@ export default function PeoplesReviews() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  disabled={reviewSubmitting}
+                  className="px-4 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
                 >
                   <Send className="h-3.5 w-3.5" />
-                  <span>Submit Review</span>
+                  <span>{reviewSubmitting ? 'Submitting...' : 'Submit Review'}</span>
                 </button>
               </div>
             </form>

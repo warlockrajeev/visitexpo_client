@@ -21,6 +21,7 @@ import axios from 'axios';
 import wpEventImages from '@/data/wordpress-event-images.json';
 import { useAuth } from '../../../context/AuthContext.js';
 import Navbar from '../../../components/Navbar.js';
+import Footer from '../../../components/Footer.js';
 import GatedAuthModal from '../../../components/GatedAuthModal.js';
 import InterestedAttendeesModal from '../../../components/InterestedAttendeesModal.js';
 import {
@@ -129,8 +130,29 @@ export default function ExpoDetailsPage() {
   // Review Modal State
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
+  const [reviewerName, setReviewerName] = useState('');
+  const [reviewerCompany, setReviewerCompany] = useState('');
+  const [reviewerRole, setReviewerRole] = useState('Verified Trade Buyer');
+  const [reviewHeadline, setReviewHeadline] = useState('');
   const [reviewText, setReviewText] = useState('');
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [eventReviews, setEventReviews] = useState([]);
+
+  // Fetch event reviews from backend API
+  useEffect(() => {
+    if (!slug) return;
+    const fetchEventReviews = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/reviews/event/${encodeURIComponent(slug)}`);
+        if (res.data?.success && Array.isArray(res.data?.data)) {
+          setEventReviews(res.data.data);
+        }
+      } catch (err) {
+        // keep fallback
+      }
+    };
+    fetchEventReviews();
+  }, [slug]);
 
   // FAQ Accordion State
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
@@ -522,14 +544,39 @@ export default function ExpoDetailsPage() {
     showToast(`Welcome! You are registered as Interested in ${event?.title}.`);
   };
 
-  const handleReviewSubmit = (e) => {
+  const handleReviewSubmit = async (e) => {
     e.preventDefault();
-    setReviewSubmitted(true);
-    setTimeout(() => {
-      setShowReviewModal(false);
-      setReviewSubmitted(false);
-      showToast('Thank you! Your verified rating has been submitted.');
-    }, 1500);
+    if (!reviewText.trim()) return;
+    try {
+      await axios.post(`${API_URL}/reviews`, {
+        name: reviewerName.trim() || user?.name || 'Trade Professional',
+        email: user?.email || '',
+        role: reviewerRole || 'Verified Trade Buyer',
+        title: user?.designation || 'Visitor',
+        company: reviewerCompany.trim() || user?.company || '',
+        eventTitle: event?.title || '',
+        eventSlug: slug,
+        venue: event?.venue || event?.location || '',
+        rating: reviewRating,
+        headline: reviewHeadline.trim(),
+        review: reviewText.trim(),
+        tags: []
+      });
+      setReviewSubmitted(true);
+      setTimeout(() => {
+        setShowReviewModal(false);
+        setReviewSubmitted(false);
+        setReviewerName('');
+        setReviewerCompany('');
+        setReviewHeadline('');
+        setReviewText('');
+        setReviewRating(5);
+        showToast('Thank you! Your review has been submitted and is pending admin moderation.');
+      }, 1500);
+    } catch (err) {
+      console.error('Error submitting review:', err);
+      showToast('Failed to submit review. Please try again.');
+    }
   };
 
   if (loading && !event) {
@@ -2053,32 +2100,44 @@ export default function ExpoDetailsPage() {
 
                 {/* User Reviews List */}
                 <div className="space-y-4 pt-1">
-                  {[
-                    {
-                      author: 'Vikramaditya Rao',
-                      role: 'VP Procurement • Apex Industrial Corp',
-                      rating: 5,
-                      date: 'September 2026',
-                      review:
-                        'Outstanding trade show experience. The caliber of direct suppliers and machinery manufacturers was exceptional. Signed two major supplier MOUs directly on the floor.'
-                    },
-                    {
-                      author: 'Sarah Chen',
-                      role: 'Senior Buyer • Global Retail Group',
-                      rating: 5,
-                      date: 'August 2026',
-                      review:
-                        'Seamless visitor entry with the VisitExpo pass. Great organization of exhibition halls, easy B2B matchmaking, and high-quality international exhibitors.'
-                    },
-                    {
-                      author: 'Marcus Weber',
-                      role: 'Managing Director • European Tools GmbH',
-                      rating: 4,
-                      date: 'July 2026',
-                      review:
-                        'Impressive turnout of genuine trade buyers. Good venue amenities and straightforward booth logistics. We plan to return for the next edition.'
-                    }
-                  ].map((rev, rIdx) => (
+                  {(eventReviews.length > 0
+                    ? eventReviews.map((r) => ({
+                        author: r.name,
+                        role: `${r.title ? r.title + ' • ' : ''}${r.company || r.role || 'Verified Trade Buyer'}`,
+                        rating: r.rating || 5,
+                        headline: r.headline,
+                        date: r.createdAt
+                          ? new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                          : 'Recent',
+                        review: r.review
+                      }))
+                    : [
+                        {
+                          author: 'Vikramaditya Rao',
+                          role: 'VP Procurement • Apex Industrial Corp',
+                          rating: 5,
+                          date: 'September 2026',
+                          review:
+                            'Outstanding trade show experience. The caliber of direct suppliers and machinery manufacturers was exceptional. Signed two major supplier MOUs directly on the floor.'
+                        },
+                        {
+                          author: 'Sarah Chen',
+                          role: 'Senior Buyer • Global Retail Group',
+                          rating: 5,
+                          date: 'August 2026',
+                          review:
+                            'Seamless visitor entry with the VisitExpo pass. Great organization of exhibition halls, easy B2B matchmaking, and high-quality international exhibitors.'
+                        },
+                        {
+                          author: 'Marcus Weber',
+                          role: 'Managing Director • European Tools GmbH',
+                          rating: 4,
+                          date: 'July 2026',
+                          review:
+                            'Impressive turnout of genuine trade buyers. Good venue amenities and straightforward booth logistics. We plan to return for the next edition.'
+                        }
+                      ]
+                  ).map((rev, rIdx) => (
                     <div key={rIdx} className="p-4 rounded-xl border border-zinc-200 bg-white space-y-2 shadow-2xs">
                       <div className="flex items-center justify-between">
                         <div>
@@ -2099,6 +2158,9 @@ export default function ExpoDetailsPage() {
                           <div className="text-[10px] text-zinc-400 font-medium">{rev.date}</div>
                         </div>
                       </div>
+                      {rev.headline && (
+                        <div className="text-xs font-bold text-zinc-900 pt-0.5">&ldquo;{rev.headline}&rdquo;</div>
+                      )}
                       <p className="text-xs text-zinc-700 leading-relaxed font-normal pt-1">
                         "{rev.review}"
                       </p>
@@ -2476,7 +2538,7 @@ export default function ExpoDetailsPage() {
             ) : (
               <form onSubmit={handleReviewSubmit} className="space-y-3">
                 <div>
-                  <label className="block text-xs font-bold text-zinc-700 mb-1">Your Rating</label>
+                  <label className="block text-xs font-bold text-zinc-700 mb-1">Your Rating *</label>
                   <div className="flex items-center gap-1.5">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <button
@@ -2497,8 +2559,59 @@ export default function ExpoDetailsPage() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 mb-1">Your Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder={user?.name || "e.g. Rahul Sharma"}
+                      value={reviewerName}
+                      onChange={(e) => setReviewerName(e.target.value)}
+                      className="w-full p-2 text-xs rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 mb-1">Company / Org</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Apex Industries"
+                      value={reviewerCompany}
+                      onChange={(e) => setReviewerCompany(e.target.value)}
+                      className="w-full p-2 text-xs rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 mb-1">Your Role</label>
+                    <select
+                      value={reviewerRole}
+                      onChange={(e) => setReviewerRole(e.target.value)}
+                      className="w-full p-2 text-xs rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800 cursor-pointer"
+                    >
+                      <option value="Verified Trade Buyer">Verified Trade Buyer</option>
+                      <option value="Verified Exhibitor">Verified Exhibitor</option>
+                      <option value="Industry Delegate">Industry Delegate</option>
+                      <option value="Trade Visitor">Trade Visitor</option>
+                      <option value="Conference Speaker">Conference Speaker</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 mb-1">Headline (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Closed 2 deals on day 1"
+                      value={reviewHeadline}
+                      onChange={(e) => setReviewHeadline(e.target.value)}
+                      className="w-full p-2 text-xs rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-xs font-bold text-zinc-700 mb-1">Your Feedback / Review</label>
+                  <label className="block text-xs font-bold text-zinc-700 mb-1">Your Feedback / Review *</label>
                   <textarea
                     required
                     rows={3}
@@ -2537,6 +2650,9 @@ export default function ExpoDetailsPage() {
           <span>{toastMessage}</span>
         </div>
       )}
+
+      {/* Footer */}
+      <Footer />
 
     </div>
   );
