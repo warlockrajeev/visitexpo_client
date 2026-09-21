@@ -43,7 +43,16 @@ export default function DashboardLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
-  const { user, loading, logout, isExhibitorView, setIsExhibitorView, hasExhibitorProfile } = useAuth();
+  const { user, loading, logout, isExhibitorView, setIsExhibitorView, toggleDashboardView, hasExhibitorProfile } = useAuth();
+
+  const handleToggleView = () => {
+    if (typeof toggleDashboardView === 'function') {
+      toggleDashboardView();
+    } else {
+      setIsExhibitorView(!isExhibitorView);
+    }
+    router.push('/dashboard');
+  };
 
   useEffect(() => {
     if (!loading && !user) {
@@ -51,7 +60,7 @@ export default function DashboardLayout({ children }) {
     }
   }, [user, loading, router]);
 
-  // Strict role-based route protection: prevent visitors and exhibitors from accessing organizer features
+  // Strict role-based route protection: prevent visitors and exhibitors in exhibitor view from accessing organizer features
   useEffect(() => {
     if (!loading && user) {
       const organizerRoutes = ['/events', '/exhibitors', '/visitors', '/leads', '/campaigns', '/tickets'];
@@ -59,7 +68,7 @@ export default function DashboardLayout({ children }) {
 
       if (user.role === 'visitor' && isOrganizerRoute) {
         router.replace('/dashboard');
-      } else if (user.role === 'exhibitor' && !isExhibitorView && isOrganizerRoute) {
+      } else if (isExhibitorView && isOrganizerRoute) {
         router.replace('/dashboard');
       }
     }
@@ -78,7 +87,7 @@ export default function DashboardLayout({ children }) {
       }
     };
 
-    if (user && user.isVerified && user.role !== 'visitor' && user.role !== 'exhibitor' && !isExhibitorView) {
+    if (user && user.isVerified && user.role !== 'visitor' && !isExhibitorView) {
       fetchDynamicSidebarEvents();
     }
   }, [user, isExhibitorView]);
@@ -140,13 +149,13 @@ export default function DashboardLayout({ children }) {
 
           <div className="space-y-2">
             <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-              Booth Pending Organizer Approval
+              Booth Pending Admin Approval
             </span>
             <h2 className="text-2xl font-extrabold text-foreground">
               Welcome, {user.name}!
             </h2>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Your exhibitor registration and booth allocation request is currently pending review. Access will be unlocked automatically once approved by the event organizers.
+              Your exhibitor registration and booth allocation request is currently pending review by the platform administrator. Access will be unlocked automatically once approved by the Admin team.
             </p>
           </div>
 
@@ -268,7 +277,7 @@ export default function DashboardLayout({ children }) {
           })}
 
           {/* Dynamic Backend Synced WP Events Subsection */}
-          {dynamicEvents.length > 0 && user.role !== 'exhibitor' && !isExhibitorView && (
+          {dynamicEvents.length > 0 && !isExhibitorView && (
             <div className="pt-4 mt-2 border-t border-border/60">
               <span className="block px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center justify-between">
                 <span>Live Synced Events</span>
@@ -361,12 +370,19 @@ export default function DashboardLayout({ children }) {
               >
                 <Ticket className="h-3.5 w-3.5" /> Browse Live Expos
               </Link>
+            ) : user?.role === 'exhibitor' ? (
+              <Link
+                href="/expos"
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-border bg-card hover:bg-secondary px-3.5 py-1.5 text-xs font-bold text-foreground transition-all shadow-sm"
+              >
+                <Ticket className="h-3.5 w-3.5 text-primary" /> Browse Live Expos
+              </Link>
             ) : (
               <>
-                {hasExhibitorProfile && (
+                {user?.role === 'organizer' && hasExhibitorProfile && (
                   <button
-                    onClick={() => setIsExhibitorView(!isExhibitorView)}
-                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all shadow-sm ${
+                    onClick={handleToggleView}
+                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all shadow-sm cursor-pointer ${
                       isExhibitorView
                         ? 'bg-amber-500/10 border-amber-500/20 text-amber-500 hover:bg-amber-500/20'
                         : 'bg-primary/10 border-primary/20 text-primary hover:bg-primary/20'
@@ -383,7 +399,7 @@ export default function DashboardLayout({ children }) {
                     )}
                   </button>
                 )}
-                {user.role !== 'exhibitor' && !isExhibitorView && (
+                {!isExhibitorView && (
                   <Link
                     href="/events/wizard"
                     className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"

@@ -49,7 +49,7 @@ export default function SettingsPage() {
   const [logoValidation, setLogoValidation] = useState(null);
 
   const isVisitor = user?.role === 'visitor';
-  const isExhibitor = user?.role === 'exhibitor' || isExhibitorView;
+  const isExhibitor = isExhibitorView;
 
   const [activeTab, setActiveTab] = useState('profile'); // profile, security, api
   const [copiedKey, setCopiedKey] = useState(false);

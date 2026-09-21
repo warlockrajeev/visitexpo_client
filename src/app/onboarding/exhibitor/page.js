@@ -623,7 +623,7 @@ function ExhibitorOnboardingContent() {
                 Exhibitor Application Submitted!
               </h3>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Thank you for applying to exhibit at <strong className="text-foreground">{selectedEvent?.title}</strong>. The organizer moderation team has received your registration request.
+                Thank you for applying to exhibit at <strong className="text-foreground">{selectedEvent?.title}</strong>. Your registration request has been forwarded to the Platform Administrator for review & approval. You will receive an email confirmation once approved.
               </p>
             </div>
 

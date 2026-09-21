@@ -44,7 +44,8 @@ import {
   User,
   UserCheck,
   Bell,
-  Bookmark
+  Bookmark,
+  X
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -642,7 +643,7 @@ export function OrganizerDashboardInner() {
 }
 
 function ExhibitorDashboard() {
-  const { accessToken } = useAuth();
+  const { user, accessToken } = useAuth();
   const [profiles, setProfiles] = useState([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [profile, setProfile] = useState(null);
@@ -650,7 +651,10 @@ function ExhibitorDashboard() {
   const [error, setError] = useState('');
   const [updating, setUpdating] = useState(false);
   const [message, setMessage] = useState('');
-  
+  const [availableEvents, setAvailableEvents] = useState([]);
+  const [showAddBoothModal, setShowAddBoothModal] = useState(false);
+  const [activating, setActivating] = useState(false);
+
   // Edit Profile States
   const [formData, setFormData] = useState({
     description: '',
@@ -659,8 +663,49 @@ function ExhibitorDashboard() {
     logo: ''
   });
 
+  // Setup / Add Booth Form State
+  const [setupForm, setSetupForm] = useState({
+    eventId: '',
+    name: '',
+    boothNumber: 'Hall 1, Booth B-42',
+    description: '',
+    website: '',
+    contactPhone: '',
+    attendanceType: 'in_person',
+    staffName: '',
+    staffEmail: '',
+    staffPhone: ''
+  });
+
   // Staff States
   const [newStaff, setNewStaff] = useState({ name: '', email: '', phone: '' });
+
+  // Load available events for booth selection
+  useEffect(() => {
+    const loadEvents = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/events?limit=50&all=true`);
+        if (res.data && res.data.success && res.data.data && res.data.data.docs) {
+          const docs = res.data.data.docs;
+          setAvailableEvents(docs);
+          if (docs.length > 0) {
+            setSetupForm(prev => ({
+              ...prev,
+              eventId: prev.eventId || docs[0]._id,
+              name: prev.name || user?.company || user?.name || 'Exhibition Partner',
+              contactPhone: prev.contactPhone || user?.phone || '+91 98765 43210',
+              staffName: prev.staffName || user?.name || 'Primary Representative',
+              staffEmail: prev.staffEmail || user?.email || '',
+              staffPhone: prev.staffPhone || user?.phone || '+91 98765 43210'
+            }));
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load events list for exhibitor setup', err);
+      }
+    };
+    loadEvents();
+  }, [user]);
 
   const fetchProfile = async () => {
     setLoading(true);
@@ -672,7 +717,7 @@ function ExhibitorDashboard() {
         const data = res.data.data || [];
         setProfiles(data);
         if (data.length > 0) {
-          const current = data[0];
+          const current = data[selectedIdx] || data[0];
           setProfile(current);
           setFormData({
             description: current.description || '',
@@ -739,6 +784,51 @@ function ExhibitorDashboard() {
     }
   };
 
+  const handleQuickSetup = async (e) => {
+    e.preventDefault();
+    if (!setupForm.eventId) {
+      alert('Please select an event for your booth.');
+      return;
+    }
+
+    setActivating(true);
+    try {
+      const headers = { Authorization: `Bearer ${accessToken}` };
+      const payload = {
+        eventId: setupForm.eventId,
+        name: setupForm.name?.trim() || user?.company || user?.name || 'Exhibition Partner',
+        description: setupForm.description?.trim() || `${setupForm.name || user?.name || 'Our company'} is an official exhibitor showcasing innovative products and services.`,
+        website: setupForm.website?.trim() || '',
+        contactPhone: setupForm.contactPhone?.trim() || user?.phone || '+91 98765 43210',
+        boothNumber: setupForm.boothNumber?.trim() || 'TBD',
+        attendanceType: setupForm.attendanceType || 'in_person',
+        staff: [
+          {
+            name: setupForm.staffName?.trim() || user?.name || 'Primary Representative',
+            email: setupForm.staffEmail?.trim() || user?.email || '',
+            phone: setupForm.staffPhone?.trim() || setupForm.contactPhone?.trim() || ''
+          }
+        ]
+      };
+
+      const res = await axios.post(`${API_URL}/exhibitors/quick-setup`, payload, { headers });
+      if (res.data && res.data.success && res.data.exhibitor) {
+        const newExhibitor = res.data.exhibitor;
+        setProfiles(prev => [newExhibitor, ...prev]);
+        setProfile(newExhibitor);
+        setSelectedIdx(0);
+        setShowAddBoothModal(false);
+        setError('');
+        setMessage('Exhibitor booth profile activated successfully!');
+      }
+    } catch (err) {
+      console.error('Failed to setup exhibitor booth', err);
+      alert('Error activating booth: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setActivating(false);
+    }
+  };
+
   const handleAddStaff = async () => {
     if (!newStaff.name || !newStaff.email) {
       alert('Staff name and email are required');
@@ -788,26 +878,172 @@ function ExhibitorDashboard() {
     );
   }
 
-  if (error || !profile) {
+  // Welcome / Onboarding Screen if no booth profile exists yet
+  if (!profile || profiles.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 px-4 text-center text-muted-foreground gap-3">
-        <AlertCircle className="h-10 w-10 text-destructive" />
-        <h3 className="font-semibold text-foreground">Failed to Load Profile</h3>
-        <p className="text-sm max-w-md">{error || 'No active exhibitor listing associated with this account.'}</p>
+      <div className="max-w-4xl mx-auto py-8 px-4 space-y-8">
+        {/* Welcome Hero Card */}
+        <div className="bg-card border border-border rounded-3xl p-8 md:p-10 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                <Building className="h-3.5 w-3.5" /> Exhibitor Portal Active
+              </div>
+              <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
+                Welcome to Your Exhibitor Hub, {user?.name || 'Exhibitor'}!
+              </h1>
+              <p className="text-xs md:text-sm text-muted-foreground max-w-xl leading-relaxed">
+                You are registered as an official trade exhibitor. Connect your company to an upcoming exhibition event below to activate your booth dashboard, manage your team delegate passes, and showcase products to trade buyers.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Booth Activation Form Card */}
+        <div className="bg-card border border-border rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
+          <div className="border-b border-border pb-4">
+            <h2 className="text-base md:text-lg font-bold text-foreground flex items-center gap-2">
+              <PlusCircle className="h-5 w-5 text-primary" /> Activate Your Exhibition Booth
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              Select your target trade show event and enter your exhibition profile details to launch your hub.
+            </p>
+          </div>
+
+          <form onSubmit={handleQuickSetup} className="space-y-5">
+            {/* Event Selection */}
+            <div>
+              <label className="block text-xs font-bold text-muted-foreground uppercase mb-1.5">
+                Target Exhibition / Expo Event *
+              </label>
+              <select
+                required
+                value={setupForm.eventId}
+                onChange={(e) => setSetupForm(prev => ({ ...prev, eventId: e.target.value }))}
+                className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-xs md:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer font-medium"
+              >
+                {availableEvents.length === 0 ? (
+                  <option value="">Loading live events...</option>
+                ) : (
+                  availableEvents.map(evt => (
+                    <option key={evt._id} value={evt._id}>
+                      {evt.title} ({evt.city || 'India'})
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-bold text-muted-foreground uppercase mb-1.5">
+                  Company / Brand Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={setupForm.name}
+                  onChange={(e) => setSetupForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g. Apex Industrial Solutions"
+                  className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-muted-foreground uppercase mb-1.5">
+                  Booth / Stall Space Number
+                </label>
+                <input
+                  type="text"
+                  value={setupForm.boothNumber}
+                  onChange={(e) => setSetupForm(prev => ({ ...prev, boothNumber: e.target.value }))}
+                  placeholder="e.g. Hall 1, Booth B-42"
+                  className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-bold text-muted-foreground uppercase mb-1.5">
+                  Contact Phone Number *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={setupForm.contactPhone}
+                  onChange={(e) => setSetupForm(prev => ({ ...prev, contactPhone: e.target.value }))}
+                  placeholder="+91 98765 43210"
+                  className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-muted-foreground uppercase mb-1.5">
+                  Official Website URL
+                </label>
+                <input
+                  type="url"
+                  value={setupForm.website}
+                  onChange={(e) => setSetupForm(prev => ({ ...prev, website: e.target.value }))}
+                  placeholder="https://company.com"
+                  className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-muted-foreground uppercase mb-1.5">
+                Company Overview & Products Showcased
+              </label>
+              <textarea
+                rows={3}
+                value={setupForm.description}
+                onChange={(e) => setSetupForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Describe your company, industry sector, and core products featured at this expo..."
+                className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              />
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={activating}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-3 text-xs md:text-sm shadow-md transition-all cursor-pointer"
+              >
+                {activating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Activating Booth Profile...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4" />
+                    Activate Exhibitor Booth & Enter Hub
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-12">
-      {/* Booth/Event Switcher Dropdown if multiple profiles exist */}
-      {profiles.length > 1 && (
-        <div className="flex items-center gap-3 bg-card border border-border p-4 rounded-2xl shadow-sm">
-          <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Switch Active Booth / Event:</span>
+      {/* Booth/Event Switcher & Add Booth Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card border border-border p-4 rounded-2xl shadow-sm">
+        <div className="flex items-center gap-3 flex-1">
+          <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+            Active Booth / Expo:
+          </span>
           <select
             value={selectedIdx}
             onChange={(e) => setSelectedIdx(Number(e.target.value))}
-            className="rounded-xl border border-border bg-background px-4 py-2 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            className="rounded-xl border border-border bg-background px-4 py-2 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary max-w-md cursor-pointer"
           >
             {profiles.map((p, idx) => (
               <option key={p._id} value={idx}>
@@ -816,7 +1052,15 @@ function ExhibitorDashboard() {
             ))}
           </select>
         </div>
-      )}
+
+        <button
+          onClick={() => setShowAddBoothModal(true)}
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-secondary hover:bg-secondary/80 text-foreground border border-border transition-colors cursor-pointer shrink-0"
+        >
+          <Plus className="h-3.5 w-3.5 text-primary" />
+          Add Another Expo Booth
+        </button>
+      </div>
 
       {/* Lock Warning Alert Banner if pending or rejected */}
       {profile.status !== 'approved' && (
@@ -825,7 +1069,7 @@ function ExhibitorDashboard() {
             ? 'bg-destructive/10 border-destructive/20 text-destructive'
             : 'bg-amber-500/10 border-amber-500/20 text-amber-500'
         }`}>
-          <AlertCircle className="h-4.5 w-4.5" />
+          <AlertCircle className="h-4.5 w-4.5 shrink-0" />
           <span>
             {profile.status === 'rejected'
               ? 'This onboarding request has been rejected by the organizers. Self-editing and badge configurations are locked.'
@@ -838,11 +1082,11 @@ function ExhibitorDashboard() {
       {/* Header Banner */}
       <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-secondary border border-border text-foreground font-extrabold text-2xl shadow-sm">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-secondary border border-border text-foreground font-extrabold text-2xl shadow-sm overflow-hidden shrink-0">
             {profile.logo ? (
-              <img src={profile.logo} alt={profile.name} className="h-full w-full object-contain rounded-2xl" />
+              <img src={profile.logo} alt={profile.name} className="h-full w-full object-contain" />
             ) : (
-              profile.name.slice(0, 2).toUpperCase()
+              profile.name?.slice(0, 2).toUpperCase() || 'EX'
             )}
           </div>
           <div>
@@ -870,10 +1114,114 @@ function ExhibitorDashboard() {
             </span>
           )}
           <span className="inline-flex items-center rounded-full bg-blue-500/10 px-3 py-1 text-xs font-bold text-blue-500 uppercase border border-blue-500/20">
-            {profile.attendanceType?.replace('_', ' ')} Booth
+            {profile.attendanceType?.replace('_', ' ') || 'in-person'} Booth
           </span>
         </div>
       </div>
+
+      {/* Modal: Add Another Booth */}
+      {showAddBoothModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-lg bg-card border border-border rounded-2xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                  <Plus className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-foreground">Register Booth for Another Expo</h3>
+                  <p className="text-xs text-muted-foreground">Select an upcoming trade show to participate in.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAddBoothModal(false)}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickSetup} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">Target Expo Event *</label>
+                <select
+                  required
+                  value={setupForm.eventId}
+                  onChange={(e) => setSetupForm(prev => ({ ...prev, eventId: e.target.value }))}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-medium cursor-pointer"
+                >
+                  {availableEvents.map(evt => (
+                    <option key={evt._id} value={evt._id}>
+                      {evt.title} ({evt.city || 'India'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">Company / Brand Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={setupForm.name}
+                  onChange={(e) => setSetupForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">Booth Number</label>
+                  <input
+                    type="text"
+                    value={setupForm.boothNumber}
+                    onChange={(e) => setSetupForm(prev => ({ ...prev, boothNumber: e.target.value }))}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">Phone *</label>
+                  <input
+                    type="text"
+                    required
+                    value={setupForm.contactPhone}
+                    onChange={(e) => setSetupForm(prev => ({ ...prev, contactPhone: e.target.value }))}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">Website URL</label>
+                <input
+                  type="url"
+                  value={setupForm.website}
+                  onChange={(e) => setSetupForm(prev => ({ ...prev, website: e.target.value }))}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setShowAddBoothModal(false)}
+                  className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={activating}
+                  className="px-4 py-2 text-xs font-bold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs transition-colors flex items-center gap-1.5"
+                >
+                  {activating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Activate Booth
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

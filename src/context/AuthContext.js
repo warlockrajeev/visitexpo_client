@@ -23,8 +23,41 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isExhibitorView, setIsExhibitorView] = useState(false);
+  const [isExhibitorView, setIsExhibitorViewState] = useState(false);
   const [hasExhibitorProfile, setHasExhibitorProfile] = useState(false);
+
+  // Synchronized view switcher that updates state & localStorage
+  const setIsExhibitorView = (val) => {
+    setIsExhibitorViewState(val);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('visitexpo_view_mode', val ? 'exhibitor' : 'organizer');
+    }
+  };
+
+  const toggleDashboardView = () => {
+    const nextVal = !isExhibitorView;
+    setIsExhibitorView(nextVal);
+    return nextVal;
+  };
+
+  // Sync initial view mode when user session loads
+  useEffect(() => {
+    if (user) {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('visitexpo_view_mode');
+        if (saved === 'exhibitor') {
+          setIsExhibitorViewState(true);
+          return;
+        }
+        if (saved === 'organizer') {
+          setIsExhibitorViewState(false);
+          return;
+        }
+      }
+      // Default: exhibitor role starts in exhibitor view; organizer starts in organizer view
+      setIsExhibitorViewState(user.role === 'exhibitor');
+    }
+  }, [user?.role]);
 
   const checkExhibitorProfile = async (token) => {
     try {
@@ -46,7 +79,6 @@ export const AuthProvider = ({ children }) => {
       checkExhibitorProfile(accessToken);
     } else {
       setHasExhibitorProfile(false);
-      setIsExhibitorView(false);
     }
   }, [accessToken]);
 
@@ -176,6 +208,11 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setUser(null);
       setAccessToken(null);
+      setIsExhibitorViewState(false);
+      setHasExhibitorProfile(false);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('visitexpo_view_mode');
+      }
       setLoading(false);
     }
   };
@@ -192,6 +229,7 @@ export const AuthProvider = ({ children }) => {
       updateUser: (updatedUser) => setUser(updatedUser),
       isExhibitorView,
       setIsExhibitorView,
+      toggleDashboardView,
       hasExhibitorProfile
     }}>
       {children}

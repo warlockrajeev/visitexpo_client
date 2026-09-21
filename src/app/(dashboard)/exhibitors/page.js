@@ -21,7 +21,8 @@ import {
   Trash2,
   AlertCircle,
   PlusCircle,
-  Loader2
+  Loader2,
+  Clock
 } from 'lucide-react';
 
 const API_URL =
@@ -199,18 +200,10 @@ export default function ExhibitorsPage() {
       if (res.data && res.data.success) {
         const created = res.data.exhibitor;
         
-        // Auto-approve right away since it was created by an Organizer from dashboard
-        const approveRes = await axios.put(
-          `${API_URL}/exhibitors/${created._id}/status`,
-          { status: 'approved' },
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
+        // Onboarded exhibitor goes to Admin for review & approval
+        setExhibitors(prev => [created, ...prev]);
 
-        if (approveRes.data && approveRes.data.success) {
-          setExhibitors(prev => [approveRes.data.exhibitor, ...prev]);
-        } else {
-          setExhibitors(prev => [created, ...prev]);
-        }
+        alert(`Exhibitor "${created.name}" onboarded successfully! Application has been forwarded to the Super Admin for review & approval.`);
 
         // Reset form
         setNewExhibitor({
@@ -257,7 +250,7 @@ export default function ExhibitorsPage() {
             <Building className="h-6 w-6 text-primary" /> Exhibitor Management
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage physical and virtual booths, approve onboarding requests, and coordinate staff.
+            Manage physical and virtual booths, track approval status, and coordinate staff.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -438,30 +431,39 @@ export default function ExhibitorsPage() {
                           ? 'bg-destructive/10 text-destructive'
                           : 'bg-amber-500/10 text-amber-500'
                       }`}>
-                        {ex.status.charAt(0).toUpperCase() + ex.status.slice(1)}
+                        {ex.status === 'pending' ? 'Pending Admin Approval' : ex.status.charAt(0).toUpperCase() + ex.status.slice(1)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {ex.status === 'pending' && (
-                          <>
-                            <button
-                              onClick={() => handleStatusUpdate(ex._id, 'approved')}
-                              className="p-1 text-emerald-500 hover:bg-emerald-500/10 rounded-md transition-colors"
-                              title="Approve request"
+                          user?.role === 'super_admin' ? (
+                            <>
+                              <button
+                                onClick={() => handleStatusUpdate(ex._id, 'approved')}
+                                className="p-1 text-emerald-500 hover:bg-emerald-500/10 rounded-md transition-colors"
+                                title="Approve request"
+                              >
+                                <Check className="h-5 w-5" />
+                              </button>
+                              <button
+                                onClick={() => handleStatusUpdate(ex._id, 'rejected')}
+                                className="p-1 text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                                title="Reject request"
+                              >
+                                <X className="h-5 w-5" />
+                              </button>
+                            </>
+                          ) : (
+                            <span
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20"
+                              title="Awaiting platform administrator review and approval"
                             >
-                              <Check className="h-5 w-5" />
-                            </button>
-                            <button
-                              onClick={() => handleStatusUpdate(ex._id, 'rejected')}
-                              className="p-1 text-destructive hover:bg-destructive/10 rounded-md transition-colors"
-                              title="Reject request"
-                            >
-                              <X className="h-5 w-5" />
-                            </button>
-                          </>
+                              <Clock className="h-3 w-3 animate-pulse" /> Pending Admin
+                            </span>
+                          )
                         )}
-                        {ex.status === 'rejected' && (
+                        {ex.status === 'rejected' && user?.role === 'super_admin' && (
                           <button
                             onClick={() => handleStatusUpdate(ex._id, 'pending')}
                             className="text-xs text-primary hover:underline px-2 py-1 font-semibold"
