@@ -32,7 +32,8 @@ import {
   Upload,
   Image as ImageIcon,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Building
 } from 'lucide-react';
 
 import { renderRichText, RichTextEditor, SPONSOR_TIER_GROUPS, PRESET_SPONSOR_TIERS, CATEGORY_SUBSECTORS } from '../events/wizard/page.js';
@@ -89,6 +90,50 @@ export default function EventsPage() {
       metaDescription: ''
     }
   });
+
+  // Duplicate Event Detection State
+  const [duplicateCheck, setDuplicateCheck] = useState({
+    checking: false,
+    isDuplicate: false,
+    existingEvent: null,
+    similarEvents: []
+  });
+
+  // Real-time Debounced Duplicate Event Detection while typing title
+  useEffect(() => {
+    const rawTitle = eventForm.title?.trim();
+    if (!rawTitle || rawTitle.length < 3) {
+      setDuplicateCheck({
+        checking: false,
+        isDuplicate: false,
+        existingEvent: null,
+        similarEvents: []
+      });
+      return;
+    }
+
+    setDuplicateCheck(prev => ({ ...prev, checking: true }));
+
+    const timer = setTimeout(async () => {
+      try {
+        const excludeParam = editMode && currentEventId ? `&excludeId=${encodeURIComponent(currentEventId)}` : '';
+        const res = await axios.get(`${API_URL}/events/check-duplicate?title=${encodeURIComponent(rawTitle)}${excludeParam}`);
+        if (res.data && res.data.success) {
+          setDuplicateCheck({
+            checking: false,
+            isDuplicate: res.data.isDuplicate,
+            existingEvent: res.data.existingEvent,
+            similarEvents: res.data.similarEvents || []
+          });
+        }
+      } catch (err) {
+        console.warn('Duplicate event check error in manage-events:', err);
+        setDuplicateCheck(prev => ({ ...prev, checking: false }));
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [eventForm.title, editMode, currentEventId]);
 
   const bannerFileInputRef = React.useRef(null);
   const [bannerValidation, setBannerValidation] = useState(null);
@@ -505,6 +550,11 @@ export default function EventsPage() {
   const handleFormSubmit = async (e) => {
     e.preventDefault();
 
+    if (duplicateCheck.isDuplicate) {
+      alert(`Cannot save duplicate event: An event titled "${duplicateCheck.existingEvent?.title}" already exists. Duplicate events cannot be created.`);
+      return;
+    }
+
     if (!eventForm.title || !eventForm.description || !eventForm.venue || !eventForm.startDate || !eventForm.endDate) {
       alert('Please fill out all required fields');
       return;
@@ -541,6 +591,18 @@ export default function EventsPage() {
       setIsModalOpen(false);
     } catch (err) {
       console.error('Error saving event', err);
+      if (err.response?.status === 409) {
+        alert(err.response.data?.error || 'A duplicate event with this title already exists.');
+        if (err.response.data?.existingEvent) {
+          setDuplicateCheck({
+            checking: false,
+            isDuplicate: true,
+            existingEvent: err.response.data.existingEvent,
+            similarEvents: []
+          });
+        }
+        return;
+      }
       alert(err.response?.data?.error || 'Failed to save event details');
     }
   };
@@ -841,18 +903,74 @@ export default function EventsPage() {
 
             <form onSubmit={handleFormSubmit} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Event Title *</label>
-                  <input
-                    type="text"
-                    name="title"
-                    required
-                    value={eventForm.title}
-                    onChange={handleInputChange}
-                    onBlur={handleTitleBlur}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="E.g. Global Tech Expo 2026"
-                  />
+                <div className={duplicateCheck.isDuplicate ? 'sm:col-span-2' : ''}>
+                  <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase flex items-center justify-between">
+                    <span>Event Title *</span>
+                    {duplicateCheck.checking && (
+                      <span className="text-[10px] text-primary flex items-center gap-1 normal-case font-normal">
+                        <Loader2 className="h-3 w-3 animate-spin" /> checking availability...
+                      </span>
+                    )}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      name="title"
+                      required
+                      value={eventForm.title}
+                      onChange={handleInputChange}
+                      onBlur={handleTitleBlur}
+                      className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none transition-all ${
+                        duplicateCheck.isDuplicate
+                          ? 'border-destructive ring-2 ring-destructive/20 focus:ring-destructive pr-10'
+                          : 'border-border focus:ring-2 focus:ring-primary'
+                      }`}
+                      placeholder="E.g. Global Tech Expo 2026"
+                    />
+                    {duplicateCheck.isDuplicate && (
+                      <div className="absolute right-3 top-2 text-destructive" title="Duplicate event title detected">
+                        <AlertTriangle className="h-5 w-5" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Duplicate event alert card */}
+                  {duplicateCheck.isDuplicate && duplicateCheck.existingEvent && (
+                    <div className="mt-3 rounded-xl border-2 border-amber-500/40 bg-amber-500/5 p-3.5 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                          <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                            Duplicate Event Detected — Cannot Create
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                          {duplicateCheck.existingEvent.status || 'Active'}
+                        </span>
+                      </div>
+                      <div className="bg-card border border-border rounded-lg p-2.5 text-xs space-y-1">
+                        <p className="font-bold text-foreground">{duplicateCheck.existingEvent.title}</p>
+                        <p className="text-muted-foreground text-[11px]">
+                          {duplicateCheck.existingEvent.venue}, {duplicateCheck.existingEvent.city}
+                          {duplicateCheck.existingEvent.startDate && ` • ${new Date(duplicateCheck.existingEvent.startDate).toLocaleDateString()}`}
+                        </p>
+                      </div>
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                        An event with this title already exists in the system. Duplicate events cannot be created. Please use a distinctive title to proceed.
+                      </p>
+                    </div>
+                  )}
+
+                  {!duplicateCheck.isDuplicate && duplicateCheck.similarEvents?.length > 0 && (
+                    <div className="mt-1.5 text-xs text-muted-foreground flex flex-wrap items-center gap-1">
+                      <span className="text-[11px]">Similar active events:</span>
+                      {duplicateCheck.similarEvents.map(sim => (
+                        <span key={sim._id} className="inline-flex items-center px-1.5 py-0.5 rounded bg-secondary text-[10px] text-muted-foreground">
+                          {sim.title}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">URL Slug *</label>
@@ -1523,9 +1641,14 @@ export default function EventsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-primary hover:bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow-md transition-colors"
+                  disabled={duplicateCheck.isDuplicate}
+                  className={`rounded-lg px-4 py-2 text-sm font-semibold shadow-md transition-colors ${
+                    duplicateCheck.isDuplicate
+                      ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                      : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                  }`}
                 >
-                  Save Event
+                  {duplicateCheck.isDuplicate ? 'Duplicate Event Title' : 'Save Event'}
                 </button>
               </div>
             </form>

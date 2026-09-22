@@ -657,6 +657,79 @@ export default function EventWizardPage() {
     metaDescription: ''
   });
 
+  // Real-time Duplicate Event Detection state
+  const [duplicateCheck, setDuplicateCheck] = useState({
+    checking: false,
+    isDuplicate: false,
+    existingEvent: null,
+    similarEvents: []
+  });
+
+  // Core duplicate verification function (can be called debounced or immediately)
+  const performDuplicateCheck = async (rawTitle) => {
+    const clean = (rawTitle || '').trim();
+    if (!clean || clean.length < 3) {
+      const reset = {
+        checking: false,
+        isDuplicate: false,
+        existingEvent: null,
+        similarEvents: []
+      };
+      setDuplicateCheck(reset);
+      return reset;
+    }
+
+    setDuplicateCheck(prev => ({ ...prev, checking: true }));
+
+    try {
+      const res = await axios.get(`${API_URL}/events/check-duplicate?title=${encodeURIComponent(clean)}`);
+      if (res.data && res.data.success) {
+        const result = {
+          checking: false,
+          isDuplicate: !!res.data.isDuplicate,
+          existingEvent: res.data.existingEvent || null,
+          similarEvents: res.data.similarEvents || []
+        };
+        setDuplicateCheck(result);
+        return result;
+      }
+    } catch (err) {
+      console.warn('Duplicate event check error:', err);
+    }
+    const fallback = { checking: false, isDuplicate: false, existingEvent: null, similarEvents: [] };
+    setDuplicateCheck(fallback);
+    return fallback;
+  };
+
+  // Real-time Debounced Duplicate Event Detection while typing title
+  useEffect(() => {
+    const rawTitle = formData.title?.trim();
+    if (!rawTitle || rawTitle.length < 3) {
+      setDuplicateCheck({
+        checking: false,
+        isDuplicate: false,
+        existingEvent: null,
+        similarEvents: []
+      });
+      return;
+    }
+
+    setDuplicateCheck(prev => ({ ...prev, checking: true }));
+
+    const timer = setTimeout(() => {
+      performDuplicateCheck(rawTitle);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [formData.title]);
+
+  // Re-verify duplicate when landing on Step 7 (Preview & Pre-Publish)
+  useEffect(() => {
+    if (currentStep === 7 && formData.title?.trim()) {
+      performDuplicateCheck(formData.title);
+    }
+  }, [currentStep]);
+
   const saveDraftToStorage = (dataToSave = formData, stepToSave = currentStep) => {
     try {
       if (typeof window !== 'undefined') {
@@ -681,7 +754,7 @@ export default function EventWizardPage() {
     }, 600);
   };
 
-  // Restore saved draft on mount if available
+  // Restore saved draft on mount if available & verify duplicate immediately
   useEffect(() => {
     try {
       if (typeof window !== 'undefined') {
@@ -695,6 +768,9 @@ export default function EventWizardPage() {
             setFormData(prev => ({ ...prev, ...loadedData }));
             setCurrentStep(loadedStep > 1 ? loadedStep : 2);
             setLastAutosaved(parsed.savedAt ? new Date(parsed.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Loaded Draft');
+            if (loadedData.title && loadedData.title.trim().length >= 3) {
+              performDuplicateCheck(loadedData.title);
+            }
           }
         }
       }
@@ -762,8 +838,11 @@ export default function EventWizardPage() {
     });
   };
 
-  // Generate Slug
-  const handleTitleBlur = () => {
+  // Generate Slug & trigger instant duplicate check on blur
+  const handleTitleBlur = async () => {
+    if (formData.title && formData.title.trim().length >= 3) {
+      await performDuplicateCheck(formData.title);
+    }
     if (!formData.slug && formData.title) {
       const generatedSlug = formData.title
         .toLowerCase()
@@ -1083,8 +1162,17 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
   const seoScore = calculateSeoScore();
 
   // Navigation handlers
-  const nextStep = () => {
+  const nextStep = async () => {
+    if (currentStep === 2) {
+      const check = await performDuplicateCheck(formData.title);
+      if (check.isDuplicate) {
+        setSubmitError(`Cannot proceed: An event titled "${check.existingEvent?.title || formData.title}" already exists on VisitExpo. Duplicate events cannot be created. Please modify your title or claim the existing listing.`);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
     if (currentStep < STEPS.length) {
+      setSubmitError('');
       setCurrentStep(prev => prev + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -1102,6 +1190,13 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
     setSubmitting(true);
     setSubmitError('');
     try {
+      // Safeguard duplicate check before final submission
+      const check = await performDuplicateCheck(formData.title);
+      if (check.isDuplicate) {
+        setSubmitError(`Submission Blocked: An event titled "${check.existingEvent?.title || formData.title}" is already present on VisitExpo. Duplicate events cannot be submitted.`);
+        setSubmitting(false);
+        return;
+      }
       const categoriesArray = [formData.category, formData.industry].filter(Boolean);
       const payload = {
         title: formData.title || 'Untitled Expo Event',
@@ -1147,6 +1242,20 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
       setCurrentStep(8);
     } catch (err) {
       console.error('Submission error:', err);
+      if (err.response?.status === 409) {
+        const existing = err.response.data?.existingEvent;
+        setSubmitError(err.response.data?.error || 'A duplicate event with this title already exists.');
+        if (existing) {
+          setDuplicateCheck({
+            checking: false,
+            isDuplicate: true,
+            existingEvent: existing,
+            similarEvents: []
+          });
+          setCurrentStep(2); // Take user directly to Step 2 to resolve duplicate
+        }
+        return;
+      }
       const errMsg = err.response?.data?.error || err.message || 'Failed to submit event';
       setSubmitError(errMsg);
     } finally {
@@ -1313,20 +1422,144 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
             </div>
 
             <div className="grid gap-6 sm:grid-cols-2">
-              <div>
-                <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
-                  Event Name / Title *
+              <div className={duplicateCheck.isDuplicate ? 'sm:col-span-2' : ''}>
+                <label className="block text-xs font-bold text-muted-foreground uppercase mb-1 flex items-center justify-between">
+                  <span>Event Name / Title *</span>
+                  {duplicateCheck.checking && (
+                    <span className="text-[10px] text-primary flex items-center gap-1 font-normal lowercase">
+                      <Loader2 className="h-3 w-3 animate-spin" /> checking availability...
+                    </span>
+                  )}
                 </label>
-                <input
-                  type="text"
-                  name="title"
-                  required
-                  value={formData.title}
-                  onChange={handleChange}
-                  onBlur={handleTitleBlur}
-                  placeholder="E.g. India International Tech & AI Summit 2026"
-                  className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="title"
+                    required
+                    value={formData.title}
+                    onChange={handleChange}
+                    onBlur={handleTitleBlur}
+                    placeholder="E.g. India International Tech & AI Summit 2026"
+                    className={`w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none transition-all ${
+                      duplicateCheck.isDuplicate
+                        ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500 pr-10'
+                        : 'border-border focus:ring-2 focus:ring-primary'
+                    }`}
+                  />
+                  {duplicateCheck.isDuplicate && (
+                    <div className="absolute right-3 top-2.5 text-rose-500" title="Duplicate event title detected">
+                      <AlertTriangle className="h-5 w-5" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Instant Inline Error Banner Under Input */}
+                {duplicateCheck.isDuplicate && (
+                  <div className="mt-2 flex items-center justify-between gap-2 text-xs text-rose-600 dark:text-rose-400 bg-rose-500/10 border border-rose-500/30 px-3 py-2 rounded-xl font-medium animate-in fade-in-50">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
+                      <span>
+                        <strong>Event Already Present:</strong> An event titled "<strong>{duplicateCheck.existingEvent?.title || formData.title}</strong>" is already registered. Duplicate events cannot be created.
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, title: '', slug: '' }))}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 dark:text-rose-300 hover:underline bg-rose-500/15 hover:bg-rose-500/25 px-2.5 py-1 rounded-lg transition-colors cursor-pointer shrink-0 ml-2"
+                    >
+                      <Eraser className="h-3 w-3" /> Clear Name
+                    </button>
+                  </div>
+                )}
+
+                {/* SHOW EXISTING DUPLICATE EVENT */}
+                {duplicateCheck.isDuplicate && duplicateCheck.existingEvent && (
+                  <div className="mt-3 rounded-2xl border-2 border-amber-500/40 bg-amber-500/5 p-4 space-y-3 animate-in fade-in-50 duration-200">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/15 text-amber-500 ring-1 ring-amber-500/30 shrink-0">
+                          <AlertTriangle className="h-4 w-4" />
+                        </span>
+                        <div>
+                          <h5 className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+                            Existing Event Already Present on VisitExpo
+                          </h5>
+                          <p className="text-[11px] text-muted-foreground">
+                            This event already exists in our system. You cannot create a duplicate listing.
+                          </p>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                        {duplicateCheck.existingEvent.status || 'Active Listing'}
+                      </span>
+                    </div>
+
+                    {/* Existing Event Details Box */}
+                    <div className="bg-card border border-border rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-extrabold text-foreground">
+                          {duplicateCheck.existingEvent.title}
+                        </h4>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                          {duplicateCheck.existingEvent.venue && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-primary" /> {duplicateCheck.existingEvent.venue}, {duplicateCheck.existingEvent.city}
+                            </span>
+                          )}
+                          {duplicateCheck.existingEvent.startDate && (
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3 text-primary" /> {new Date(duplicateCheck.existingEvent.startDate).toLocaleDateString()}
+                            </span>
+                          )}
+                          {duplicateCheck.existingEvent.orgName && (
+                            <span className="flex items-center gap-1 font-medium text-foreground/80">
+                              <Building className="h-3 w-3 text-amber-500" /> {duplicateCheck.existingEvent.orgName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action Links */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <a
+                          href={`https://visitexpo.in/event/${duplicateCheck.existingEvent.slug}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 rounded-lg border border-border bg-secondary hover:bg-secondary/80 px-3 py-1.5 text-xs font-bold text-foreground transition-colors"
+                        >
+                          <ExternalLink className="h-3 w-3" /> View Event
+                        </a>
+                        <Link
+                          href={`/events/claim?search=${encodeURIComponent(duplicateCheck.existingEvent.title)}`}
+                          className="inline-flex items-center gap-1 rounded-lg bg-amber-500 hover:bg-amber-600 px-3 py-1.5 text-xs font-bold text-white shadow transition-colors"
+                        >
+                          <ShieldCheck className="h-3 w-3" /> Claim Listing
+                        </Link>
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                      💡 If you are the official organizer of this event, click <strong>Claim Listing</strong> to manage it. Otherwise, modify your title (e.g. add the edition or year) to make it unique.
+                    </p>
+                  </div>
+                )}
+
+                {/* SHOW SIMILAR EVENTS IF ANY */}
+                {!duplicateCheck.isDuplicate && duplicateCheck.similarEvents?.length > 0 && (
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    <span className="text-[11px] font-medium text-foreground/70">Similar existing events:</span>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {duplicateCheck.similarEvents.map(sim => (
+                        <span
+                          key={sim._id}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-secondary border border-border text-[11px] text-muted-foreground"
+                        >
+                          <Calendar className="h-2.5 w-2.5 text-primary" /> {sim.title} {sim.city ? `(${sim.city})` : ''}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -2268,6 +2501,76 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               </div>
             </div>
 
+            {/* High-priority duplicate warning banner in Step 7 */}
+            {duplicateCheck.isDuplicate && duplicateCheck.existingEvent && (
+              <div className="rounded-2xl border-2 border-amber-500/50 bg-amber-500/10 p-5 space-y-3 shadow-md animate-in fade-in-50">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white font-bold shadow shrink-0">
+                      <AlertTriangle className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wide">
+                        Duplicate Event Detected — Submission Blocked
+                      </h4>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        An event titled <strong className="text-foreground font-bold">"{duplicateCheck.existingEvent.title}"</strong> is already registered in VisitExpo.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep(2)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-xs font-bold text-white shadow transition-colors shrink-0 cursor-pointer"
+                  >
+                    ← Edit Title in Step 2
+                  </button>
+                </div>
+
+                {/* Existing event card details */}
+                <div className="bg-card border border-border rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-sm">
+                  <div className="space-y-1">
+                    <span className="font-extrabold text-foreground text-sm block">{duplicateCheck.existingEvent.title}</span>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground text-xs">
+                      {duplicateCheck.existingEvent.venue && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3 text-primary" /> {duplicateCheck.existingEvent.venue}, {duplicateCheck.existingEvent.city}
+                        </span>
+                      )}
+                      {duplicateCheck.existingEvent.startDate && (
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-primary" /> {new Date(duplicateCheck.existingEvent.startDate).toLocaleDateString()}
+                        </span>
+                      )}
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                        {duplicateCheck.existingEvent.source === 'wordpress' ? 'Live Directory Listing' : 'Platform Event'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a
+                      href={`https://visitexpo.in/event/${duplicateCheck.existingEvent.slug}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-xs font-bold text-foreground inline-flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <ExternalLink className="h-3 w-3" /> View Event
+                    </a>
+                    <Link
+                      href={`/events/claim?search=${encodeURIComponent(duplicateCheck.existingEvent.title)}`}
+                      className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-xs font-bold text-white shadow inline-flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <ShieldCheck className="h-3 w-3" /> Claim Listing
+                    </Link>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                  💡 Duplicate events cannot be published. If you are the official organizer of this event, please click <strong>Claim Listing</strong>. Otherwise, click <strong>Edit Title in Step 2</strong> to give your event a distinctive name.
+                </p>
+              </div>
+            )}
+
             <div className="grid gap-6 md:grid-cols-3">
               {/* Live Preview Card */}
               <div className="md:col-span-2 space-y-4">
@@ -2281,9 +2584,15 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                         Banner Preview
                       </div>
                     )}
-                    <span className="absolute top-3 right-3 bg-amber-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shadow">
-                      Pending Review
-                    </span>
+                    {duplicateCheck.isDuplicate ? (
+                      <span className="absolute top-3 right-3 bg-rose-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shadow flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" /> Duplicate Name — Blocked
+                      </span>
+                    ) : (
+                      <span className="absolute top-3 right-3 bg-amber-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shadow">
+                        Pending Review
+                      </span>
+                    )}
                   </div>
 
                   <div className="p-6 space-y-3">
@@ -2313,6 +2622,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 <h4 className="text-xs font-bold text-muted-foreground uppercase">Pre-Submission Quality Checklist</h4>
                 <div className="rounded-2xl border border-border bg-card p-4 space-y-3 shadow-sm">
                   {[
+                    { label: 'Event Title Unique (Not Duplicate)', pass: !duplicateCheck.isDuplicate, isCritical: true },
                     { label: 'Event Banner Uploaded', pass: !!formData.bannerUrl },
                     { label: 'Start & End Dates Set', pass: !!formData.startDate && !!formData.endDate },
                     { label: 'Venue Location Confirmed', pass: !!formData.venueName && !!formData.city },
@@ -2322,7 +2632,11 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                   ].map((item, idx) => (
                     <div key={idx} className="flex items-center justify-between text-xs py-1 border-b border-border/60 last:border-0">
                       <span className="text-foreground">{item.label}</span>
-                      {item.pass ? (
+                      {item.isCritical && !item.pass ? (
+                        <span className="flex items-center gap-1 text-rose-600 font-bold">
+                          <AlertTriangle className="h-4 w-4" /> Blocked (Duplicate)
+                        </span>
+                      ) : item.pass ? (
                         <span className="flex items-center gap-1 text-emerald-500 font-bold">
                           <CheckCircle2 className="h-4 w-4" /> Pass
                         </span>
@@ -2415,12 +2729,41 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               </button>
 
               {currentStep === 7 ? (
+                duplicateCheck.isDuplicate ? (
+                  <div className="flex flex-col sm:flex-row items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(2)}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow transition-all cursor-pointer"
+                    >
+                      ← Return to Step 2 to Edit Title
+                    </button>
+                    <button
+                      type="button"
+                      disabled
+                      className="inline-flex items-center gap-2 rounded-xl bg-destructive/60 cursor-not-allowed px-5 py-2.5 text-xs font-bold text-destructive-foreground shadow transition-all"
+                      title="An event with this title already exists"
+                    >
+                      <AlertTriangle className="h-4 w-4" /> Duplicate Event — Cannot Submit
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleSubmitEvent}
+                    disabled={submitting}
+                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
+                  >
+                    {submitting ? 'Submitting...' : 'Submit Event for Moderation'} <ArrowRight className="h-4 w-4" />
+                  </button>
+                )
+              ) : currentStep === 2 && duplicateCheck.isDuplicate ? (
                 <button
-                  onClick={handleSubmitEvent}
-                  disabled={submitting}
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-500/20 transition-all"
+                  type="button"
+                  disabled
+                  className="inline-flex items-center gap-2 rounded-xl bg-destructive/70 cursor-not-allowed px-6 py-2.5 text-xs font-bold text-destructive-foreground shadow transition-all"
+                  title="An event with this name already exists"
                 >
-                  {submitting ? 'Submitting...' : 'Submit Event for Moderation'} <ArrowRight className="h-4 w-4" />
+                  <AlertTriangle className="h-4 w-4" /> Duplicate Event Name <ArrowRight className="h-4 w-4" />
                 </button>
               ) : (
                 <button

@@ -60,8 +60,16 @@ export default function ClaimEventPage() {
     additionalNotes: ''
   });
 
-  // Fetch live claimable WP events from API
+  // Fetch live claimable WP events from API and read URL search param if present
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const initialSearch = params.get('search');
+      if (initialSearch) {
+        setSearchTerm(initialSearch);
+      }
+    }
+
     const fetchClaimableEvents = async () => {
       setLoading(true);
       try {
