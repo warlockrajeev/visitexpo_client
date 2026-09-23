@@ -188,23 +188,49 @@ export default function LandingPage() {
     );
   }, [faqsList, activeFaqCategory]);
 
-  // Fetch events directly from WordPress website via route handler
+  // 1. Instant hydration from client storage (0 ms perceived latency on reload / repeat visits)
   useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem('visitexpo_landing_events_v1') || localStorage.getItem('visitexpo_landing_events_v1');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setEvents(parsed);
+          setIsFetchingWp(false);
+        }
+      }
+    } catch (e) {
+      // Storage unavailable or quota, continue
+    }
+  }, []);
+
+  // 2. Fetch fresh events directly from WordPress website via route handler
+  useEffect(() => {
+    let isMounted = true;
     const fetchWordPressEvents = async () => {
-      setIsFetchingWp(true);
       try {
         const res = await axios.get('/api/wordpress-events');
-        if (res.data?.success && Array.isArray(res.data?.events) && res.data.events.length > 0) {
+        if (isMounted && res.data?.success && Array.isArray(res.data?.events) && res.data.events.length > 0) {
           setEvents(res.data.events);
           setWpSource(res.data.source || 'wordpress_direct');
+          try {
+            const serialized = JSON.stringify(res.data.events);
+            sessionStorage.setItem('visitexpo_landing_events_v1', serialized);
+            localStorage.setItem('visitexpo_landing_events_v1', serialized);
+          } catch (storageErr) {
+            // Ignore quota errors
+          }
         }
       } catch (err) {
         console.error('Failed to fetch WordPress events:', err);
       } finally {
-        setIsFetchingWp(false);
+        if (isMounted) {
+          setIsFetchingWp(false);
+        }
       }
     };
     fetchWordPressEvents();
+    return () => { isMounted = false; };
   }, []);
 
   // Fetch followed exhibitions for logged-in user
@@ -243,6 +269,11 @@ export default function LandingPage() {
 
   // Enrich events with deterministic 10times social proof metrics
   const enrichedEvents = useMemo(() => {
+    if (!events || events.length === 0) return [];
+    // If the server route already precomputed metrics, reuse the array directly (0 ms main thread overhead)
+    if (events[0] && events[0].rating !== undefined) {
+      return events;
+    }
     return events.map((item, idx) => {
       const charSum = (item.title || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), idx * 19);
       const rating = (4.5 + ((charSum % 5) * 0.1)).toFixed(1);
@@ -254,12 +285,12 @@ export default function LandingPage() {
 
       return {
         ...item,
-        rating,
-        reviewCount,
-        interestedCount,
-        edition,
-        format,
-        eventType,
+        rating: item.rating || rating,
+        reviewCount: item.reviewCount || reviewCount,
+        interestedCount: item.interestedCount || interestedCount,
+        edition: item.edition || edition,
+        format: item.format || format,
+        eventType: item.eventType || eventType,
         verified: true
       };
     });
@@ -1088,6 +1119,19 @@ export default function LandingPage() {
                 </div>
 
                 <div className="space-y-3">
+                  {trendingEvents.length === 0 && isFetchingWp && (
+                    <>
+                      {[1, 2, 3].map((sk) => (
+                        <div key={sk} className="p-2 -mx-2 rounded-xl flex items-center gap-3 animate-pulse">
+                          <div className="h-12 w-12 rounded-lg bg-zinc-200 shrink-0" />
+                          <div className="min-w-0 flex-1 space-y-1.5">
+                            <div className="h-3 w-4/5 bg-zinc-200 rounded" />
+                            <div className="h-2.5 w-1/2 bg-zinc-200 rounded" />
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  )}
                   {trendingEvents.map((tr) => (
                     <Link
                       key={tr.id}
@@ -1283,11 +1327,32 @@ export default function LandingPage() {
                 ))}
               </div>
 
-              {/* Loading State */}
-              {isFetchingWp && (
-                <div className="flex items-center justify-center py-16 gap-2 text-xs text-zinc-500 bg-white rounded-2xl border border-zinc-200">
-                  <Loader2 className="h-5 w-5 animate-spin text-[#FF2E63]" />
-                  <span>Loading verified trade exhibitions from visitexpo.in...</span>
+              {/* Skeleton Cards State when cold-loading with no events in memory */}
+              {isFetchingWp && events.length === 0 && (
+                <div className="grid sm:grid-cols-2 gap-5">
+                  {[1, 2, 3, 4, 5, 6].map((sk) => (
+                    <div
+                      key={sk}
+                      className="bg-white border border-zinc-200 rounded-2xl overflow-hidden animate-pulse flex flex-col justify-between"
+                    >
+                      <div className="h-44 w-full bg-zinc-100 relative">
+                        <div className="absolute top-3 left-3 h-5 w-24 bg-zinc-200 rounded-full" />
+                        <div className="absolute top-3 right-3 h-7 w-7 bg-zinc-200 rounded-full" />
+                      </div>
+                      <div className="p-5 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <div className="h-4 w-28 bg-zinc-200 rounded-md" />
+                          <div className="h-4 w-12 bg-zinc-200 rounded-md" />
+                        </div>
+                        <div className="h-5 w-5/6 bg-zinc-200 rounded-md" />
+                        <div className="h-4 w-3/5 bg-zinc-200 rounded-md" />
+                        <div className="pt-3 border-t border-zinc-100 flex items-center justify-between">
+                          <div className="h-8 w-28 bg-zinc-200 rounded-xl" />
+                          <div className="h-8 w-24 bg-zinc-200 rounded-xl" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -1304,7 +1369,7 @@ export default function LandingPage() {
                       setDateRangeFilter('all');
                       setFormatFilter('all');
                     }}
-                    className="px-4 py-2 rounded-xl bg-zinc-900 text-white text-xs font-bold"
+                    className="px-4 py-2 rounded-xl bg-zinc-900 text-white text-xs font-bold hover:bg-zinc-800 transition-colors"
                   >
                     Clear Filters
                   </button>
@@ -1312,7 +1377,7 @@ export default function LandingPage() {
               )}
 
               {/* 10times Enriched Event Cards Grid */}
-              {!isFetchingWp && displayedEvents.length > 0 && (
+              {displayedEvents.length > 0 && (
                 <div className="grid sm:grid-cols-2 gap-5">
                   {displayedEvents.map((expo) => {
                     const isSaved = savedEventIds.has(expo.id);
