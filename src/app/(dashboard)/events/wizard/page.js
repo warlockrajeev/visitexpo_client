@@ -61,6 +61,8 @@ import {
   Eraser,
   Loader2,
   Trash2,
+  ScrollText,
+  Compass,
   X
 } from 'lucide-react';
 
@@ -605,6 +607,7 @@ export default function EventWizardPage() {
   const fileInputRef = React.useRef(null);
 
   const [currentStep, setCurrentStep] = useState(1);
+  const [formMode, setFormMode] = useState('wizard'); // 'wizard' | 'scrollable'
   const [lastAutosaved, setLastAutosaved] = useState('Just now');
   const [isSaving, setIsSaving] = useState(false);
   const [isAiGenerating, setIsAiGenerating] = useState(false);
@@ -783,11 +786,35 @@ export default function EventWizardPage() {
             }
           }
         }
+
+        // Restore chosen form mode (wizard vs scrollable)
+        const savedMode = localStorage.getItem('visitexpo_create_event_mode');
+        if (savedMode === 'wizard' || savedMode === 'scrollable') {
+          setFormMode(savedMode);
+        }
       }
     } catch (e) {
-      console.error('Error restoring saved draft', e);
+      console.error('Error restoring saved draft / mode', e);
     }
   }, []);
+
+  const handleModeChange = (newMode) => {
+    setFormMode(newMode);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('visitexpo_create_event_mode', newMode);
+      }
+    } catch (e) {
+      console.error('Error saving formMode preference', e);
+    }
+  };
+
+  const scrollToSection = (id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   // Autosave interval every 25 seconds
   useEffect(() => {
@@ -1300,91 +1327,9 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
     }
   };
 
-  return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12">
-      {/* Top Banner: Progress Stepper & Autosave Header */}
-      <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/80 pb-4">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight text-foreground">
-              Event & Organizer Onboarding
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Step {currentStep} of {STEPS.length}: <span className="font-semibold text-foreground">{STEPS[currentStep - 1].title}</span>
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {(formData.title || currentStep > 1) && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to discard this draft and start fresh?')) {
-                    if (typeof window !== 'undefined') {
-                      localStorage.removeItem('visitexpo_wizard_draft');
-                    }
-                    window.location.href = '/events/wizard';
-                  }
-                }}
-                className="text-xs font-semibold text-muted-foreground hover:text-red-500 px-2.5 py-1.5 rounded-lg border border-border hover:border-red-500/30 bg-muted/20 hover:bg-red-500/10 transition-all cursor-pointer"
-                title="Discard draft and start fresh"
-              >
-                Discard Draft
-              </button>
-            )}
-
-            {/* Autosave / Save Draft Button */}
-            <button
-              type="button"
-              onClick={handleManualSaveDraft}
-              disabled={isSaving}
-              title="Click to save draft now"
-              className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted active:scale-95 px-3 py-1.5 rounded-lg border border-border transition-all cursor-pointer hover:border-primary/50 shadow-2xs"
-            >
-              <Save className={`h-3.5 w-3.5 ${isSaving ? 'animate-spin text-primary' : 'text-emerald-500'}`} />
-              <span>{isSaving ? 'Saving Draft...' : `Autosaved at ${lastAutosaved}`}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Stepper Bar */}
-        <div className="relative overflow-x-auto py-2">
-          <div className="flex items-center justify-between min-w-[700px]">
-            {STEPS.map((step) => {
-              const isCompleted = currentStep > step.id || isSubmitted;
-              const isCurrent = currentStep === step.id;
-
-              return (
-                <div key={step.id} className="flex flex-col items-center relative z-10">
-                  <button
-                    onClick={() => step.id <= currentStep && setCurrentStep(step.id)}
-                    disabled={step.id > currentStep}
-                    className={`flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold transition-all duration-200 ${
-                      isCompleted
-                        ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
-                        : isCurrent
-                        ? 'bg-primary text-primary-foreground ring-4 ring-primary/20 shadow-md'
-                        : 'bg-muted text-muted-foreground border border-border cursor-not-allowed'
-                    }`}
-                  >
-                    {isCompleted ? <Check className="h-5 w-5" /> : <step.icon className="h-4 w-4" />}
-                  </button>
-                  <span className={`text-[11px] font-semibold mt-2 ${isCurrent ? 'text-primary font-bold' : 'text-muted-foreground'}`}>
-                    {step.title}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* STEP CONTENT PANELS */}
-      <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm">
-        
-        {/* STEP 1: WELCOME & ACTION CHOICE */}
-        {currentStep === 1 && (
-          <div className="space-y-6">
+    // Renderers for individual form steps (shared between Wizard and Scrollable modes)
+  const renderStep1 = () => (
+    <div className="space-y-6">
             <div className="text-center max-w-xl mx-auto space-y-2">
               <h3 className="text-xl font-bold text-foreground">Welcome to VisitExpo Event Onboarding</h3>
               <p className="text-sm text-muted-foreground">
@@ -1444,15 +1389,14 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               </div>
             </div>
           </div>
-        )}
+  );
 
-        {/* STEP 2: BASIC DETAILS */}
-        {currentStep === 2 && (
-          <div className="space-y-6">
+  const renderStep2Content = ({ isScrollable = false } = {}) => (
+    <div className="space-y-6">
             <div className="border-b border-border pb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-primary" /> Step 2: Basic Event Information
+                  <FileText className="h-5 w-5 text-primary" /> {isScrollable ? "1. Basic Event Information" : "Step 2: Basic Event Information"}
                 </h3>
                 <p className="text-xs text-muted-foreground">Provide core identity and taxonomy for your expo.</p>
               </div>
@@ -1699,14 +1643,13 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               />
             </div>
           </div>
-        )}
+  );
 
-        {/* STEP 3: DATE & VENUE */}
-        {currentStep === 3 && (
-          <div className="space-y-6">
+  const renderStep3Content = ({ isScrollable = false } = {}) => (
+    <div className="space-y-6">
             <div className="border-b border-border pb-4">
               <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary" /> Step 3: Dates, Timings & Venue Location
+                <Calendar className="h-5 w-5 text-primary" /> {isScrollable ? "2. Dates, Timings & Venue Location" : "Step 3: Dates, Timings & Venue Location"}
               </h3>
               <p className="text-xs text-muted-foreground">Specify event schedule and exact hall address.</p>
             </div>
@@ -1869,14 +1812,13 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               )}
             </div>
           </div>
-        )}
+  );
 
-        {/* STEP 4: ORGANIZER PROFILE SETUP */}
-        {currentStep === 4 && (
-          <div className="space-y-6">
+  const renderStep4Content = ({ isScrollable = false } = {}) => (
+    <div className="space-y-6">
             <div className="border-b border-border pb-4">
               <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                <Building className="h-5 w-5 text-primary" /> Step 4: Organizer Profile Setup
+                <Building className="h-5 w-5 text-primary" /> {isScrollable ? "3. Organizer Profile Setup" : "Step 4: Organizer Profile Setup"}
               </h3>
               <p className="text-xs text-muted-foreground">Build trust with corporate attendees & exhibitors.</p>
             </div>
@@ -2066,14 +2008,13 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               </div>
             </div>
           </div>
-        )}
+  );
 
-        {/* STEP 5: MEDIA UPLOAD */}
-        {currentStep === 5 && (
-          <div className="space-y-6">
+  const renderStep5Content = ({ isScrollable = false } = {}) => (
+    <div className="space-y-6">
             <div className="border-b border-border pb-4">
               <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                <ImageIcon className="h-5 w-5 text-primary" /> Step 5: Media Upload & Promotional Assets
+                <ImageIcon className="h-5 w-5 text-primary" /> {isScrollable ? "4. Media Upload & Promotional Assets" : "Step 5: Media Upload & Promotional Assets"}
               </h3>
               <p className="text-xs text-muted-foreground">Upload 1920x1080 banner, gallery photos, brochure PDF & promo video.</p>
             </div>
@@ -2317,14 +2258,13 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               )}
             </div>
           </div>
-        )}
+  );
 
-        {/* STEP 6: TICKETING & REGISTRATION FORM */}
-        {currentStep === 6 && (
-          <div className="space-y-6">
+  const renderStep6Content = ({ isScrollable = false } = {}) => (
+    <div className="space-y-6">
             <div className="border-b border-border pb-4">
               <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                <Ticket className="h-5 w-5 text-primary" /> Step 6: Ticketing & Visitor Registration Setup
+                <Ticket className="h-5 w-5 text-primary" /> {isScrollable ? "5. Ticketing & Visitor Registration Setup" : "Step 6: Ticketing & Visitor Registration Setup"}
               </h3>
               <p className="text-xs text-muted-foreground">Configure registration rules and visitor data collection fields.</p>
             </div>
@@ -2567,15 +2507,14 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               />
             </div>
           </div>
-        )}
+  );
 
-        {/* STEP 7: PREVIEW & SEO CHECK */}
-        {currentStep === 7 && (
-          <div className="space-y-6">
+  const renderStep7Content = ({ isScrollable = false } = {}) => (
+    <div className="space-y-6">
             <div className="border-b border-border pb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                  <Eye className="h-5 w-5 text-primary" /> Step 7: Event Preview & Pre-Publish SEO Analysis
+                  <Eye className="h-5 w-5 text-primary" /> {isScrollable ? "6. Event Preview & Pre-Publish SEO Analysis" : "Step 7: Event Preview & Pre-Publish SEO Analysis"}
                 </h3>
                 <p className="text-xs text-muted-foreground">Verify public details and search engine optimization grade.</p>
               </div>
@@ -2609,10 +2548,10 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                   </div>
                   <button
                     type="button"
-                    onClick={() => setCurrentStep(2)}
+                    onClick={() => isScrollable ? scrollToSection('section-basic') : setCurrentStep(2)}
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-xs font-bold text-white shadow transition-colors shrink-0 cursor-pointer"
                   >
-                    ← Edit Title in Step 2
+                    {isScrollable ? '↑ Edit Title in Section 1' : '← Edit Title in Step 2'}
                   </button>
                 </div>
 
@@ -2660,6 +2599,43 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               </div>
             )}
 
+                        {/* SEO Meta Customization */}
+            <div className="rounded-2xl border border-border bg-card p-5 space-y-3 shadow-sm">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Google & Search Engine Snippet
+                </h4>
+                <span className="text-[11px] text-muted-foreground">Used for SEO indexing</span>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
+                    Meta Title
+                  </label>
+                  <input
+                    type="text"
+                    name="metaTitle"
+                    value={formData.metaTitle}
+                    onChange={handleChange}
+                    placeholder={`${formData.title || "Event Name"} | VisitExpo`}
+                    className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
+                    Meta Description
+                  </label>
+                  <input
+                    type="text"
+                    name="metaDescription"
+                    value={formData.metaDescription}
+                    onChange={handleChange}
+                    placeholder="Brief description for Google search results..."
+                    className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              </div>
+            </div>
             <div className="grid gap-6 md:grid-cols-3">
               {/* Live Preview Card */}
               <div className="md:col-span-2 space-y-4">
@@ -2740,11 +2716,10 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               </div>
             </div>
           </div>
-        )}
+  );
 
-        {/* STEP 8: SUBMIT & MODERATION WORKFLOW */}
-        {currentStep === 8 && (
-          <div className="text-center max-w-xl mx-auto space-y-6 py-6">
+  const renderStep8 = () => (
+    <div className="text-center max-w-xl mx-auto space-y-6 py-6">
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500 mx-auto ring-8 ring-emerald-500/20">
               <CheckCircle2 className="h-10 w-10 animate-bounce" />
             </div>
@@ -2793,9 +2768,208 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               </button>
             </div>
           </div>
+  );
+
+  const sectionChecklist = [
+    {
+      id: 'basic',
+      anchor: 'section-basic',
+      label: '1. Basic Info',
+      icon: FileText,
+      isComplete: Boolean(formData.title?.trim() && formData.description?.trim())
+    },
+    {
+      id: 'venue',
+      anchor: 'section-venue',
+      label: '2. Dates & Venue',
+      icon: Calendar,
+      isComplete: Boolean(formData.startDate && formData.endDate && formData.venueName?.trim() && formData.city?.trim())
+    },
+    {
+      id: 'organizer',
+      anchor: 'section-organizer',
+      label: '3. Organizer Profile',
+      icon: Building,
+      isComplete: Boolean(formData.orgName?.trim() && formData.orgEmail?.trim())
+    },
+    {
+      id: 'media',
+      anchor: 'section-media',
+      label: '4. Media & Assets',
+      icon: ImageIcon,
+      isComplete: Boolean(formData.bannerUrl?.trim())
+    },
+    {
+      id: 'tickets',
+      anchor: 'section-tickets',
+      label: '5. Tickets & Form',
+      icon: Ticket,
+      isComplete: Boolean(formData.isFreeEvent || (formData.paidTicketPrice && formData.paidTicketPrice !== ''))
+    },
+    {
+      id: 'seo',
+      anchor: 'section-seo',
+      label: '6. SEO & Review',
+      icon: Eye,
+      isComplete: Boolean(!duplicateCheck.isDuplicate && (formData.metaTitle?.trim() || formData.title?.trim()))
+    }
+  ];
+
+  const completedSectionsCount = sectionChecklist.filter(s => s.isComplete).length;
+
+  return (
+    <div className={`space-y-6 ${formMode === 'scrollable' ? 'max-w-7xl' : 'max-w-5xl'} mx-auto pb-12`}>
+      {/* Top Banner: Progress Stepper & Mode Switcher Header */}
+      <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/80 pb-4">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-foreground">
+              Event & Organizer Onboarding
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {formMode === 'wizard' ? (
+                <>Step {currentStep} of {STEPS.length}: <span className="font-semibold text-foreground">{STEPS[currentStep - 1]?.title}</span></>
+              ) : (
+                <>All-in-One Form • Fill all sections continuously on a single scrollable page</>
+              )}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Form Mode Switcher Toggle */}
+            <div className="inline-flex items-center p-1 bg-muted/60 dark:bg-muted/40 border border-border rounded-xl shadow-2xs">
+              <button
+                type="button"
+                onClick={() => handleModeChange('wizard')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  formMode === 'wizard'
+                    ? 'bg-background text-foreground shadow-xs border border-border/80'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                title="Navigate one step at a time with guided stepper"
+              >
+                <Compass className="h-3.5 w-3.5 text-primary" />
+                <span>Step-by-Step Wizard</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleModeChange('scrollable')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  formMode === 'scrollable'
+                    ? 'bg-background text-foreground shadow-xs border border-border/80'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                title="View and edit all sections on a single continuous page"
+              >
+                <ScrollText className="h-3.5 w-3.5 text-primary" />
+                <span>All-in-One Form</span>
+              </button>
+            </div>
+
+            {(formData.title || currentStep > 1) && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to discard this draft and start fresh?')) {
+                    if (typeof window !== 'undefined') {
+                      localStorage.removeItem('visitexpo_wizard_draft');
+                    }
+                    window.location.href = '/events/wizard';
+                  }
+                }}
+                className="text-xs font-semibold text-muted-foreground hover:text-red-500 px-2.5 py-1.5 rounded-lg border border-border hover:border-red-500/30 bg-muted/20 hover:bg-red-500/10 transition-all cursor-pointer"
+                title="Discard draft and start fresh"
+              >
+                Discard Draft
+              </button>
+            )}
+
+            {/* Autosave / Save Draft Button */}
+            <button
+              type="button"
+              onClick={handleManualSaveDraft}
+              disabled={isSaving}
+              title="Click to save draft now"
+              className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted active:scale-95 px-3 py-1.5 rounded-lg border border-border transition-all cursor-pointer hover:border-primary/50 shadow-2xs"
+            >
+              <Save className={`h-3.5 w-3.5 ${isSaving ? 'animate-spin text-primary' : 'text-emerald-500'}`} />
+              <span>{isSaving ? 'Saving Draft...' : `Autosaved at ${lastAutosaved}`}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* WIZARD MODE: Stepper Bar */}
+        {formMode === 'wizard' && (
+          <div className="relative overflow-x-auto py-2">
+            <div className="flex items-center justify-between min-w-[700px]">
+              {STEPS.map((step) => {
+                const isCompleted = currentStep > step.id || isSubmitted;
+                const isCurrent = currentStep === step.id;
+
+                return (
+                  <div key={step.id} className="flex flex-col items-center relative z-10">
+                    <button
+                      onClick={() => step.id <= currentStep && setCurrentStep(step.id)}
+                      disabled={step.id > currentStep}
+                      className={`flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold transition-all duration-200 ${
+                        isCompleted
+                          ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
+                          : isCurrent
+                          ? 'bg-primary text-primary-foreground ring-4 ring-primary/20 shadow-md'
+                          : 'bg-muted text-muted-foreground border border-border cursor-not-allowed'
+                      }`}
+                    >
+                      {isCompleted ? <Check className="h-5 w-5" /> : <step.icon className="h-4 w-4" />}
+                    </button>
+                    <span className={`text-[11px] font-semibold mt-2 ${isCurrent ? 'text-primary font-bold' : 'text-muted-foreground'}`}>
+                      {step.title}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
 
-        {/* Bottom Stepper Navigation Control Buttons */}
+        {/* SCROLLABLE MODE: Sticky Quick Jump Anchor Bar */}
+        {formMode === 'scrollable' && !isSubmitted && currentStep !== 8 && (
+          <div className="flex items-center justify-between gap-3 pt-1 border-t border-border/60 overflow-x-auto pb-1 text-xs">
+            <div className="flex items-center gap-1.5 font-bold text-muted-foreground shrink-0 text-[11px] uppercase tracking-wider">
+              <span>Quick Jump:</span>
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto py-0.5">
+              {sectionChecklist.map((sec) => (
+                <button
+                  key={sec.id}
+                  type="button"
+                  onClick={() => scrollToSection(sec.anchor)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary active:scale-95 text-foreground text-xs font-semibold border border-border shrink-0 transition-all cursor-pointer hover:border-primary/40"
+                >
+                  <sec.icon className="h-3.5 w-3.5 text-primary" />
+                  <span>{sec.label}</span>
+                  {sec.isComplete && <Check className="h-3 w-3 text-emerald-500 stroke-[3]" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      
+      {/* RENDER CONTENT BASED ON SELECTED MODE */}
+      {formMode === 'wizard' ? (
+        /* WIZARD MODE: Single step container + bottom stepper nav */
+        <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm">
+          {currentStep === 1 && renderStep1()}
+          {currentStep === 2 && renderStep2Content({ isScrollable: false })}
+          {currentStep === 3 && renderStep3Content({ isScrollable: false })}
+          {currentStep === 4 && renderStep4Content({ isScrollable: false })}
+          {currentStep === 5 && renderStep5Content({ isScrollable: false })}
+          {currentStep === 6 && renderStep6Content({ isScrollable: false })}
+          {currentStep === 7 && renderStep7Content({ isScrollable: false })}
+          {currentStep === 8 && renderStep8()}
+
+          {/* Bottom Stepper Navigation Control Buttons */}
         {currentStep < 8 && (
           <div className="flex flex-col gap-4 pt-8 border-t border-border mt-8">
             {submitError && (
@@ -2865,8 +3039,208 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
             </div>
           </div>
         )}
+        </div>
+      ) : (
+        /* SCROLLABLE MODE: All sections continuous stack + Sticky Sidebar */
+        isSubmitted || currentStep === 8 ? (
+          <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm">
+            {renderStep8()}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Left Column: All Continuous Section Cards */}
+            <div className="lg:col-span-8 space-y-8">
+              {/* Quick Claim Info Notice */}
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <ShieldCheck className="h-5 w-5 text-primary shrink-0" />
+                  <p className="text-xs text-muted-foreground">
+                    Is this event already listed on VisitExpo? <Link href="/events/claim" className="font-bold text-primary hover:underline">Claim official ownership here</Link> instead of creating a duplicate.
+                  </p>
+                </div>
+              </div>
 
-      </div>
+              {/* SECTION 1: Basic Information */}
+              <div id="section-basic" className="scroll-mt-24 bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm space-y-6">
+                {renderStep2Content({ isScrollable: true })}
+              </div>
+
+              {/* SECTION 2: Dates, Timings & Venue */}
+              <div id="section-venue" className="scroll-mt-24 bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm space-y-6">
+                {renderStep3Content({ isScrollable: true })}
+              </div>
+
+              {/* SECTION 3: Organizer Profile */}
+              <div id="section-organizer" className="scroll-mt-24 bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm space-y-6">
+                {renderStep4Content({ isScrollable: true })}
+              </div>
+
+              {/* SECTION 4: Media Upload & Assets */}
+              <div id="section-media" className="scroll-mt-24 bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm space-y-6">
+                {renderStep5Content({ isScrollable: true })}
+              </div>
+
+              {/* SECTION 5: Ticketing & Registration */}
+              <div id="section-tickets" className="scroll-mt-24 bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm space-y-6">
+                {renderStep6Content({ isScrollable: true })}
+              </div>
+
+              {/* SECTION 6: Preview & Pre-Publish SEO Checker */}
+              <div id="section-seo" className="scroll-mt-24 bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm space-y-6">
+                {renderStep7Content({ isScrollable: true })}
+              </div>
+            </div>
+
+            {/* Right Column: Sticky Sidebar (Publish Action, Checklist, SEO Gauge) */}
+            <div className="lg:col-span-4 sticky top-6 space-y-6">
+              {/* Publish Action Box */}
+              <div className="bg-card border border-border rounded-2xl p-5 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-border pb-3">
+                  <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-primary" /> Publish & Status
+                  </h4>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    Draft Listing
+                  </span>
+                </div>
+
+                {submitError && (
+                  <div className="p-3 rounded-xl border border-red-500/20 bg-red-500/10 text-red-500 text-xs font-semibold flex items-start justify-between gap-2">
+                    <span>{submitError}</span>
+                    <button onClick={() => setSubmitError('')} className="font-bold text-sm shrink-0">×</button>
+                  </div>
+                )}
+
+                {duplicateCheck.isDuplicate ? (
+                  <div className="space-y-2">
+                    <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-xs text-destructive space-y-1">
+                      <p className="font-bold flex items-center gap-1.5">
+                        <AlertTriangle className="h-4 w-4 shrink-0" /> Duplicate Event Name
+                      </p>
+                      <p className="text-[11px] leading-relaxed">
+                        An event with this name already exists. Please rename your event in Section 1 or claim it.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-destructive/70 cursor-not-allowed px-4 py-3 text-xs font-bold text-destructive-foreground shadow"
+                    >
+                      <AlertTriangle className="h-4 w-4" /> Duplicate — Cannot Submit
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSubmitEvent}
+                    disabled={submitting}
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-[0.99] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Submitting Event...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Submit Event for Moderation</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+                )}
+
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/70 text-xs">
+                  <button
+                    type="button"
+                    onClick={handleManualSaveDraft}
+                    disabled={isSaving}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline transition-colors cursor-pointer"
+                  >
+                    <Save className={'h-3.5 w-3.5 ' + (isSaving ? 'animate-spin text-primary' : 'text-emerald-500')} />
+                    <span>{isSaving ? 'Saving...' : 'Save Draft'}</span>
+                  </button>
+                  <span className="text-[11px] text-muted-foreground">
+                    {lastAutosaved}
+                  </span>
+                </div>
+              </div>
+
+              {/* Form Checklist Card */}
+              <div className="bg-card border border-border rounded-2xl p-5 shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Section Checklist
+                  </h4>
+                  <span className="text-xs font-extrabold text-primary">
+                    {completedSectionsCount} / 6 Ready
+                  </span>
+                </div>
+
+                <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 transition-all duration-300"
+                    style={{ width: ((completedSectionsCount / 6) * 100) + '%' }}
+                  />
+                </div>
+
+                <div className="space-y-1.5 pt-2">
+                  {sectionChecklist.map((sec) => (
+                    <button
+                      key={sec.id}
+                      type="button"
+                      onClick={() => scrollToSection(sec.anchor)}
+                      className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-secondary/60 text-xs transition-colors text-left group cursor-pointer"
+                    >
+                      <span className="text-foreground group-hover:text-primary font-medium flex items-center gap-2">
+                        <sec.icon className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary" />
+                        {sec.label}
+                      </span>
+                      {sec.isComplete ? (
+                        <span className="flex items-center text-emerald-500 font-bold text-[11px]">
+                          <Check className="h-3.5 w-3.5 mr-0.5" /> Ready
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground font-normal">
+                          Incomplete
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* SEO Score Meter Card */}
+              <div className="bg-card border border-border rounded-2xl p-5 shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Star className="h-3.5 w-3.5 text-emerald-500 fill-emerald-500" /> SEO Optimization
+                  </h4>
+                  <span className="text-xs font-extrabold text-emerald-500">
+                    {seoScore} / 100
+                  </span>
+                </div>
+
+                <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                  <div
+                    className={'h-full transition-all duration-300 ' + (
+                      seoScore >= 80 ? 'bg-emerald-500' : seoScore >= 50 ? 'bg-amber-500' : 'bg-rose-500'
+                    )}
+                    style={{ width: seoScore + '%' }}
+                  />
+                </div>
+
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  {seoScore >= 80
+                    ? 'Listing quality is excellent! Meets requirements for directory indexing and SEO visibility.'
+                    : 'Add complete description, 1920x1080 banner cover, and SEO tags to improve ranking.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )
+      )}
     </div>
   );
 }
+
