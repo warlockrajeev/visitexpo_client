@@ -1328,7 +1328,18 @@ export default function EventsPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-muted-foreground uppercase">Organizer Logo</label>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[10px] font-bold text-muted-foreground uppercase">Organizer Logo</label>
+                      {eventForm.orgLogo && (
+                        <button
+                          type="button"
+                          onClick={() => setEventForm(prev => ({ ...prev, orgLogo: '' }))}
+                          className="text-[9px] font-bold text-red-500 hover:text-red-700 hover:underline cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
                     <div className="relative border border-dashed border-border rounded-lg p-1.5 text-center bg-background hover:border-primary transition-colors cursor-pointer flex items-center justify-center h-[32px]">
                       <input
                         type="file"
@@ -1339,7 +1350,10 @@ export default function EventsPage() {
                       {isUploading ? (
                         <Loader2 className="h-4 w-4 animate-spin text-primary" />
                       ) : eventForm.orgLogo ? (
-                        <img src={eventForm.orgLogo} alt="Org Logo" className="max-h-6 object-contain" />
+                        <div className="flex items-center gap-1.5">
+                          <img src={eventForm.orgLogo} alt="Org Logo" className="max-h-6 object-contain" />
+                          <span className="text-[9px] text-muted-foreground font-semibold">Change</span>
+                        </div>
                       ) : (
                         <span className="text-[10px] text-muted-foreground">Click to upload</span>
                       )}

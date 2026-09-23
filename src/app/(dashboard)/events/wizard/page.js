@@ -59,7 +59,9 @@ import {
   Link as LinkIcon,
   Edit3,
   Eraser,
-  Loader2
+  Loader2,
+  Trash2,
+  X
 } from 'lucide-react';
 
 const API_URL =
@@ -1953,25 +1955,77 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
             {/* Organizer Logo & Description */}
             <div className="grid gap-6 sm:grid-cols-3">
               <div className="sm:col-span-1 space-y-1">
-                <label className="block text-xs font-bold text-muted-foreground uppercase">
-                  Organizer Logo (Min 100×100 px)
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-muted-foreground uppercase">
+                    Organizer Logo (Min 100×100 px)
+                  </label>
+                  {formData.orgLogo && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, orgLogo: '' }));
+                        setOrgLogoValidation(null);
+                      }}
+                      className="text-[11px] font-bold text-red-500 hover:text-red-700 hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <Trash2 className="h-3 w-3" /> Remove Logo
+                    </button>
+                  )}
+                </div>
                 {orgLogoValidation?.error && (
                   <p className="text-[11px] font-semibold text-red-500 my-1">{orgLogoValidation.error}</p>
                 )}
-                <div className="relative border border-dashed border-border rounded-xl p-4 text-center bg-background hover:border-primary transition-colors cursor-pointer min-h-[110px] flex items-center justify-center">
-                  <input
-                    type="file"
-                    onChange={handleOrgLogoUpload}
-                    accept="image/*"
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                  {formData.orgLogo ? (
-                    <img src={formData.orgLogo} alt="Org Logo" className="mx-auto max-h-16 object-contain" />
-                  ) : (
-                    <div className="text-[11px] text-muted-foreground">Click to upload logo</div>
-                  )}
-                </div>
+                {formData.orgLogo ? (
+                  <div className="relative border border-border rounded-xl p-3 bg-card flex flex-col items-center justify-center min-h-[110px] space-y-2 shadow-xs">
+                    <div className="relative h-16 w-full flex items-center justify-center bg-muted/30 rounded-lg p-1.5 border border-border/50">
+                      <img src={formData.orgLogo} alt="Org Logo" className="max-h-full max-w-full object-contain" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, orgLogo: '' }));
+                          setOrgLogoValidation(null);
+                        }}
+                        title="Delete Organizer Logo"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-600 text-white flex items-center justify-center shadow-md hover:bg-red-700 transition-transform hover:scale-105 cursor-pointer z-10"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2 pt-0.5">
+                      <label className="px-2.5 py-1 rounded-md bg-muted hover:bg-muted/80 text-[11px] font-bold text-foreground cursor-pointer transition-colors border border-border flex items-center gap-1">
+                        <Upload className="h-3 w-3 text-muted-foreground" /> Change
+                        <input
+                          type="file"
+                          onChange={handleOrgLogoUpload}
+                          accept="image/*"
+                          className="hidden"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, orgLogo: '' }));
+                          setOrgLogoValidation(null);
+                        }}
+                        className="px-2.5 py-1 rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-600 text-[11px] font-bold cursor-pointer transition-colors flex items-center gap-1"
+                      >
+                        <Trash2 className="h-3 w-3" /> Delete
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative border border-dashed border-border rounded-xl p-4 text-center bg-background hover:border-primary transition-colors cursor-pointer min-h-[110px] flex flex-col items-center justify-center">
+                    <input
+                      type="file"
+                      onChange={handleOrgLogoUpload}
+                      accept="image/*"
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                    />
+                    <Upload className="h-5 w-5 text-muted-foreground/70 mb-1" />
+                    <div className="text-[11px] font-semibold text-muted-foreground">Click or drag logo here</div>
+                    <div className="text-[9px] text-muted-foreground/60 mt-0.5">PNG, JPG, WebP up to 5MB</div>
+                  </div>
+                )}
               </div>
               
               <div className="sm:col-span-2 space-y-1">
