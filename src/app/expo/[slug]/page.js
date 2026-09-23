@@ -92,6 +92,126 @@ function decodeHtmlEntities(str) {
     .replace(/&gt;/g, '>');
 }
 
+function formatInlineHtml(text) {
+  if (!text) return '';
+  return text
+    .replace(/\*\*\s*([^*]+?)\s*\*\*/g, '<strong>$1</strong>')
+    .replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em>$1</em>')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/\*{2,}/g, '')
+    .trim();
+}
+
+function renderCleanDescription(rawText, isExpanded, eventTitle = '') {
+  if (!rawText || typeof rawText !== 'string') return null;
+
+  const normalized = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const rawLines = normalized.split('\n');
+  const lines = [];
+  let isFirstLine = true;
+
+  for (let i = 0; i < rawLines.length; i++) {
+    let line = rawLines[i].trim();
+    if (lines.length === 0 && !line) continue;
+    if (isFirstLine && line) {
+      isFirstLine = false;
+      const strippedHeader = line.replace(/^#{1,6}\s*/, '').trim().toLowerCase();
+      const normTitle = (eventTitle || '').trim().toLowerCase();
+      if (normTitle && (strippedHeader === normTitle || strippedHeader.includes(normTitle))) {
+        continue;
+      }
+    }
+    // Skip lone hashtag lines like "###" or "##"
+    if (/^#{1,6}$/.test(line)) continue;
+    lines.push(rawLines[i]);
+  }
+
+  const elements = [];
+  let currentList = [];
+  let currentParagraphLines = [];
+
+  const flushParagraph = (key) => {
+    if (currentParagraphLines.length > 0) {
+      const combined = currentParagraphLines.join(' ').trim();
+      if (combined) {
+        const cleaned = formatInlineHtml(combined);
+        if (cleaned) {
+          elements.push(
+            <p
+              key={`p-${key}`}
+              className="text-zinc-700 text-xs sm:text-sm leading-relaxed my-2"
+              dangerouslySetInnerHTML={{ __html: cleaned }}
+            />
+          );
+        }
+      }
+      currentParagraphLines = [];
+    }
+  };
+
+  const flushList = (key) => {
+    if (currentList.length > 0) {
+      elements.push(
+        <ul key={`ul-${key}`} className="list-disc pl-5 my-2 space-y-1">
+          {currentList.map((item, idx) => (
+            <li
+              key={idx}
+              className="text-zinc-700 text-xs sm:text-sm"
+              dangerouslySetInnerHTML={{ __html: formatInlineHtml(item) }}
+            />
+          ))}
+        </ul>
+      );
+      currentList = [];
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (!trimmed) {
+      flushParagraph(i);
+      flushList(i);
+      continue;
+    }
+
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+    if (headingMatch) {
+      flushParagraph(i);
+      flushList(i);
+      const headingText = formatInlineHtml(headingMatch[2]);
+      if (headingText) {
+        elements.push(
+          <h4
+            key={`h-${i}`}
+            className="text-sm sm:text-base font-bold text-zinc-900 mt-4 mb-1.5"
+            dangerouslySetInnerHTML={{ __html: headingText }}
+          />
+        );
+      }
+      continue;
+    }
+
+    const listMatch = trimmed.match(/^([•\-\*]|\d+\.)\s+(.+)$/);
+    if (listMatch) {
+      flushParagraph(i);
+      currentList.push(listMatch[2]);
+      continue;
+    }
+
+    flushList(i);
+    currentParagraphLines.push(trimmed);
+  }
+
+  flushParagraph('end');
+  flushList('end');
+
+  if (!isExpanded && elements.length > 2) {
+    return elements.slice(0, 2);
+  }
+
+  return elements;
+}
+
 export default function ExpoDetailsPage() {
   const params = useParams();
   const router = useRouter();
@@ -1271,17 +1391,13 @@ export default function ExpoDetailsPage() {
               </div>
 
               {/* About Description */}
-              <div className="space-y-2 text-zinc-700 text-xs sm:text-sm leading-relaxed">
-                <p className="whitespace-pre-line">
-                  {isReadMore
-                    ? event?.description
-                    : (event?.description?.slice(0, 320) || '') + (event?.description?.length > 320 ? '...' : '')}
-                </p>
+              <div className="space-y-1 text-zinc-700 text-xs sm:text-sm leading-relaxed">
+                {renderCleanDescription(event?.description, isReadMore, event?.title)}
                 {event?.description?.length > 320 && (
                   <button
                     type="button"
                     onClick={() => setIsReadMore(!isReadMore)}
-                    className="text-xs font-bold text-[#FF2E63] hover:underline cursor-pointer inline-block"
+                    className="text-xs font-bold text-[#FF2E63] hover:underline cursor-pointer inline-block mt-2"
                   >
                     {isReadMore ? 'Show Less' : 'Read More &rarr;'}
                   </button>

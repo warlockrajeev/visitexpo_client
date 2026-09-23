@@ -233,11 +233,14 @@ export function renderRichText(content) {
   const formatInline = (text) => {
     if (!text) return '';
     return text
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/\*\*\s*([^*]+?)\s*\*\*/g, '<strong>$1</strong>')
+      .replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em>$1</em>')
       .replace(/<u>(.*?)<\/u>/g, '<u>$1</u>')
       .replace(/`([^`]+)`/g, '<code class="bg-muted px-1 py-0.5 rounded text-xs font-mono">$1</code>')
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-primary underline font-medium">$1</a>');
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-primary underline font-medium">$1</a>')
+      .replace(/#{1,6}\s*/g, '')
+      .replace(/\*{2,}/g, '')
+      .trim();
   };
 
   const flushList = (key) => {
@@ -267,15 +270,20 @@ export function renderRichText(content) {
   lines.forEach((line, idx) => {
     const trimmed = line.trim();
 
+    // Skip stray empty hashtags
+    if (/^#{1,6}$/.test(trimmed)) {
+      return;
+    }
+
     if (trimmed.startsWith('# ')) {
       flushList(idx);
-      elements.push(<h1 key={idx} className="text-xl font-extrabold tracking-tight text-foreground my-3 border-b border-border pb-1" dangerouslySetInnerHTML={{ __html: formatInline(trimmed.slice(2)) }} />);
+      elements.push(<h1 key={idx} className="text-xl font-extrabold tracking-tight text-foreground my-3 border-b border-border pb-1" dangerouslySetInnerHTML={{ __html: formatInline(trimmed.replace(/^#\s*/, '')) }} />);
     } else if (trimmed.startsWith('## ')) {
       flushList(idx);
-      elements.push(<h2 key={idx} className="text-lg font-bold text-foreground my-2.5" dangerouslySetInnerHTML={{ __html: formatInline(trimmed.slice(3)) }} />);
+      elements.push(<h2 key={idx} className="text-lg font-bold text-foreground my-2.5" dangerouslySetInnerHTML={{ __html: formatInline(trimmed.replace(/^##\s*/, '')) }} />);
     } else if (trimmed.startsWith('### ')) {
       flushList(idx);
-      elements.push(<h3 key={idx} className="text-base font-bold text-foreground my-2 text-primary" dangerouslySetInnerHTML={{ __html: formatInline(trimmed.slice(4)) }} />);
+      elements.push(<h3 key={idx} className="text-base font-bold text-foreground my-2 text-primary" dangerouslySetInnerHTML={{ __html: formatInline(trimmed.replace(/^###\s*/, '')) }} />);
     } else if (trimmed.startsWith('> ')) {
       flushList(idx);
       elements.push(<blockquote key={idx} className="border-l-4 border-primary pl-4 py-1 italic text-muted-foreground my-2 bg-muted/20 rounded-r" dangerouslySetInnerHTML={{ __html: formatInline(trimmed.slice(2)) }} />);
@@ -1084,10 +1092,17 @@ Given the following event details:
 - City: "${formData.city || ''}"
 - Venue: "${formData.venueName || ''}"
 
-Generate a compelling, professional B2B description for this event using rich markdown formatting (# Heading 1, ## Heading 2, **bold text**, • bullet points, > quote). It should be informative, highlighting who should attend (delegates, speakers, sponsors, exhibitors), key themes, and value proposition. Also generate a short SEO meta description (under 160 characters).
+Generate a compelling, professional B2B description for this event.
+IMPORTANT FORMATTING RULES:
+1. Do NOT include the event title as a heading (# Title) at the start; the title is already displayed in the hero banner.
+2. Structure the description into clear, well-spaced paragraphs with clean section headings (e.g. ## About the Expo, ## Key Expo Highlights, ## Who Should Attend, ## Venue & Networking).
+3. Use bullet points (• ) for key highlights, exhibitor benefits, or conference tracks.
+4. Use clean bold text (**key term**) sparingly for emphasis. Do not leave trailing or dangling asterisks or unclosed markdown symbols.
+5. Provide a short SEO meta description (under 150 characters).
+
 Return the result strictly as a JSON object with the following keys:
 {
-  "description": "The detailed rich markdown formatted B2B description",
+  "description": "The detailed B2B description",
   "metaDescription": "The short SEO meta description (under 150 characters)"
 }
 Do not return any markdown code block wrapper around the JSON object. Just return raw JSON.`;
@@ -1136,7 +1151,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
       const title = formData.title || 'Tech & Trade Expo 2026';
       const cat = formData.category || 'Technology';
       const city = formData.city || 'New Delhi';
-      const aiText = `# ${title}\n\n${title} is the premier international B2B gathering for **${cat}** pioneers, industry leaders, and enterprise buyers.\n\n## Key Expo Highlights\n• **150+ Interactive Exhibitor Stalls**: Explore cutting-edge product launches and live tech demos.\n• **C-Suite Keynotes & Panels**: Gain actionable strategic insights from 40+ global keynote speakers.\n• **High-Impact Networking Lounges**: Connect with pre-qualified buyers and strategic venture partners.\n\n> "Join over 5,000+ registered delegates driving the future of global trade and industrial transformation in ${city}."`;
+      const aiText = `${title} is the premier international B2B gathering for **${cat}** pioneers, industry leaders, and enterprise buyers in ${city}.\n\n## Key Expo Highlights\n• **150+ Interactive Exhibitor Stalls**: Explore cutting-edge product launches and live tech demos.\n• **C-Suite Keynotes & Panels**: Gain actionable strategic insights from 40+ global keynote speakers.\n• **High-Impact Networking Lounges**: Connect with pre-qualified buyers and strategic venture partners.\n\n## Who Should Attend\nDelegates, procurement directors, technology vendors, and enterprise investors looking to accelerate commercial growth and discover new supplier networks.\n\n> "Join over 5,000+ registered delegates driving the future of global trade and industrial transformation in ${city}."`;
 
       setFormData(prev => ({
         ...prev,
@@ -1153,9 +1168,9 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
     let score = 30;
     if (formData.title) score += 15;
     if (formData.description && formData.description.length > 50) score += 20;
+    if (formData.category) score += 10;
     if (formData.bannerUrl) score += 15;
-    if (formData.venueName && formData.city) score += 10;
-    if (formData.metaTitle && formData.metaDescription) score += 10;
+    if (formData.metaDescription && formData.metaDescription.length >= 50) score += 10;
     return Math.min(score, 100);
   };
 
@@ -1171,6 +1186,18 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
         return;
       }
     }
+
+    // Auto-commit pending sponsor inputs if filled
+    if (currentStep === 5 && newSponsor.name && newSponsor.name.trim()) {
+      const finalTier = newSponsor.tier?.trim() || 'Platinum Sponsor';
+      setFormData(prev => ({
+        ...prev,
+        sponsorsList: [...(prev.sponsorsList || []), { ...newSponsor, tier: finalTier }]
+      }));
+      setNewSponsor({ name: '', link: '', logo: '', tier: 'Platinum Sponsor' });
+      setIsCustomSponsorTier(false);
+    }
+
     if (currentStep < STEPS.length) {
       setSubmitError('');
       setCurrentStep(prev => prev + 1);
@@ -1197,6 +1224,14 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
         setSubmitting(false);
         return;
       }
+
+      // Auto-commit any pending sponsor input if filled
+      let finalSponsorsList = Array.isArray(formData.sponsorsList) ? [...formData.sponsorsList] : [];
+      if (newSponsor.name && newSponsor.name.trim()) {
+        const finalTier = newSponsor.tier?.trim() || 'Platinum Sponsor';
+        finalSponsorsList.push({ ...newSponsor, tier: finalTier });
+      }
+
       const categoriesArray = [formData.category, formData.industry].filter(Boolean);
       const payload = {
         title: formData.title || 'Untitled Expo Event',
@@ -1218,7 +1253,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
         orgDesc: formData.orgDesc,
         orgLogo: formData.orgLogo,
         schedules: formData.schedules,
-        sponsorsList: formData.sponsorsList,
+        sponsorsList: finalSponsorsList,
         faqsList: formData.faqsList,
         contactShortcode: formData.contactShortcode,
         // Ticketing data — server auto-creates a Ticket tier from this
