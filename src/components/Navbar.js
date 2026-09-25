@@ -131,9 +131,9 @@ export default function Navbar({ solid = false }) {
           <a href="#claim" className="hover:text-white transition-colors">
             Claim Listing
           </a>
-          <a href="#contact" className="hover:text-white transition-colors">
+          <Link href="/contact" className="hover:text-white transition-colors">
             Contact
-          </a>
+          </Link>
         </nav>
 
         {/* Desktop Actions */}
@@ -409,13 +409,13 @@ export default function Navbar({ solid = false }) {
             >
               Claim Listing
             </a>
-            <a
-              href="#contact"
+            <Link
+              href="/contact"
               onClick={() => setMobileMenuOpen(false)}
               className="hover:text-white py-1 transition-colors"
             >
               Contact
-            </a>
+            </Link>
           </nav>
 
           {/* Mobile Footer Actions */}

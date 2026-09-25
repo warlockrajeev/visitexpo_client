@@ -37,6 +37,12 @@ const FacebookIcon = ({ className = "h-4 w-4" }) => (
   </svg>
 );
 
+const YouTubeIcon = ({ className = "h-4 w-4" }) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+  </svg>
+);
+
 export default function Footer() {
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
@@ -58,7 +64,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10">
           
           {/* Brand & Newsletter Column */}
-          <div className="lg:col-span-4 space-y-4">
+          <div className="lg:col-span-8 space-y-4">
             <div className="flex items-center gap-2">
               <Logo className="h-7 w-7" />
               <span className="text-sm font-bold text-zinc-100 tracking-tight">VisitExpo</span>
@@ -93,87 +99,24 @@ export default function Footer() {
 
             <div className="pt-1 text-[11px] text-zinc-500 space-y-0.5">
               <p>Email: support@visitexpo.in</p>
-              <p>Helpline:+91 93236 77688 (Mon–Fri, 9am–6pm IST)</p>
+              <p>Helpline: +91 93236 77688 (Mon–Fri, 9am–6pm IST)</p>
             </div>
           </div>
 
-          {/* Discover */}
-          <div className="lg:col-span-3 space-y-3">
+          {/* Company & Support */}
+          <div className="lg:col-span-4 space-y-3 md:pl-6">
             <h4 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
-              Discover
-            </h4>
-            <ul className="space-y-2 text-xs">
-              <li>
-                <Link href="/events" className="hover:text-zinc-200 transition-colors">
-                  All Exhibitions
-                </Link>
-              </li>
-              <li>
-                <Link href="/#categories" className="hover:text-zinc-200 transition-colors">
-                  Industry Categories
-                </Link>
-              </li>
-              <li>
-                <Link href="/#cities" className="hover:text-zinc-200 transition-colors">
-                  Exhibition Cities
-                </Link>
-              </li>
-              <li>
-                <Link href="/#venues" className="hover:text-zinc-200 transition-colors">
-                  Convention Venues
-                </Link>
-              </li>
-              <li>
-                <Link href="/#reviews" className="hover:text-zinc-200 transition-colors">
-                  Attendee Reviews
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* For Business */}
-          <div className="lg:col-span-3 space-y-3">
-            <h4 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
-              For Business
-            </h4>
-            <ul className="space-y-2 text-xs">
-              <li>
-                <Link href="/login?role=organizer&signup=true" className="hover:text-zinc-200 transition-colors">
-                  Onboard as Organizer
-                </Link>
-              </li>
-              <li>
-                <Link href="/login?role=exhibitor&signup=true" className="hover:text-zinc-200 transition-colors">
-                  Register as Exhibitor
-                </Link>
-              </li>
-              <li>
-                <Link href="/events/claim" className="hover:text-zinc-200 transition-colors">
-                  Claim an Exhibition
-                </Link>
-              </li>
-              <li>
-                <Link href="/dashboard" className="hover:text-zinc-200 transition-colors">
-                  Portal Dashboard
-                </Link>
-              </li>
-              <li>
-                <Link href="/#contact" className="hover:text-zinc-200 transition-colors">
-                  Sponsorship &amp; Inquiries
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Company & Legal */}
-          <div className="lg:col-span-2 space-y-3">
-            <h4 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
-              Company
+              Company &amp; Support
             </h4>
             <ul className="space-y-2 text-xs">
               <li>
                 <Link href="/about" className="hover:text-zinc-200 transition-colors">
                   About Us
+                </Link>
+              </li>
+              <li>
+                <Link href="/contact" className="hover:text-zinc-200 transition-colors">
+                  Contact Us
                 </Link>
               </li>
               <li>
@@ -189,11 +132,6 @@ export default function Footer() {
               <li>
                 <Link href="/refund-policy" className="hover:text-zinc-200 transition-colors">
                   Refund Policy
-                </Link>
-              </li>
-              <li>
-                <Link href="/#contact" className="hover:text-zinc-200 transition-colors">
-                  Contact
                 </Link>
               </li>
             </ul>
@@ -217,45 +155,56 @@ export default function Footer() {
             <Link href="/refund-policy" className="hover:text-zinc-300 transition-colors">Refunds</Link>
             <span>·</span>
             <Link href="/about" className="hover:text-zinc-300 transition-colors">About</Link>
+            <span>·</span>
+            <Link href="/contact" className="hover:text-zinc-300 transition-colors">Contact</Link>
           </div>
 
-          {/* Subtle Monochrome Social Icons */}
-          <div className="flex items-center gap-3 text-zinc-500">
+          {/* Official Social Links */}
+          <div className="flex items-center gap-3.5 text-zinc-500">
             <a
-              href="https://linkedin.com"
+              href="https://www.facebook.com/visitexpo.in"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-zinc-300 transition-colors"
+              aria-label="Facebook"
+            >
+              <FacebookIcon className="h-4 w-4" />
+            </a>
+            <a
+              href="https://x.com/visitexpo_in"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-zinc-300 transition-colors"
+              aria-label="X (Twitter)"
+            >
+              <TwitterIcon className="h-3.5 w-3.5" />
+            </a>
+            <a
+              href="https://www.instagram.com/visitexpo.in"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-zinc-300 transition-colors"
+              aria-label="Instagram"
+            >
+              <InstagramIcon className="h-4 w-4" />
+            </a>
+            <a
+              href="https://www.youtube.com/@visitexpo"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-zinc-300 transition-colors"
+              aria-label="YouTube"
+            >
+              <YouTubeIcon className="h-4 w-4" />
+            </a>
+            <a
+              href="https://www.linkedin.com/in/visitexpo/"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-zinc-300 transition-colors"
               aria-label="LinkedIn"
             >
               <LinkedInIcon className="h-3.5 w-3.5" />
-            </a>
-            <a
-              href="https://twitter.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-zinc-300 transition-colors"
-              aria-label="Twitter"
-            >
-              <TwitterIcon className="h-3.5 w-3.5" />
-            </a>
-            <a
-              href="https://instagram.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-zinc-300 transition-colors"
-              aria-label="Instagram"
-            >
-              <InstagramIcon className="h-3.5 w-3.5" />
-            </a>
-            <a
-              href="https://facebook.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-zinc-300 transition-colors"
-              aria-label="Facebook"
-            >
-              <FacebookIcon className="h-3.5 w-3.5" />
             </a>
           </div>
         </div>

@@ -1137,9 +1137,12 @@ export default function LandingPage() {
                       Trending Exhibitions
                     </h4>
                   </div>
-                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                  <Link
+                    href="/trending"
+                    className="text-[10px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200 transition-colors"
+                  >
                     High Demand
-                  </span>
+                  </Link>
                 </div>
 
                 <div className="space-y-3">
@@ -1187,17 +1190,12 @@ export default function LandingPage() {
                   ))}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('popularity');
-                    const el = document.getElementById('events');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  }}
+                <Link
+                  href="/trending"
                   className="w-full text-center text-xs font-bold text-[#FF2E63] hover:underline pt-1 block cursor-pointer"
                 >
                   View All Trending Shows &rarr;
-                </button>
+                </Link>
               </div>
 
 

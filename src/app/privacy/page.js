@@ -2,14 +2,13 @@
 
 /**
  * @file app/privacy/page.js
- * @description Privacy Policy for the VisitExpo platform.
- * Compliant with GDPR, CCPA, and India Digital Personal Data Protection (DPDP) Act.
+ * @description Official Privacy Policy for VisitExpo.in.
  */
 
 import React from 'react';
 import Link from 'next/link';
-import Navbar from '../../components/Navbar.js';
-import Footer from '../../components/Footer.js';
+import Navbar from '@/components/Navbar.js';
+import Footer from '@/components/Footer.js';
 import {
   ShieldCheck,
   Lock,
@@ -18,7 +17,10 @@ import {
   ChevronRight,
   Database,
   CheckCircle2,
-  FileText
+  FileText,
+  Mail,
+  MapPin,
+  Globe
 } from 'lucide-react';
 
 export default function PrivacyPage() {
@@ -34,12 +36,12 @@ export default function PrivacyPage() {
             <div className="flex items-center gap-2 text-xs text-zinc-400 font-medium">
               <Link href="/" className="hover:text-white transition-colors">Home</Link>
               <ChevronRight className="h-3 w-3" />
-              <span className="text-emerald-400">Privacy Policy</span>
+              <span className="text-[#FFCC00]">Privacy Policy</span>
             </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-400/10 text-emerald-400 border border-emerald-400/20">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#FFCC00]/10 text-[#FFCC00] border border-[#FFCC00]/20">
               <ShieldCheck className="h-3.5 w-3.5" />
-              <span>Data Protection &amp; GDPR / DPDP Compliant</span>
+              <span>Data Protection &amp; Privacy Practices</span>
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
@@ -49,12 +51,12 @@ export default function PrivacyPage() {
             <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-400 pt-1">
               <span className="flex items-center gap-1.5">
                 <Clock className="h-3.5 w-3.5 text-zinc-500" />
-                Last Updated: September 1, 2026
+                Updated &amp; Effective
               </span>
               <span>•</span>
               <span className="flex items-center gap-1.5">
                 <Lock className="h-3.5 w-3.5 text-emerald-400" />
-                256-Bit SSL Encrypted Platform
+                Secure Data Governance
               </span>
             </div>
           </div>
@@ -63,119 +65,258 @@ export default function PrivacyPage() {
         {/* Content Container */}
         <main className="max-w-4xl mx-auto px-4 sm:px-6 py-14 space-y-12 leading-relaxed text-zinc-700 text-sm">
           
-          {/* Executive Summary Card */}
-          <div className="p-5 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-emerald-950 space-y-2">
-            <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-emerald-800">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-              <span>Our Privacy Pledge to Trade Visitors &amp; Exhibitors</span>
-            </div>
-            <p className="text-xs leading-relaxed text-emerald-900">
-              VisitExpo never sells your personal contact information to third-party data brokers. Your information is strictly utilized to facilitate exhibition pass delivery, B2B supplier networking, and direct organizer-delegate communications in compliance with international privacy laws.
+          {/* Introductory Notice */}
+          <div className="p-5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-800 space-y-3">
+            <p>
+              At <strong>VisitExpo.in</strong>, we take your privacy seriously. Please read this Privacy Policy to understand how we collect, use, and share your personal data. By accessing or using our website, you agree to the terms outlined in this Privacy Policy and consent to our collection and usage practices.
+            </p>
+            <p className="text-xs text-zinc-500">
+              Remember, your use of VisitExpo.in is also governed by our <Link href="/terms" className="text-[#FF2E63] font-semibold hover:underline">Terms of Use</Link>, which incorporates this Privacy Policy. Any terms used here without definition are defined in the Terms of Use.
             </p>
           </div>
 
-          {/* Section 1 */}
-          <section className="space-y-3">
-            <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
-              1. Information We Collect
-            </h2>
-            <p>
-              When you register for an exhibition pass, onboard an event, or interact with our platform, we collect:
-            </p>
-            <ul className="list-disc pl-5 space-y-2 text-xs sm:text-sm">
-              <li>
-                <strong>Identity &amp; Professional Profile:</strong> Full name, corporate email address, contact phone number, job designation, company name, industry sector, and trade purchasing authority.
-              </li>
-              <li>
-                <strong>Exhibition Attendance History:</strong> Passes generated, bookmarked expos, exhibitors followed, and reviews submitted.
-              </li>
-              <li>
-                <strong>Device &amp; Telemetry Data:</strong> IP address, browser type, operating system, and approximate geographical location (with your browser permission) to display nearby exhibitions.
-              </li>
+          {/* Privacy Policy Table of Contents */}
+          <section className="p-6 rounded-2xl bg-zinc-50/60 border border-zinc-200 space-y-3">
+            <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-zinc-800">
+              <FileText className="h-4 w-4 text-[#FF2E63]" />
+              <span>Privacy Policy Table of Contents</span>
+            </div>
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-medium text-zinc-700">
+              <li>• What this Privacy Policy Covers</li>
+              <li>• Personal Data (Categories, Sources &amp; Purposes)</li>
+              <li>• How We Share Your Personal Data</li>
+              <li>• Tracking Tools and Opt-Out</li>
+              <li>• Data Security and Retention</li>
+              <li>• Personal Data of Children</li>
+              <li>• State Law Privacy Rights</li>
+              <li>• Changes to this Privacy Policy</li>
+              <li>• Contact Information</li>
             </ul>
           </section>
 
-          {/* Section 2 */}
+          {/* Section: What this Privacy Policy Covers */}
           <section className="space-y-3">
             <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
-              2. How We Use Your Information
-            </h2>
-            <p>We process your personal information for the following legitimate purposes:</p>
-            <ul className="list-disc pl-5 space-y-1.5 text-xs sm:text-sm">
-              <li>Generating and transmitting digital fast-track entry badges and QR passes.</li>
-              <li>Confirming booth reservations and ticketing invoices.</li>
-              <li>Providing organizers with verified attendee rosters for event security and hall logistics.</li>
-              <li>Recommending curated trade expos aligned with your business category and sourcing interests.</li>
-              <li>Detecting fraudulent ticket registrations and protecting platform integrity.</li>
-            </ul>
-          </section>
-
-          {/* Section 3 */}
-          <section className="space-y-3">
-            <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
-              3. Exhibition Badge QR Code Scanning Consent
+              What this Privacy Policy Covers
             </h2>
             <p>
-              Your digital pass features an encrypted QR code. When you physically visit an exhibition stall and permit an exhibitor to scan your badge:
+              This Privacy Policy covers how we treat Personal Data collected when you access or use VisitExpo.in. &ldquo;Personal Data&rdquo; refers to any information that identifies or relates to an individual, including &ldquo;personally identifiable information&rdquo; under applicable laws.
             </p>
-            <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200 text-xs space-y-2 text-zinc-700">
-              <p className="font-semibold text-zinc-900">What happens when your badge is scanned?</p>
-              <p>
-                Allowing an exhibitor to scan your badge is equivalent to handing them your business card. You explicitly authorize VisitExpo to share your professional registration details (Name, Title, Company, Work Email, Phone) with that exhibitor for follow-up trade quotes, brochures, and meetings.
+            <p>
+              This Privacy Policy does not apply to third-party practices outside our control.
+            </p>
+          </section>
+
+          {/* Section: Personal Data */}
+          <section className="space-y-6">
+            <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
+              Personal Data
+            </h2>
+
+            <div className="space-y-2">
+              <h3 className="font-bold text-sm text-zinc-900">Categories of Personal Data We Collect</h3>
+              <p>We collect the following types of personal data:</p>
+              <ul className="list-disc pl-5 space-y-1.5 text-xs sm:text-sm">
+                <li>Contact Information (e.g., name, email, phone number)</li>
+                <li>Login Credentials (if account-based features are used)</li>
+                <li>Location Data (if permitted by your device)</li>
+                <li>Usage Data (pages visited, time spent, interaction patterns)</li>
+                <li>Cookies and Tracking Information</li>
+              </ul>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="font-bold text-sm text-zinc-900">Categories of Sources of Personal Data</h3>
+              <p>We collect data from:</p>
+              <div className="space-y-3 pl-2">
+                <div>
+                  <strong className="text-zinc-900 text-xs sm:text-sm block">You:</strong>
+                  <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm text-zinc-600">
+                    <li>Through forms, contact inquiries, and registration on our site</li>
+                    <li>Through communications (email, chat, etc.)</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <strong className="text-zinc-900 text-xs sm:text-sm block">Automatically:</strong>
+                  <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm text-zinc-600">
+                    <li>Through browser Cookies and device tracking tools</li>
+                    <li>Through location-enabled services (if opted in)</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <strong className="text-zinc-900 text-xs sm:text-sm block">Third Parties:</strong>
+                  <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm text-zinc-600">
+                    <li>Analytics providers</li>
+                    <li>Advertising and marketing partners</li>
+                    <li>Business vendors and platforms that integrate with VisitExpo.in</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="font-bold text-sm text-zinc-900">Our Commercial or Business Purposes for Collecting Personal Data</h3>
+              <ul className="list-disc pl-5 space-y-1.5 text-xs sm:text-sm">
+                <li>To provide and personalize our services</li>
+                <li>To communicate with you regarding services and updates</li>
+                <li>To improve and optimize website performance</li>
+                <li>To prevent fraud and enhance security</li>
+                <li>To comply with legal obligations</li>
+                <li>For marketing and promotional purposes (based on your preferences)</li>
+              </ul>
+              <p className="text-xs text-zinc-500 pt-1">
+                We do not use your personal data for materially different purposes without providing additional notice.
               </p>
             </div>
           </section>
 
-          {/* Section 4 */}
-          <section className="space-y-3">
+          {/* Section: How We Share Your Personal Data */}
+          <section className="space-y-4">
             <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
-              4. Data Sharing &amp; Third Parties
+              How We Share Your Personal Data
             </h2>
-            <p>We share personal data exclusively with:</p>
-            <ul className="list-disc pl-5 space-y-1.5 text-xs sm:text-sm">
-              <li><strong>Authorized Event Organizers:</strong> For visitor accreditation, badge issuance, and safety enforcement.</li>
-              <li><strong>Scanned Exhibitors:</strong> Only upon your affirmative consent when presenting your badge at their stall.</li>
-              <li><strong>Essential Infrastructure Providers:</strong> Cloud hosting (AWS, MongoDB Cloud), transactional email (SendGrid), and payment processors (Stripe, Razorpay). All vendors are bound by strict Data Processing Agreements (DPAs).</li>
+            <p>We may share your data with:</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200">
+                <strong className="text-zinc-900 text-xs sm:text-sm block font-bold mb-1">Service Providers:</strong>
+                <ul className="list-disc pl-4 text-xs text-zinc-600 space-y-0.5">
+                  <li>Hosting and infrastructure providers</li>
+                  <li>Customer support platforms</li>
+                  <li>Email and communication tools</li>
+                </ul>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200">
+                <strong className="text-zinc-900 text-xs sm:text-sm block font-bold mb-1">Analytics Partners:</strong>
+                <ul className="list-disc pl-4 text-xs text-zinc-600 space-y-0.5">
+                  <li>Web traffic and interaction trackers</li>
+                </ul>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200">
+                <strong className="text-zinc-900 text-xs sm:text-sm block font-bold mb-1">Marketing Partners:</strong>
+                <ul className="list-disc pl-4 text-xs text-zinc-600 space-y-0.5">
+                  <li>Ad networks and marketing agencies (to improve campaign performance)</li>
+                </ul>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200">
+                <strong className="text-zinc-900 text-xs sm:text-sm block font-bold mb-1">Legal and Compliance:</strong>
+                <p className="text-xs text-zinc-600">
+                  If required by law, legal process, or to protect rights, property, or safety.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200">
+                <strong className="text-zinc-900 text-xs sm:text-sm block font-bold mb-1">Business Transfers:</strong>
+                <p className="text-xs text-zinc-600">
+                  In case of merger, acquisition, or asset sale, your data may be transferred.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200">
+                <strong className="text-zinc-900 text-xs sm:text-sm block font-bold mb-1">De-Identified Data:</strong>
+                <p className="text-xs text-zinc-600">
+                  Aggregated and anonymized data may be used for analytics or reporting.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Section: Tracking Tools and Opt-Out */}
+          <section className="space-y-4">
+            <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
+              Tracking Tools and Opt-Out
+            </h2>
+            <p>
+              VisitExpo.in uses Cookies and similar technologies to improve user experience and analyze traffic. You may adjust your browser settings to refuse some or all Cookies. However, some features may become unavailable.
+            </p>
+            <p>We use:</p>
+            <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
+              <li><strong>Essential Cookies:</strong> For secure access and navigation.</li>
+              <li><strong>Functional Cookies:</strong> To remember preferences.</li>
+              <li><strong>Performance Cookies:</strong> (e.g., Google Analytics) to optimize experience.</li>
             </ul>
           </section>
 
-          {/* Section 5 */}
-          <section className="space-y-3">
+          {/* Section: Data Security and Retention */}
+          <section className="space-y-4">
             <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
-              5. Data Security Standards
+              Data Security and Retention
             </h2>
             <p>
-              VisitExpo enforces enterprise security measures including 256-bit TLS/SSL encryption for all data in transit, AES-256 encryption for sensitive credentials at rest, multi-factor authentication for administrative users, and regular vulnerability audits.
+              We implement security measures to protect your data but cannot guarantee absolute security. We retain data as long as necessary to provide services or comply with legal obligations.
             </p>
           </section>
 
-          {/* Section 6 */}
-          <section className="space-y-3">
+          {/* Section: Personal Data of Children */}
+          <section className="space-y-4">
             <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
-              6. Your Privacy Rights (GDPR, CCPA &amp; DPDP)
-            </h2>
-            <p>Depending on your location, you hold legal rights regarding your personal information:</p>
-            <ul className="list-disc pl-5 space-y-1.5 text-xs sm:text-sm">
-              <li><strong>Right of Access:</strong> Request a copy of all personal records we hold about you.</li>
-              <li><strong>Right to Rectification:</strong> Update inaccurate or incomplete contact records.</li>
-              <li><strong>Right to Erasure (&ldquo;Right to be Forgotten&rdquo;):</strong> Request permanent deletion of your account and registration history.</li>
-              <li><strong>Right to Opt-Out:</strong> Unsubscribe from marketing communications at any time with one click.</li>
-            </ul>
-          </section>
-
-          {/* Section 7 */}
-          <section className="space-y-3">
-            <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
-              7. Contact Our Data Protection Officer (DPO)
+              Personal Data of Children
             </h2>
             <p>
-              To exercise any of your privacy rights or file a data inquiry, please contact our Data Protection Office:
+              VisitExpo.in does not knowingly collect data from children under 13. If we learn that we have inadvertently collected such data, we will delete it. Please contact us if you believe a child has submitted personal data.
             </p>
-            <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200 text-xs space-y-1">
-              <p className="font-bold text-zinc-900">Data Protection Officer (DPO) — VisitExpo</p>
-              <p>Email: <a href="mailto:privacy@visitexpo.in" className="text-primary hover:underline">privacy@visitexpo.in</a></p>
-              <p>Security Response: <a href="mailto:security@visitexpo.in" className="text-primary hover:underline">security@visitexpo.in</a></p>
-              <p>Response Time: Within 48 business hours</p>
+          </section>
+
+          {/* Section: State Law Privacy Rights */}
+          <section className="space-y-4">
+            <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
+              State Law Privacy Rights
+            </h2>
+            <div className="space-y-3 pl-3 border-l-2 border-zinc-200 text-xs sm:text-sm">
+              <p>
+                <strong>California Residents:</strong> You may request details about personal data shared with third parties for marketing purposes. Email us to submit such a request.
+              </p>
+              <p>
+                <strong>Nevada Residents:</strong> You may opt out of the sale of certain data. To do so, email us with the subject line &ldquo;Nevada Do Not Sell Request.&rdquo;
+              </p>
+            </div>
+          </section>
+
+          {/* Section: Changes to this Privacy Policy */}
+          <section className="space-y-4">
+            <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
+              Changes to this Privacy Policy
+            </h2>
+            <p>
+              We may update this Privacy Policy periodically. We will notify you of major changes via email or on our website. Continued use of VisitExpo.in after changes means you accept those changes.
+            </p>
+          </section>
+
+          {/* Section: Contact Information */}
+          <section className="space-y-4 pt-4 border-t border-zinc-200">
+            <h2 className="text-xl font-bold text-zinc-900">
+              Contact Information
+            </h2>
+            <p>If you have questions about this Privacy Policy or your data:</p>
+
+            <div className="p-5 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-3 text-xs sm:text-sm">
+              <div className="flex items-center gap-2.5">
+                <Globe className="h-4 w-4 text-zinc-500 shrink-0" />
+                <span className="font-semibold text-zinc-900">Website:</span>
+                <a href="https://www.visitexpo.in" target="_blank" rel="noopener noreferrer" className="text-[#FF2E63] font-bold hover:underline">
+                  www.visitexpo.in
+                </a>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                <Mail className="h-4 w-4 text-[#FF2E63] shrink-0" />
+                <span className="font-semibold text-zinc-900">Email:</span>
+                <a href="mailto:support@visitexpo.in" className="text-[#FF2E63] font-bold hover:underline">
+                  support@visitexpo.in
+                </a>
+              </div>
+
+              <div className="flex items-start gap-2.5">
+                <MapPin className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold text-zinc-900">Address:</span>{' '}
+                  <span className="text-zinc-700">LEOMEO IT Solutions, Churchgate 35, Court Chambers, Mumbai</span>
+                </div>
+              </div>
             </div>
           </section>
 

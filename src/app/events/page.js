@@ -115,6 +115,9 @@ export default function EventsDirectoryPage() {
       const catParam = sp.get('category');
       const searchParam = sp.get('search') || sp.get('q') || sp.get('organizer');
 
+      const sortParam = sp.get('sort');
+      const filterParam = sp.get('filter');
+
       if (cityParam) {
         setSelectedCity(cityParam);
       }
@@ -123,6 +126,11 @@ export default function EventsDirectoryPage() {
       }
       if (searchParam) {
         setSearchQuery(searchParam);
+      }
+      if (sortParam === 'trending' || sortParam === 'turnout' || sortParam === 'popularity' || filterParam === 'trending') {
+        setSortBy('turnout');
+      } else if (sortParam === 'rating') {
+        setSortBy('rating');
       }
     }
   }, []);
@@ -570,7 +578,7 @@ export default function EventsDirectoryPage() {
                 >
                   <option value="upcoming">Upcoming</option>
                   <option value="rating">Top Rated</option>
-                  <option value="turnout">Turnout</option>
+                  <option value="turnout">Trending &amp; Turnout</option>
                   <option value="title">A-Z</option>
                 </select>
                 <ChevronDown className="absolute right-3 h-4 w-4 text-zinc-400 pointer-events-none" />
