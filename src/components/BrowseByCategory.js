@@ -232,72 +232,47 @@ export default function BrowseByCategory({ onSelectCategory, activeCategory, onR
       {/* Grid: 6 Columns matching 10times layout */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 sm:gap-4 transition-all duration-300">
         {displayedCategories.map((cat) => {
-          const isSelected = activeCategory === cat.filterKey || activeCategory === cat.name;
           const IconComp = ICON_COMPONENTS[cat.iconName || cat.name] || Briefcase;
 
           return (
-            <div
+            <Link
               key={cat.id || cat.slug}
-              onClick={() => handleCategoryClick(cat)}
-              className={`text-left p-4 sm:p-4.5 rounded-xl border transition-all duration-200 cursor-pointer flex flex-col justify-between h-28 sm:h-32 group relative ${
-                isSelected
-                  ? 'bg-zinc-950 text-white border-zinc-950 shadow-md ring-2 ring-[#FFCC00]'
-                  : 'bg-white border-zinc-200/90 hover:border-zinc-300 hover:shadow-md hover:-translate-y-0.5 text-zinc-900 shadow-2xs'
-              }`}
+              href={`/category/${cat.slug}`}
+              className="text-left p-4 sm:p-4.5 rounded-xl border border-zinc-200/90 hover:border-zinc-300 hover:shadow-md hover:-translate-y-0.5 text-zinc-900 shadow-2xs transition-all duration-200 cursor-pointer flex flex-col justify-between h-28 sm:h-32 group relative bg-white block"
+              title={`Browse ${cat.name} Events`}
             >
-              {/* Top Row: Circular Icon Holder + Link to Dedicated Category Page */}
+              {/* Top Row: Circular Icon Holder + Link Arrow */}
               <div className="flex items-center justify-between">
-                <div
-                  className={`h-7 w-7 sm:h-8 sm:w-8 rounded-full flex items-center justify-center transition-colors ${
-                    isSelected
-                      ? 'bg-white/20 text-white'
-                      : 'bg-zinc-100 text-zinc-800 group-hover:bg-zinc-200/90'
-                  }`}
-                >
+                <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full flex items-center justify-center transition-colors bg-zinc-100 text-zinc-800 group-hover:bg-[#FF2E63]/10 group-hover:text-[#FF2E63]">
                   <IconComp className="h-4 w-4" />
                 </div>
 
-                <Link
-                  href={`/category/${cat.slug}`}
-                  onClick={(e) => e.stopPropagation()}
-                  title={`Open ${cat.name} Page`}
-                  className={`p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity ${
-                    isSelected ? 'text-zinc-400 hover:text-white' : 'text-zinc-400 hover:text-[#FF2E63]'
-                  }`}
-                >
-                  <ExternalLink className="h-3 w-3" />
-                </Link>
+                <div className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 group-hover:text-[#FF2E63]">
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </div>
               </div>
 
               {/* Bottom: Title & Real Event Count */}
               <div>
-                <div
-                  className={`font-bold text-xs sm:text-[13px] leading-snug line-clamp-1 ${
-                    isSelected ? 'text-white' : 'text-zinc-900 group-hover:text-[#FF2E63] transition-colors'
-                  }`}
-                >
+                <div className="font-bold text-xs sm:text-[13px] leading-snug line-clamp-1 text-zinc-900 group-hover:text-[#FF2E63] transition-colors">
                   {cat.name}
                 </div>
-                <div
-                  className={`text-[11px] font-medium mt-0.5 ${
-                    isSelected ? 'text-zinc-300' : 'text-zinc-500'
-                  }`}
-                >
+                <div className="text-[11px] font-medium mt-0.5 text-zinc-500">
                   {cat.countFormatted || `${cat.count} Events`}
                 </div>
               </div>
-            </div>
+            </Link>
           );
         })}
 
-        {/* 6th Card: "View All" Toggle in Warm Peach / Coral (Matching Screenshot) */}
+        {/* 6th Card: "View All" Toggle (VisitExpo Theme) */}
         {!isExpanded ? (
           <button
             type="button"
             onClick={() => setIsExpanded(true)}
-            className="p-4 sm:p-4.5 rounded-xl bg-[#FFF9F2] hover:bg-[#FFF2E5] border border-[#FFE7D4] hover:border-[#FFD5B3] shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex items-center justify-center text-center h-28 sm:h-32 group"
+            className="p-4 sm:p-4.5 rounded-xl bg-[#FFCC00]/10 hover:bg-[#FFCC00]/20 border border-[#FFCC00]/30 hover:border-[#FFCC00]/60 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex items-center justify-center text-center h-28 sm:h-32 group"
           >
-            <span className="font-extrabold text-sm sm:text-base text-[#FF5A36] group-hover:scale-105 transition-transform flex items-center justify-center gap-1.5">
+            <span className="font-extrabold text-sm sm:text-base text-zinc-900 group-hover:text-[#FF2E63] group-hover:scale-105 transition-all flex items-center justify-center gap-1.5">
               <span>View All</span>
               <ArrowRight className="h-3.5 w-3.5" />
             </span>
@@ -306,9 +281,9 @@ export default function BrowseByCategory({ onSelectCategory, activeCategory, onR
           <button
             type="button"
             onClick={() => setIsExpanded(false)}
-            className="p-4 sm:p-4.5 rounded-xl bg-[#FFF9F2] hover:bg-[#FFF2E5] border border-[#FFE7D4] hover:border-[#FFD5B3] shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex items-center justify-center text-center h-28 sm:h-32 group"
+            className="p-4 sm:p-4.5 rounded-xl bg-[#FFCC00]/10 hover:bg-[#FFCC00]/20 border border-[#FFCC00]/30 hover:border-[#FFCC00]/60 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex items-center justify-center text-center h-28 sm:h-32 group"
           >
-            <span className="font-extrabold text-sm sm:text-base text-[#FF5A36] group-hover:scale-105 transition-transform flex items-center justify-center gap-1.5">
+            <span className="font-extrabold text-sm sm:text-base text-zinc-900 group-hover:text-[#FF2E63] group-hover:scale-105 transition-all flex items-center justify-center gap-1.5">
               <span>Show Top 5</span>
               <ChevronUp className="h-3.5 w-3.5" />
             </span>

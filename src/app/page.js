@@ -327,6 +327,33 @@ export default function LandingPage() {
       if (formatFilter === 'hybrid' && item.format !== 'Hybrid Expo') return false;
       if (entryTypeFilter === 'free' && !item.entryType?.toLowerCase().includes('free')) return false;
 
+      // Date Range Filter ('all' | 'month' | '30days' | '90days')
+      if (dateRangeFilter && dateRangeFilter !== 'all') {
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+
+        let start = item.startDate ? new Date(item.startDate).getTime() : null;
+        let end = item.endDate ? new Date(item.endDate).getTime() : null;
+        if (isNaN(start)) start = null;
+        if (isNaN(end)) end = null;
+        if (!end && start) end = start;
+        if (!start && end) start = end;
+
+        // If an event has no valid dates, exclude it from specific range queries
+        if (!start && !end) return false;
+
+        if (dateRangeFilter === 'month') {
+          const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
+          if (start > endOfMonth || end < startOfToday) return false;
+        } else if (dateRangeFilter === '30days') {
+          const in30Days = startOfToday + 30 * 24 * 60 * 60 * 1000 + (23 * 3600 + 59 * 60 + 59) * 1000;
+          if (start > in30Days || end < startOfToday) return false;
+        } else if (dateRangeFilter === '90days') {
+          const in90Days = startOfToday + 90 * 24 * 60 * 60 * 1000 + (23 * 3600 + 59 * 60 + 59) * 1000;
+          if (start > in90Days || end < startOfToday) return false;
+        }
+      }
+
       return true;
     });
 
@@ -350,11 +377,24 @@ export default function LandingPage() {
         result = [...result].sort((a, b) => parseFloat(b.rating) - parseFloat(a.rating));
       } else if (sortBy === 'popularity') {
         result = [...result].sort((a, b) => b.interestedCount - a.interestedCount);
+      } else if (sortBy === 'upcoming') {
+        const now = Date.now();
+        result = [...result].sort((a, b) => {
+          const timeA = a.startDate ? new Date(a.startDate).getTime() : 0;
+          const timeB = b.startDate ? new Date(b.startDate).getTime() : 0;
+          const isFutureA = timeA >= now;
+          const isFutureB = timeB >= now;
+
+          if (isFutureA && !isFutureB) return -1;
+          if (!isFutureA && isFutureB) return 1;
+          if (isFutureA && isFutureB) return timeA - timeB; // soonest upcoming first
+          return timeB - timeA;
+        });
       }
     }
 
     return result;
-  }, [enrichedEvents, searchQuery, selectedCity, selectedCategory, activeCategoryTab, quickFilter, formatFilter, entryTypeFilter, sortBy, isNearbyActive, userLocation]);
+  }, [enrichedEvents, searchQuery, selectedCity, selectedCategory, activeCategoryTab, quickFilter, formatFilter, entryTypeFilter, dateRangeFilter, sortBy, isNearbyActive, userLocation]);
 
   // Displayed slice
   const displayedEvents = useMemo(() => {

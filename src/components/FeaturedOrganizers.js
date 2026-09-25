@@ -8,6 +8,7 @@
  */
 
 import React, { useRef, useState, useEffect } from 'react';
+import Link from 'next/link';
 import { ChevronLeft, ChevronRight, CheckCircle2, Globe } from 'lucide-react';
 
 const API_URL =
@@ -574,18 +575,9 @@ export default function FeaturedOrganizers({ onSelectOrganizer, activeOrganizer 
                   </div>
                 )}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (onSelectOrganizer) {
-                      onSelectOrganizer(org.searchTerm || org.shortName);
-                    }
-                  }}
-                  className={`w-28 sm:w-32 h-24 sm:h-26 bg-white rounded-xl flex flex-col items-center justify-center p-2.5 transition-all duration-200 cursor-pointer group relative ${
-                    isSelected
-                      ? 'border-2 border-[#FF2E63] ring-3 ring-[#FF2E63]/15 shadow-md bg-rose-50/20'
-                      : 'border border-zinc-200/90 hover:border-zinc-300 shadow-2xs hover:shadow-md'
-                  }`}
+                <Link
+                  href={`/organizer/${org.id}`}
+                  className="w-28 sm:w-32 h-24 sm:h-26 bg-white rounded-xl flex flex-col items-center justify-center p-2.5 transition-all duration-200 cursor-pointer group relative border border-zinc-200/90 hover:border-zinc-300 shadow-2xs hover:shadow-md hover:-translate-y-0.5 block"
                   title={`${org.name} (${org.countFormatted})`}
                 >
                   {/* Badge pill */}
@@ -617,14 +609,7 @@ export default function FeaturedOrganizers({ onSelectOrganizer, activeOrganizer 
                       </div>
                     )}
                   </div>
-
-                  {/* Selected Indicator */}
-                  {isSelected && (
-                    <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex items-center gap-0.5 text-[8px] font-bold text-[#FF2E63]">
-                      <span>Active Filter</span>
-                    </div>
-                  )}
-                </button>
+                </Link>
               </div>
             );
           })}

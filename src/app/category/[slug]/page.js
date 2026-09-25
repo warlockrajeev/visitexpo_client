@@ -3,13 +3,14 @@
 /**
  * @file app/category/[slug]/page.js
  * @description Dedicated Category Events Discovery Page matching the 10times reference screenshots
- * styled with the VisitExpo color theme (#FF2E63 vibrant pink/orange, #FFCC00 yellow, clean white canvas).
+ * styled with the VisitExpo color theme (#FFCC00 primary gold, #FF2E63 ruby accent, clean white canvas).
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '../../../components/Navbar.js';
+import { useAuth } from '../../../context/AuthContext.js';
 import { getCategoryBySlug, CATEGORIES_CONFIG } from '../../../data/categoryEventsData.js';
 import {
   Search,
@@ -36,6 +37,7 @@ import {
 } from 'lucide-react';
 
 export default function CategoryEventsPage() {
+  const { user } = useAuth();
   const params = useParams();
   const router = useRouter();
   const slug = params?.slug || 'it-technology';
@@ -85,15 +87,69 @@ export default function CategoryEventsPage() {
     }));
   };
 
-  // Filter events based on selected format/country
+  // Live WordPress events state for dynamic category discovery
+  const [liveEvents, setLiveEvents] = useState([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch('/api/wordpress-events')
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted && data?.success && Array.isArray(data.events)) {
+          setLiveEvents(data.events);
+        }
+      })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, []);
+
+  // Filter events based on selected format/country, merging static and live WordPress events
   const filteredEvents = useMemo(() => {
-    return category.events.filter((evt) => {
-      if (selectedFormat === 'tradeshows' && !evt.tags.includes('Tradeshow')) return false;
-      if (selectedFormat === 'conferences' && !evt.tags.includes('Conference')) return false;
-      if (selectedCountry !== 'all' && evt.country.toLowerCase() !== selectedCountry.toLowerCase()) return false;
+    // If static events exist, use them
+    let baseEvents = (category.events && category.events.length > 0) ? category.events : [];
+
+    // If static events are empty, adapt live events from WordPress
+    if (baseEvents.length === 0 && liveEvents.length > 0) {
+      const catNameLower = (category.name || '').toLowerCase();
+      const shortNameLower = (category.shortName || '').toLowerCase();
+      const slugLower = slug.replace(/-/g, ' ');
+
+      baseEvents = liveEvents
+        .filter((e) => {
+          const c = (e.category || '').toLowerCase();
+          const t = (e.title || '').toLowerCase();
+          const d = (e.description || '').toLowerCase();
+          return c.includes(shortNameLower) || c.includes(slugLower) || t.includes(shortNameLower) || c.includes(catNameLower) || d.includes(shortNameLower);
+        })
+        .map((e) => ({
+          id: e.id,
+          slug: e.slug || e.id,
+          title: e.title,
+          dates: e.dates || 'Upcoming 2026',
+          daysToGo: 'Upcoming',
+          edition: e.edition || 'Annual Edition',
+          city: e.city || '',
+          country: e.country || 'India',
+          venue: e.venue || '',
+          description: e.description || '',
+          format: e.format || 'Business Events',
+          subFormat: 'Trade Shows',
+          category: e.category || category.shortName,
+          tags: ['Tradeshow', category.shortName],
+          interestedCount: e.interestedCount || 500,
+          rating: e.rating || '4.5',
+          reviewsCount: e.reviewCount || 100,
+          logo: e.image || category.heroBanner
+        }));
+    }
+
+    return baseEvents.filter((evt) => {
+      if (selectedFormat === 'tradeshows' && !evt.tags?.includes('Tradeshow')) return false;
+      if (selectedFormat === 'conferences' && !evt.tags?.includes('Conference')) return false;
+      if (selectedCountry !== 'all' && (evt.country || '').toLowerCase() !== selectedCountry.toLowerCase()) return false;
       return true;
     });
-  }, [category, selectedFormat, selectedCountry]);
+  }, [category, liveEvents, slug, selectedFormat, selectedCountry]);
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-zinc-900 font-sans antialiased selection:bg-[#FF2E63] selection:text-white">
@@ -109,7 +165,7 @@ export default function CategoryEventsPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 1. TOP SUB-NAV BAR (Events | Companies | People) (Screenshot 1 Match)     */}
+      {/* 1. TOP SUB-NAV BAR (Events | Companies | People) (VisitExpo Theme)        */}
       {/* ========================================================================= */}
       <div className="bg-white border-b border-zinc-200 pt-24 sm:pt-28">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-6 text-xs sm:text-sm font-bold">
@@ -118,7 +174,7 @@ export default function CategoryEventsPage() {
             onClick={() => setActiveTab('events')}
             className={`py-3 flex items-center gap-1.5 transition-colors cursor-pointer border-b-2 ${
               activeTab === 'events'
-                ? 'border-[#FF5A36] text-[#FF5A36]'
+                ? 'border-[#FF2E63] text-[#FF2E63]'
                 : 'border-transparent text-zinc-600 hover:text-zinc-900'
             }`}
           >
@@ -131,7 +187,7 @@ export default function CategoryEventsPage() {
             onClick={() => setActiveTab('companies')}
             className={`py-3 flex items-center gap-1.5 transition-colors cursor-pointer border-b-2 ${
               activeTab === 'companies'
-                ? 'border-[#FF5A36] text-[#FF5A36]'
+                ? 'border-[#FF2E63] text-[#FF2E63]'
                 : 'border-transparent text-zinc-600 hover:text-zinc-900'
             }`}
           >
@@ -144,7 +200,7 @@ export default function CategoryEventsPage() {
             onClick={() => setActiveTab('people')}
             className={`py-3 flex items-center gap-1.5 transition-colors cursor-pointer border-b-2 ${
               activeTab === 'people'
-                ? 'border-[#FF5A36] text-[#FF5A36]'
+                ? 'border-[#FF2E63] text-[#FF2E63]'
                 : 'border-transparent text-zinc-600 hover:text-zinc-900'
             }`}
           >
@@ -188,15 +244,15 @@ export default function CategoryEventsPage() {
               </div>
             </div>
 
-            {/* Follow & Share buttons matching Screenshot 1 */}
+            {/* Follow & Share buttons matching VisitExpo Theme */}
             <div className="flex items-center gap-2.5 self-start md:self-auto shrink-0">
               <button
                 type="button"
                 onClick={() => setIsFollowing(!isFollowing)}
-                className={`px-5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm ${
+                className={`px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm ${
                   isFollowing
                     ? 'bg-emerald-600 text-white'
-                    : 'bg-[#FF5A36] hover:bg-[#E84E2C] text-white'
+                    : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-extrabold'
                 }`}
               >
                 {isFollowing ? (
@@ -233,36 +289,50 @@ export default function CategoryEventsPage() {
           {/* ===================================================================== */}
           <div className="lg:col-span-4 space-y-4">
             
-            {/* 1. Sign In Callout (Screenshot 1) */}
-            <div className="bg-white border border-zinc-200 rounded-xl p-3.5 flex items-center justify-between text-xs text-zinc-600 shadow-2xs">
-              <div className="flex items-center gap-2">
-                <span className="text-zinc-400">ⓘ</span>
-                <span>
-                  <Link href="/login" className="text-blue-600 font-semibold hover:underline">
-                    Sign in
-                  </Link>{' '}
-                  to unlock all features
+            {/* 1. Auth Status Callout */}
+            {!user ? (
+              <div className="bg-white border border-zinc-200 rounded-xl p-3.5 flex items-center justify-between text-xs text-zinc-600 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-zinc-400">ⓘ</span>
+                  <span>
+                    <Link href={`/login?redirect=/category/${slug}`} className="text-blue-600 font-semibold hover:underline">
+                      Sign in
+                    </Link>{' '}
+                    to unlock all features
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white border border-emerald-200 rounded-xl p-3.5 flex items-center justify-between text-xs text-zinc-700 shadow-2xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span className="truncate">
+                    Logged in as <strong className="text-zinc-900 font-bold">{user.name || user.email}</strong>
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
+                  All Features Unlocked
                 </span>
               </div>
-            </div>
+            )}
 
-            {/* 2. WHO'S IN TOWN? Network Widget (Screenshot 1) */}
+            {/* 2. WHO'S IN TOWN? Network Widget (VisitExpo Theme) */}
             <div className="bg-white border border-zinc-200 rounded-xl p-4 shadow-2xs space-y-3">
               <div className="flex items-center gap-3">
-                {/* 3 Stacked Avatars (OB, L, R) */}
+                {/* 3 Stacked Avatars */}
                 <div className="flex -space-x-2">
-                  <div className="h-8 w-8 rounded-full bg-[#FF5A36] text-white font-extrabold text-[10px] flex items-center justify-center ring-2 ring-white">
+                  <div className="h-8 w-8 rounded-full bg-[#FF2E63] text-white font-extrabold text-[10px] flex items-center justify-center ring-2 ring-white">
                     OB
                   </div>
-                  <div className="h-8 w-8 rounded-full bg-orange-400 text-white font-extrabold text-[10px] flex items-center justify-center ring-2 ring-white">
+                  <div className="h-8 w-8 rounded-full bg-[#FFCC00] text-zinc-950 font-extrabold text-[10px] flex items-center justify-center ring-2 ring-white">
                     LR
                   </div>
-                  <div className="h-8 w-8 rounded-full bg-emerald-500 text-white font-extrabold text-[10px] flex items-center justify-center ring-2 ring-white">
+                  <div className="h-8 w-8 rounded-full bg-zinc-900 text-white font-extrabold text-[10px] flex items-center justify-center ring-2 ring-white">
                     VK
                   </div>
                 </div>
 
-                <span className="text-xs font-extrabold text-[#FF5A36] uppercase tracking-wider">
+                <span className="text-xs font-extrabold text-zinc-900 uppercase tracking-wider">
                   Who's In Town?
                 </span>
               </div>
@@ -272,8 +342,8 @@ export default function CategoryEventsPage() {
               </p>
 
               <Link
-                href="/login?redirect=network"
-                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#FF5A36] hover:bg-[#E84E2C] text-white text-xs font-bold transition-colors shadow-2xs"
+                href={user ? "/events" : `/login?redirect=/category/${slug}`}
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold transition-colors shadow-2xs"
               >
                 <span>Explore</span>
                 <ArrowRight className="h-3 w-3" />
@@ -298,7 +368,7 @@ export default function CategoryEventsPage() {
                   <div className="mt-3 space-y-1.5 pt-2 border-t border-zinc-100">
                     {['Any Date', 'This Month', 'Next 3 Months', '2026 - 2027'].map((d, i) => (
                       <label key={i} className="flex items-center gap-2 cursor-pointer text-zinc-600 hover:text-zinc-900">
-                        <input type="radio" name="calDate" defaultChecked={i === 0} className="text-[#FF5A36] focus:ring-[#FF5A36]" />
+                        <input type="radio" name="calDate" defaultChecked={i === 0} className="accent-[#FF2E63] text-[#FF2E63] focus:ring-[#FF2E63]" />
                         <span>{d}</span>
                       </label>
                     ))}
@@ -321,12 +391,12 @@ export default function CategoryEventsPage() {
                   <div className="mt-3 space-y-2.5">
                     {/* Business Events */}
                     <div>
-                      <label className="flex items-center gap-2 font-bold text-[#FF5A36] cursor-pointer">
+                      <label className="flex items-center gap-2 font-bold text-zinc-900 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={true}
                           readOnly
-                          className="rounded text-[#FF5A36] focus:ring-[#FF5A36]"
+                          className="rounded accent-[#FF2E63] text-[#FF2E63] focus:ring-[#FF2E63]"
                         />
                         <span>Business Events</span>
                       </label>
@@ -339,7 +409,7 @@ export default function CategoryEventsPage() {
                             name="subFormat"
                             checked={selectedFormat === 'all'}
                             onChange={() => setSelectedFormat('all')}
-                            className="text-[#FF5A36] focus:ring-[#FF5A36]"
+                            className="accent-[#FF2E63] text-[#FF2E63] focus:ring-[#FF2E63]"
                           />
                           <span>All</span>
                         </label>
@@ -349,7 +419,7 @@ export default function CategoryEventsPage() {
                             name="subFormat"
                             checked={selectedFormat === 'tradeshows'}
                             onChange={() => setSelectedFormat('tradeshows')}
-                            className="text-[#FF5A36] focus:ring-[#FF5A36]"
+                            className="accent-[#FF2E63] text-[#FF2E63] focus:ring-[#FF2E63]"
                           />
                           <span>Trade Shows</span>
                         </label>
@@ -359,7 +429,7 @@ export default function CategoryEventsPage() {
                             name="subFormat"
                             checked={selectedFormat === 'conferences'}
                             onChange={() => setSelectedFormat('conferences')}
-                            className="text-[#FF5A36] focus:ring-[#FF5A36]"
+                            className="accent-[#FF2E63] text-[#FF2E63] focus:ring-[#FF2E63]"
                           />
                           <span>Conferences</span>
                         </label>
@@ -369,7 +439,7 @@ export default function CategoryEventsPage() {
                     {/* Social Events */}
                     <div>
                       <label className="flex items-center gap-2 font-medium text-zinc-600 cursor-pointer hover:text-zinc-900">
-                        <input type="checkbox" className="rounded text-[#FF5A36] focus:ring-[#FF5A36]" />
+                        <input type="checkbox" className="rounded accent-[#FF2E63] text-[#FF2E63] focus:ring-[#FF2E63]" />
                         <span>Social Events</span>
                       </label>
                     </div>
@@ -410,7 +480,7 @@ export default function CategoryEventsPage() {
                                 selectedCountry.toLowerCase() === cnt.name.toLowerCase() ? 'all' : cnt.name
                               );
                             }}
-                            className="rounded text-[#FF5A36] focus:ring-[#FF5A36]"
+                            className="rounded accent-[#FF2E63] text-[#FF2E63] focus:ring-[#FF2E63]"
                           />
                           <span>{cnt.name}</span>
                         </div>
@@ -448,7 +518,7 @@ export default function CategoryEventsPage() {
                         placeholder="Search for topics"
                         value={categorySearchQuery}
                         onChange={(e) => setCategorySearchQuery(e.target.value)}
-                        className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-1.5 pl-3 pr-8 text-xs text-zinc-900 placeholder-zinc-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#FF5A36]"
+                        className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-1.5 pl-3 pr-8 text-xs text-zinc-900 placeholder-zinc-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#FF2E63]"
                       />
                       <Search className="absolute right-2.5 top-2 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
                     </div>
@@ -463,7 +533,7 @@ export default function CategoryEventsPage() {
                             key={cat.slug}
                             href={`/category/${cat.slug}`}
                             className={`flex items-center justify-between cursor-pointer py-0.5 ${
-                              isCurrentCategory ? 'font-bold text-[#FF5A36]' : 'text-zinc-600 hover:text-zinc-900'
+                              isCurrentCategory ? 'font-bold text-[#FF2E63]' : 'text-zinc-600 hover:text-zinc-900'
                             }`}
                           >
                             <div className="flex items-center gap-2">
@@ -471,11 +541,11 @@ export default function CategoryEventsPage() {
                                 type="checkbox"
                                 checked={isCurrentCategory}
                                 readOnly
-                                className="rounded text-[#FF5A36] focus:ring-[#FF5A36]"
+                                className="rounded accent-[#FF2E63] text-[#FF2E63] focus:ring-[#FF2E63]"
                               />
                               <span className="truncate max-w-[170px]">{cat.shortName}</span>
                             </div>
-                            <span className={`text-[11px] ${isCurrentCategory ? 'text-[#FF5A36]' : 'text-zinc-400'}`}>
+                            <span className={`text-[11px] ${isCurrentCategory ? 'text-[#FF2E63] font-bold' : 'text-zinc-400'}`}>
                               {cat.eventsCount.split(' ')[0]}
                             </span>
                           </Link>
@@ -501,7 +571,7 @@ export default function CategoryEventsPage() {
                   <div className="mt-3 space-y-2">
                     {['Accountants', 'Database Administrators', 'Advertising Managers', 'Aerospace Engineers', 'Insurance Agents'].map((des, i) => (
                       <label key={i} className="flex items-center gap-2 text-zinc-600 hover:text-zinc-900 cursor-pointer">
-                        <input type="checkbox" className="rounded text-[#FF5A36] focus:ring-[#FF5A36]" />
+                        <input type="checkbox" className="rounded accent-[#FF2E63] text-[#FF2E63] focus:ring-[#FF2E63]" />
                         <span>{des}</span>
                       </label>
                     ))}
@@ -509,43 +579,71 @@ export default function CategoryEventsPage() {
                 )}
               </div>
 
-              {/* Locked / Gated Filters (Screenshot 3) */}
-              <div className="p-4 space-y-2.5 text-zinc-500 bg-zinc-50/50">
-                <div className="flex items-center justify-between cursor-pointer hover:text-zinc-700">
-                  <div className="flex items-center gap-2">
-                    <Lock className="h-3.5 w-3.5 text-zinc-400" />
-                    <span>Entry Fee</span>
+              {/* Gated / Unlocked Filters */}
+              {!user ? (
+                <div className="p-4 space-y-2.5 text-zinc-500 bg-zinc-50/50">
+                  <div className="flex items-center justify-between cursor-pointer hover:text-zinc-700">
+                    <div className="flex items-center gap-2">
+                      <Lock className="h-3.5 w-3.5 text-zinc-400" />
+                      <span>Entry Fee</span>
+                    </div>
+                    <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />
                   </div>
-                  <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />
-                </div>
 
-                <div className="flex items-center justify-between cursor-pointer hover:text-zinc-700">
-                  <div className="flex items-center gap-2">
-                    <Lock className="h-3.5 w-3.5 text-zinc-400" />
-                    <span>Rating</span>
+                  <div className="flex items-center justify-between cursor-pointer hover:text-zinc-700">
+                    <div className="flex items-center gap-2">
+                      <Lock className="h-3.5 w-3.5 text-zinc-400" />
+                      <span>Rating</span>
+                    </div>
+                    <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />
                   </div>
-                  <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />
-                </div>
 
-                <div className="flex items-center justify-between cursor-pointer hover:text-zinc-700">
-                  <div className="flex items-center gap-2">
-                    <Lock className="h-3.5 w-3.5 text-zinc-400" />
-                    <span>Members</span>
+                  <div className="flex items-center justify-between cursor-pointer hover:text-zinc-700">
+                    <div className="flex items-center gap-2">
+                      <Lock className="h-3.5 w-3.5 text-zinc-400" />
+                      <span>Members</span>
+                    </div>
+                    <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />
                   </div>
-                  <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />
                 </div>
-              </div>
+              ) : (
+                <div className="p-4 space-y-3 bg-zinc-50/50 text-xs">
+                  <div>
+                    <span className="font-bold text-zinc-900 block mb-1.5">Entry Fee (Unlocked)</span>
+                    <div className="space-y-1 text-zinc-600">
+                      <label className="flex items-center gap-2 cursor-pointer hover:text-zinc-900">
+                        <input type="checkbox" defaultChecked className="rounded accent-[#FF2E63] text-[#FF2E63] focus:ring-[#FF2E63]" />
+                        <span>Free Visitor Passes</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer hover:text-zinc-900">
+                        <input type="checkbox" className="rounded accent-[#FF2E63] text-[#FF2E63] focus:ring-[#FF2E63]" />
+                        <span>Paid Delegate Tickets</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-zinc-200/60">
+                    <span className="font-bold text-zinc-900 block mb-1.5">Rating (Unlocked)</span>
+                    <div className="space-y-1 text-zinc-600">
+                      <label className="flex items-center gap-2 cursor-pointer hover:text-zinc-900">
+                        <input type="checkbox" defaultChecked className="rounded accent-[#FF2E63] text-[#FF2E63] focus:ring-[#FF2E63]" />
+                        <span>4.0+ Stars Rated</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
 
             </div>
 
             {/* Quick Links (Screenshot 3) */}
             <div className="bg-white border border-zinc-200 rounded-xl p-4 shadow-2xs space-y-3 text-xs">
-              <Link href="/events" className="flex items-center justify-between font-bold text-zinc-800 hover:text-[#FF5A36]">
+              <Link href="/events" className="flex items-center justify-between font-bold text-zinc-800 hover:text-[#FF2E63]">
                 <div>
                   <span className="block font-bold">Top 100 Events</span>
                   <span className="text-[11px] text-zinc-500 font-normal">Discover and track top events</span>
                 </div>
-                <ArrowRight className="h-4 w-4 text-orange-500" />
+                <ArrowRight className="h-4 w-4 text-[#FF2E63]" />
               </Link>
             </div>
 
@@ -563,7 +661,7 @@ export default function CategoryEventsPage() {
                   type="button"
                   onClick={() => setActiveSort('trending')}
                   className={`cursor-pointer transition-colors ${
-                    activeSort === 'trending' ? 'text-[#FF5A36]' : 'text-zinc-600 hover:text-zinc-900'
+                    activeSort === 'trending' ? 'text-[#FF2E63] font-extrabold' : 'text-zinc-600 hover:text-zinc-900'
                   }`}
                 >
                   Trending ⇅
@@ -572,7 +670,7 @@ export default function CategoryEventsPage() {
                   type="button"
                   onClick={() => setActiveSort('date')}
                   className={`cursor-pointer transition-colors ${
-                    activeSort === 'date' ? 'text-[#FF5A36]' : 'text-zinc-600 hover:text-zinc-900'
+                    activeSort === 'date' ? 'text-[#FF2E63] font-extrabold' : 'text-zinc-600 hover:text-zinc-900'
                   }`}
                 >
                   Date
@@ -709,26 +807,46 @@ export default function CategoryEventsPage() {
               })}
             </div>
 
-            {/* Bottom Sign-In CTA Banner (Screenshot 3 Match) */}
+            {/* Bottom Sign-In / Dashboard CTA Banner */}
             <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-2xs space-y-4">
               <p className="text-sm font-bold text-zinc-900 leading-snug">
-                Sign in to view more events or explore advanced search to access all data, advanced filters, and powerful search for a deeper dive.
+                {user
+                  ? 'Explore the full event directory or jump to your organizer/visitor dashboard to manage your tickets, booths, and live passes.'
+                  : 'Sign in to view more events or explore advanced search to access all data, advanced filters, and powerful search for a deeper dive.'}
               </p>
 
               <div className="flex flex-wrap items-center gap-3 pt-1">
-                <Link
-                  href="/login"
-                  className="px-5 py-2 rounded-xl bg-[#FF5A36] hover:bg-[#E84E2C] text-white font-bold text-xs shadow-xs transition-colors"
-                >
-                  Sign in
-                </Link>
-
-                <Link
-                  href="/events"
-                  className="px-5 py-2 rounded-xl bg-[#FF5A36] hover:bg-[#E84E2C] text-white font-bold text-xs shadow-xs transition-colors"
-                >
-                  Explore advanced search
-                </Link>
+                {user ? (
+                  <>
+                    <Link
+                      href="/dashboard"
+                      className="px-5 py-2.5 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold text-xs shadow-xs transition-colors"
+                    >
+                      Go to My Dashboard
+                    </Link>
+                    <Link
+                      href="/events"
+                      className="px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs shadow-xs transition-colors"
+                    >
+                      Explore All Events
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      href={`/login?redirect=/category/${slug}`}
+                      className="px-5 py-2.5 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold text-xs shadow-xs transition-colors"
+                    >
+                      Sign in
+                    </Link>
+                    <Link
+                      href="/events"
+                      className="px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs shadow-xs transition-colors"
+                    >
+                      Explore advanced search
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
 

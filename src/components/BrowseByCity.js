@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { MapPin } from 'lucide-react';
 
 /* ========================================================================= */
@@ -321,18 +322,12 @@ export default function BrowseByCity({ onSelectCity, activeCity, onResetCity }) 
       {/* 12-Card Grid (6 Columns x 2 Rows on Desktop) matching Screenshot */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 sm:gap-4">
         {citiesToDisplay.map((city) => {
-          const isSelected = activeCity?.toLowerCase() === city.name.toLowerCase();
-
           return (
-            <button
+            <Link
               key={city.id}
-              type="button"
-              onClick={() => onSelectCity(city.name)}
-              className={`text-left p-4 sm:p-4.5 rounded-xl border transition-all duration-200 cursor-pointer flex flex-col justify-between h-28 sm:h-32 group ${
-                isSelected
-                  ? 'bg-zinc-950 text-white border-zinc-950 shadow-md ring-2 ring-[#FFCC00]'
-                  : 'bg-white border-zinc-200/90 hover:border-zinc-300 hover:shadow-md hover:-translate-y-0.5 text-zinc-900 shadow-2xs'
-              }`}
+              href={`/city/${city.id}`}
+              className="text-left p-4 sm:p-4.5 rounded-xl border border-zinc-200/90 hover:border-zinc-300 hover:shadow-md hover:-translate-y-0.5 text-zinc-900 shadow-2xs transition-all duration-200 cursor-pointer flex flex-col justify-between h-28 sm:h-32 group bg-white block"
+              title={`Explore Exhibitions in ${city.name}`}
             >
               {/* Landmark Icon */}
               <div className="h-7 w-7 flex items-center justify-start group-hover:scale-108 transition-transform">
@@ -341,22 +336,14 @@ export default function BrowseByCity({ onSelectCity, activeCity, onResetCity }) 
 
               {/* City & Real Event Count */}
               <div>
-                <div
-                  className={`font-bold text-xs sm:text-[13px] leading-snug line-clamp-1 ${
-                    isSelected ? 'text-white' : 'text-zinc-900 group-hover:text-[#FF2E63] transition-colors'
-                  }`}
-                >
+                <div className="font-bold text-xs sm:text-[13px] leading-snug line-clamp-1 text-zinc-900 group-hover:text-[#FF2E63] transition-colors">
                   {city.name}
                 </div>
-                <div
-                  className={`text-[11px] font-medium mt-0.5 ${
-                    isSelected ? 'text-zinc-300' : 'text-zinc-500'
-                  }`}
-                >
+                <div className="text-[11px] font-medium mt-0.5 text-zinc-500">
                   {city.countFormatted || `${city.count} Events`}
                 </div>
               </div>
-            </button>
+            </Link>
           );
         })}
       </div>

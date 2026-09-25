@@ -107,6 +107,26 @@ export default function EventsDirectoryPage() {
   const [claimedPassIds, setClaimedPassIds] = useState(new Set());
   const [toastMessage, setToastMessage] = useState(null);
 
+  // Read URL query parameters on initial page load
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      const cityParam = sp.get('city');
+      const catParam = sp.get('category');
+      const searchParam = sp.get('search') || sp.get('q') || sp.get('organizer');
+
+      if (cityParam) {
+        setSelectedCity(cityParam);
+      }
+      if (catParam) {
+        setSelectedCategory(catParam);
+      }
+      if (searchParam) {
+        setSearchQuery(searchParam);
+      }
+    }
+  }, []);
+
   // Fetch events from WordPress API
   useEffect(() => {
     const fetchEvents = async () => {
