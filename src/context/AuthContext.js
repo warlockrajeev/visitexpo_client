@@ -204,7 +204,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signup = async (name, email, password, orgName, role = 'organizer') => {
+  const signup = async (name, email, password, orgName, role = 'organizer', extraData = {}) => {
     setLoading(true);
     try {
       const res = await axios.post(`${API_URL}/auth/signup`, {
@@ -212,7 +212,8 @@ export const AuthProvider = ({ children }) => {
         email,
         password,
         organizationName: orgName,
-        role
+        role,
+        ...extraData
       });
       setUser(res.data.user);
       setAccessToken(res.data.accessToken);

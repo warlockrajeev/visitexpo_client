@@ -110,7 +110,10 @@ export default function Navbar({ solid = false }) {
 
         {/* Desktop Navigation Links */}
         <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-zinc-200">
-          <Link href="/events" className="hover:text-white transition-colors">
+          <Link
+            href={user ? '/events' : '/login?role=visitor&redirect=/events'}
+            className="hover:text-white transition-colors"
+          >
             Explore Events
           </Link>
           <Link
@@ -379,7 +382,7 @@ export default function Navbar({ solid = false }) {
           {/* Navigation Links */}
           <nav className="flex flex-col space-y-3 text-sm font-semibold text-zinc-200">
             <Link
-              href="/events"
+              href={user ? '/events' : '/login?role=visitor&redirect=/events'}
               onClick={() => setMobileMenuOpen(false)}
               className="hover:text-white py-1 transition-colors"
             >

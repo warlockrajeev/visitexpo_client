@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext.js';
 import {
   X,
@@ -31,6 +32,7 @@ import { auth, googleProvider, signInWithPopup } from '../lib/firebase.js';
 
 export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) {
   const { login, signup, loginWithGoogle } = useAuth();
+  const router = useRouter();
 
   const [mode, setMode] = useState('login'); // 'login' | 'signup'
   const [selectedRole, setSelectedRole] = useState('visitor'); // 'organizer' | 'exhibitor' | 'visitor'
@@ -148,7 +150,12 @@ export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) 
         if (onSuccess) onSuccess(res.user);
         onClose();
       } else {
-        setError(res.error || 'Google login failed.');
+        if (res.error?.includes('OTP') || res.error?.includes('mandatory') || res.error?.includes('registered')) {
+          router.push(`/login?role=${selectedRole}&signup=true`);
+          onClose();
+        } else {
+          setError(res.error || 'Google login failed.');
+        }
       }
     } catch (err) {
       console.error('Google auth error in GatedModal:', err);
@@ -174,23 +181,10 @@ export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) 
           setError(res.error || 'Invalid email or password.');
         }
       } else {
-        if (!name.trim()) {
-          setError('Please provide your name.');
-          setLoading(false);
-          return;
-        }
-        if ((selectedRole === 'organizer' || selectedRole === 'exhibitor') && !organizationName.trim()) {
-          setError(selectedRole === 'exhibitor' ? 'Company / Exhibitor name is required.' : 'Organization name is required.');
-          setLoading(false);
-          return;
-        }
-        const res = await signup(name, email, password, organizationName.trim(), selectedRole);
-        if (res.success) {
-          if (onSuccess) onSuccess(res.user);
-          onClose();
-        } else {
-          setError(res.error || 'Registration failed. Please try again.');
-        }
+        // Mandatory mobile OTP verification is required for all new registrations
+        router.push(`/login?role=${selectedRole}&signup=true`);
+        onClose();
+        return;
       }
     } catch (err) {
       setError(err.message || 'Authentication error.');
@@ -431,10 +425,13 @@ export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) 
                 Don't have a VisitExpo account yet?{' '}
                 <button
                   type="button"
-                  onClick={() => setMode('signup')}
+                  onClick={() => {
+                    router.push(`/login?role=${selectedRole}&signup=true`);
+                    onClose();
+                  }}
                   className="font-bold text-[#FF2E63] hover:underline cursor-pointer"
                 >
-                  Join Free
+                  Join Free (OTP Verified)
                 </button>
               </span>
             ) : (

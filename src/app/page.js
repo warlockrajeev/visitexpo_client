@@ -58,7 +58,6 @@ import {
 import axios from 'axios';
 import Navbar, { Logo } from '../components/Navbar.js';
 import ActionDiscoveryBanner from '../components/ActionDiscoveryBanner.js';
-import GatedAuthModal from '../components/GatedAuthModal.js';
 import AdvertiseModal from '../components/AdvertiseModal.js';
 import BrowseByCategory from '../components/BrowseByCategory.js';
 import BrowseByCity from '../components/BrowseByCity.js';
@@ -116,8 +115,6 @@ export default function LandingPage() {
   const [activeCategoryTab, setActiveCategoryTab] = useState('all');
   const [quickFilter, setQuickFilter] = useState('all');
 
-  // 10times Unregistered & Gated Flow States
-  const [gatedAuthContext, setGatedAuthContext] = useState(null); // { action, event }
   const [showAdvertiseModal, setShowAdvertiseModal] = useState(false);
   const [savedEventIds, setSavedEventIds] = useState(new Set());
   const [followedEventSlugs, setFollowedEventSlugs] = useState(new Set());
@@ -390,12 +387,17 @@ export default function LandingPage() {
     }
   };
 
-  // 10times Gated Action Handler
+  // Gated Action Handler - routes directly to the single unified login page
   const handleTriggerGated = (action, event) => {
     if (user) {
       executeGatedAction(action, event, user);
     } else {
-      setGatedAuthContext({ action, event });
+      if (action === 'explore_events') {
+        router.push('/login?role=visitor&redirect=/events');
+      } else {
+        const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/';
+        router.push(`/login?role=visitor&redirect=${encodeURIComponent(currentPath)}`);
+      }
     }
   };
 
@@ -635,24 +637,13 @@ export default function LandingPage() {
 
           {/* Hero CTAs */}
           <div className="pt-2 flex flex-wrap items-center justify-center gap-3.5">
-            <button
-              type="button"
-              onClick={() => {
-                if (!user) {
-                  setGatedAuthContext({
-                    action: 'explore_events',
-                    event: { title: '100+ Trade Shows & Exhibitions' },
-                    role: 'visitor'
-                  });
-                } else {
-                  router.push('/events');
-                }
-              }}
+            <Link
+              href={user ? '/events' : '/login?role=visitor&redirect=/events'}
               className="inline-flex items-center gap-2 rounded-full bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold px-7 py-3 text-xs sm:text-sm transition-all shadow-md hover:scale-102 cursor-pointer"
             >
               <span>Explore Exhibitions</span>
               <ArrowRight className="h-4 w-4" />
-            </button>
+            </Link>
             <Link
               href={user ? '/dashboard' : '/login?role=organizer&signup=true'}
               className="inline-flex items-center gap-2 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/30 text-white font-bold px-7 py-3 text-xs sm:text-sm transition-all shadow-sm hover:scale-102 cursor-pointer"
@@ -1566,24 +1557,13 @@ export default function LandingPage() {
 
               {/* Dedicated View All Events CTA */}
               <div className="pt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!user) {
-                      setGatedAuthContext({
-                        action: 'explore_events',
-                        event: { title: 'All 100+ Global Exhibitions' },
-                        role: 'visitor'
-                      });
-                    } else {
-                      router.push('/events');
-                    }
-                  }}
+                <Link
+                  href={user ? '/events' : '/login?role=visitor&redirect=/events'}
                   className="inline-flex items-center gap-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold px-8 py-3.5 text-xs sm:text-sm transition-all shadow-md hover:scale-102 cursor-pointer group"
                 >
                   <span>Explore All Events ({events.length || 100}+)</span>
                   <ArrowRight className="h-4 w-4 text-[#FFCC00] group-hover:translate-x-1 transition-transform" />
-                </button>
+                </Link>
 
                 <a
                   href="https://visitexpo.in"
@@ -1902,15 +1882,8 @@ export default function LandingPage() {
       <Footer />
 
       {/* ========================================================================= */}
-      {/* 9. 10TIMES MODALS: GATED AUTH, EDP MODAL, ADVERTISE MODAL & TOAST         */}
+      {/* 9. MODALS: ADVERTISE MODAL & TOAST                                          */}
       {/* ========================================================================= */}
-      <GatedAuthModal
-        isOpen={Boolean(gatedAuthContext)}
-        onClose={() => setGatedAuthContext(null)}
-        context={gatedAuthContext}
-        onSuccess={handleAuthSuccess}
-      />
-
       <AdvertiseModal
         isOpen={showAdvertiseModal}
         onClose={() => setShowAdvertiseModal(false)}

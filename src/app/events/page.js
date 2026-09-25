@@ -10,9 +10,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import Navbar from '../../components/Navbar.js';
-import GatedAuthModal from '../../components/GatedAuthModal.js';
 import { useAuth } from '../../context/AuthContext.js';
 import wpEventImages from '@/data/wordpress-event-images.json';
 import {
@@ -27,6 +27,7 @@ import {
   SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   ShieldCheck,
   Tag,
   Bookmark,
@@ -68,16 +69,28 @@ const CATEGORIES = [
 const ITEMS_PER_PAGE = 12;
 
 export default function EventsDirectoryPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  // Authentication Guard: require logged-in account to view Explore Events
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace('/login?role=visitor&redirect=/events');
+    }
+  }, [user, authLoading, router]);
 
   // Events State
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Search & Filters State
+  // Search & Filters State (WordPress Directory 7-Input Spec)
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedState, setSelectedState] = useState('all');
   const [selectedCity, setSelectedCity] = useState('all');
+  const [selectedVenue, setSelectedVenue] = useState('all');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [sortBy, setSortBy] = useState('upcoming'); // 'upcoming' | 'rating' | 'turnout' | 'title'
   const [featuredOnly, setFeaturedOnly] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -88,8 +101,7 @@ export default function EventsDirectoryPage() {
   const [userLocation, setUserLocation] = useState(null);
   const [userCityName, setUserCityName] = useState('');
 
-  // Gated Auth, Save & Follow State
-  const [gatedContext, setGatedContext] = useState(null);
+  // Save, Follow & Pass State
   const [savedEventIds, setSavedEventIds] = useState(new Set());
   const [followedSlugs, setFollowedSlugs] = useState(new Set());
   const [claimedPassIds, setClaimedPassIds] = useState(new Set());
@@ -159,11 +171,35 @@ export default function EventsDirectoryPage() {
     return Array.from(set).sort();
   }, [events]);
 
+  // Distinct states list from events
+  const availableStates = useMemo(() => {
+    const set = new Set();
+    events.forEach((e) => {
+      const st = (e.state || '').trim();
+      if (st && st !== 'India' && st.toLowerCase() !== (e.city || '').toLowerCase()) {
+        set.add(st);
+      }
+    });
+    return Array.from(set).sort();
+  }, [events]);
+
+  // Distinct venues list from events
+  const availableVenues = useMemo(() => {
+    const set = new Set();
+    events.forEach((e) => {
+      const v = (e.venue || '').trim();
+      if (v && v.toLowerCase() !== 'exhibition center' && v.toLowerCase() !== (e.city || '').toLowerCase()) {
+        set.add(v);
+      }
+    });
+    return Array.from(set).sort();
+  }, [events]);
+
   // Filtered & Sorted Events
   const filteredEvents = useMemo(() => {
     let list = [...events];
 
-    // Search Query
+    // Search Query (Enter Name ...)
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       list = list.filter(
@@ -172,20 +208,51 @@ export default function EventsDirectoryPage() {
           (e.venue && e.venue.toLowerCase().includes(q)) ||
           (e.address && e.address.toLowerCase().includes(q)) ||
           (e.city && e.city.toLowerCase().includes(q)) ||
+          (e.state && e.state.toLowerCase().includes(q)) ||
           (e.country && e.country.toLowerCase().includes(q)) ||
           (e.category && e.category.toLowerCase().includes(q)) ||
           (e.description && e.description.toLowerCase().includes(q))
       );
     }
 
-    // Category Filter
+    // Category Filter (All Categories)
     if (selectedCategory && selectedCategory !== 'All') {
       list = list.filter((e) => e.category === selectedCategory);
     }
 
-    // City Filter
+    // State Filter (All States)
+    if (selectedState && selectedState !== 'all') {
+      list = list.filter((e) => (e.state || '').toLowerCase() === selectedState.toLowerCase());
+    }
+
+    // City Filter (All Cities)
     if (selectedCity && selectedCity !== 'all') {
       list = list.filter((e) => (e.city || '').toLowerCase() === selectedCity.toLowerCase());
+    }
+
+    // Venue Filter (All Venue)
+    if (selectedVenue && selectedVenue !== 'all') {
+      list = list.filter((e) => (e.venue || '').toLowerCase() === selectedVenue.toLowerCase());
+    }
+
+    // Date Filter (From .. To ...)
+    if (fromDate) {
+      const fTime = new Date(fromDate).getTime();
+      if (!isNaN(fTime)) {
+        list = list.filter((e) => {
+          const sTime = e.startDate ? new Date(e.startDate).getTime() : 0;
+          return sTime >= fTime;
+        });
+      }
+    }
+    if (toDate) {
+      const tTime = new Date(toDate).getTime();
+      if (!isNaN(tTime)) {
+        list = list.filter((e) => {
+          const eTime = e.endDate ? new Date(e.endDate).getTime() : (e.startDate ? new Date(e.startDate).getTime() : 0);
+          return eTime <= tTime + 86400000;
+        });
+      }
     }
 
     // Featured Only Filter
@@ -241,12 +308,12 @@ export default function EventsDirectoryPage() {
     }
 
     return list;
-  }, [events, searchQuery, selectedCategory, selectedCity, sortBy, featuredOnly, isNearbyActive, userLocation]);
+  }, [events, searchQuery, selectedCategory, selectedState, selectedCity, selectedVenue, fromDate, toDate, sortBy, featuredOnly, isNearbyActive, userLocation]);
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedCategory, selectedCity, sortBy, featuredOnly, isNearbyActive]);
+  }, [searchQuery, selectedCategory, selectedState, selectedCity, selectedVenue, fromDate, toDate, sortBy, featuredOnly, isNearbyActive]);
 
   // Pagination calculation
   const totalPages = Math.ceil(filteredEvents.length / ITEMS_PER_PAGE) || 1;
@@ -275,7 +342,7 @@ export default function EventsDirectoryPage() {
     if (!slug) return;
 
     if (!user) {
-      setGatedContext({ action: 'follow', event: evt });
+      router.push('/login?role=visitor&redirect=/events');
       return;
     }
 
@@ -323,7 +390,7 @@ export default function EventsDirectoryPage() {
 
   const handleGetPass = (evt) => {
     if (!user) {
-      setGatedContext({ action: 'ticket', event: evt });
+      router.push('/login?role=visitor&redirect=/events');
     } else {
       const next = new Set(claimedPassIds);
       next.add(evt.id);
@@ -356,7 +423,11 @@ export default function EventsDirectoryPage() {
   const handleResetFilters = () => {
     setSearchQuery('');
     setSelectedCategory('All');
+    setSelectedState('all');
     setSelectedCity('all');
+    setSelectedVenue('all');
+    setFromDate('');
+    setToDate('');
     setSortBy('upcoming');
     setFeaturedOnly(false);
     setIsNearbyActive(false);
@@ -366,64 +437,207 @@ export default function EventsDirectoryPage() {
   const hasActiveFilters =
     searchQuery.trim() !== '' ||
     selectedCategory !== 'All' ||
+    selectedState !== 'all' ||
     selectedCity !== 'all' ||
+    selectedVenue !== 'all' ||
+    fromDate !== '' ||
+    toDate !== '' ||
     sortBy !== 'upcoming' ||
     featuredOnly ||
     isNearbyActive;
 
+  // Unauthenticated session guard screen
+  if (authLoading || !user) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center p-4">
+        <div className="flex flex-col items-center space-y-4 text-center max-w-sm">
+          <div className="h-14 w-14 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shadow-xl">
+            <Loader2 className="h-7 w-7 animate-spin text-[#FFCC00]" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-zinc-100">Sign in to Explore Events</h2>
+            <p className="text-xs text-zinc-400 mt-1">
+              Redirecting you to login to access verified exhibitions, visitor passes, and exhibitor directories...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-zinc-900 font-sans antialiased selection:bg-[#FF2E63] selection:text-white pb-24">
+    <div className="min-h-screen bg-[#F8F9FA] text-zinc-900 font-sans antialiased selection:bg-[#FFCC00] selection:text-zinc-950 pb-24">
       {/* Universal Navbar */}
       <Navbar solid={true} />
 
-      {/* Header Banner */}
-      <header className="pt-24 sm:pt-28 pb-10 bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 text-white border-b border-zinc-800 relative overflow-hidden">
-        {/* Subtle decorative glow */}
-        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-[#FFCC00]/10 blur-3xl pointer-events-none" />
-        <div className="absolute top-1/2 -right-24 w-96 h-96 rounded-full bg-[#FF2E63]/10 blur-3xl pointer-events-none" />
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10 space-y-5">
-          {/* Breadcrumb */}
-          <nav className="flex items-center gap-2 text-xs text-zinc-400 font-medium">
-            <Link href="/" className="hover:text-white transition-colors">
-              Home
-            </Link>
-            <span>/</span>
-            <span className="text-[#FFCC00] font-semibold">Trade Shows &amp; Exhibitions</span>
-          </nav>
-
-          {/* Heading */}
-          <div className="max-w-3xl space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-xs font-bold text-[#FFCC00]">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              <span>{events.length > 0 ? `${events.length.toLocaleString()}+ Verified Global Exhibitions & Expos` : 'Verified Global Exhibitions & Expos'}</span>
+      {/* ========================================================================= */}
+      {/* COMPACT DIRECTORY HEADER & SEARCH CONSOLE (NOT Full-Screen)               */}
+      {/* ========================================================================= */}
+      <header className="bg-white border-b border-zinc-200/80 pt-20 sm:pt-24 pb-5 px-4 sm:px-6 shadow-2xs">
+        <div className="max-w-7xl mx-auto space-y-4">
+          {/* Top Title & Metrics Row */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <nav className="flex items-center gap-1.5 text-xs text-zinc-400 font-medium">
+                <Link href="/" className="hover:text-zinc-900 transition-colors">Home</Link>
+                <span>/</span>
+                <span className="text-zinc-800 font-semibold">Exhibitions Directory</span>
+              </nav>
+              <h1 className="text-2xl sm:text-3xl font-black text-zinc-950 tracking-tight flex items-center gap-2">
+                <span>Explore Trade Shows &amp; Expos</span>
+              </h1>
             </div>
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight">
-              Explore Global Trade Shows &amp; Exhibitions
-            </h1>
-            <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed max-w-2xl">
-              Browse, filter, and secure verified delegate passes for leading international expos, B2B trade fairs, and industry conventions across Europe, Asia, and worldwide.
-            </p>
+
+            {/* Live Count Pill */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-xs font-bold text-emerald-800 self-start sm:self-auto shadow-2xs">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span>{events.length > 0 ? `${events.length.toLocaleString()} Verified Live Expos` : '2,100+ Live Expos'}</span>
+            </div>
           </div>
 
-          {/* Search Box */}
-          <div className="pt-2 max-w-3xl">
-            <div className="relative flex items-center">
-              <Search className="absolute left-4 h-5 w-5 text-zinc-400 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search exhibitions by name, industry, city, venue, or keywords (e.g. IFTM, Paris, Food, Tech)..."
-                className="w-full pl-12 pr-10 py-3.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white placeholder-zinc-400 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:bg-white/15 transition-all shadow-lg"
-              />
-              {searchQuery && (
+          {/* Unified Compact Search & Filters Console */}
+          <div className="bg-zinc-50/90 border border-zinc-200 rounded-2xl p-2 sm:p-2.5 shadow-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 sm:gap-2.5 items-center">
+              {/* 1. Keyword Search */}
+              <div className="lg:col-span-5 relative flex items-center">
+                <Search className="absolute left-3.5 h-4 w-4 text-zinc-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by event, keyword, or venue..."
+                  className="w-full pl-10 pr-8 py-2.5 rounded-xl bg-white border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-amber-400 transition-all shadow-2xs"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 text-xs text-zinc-400 hover:text-zinc-700 p-1 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* 2. City Dropdown */}
+              <div className="lg:col-span-3 relative flex items-center">
+                <MapPin className="absolute left-3.5 h-4 w-4 text-rose-500 pointer-events-none" />
+                <select
+                  value={selectedCity}
+                  onChange={(e) => setSelectedCity(e.target.value)}
+                  className="w-full pl-10 pr-8 py-2.5 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-amber-400 transition-all cursor-pointer appearance-none shadow-2xs"
+                >
+                  <option value="all">All Locations / Cities</option>
+                  {availableCities.map((city) => (
+                    <option key={city} value={city}>
+                      {city}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 h-4 w-4 text-zinc-400 pointer-events-none" />
+              </div>
+
+              {/* 3. Sort Dropdown */}
+              <div className="lg:col-span-2 relative flex items-center">
+                <SlidersHorizontal className="absolute left-3.5 h-4 w-4 text-zinc-400 pointer-events-none" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="w-full pl-10 pr-8 py-2.5 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-amber-400 transition-all cursor-pointer appearance-none shadow-2xs"
+                >
+                  <option value="upcoming">Upcoming</option>
+                  <option value="rating">Top Rated</option>
+                  <option value="turnout">Turnout</option>
+                  <option value="title">A-Z</option>
+                </select>
+                <ChevronDown className="absolute right-3 h-4 w-4 text-zinc-400 pointer-events-none" />
+              </div>
+
+              {/* 4. Find Expos Button */}
+              <div className="lg:col-span-2">
                 <button
                   type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3.5 text-xs text-zinc-400 hover:text-white p-1 rounded-full hover:bg-white/10 cursor-pointer"
+                  onClick={() => {
+                    const el = document.getElementById('events-grid-anchor');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-black text-xs sm:text-sm transition-all shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  ✕
+                  <span>Find Expos</span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Category Chips Bar + Quick Tools */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-0.5">
+            {/* Horizontal Category Carousel */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+              {CATEGORIES.map((cat) => {
+                const active = selectedCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all duration-200 cursor-pointer shrink-0 text-xs font-bold ${
+                      active
+                        ? 'bg-zinc-950 text-[#FFCC00] shadow-sm ring-1 ring-zinc-950'
+                        : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Quick Tools on Right: Nearby, Featured & Reset */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleToggleNearby}
+                disabled={isDetectingLocation}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs ${
+                  isNearbyActive
+                    ? 'bg-[#FF2E63] text-white border-[#FF2E63]'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                }`}
+                title="Show exhibitions closest to your location"
+              >
+                {isDetectingLocation ? (
+                  <Loader2 className="h-3 w-3 animate-spin text-zinc-500" />
+                ) : (
+                  <LocateFixed className={`h-3 w-3 ${isNearbyActive ? 'text-white' : 'text-[#FF2E63]'}`} />
+                )}
+                <span>Nearby</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFeaturedOnly((prev) => !prev)}
+                className={`px-3 py-1.5 rounded-xl border text-xs transition-all cursor-pointer flex items-center gap-1 shadow-2xs ${
+                  featuredOnly
+                    ? 'bg-amber-50 text-amber-900 border-amber-300 font-bold'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-semibold'
+                }`}
+              >
+                <Tag className="h-3 w-3 text-amber-500" />
+                <span>Featured</span>
+              </button>
+
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-zinc-500 hover:text-zinc-950 hover:bg-zinc-100 transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  <span>Reset</span>
                 </button>
               )}
             </div>
@@ -431,150 +645,40 @@ export default function EventsDirectoryPage() {
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 space-y-6">
-        {/* ========================================================================= */}
-        {/* FILTER CONTROLS BAR                                                       */}
-        {/* ========================================================================= */}
-        <div className="bg-white border border-zinc-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
-          {/* Category Pills Carousel */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs font-bold">
-            {CATEGORIES.map((cat) => {
-              const active = selectedCategory === cat;
-              return (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-all cursor-pointer shrink-0 ${
-                    active
-                      ? 'bg-zinc-900 text-white shadow-xs scale-102 ring-1 ring-zinc-900'
-                      : 'bg-zinc-100 hover:bg-zinc-200/80 text-zinc-700 hover:text-zinc-950'
-                  }`}
-                >
-                  {cat}
-                </button>
-              );
-            })}
-          </div>
+      {/* Main Content Area - Event Cards Grid starts right here! */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-5">
+        <div id="events-grid-anchor" className="scroll-mt-4" />
 
-          {/* Secondary Controls: City, Sort, Featured, Counter */}
-          <div className="pt-2 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              {/* City Dropdown */}
-              <div className="flex items-center gap-1.5 bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2">
-                <MapPin className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
-                <select
-                  value={selectedCity}
-                  onChange={(e) => setSelectedCity(e.target.value)}
-                  className="bg-transparent text-xs font-bold text-zinc-800 focus:outline-none cursor-pointer"
-                >
-                  <option value="all">All Locations</option>
-                  {availableCities.map((city) => (
-                    <option key={city} value={city}>
-                      {city}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Sort Dropdown */}
-              <div className="flex items-center gap-1.5 bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2">
-                <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="bg-transparent text-xs font-bold text-zinc-800 focus:outline-none cursor-pointer"
-                >
-                  <option value="upcoming">Sort: Upcoming Dates</option>
-                  <option value="rating">Sort: Highest Rated</option>
-                  <option value="turnout">Sort: Largest Turnout</option>
-                  <option value="title">Sort: Alphabetical (A-Z)</option>
-                </select>
-              </div>
-
-              {/* Nearby Proximity Toggle Button */}
-              <button
-                type="button"
-                onClick={handleToggleNearby}
-                disabled={isDetectingLocation}
-                className={`px-3 py-2 rounded-xl border font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
-                  isNearbyActive
-                    ? 'bg-[#FF2E63] text-white border-[#FF2E63] shadow-xs'
-                    : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100 hover:border-zinc-300'
-                }`}
-                title="Show exhibitions closest to your location"
-              >
-                {isDetectingLocation ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-500" />
-                ) : (
-                  <LocateFixed className={`h-3.5 w-3.5 ${isNearbyActive ? 'text-white' : 'text-[#FF2E63]'}`} />
-                )}
-                <span>Nearby</span>
-                {isNearbyActive && userCityName && (
-                  <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-md font-semibold">
-                    {userCityName}
-                  </span>
-                )}
-              </button>
-
-              {/* Featured Only Toggle */}
-              <button
-                type="button"
-                onClick={() => setFeaturedOnly((prev) => !prev)}
-                className={`px-3 py-2 rounded-xl border font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
-                  featuredOnly
-                    ? 'bg-rose-50 text-[#FF2E63] border-[#FF2E63]/30'
-                    : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100'
-                }`}
-              >
-                <Tag className="h-3.5 w-3.5" />
-                <span>Featured Only</span>
-              </button>
-
-              {/* Reset All Filters Button */}
-              {hasActiveFilters && (
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-zinc-500 hover:text-zinc-900 transition-colors cursor-pointer px-2 py-1"
-                >
-                  <RotateCcw className="h-3 w-3" />
-                  <span>Reset filters</span>
-                </button>
-              )}
-            </div>
-
-            {/* Results Count */}
-            <div className="text-zinc-500 font-medium">
-              Showing{' '}
-              <strong className="text-zinc-900 font-extrabold">
-                {filteredEvents.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0}–
-                {Math.min(currentPage * ITEMS_PER_PAGE, filteredEvents.length)}
-              </strong>{' '}
-              of <strong className="text-zinc-900 font-extrabold">{filteredEvents.length.toLocaleString()}</strong> events
-            </div>
+        {/* Results Count Line */}
+        <div className="flex items-center justify-between text-xs text-zinc-500 pb-1">
+          <div>
+            Showing{' '}
+            <strong className="text-zinc-950 font-bold">
+              {filteredEvents.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0}–
+              {Math.min(currentPage * ITEMS_PER_PAGE, filteredEvents.length)}
+            </strong>{' '}
+            of <strong className="text-zinc-950 font-bold">{filteredEvents.length.toLocaleString()}</strong> verified exhibitions
           </div>
         </div>
 
         {/* Proximity Filter Active Banner */}
         {isNearbyActive && (
-          <div className="bg-gradient-to-r from-rose-50 to-amber-50/60 border border-rose-200/90 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 text-xs text-rose-950 shadow-2xs">
+          <div className="bg-amber-50/70 border border-amber-200/90 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 text-xs text-amber-950 shadow-xs">
             <div className="flex items-center gap-2.5">
-              <div className="p-1.5 rounded-lg bg-[#FF2E63] text-white">
+              <div className="p-1.5 rounded-lg bg-[#FF2E63] text-white shadow-2xs">
                 <Navigation className="h-3.5 w-3.5" />
               </div>
               <div>
-                <span className="font-extrabold text-zinc-900">Nearby Exhibitions Active:</span>{' '}
+                <span className="font-extrabold text-zinc-950">Nearby Exhibitions Active:</span>{' '}
                 <span>
-                  Showing verified expos sorted by shortest distance to <strong className="text-[#FF2E63]">{userCityName || 'your detected location'}</strong>.
+                  Showing expos sorted by shortest distance to <strong className="text-[#FF2E63] font-bold">{userCityName || 'your detected location'}</strong>.
                 </span>
               </div>
             </div>
             <button
               type="button"
               onClick={() => setIsNearbyActive(false)}
-              className="px-3 py-1 rounded-xl bg-white border border-rose-200 hover:bg-rose-100/50 text-[#FF2E63] font-bold transition-all shadow-2xs cursor-pointer text-xs"
+              className="px-3 py-1.5 rounded-xl bg-white border border-amber-300 hover:bg-amber-100 text-zinc-900 font-bold transition-all shadow-2xs cursor-pointer text-xs"
             >
               Show All Locations (Reset)
             </button>
@@ -582,221 +686,195 @@ export default function EventsDirectoryPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* EVENTS GRID                                                               */}
+        {/* EVENTS GRID - Cutting-Edge Next-Gen Cards (3 Columns)                     */}
         {/* ========================================================================= */}
         {loading ? (
-          <div className="py-24 text-center space-y-3 bg-white rounded-2xl border border-zinc-200">
-            <div className="h-10 w-10 border-3 border-[#FF2E63] border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-xs text-zinc-500 font-medium">Loading trade shows and expos...</p>
+          /* Modern Pulsing Skeleton Cards */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-white border border-zinc-200/80 rounded-3xl overflow-hidden shadow-xs animate-pulse flex flex-col">
+                <div className="aspect-[16/10] bg-zinc-200 w-full relative">
+                  <div className="absolute top-3.5 left-3.5 h-6 w-24 bg-zinc-300 rounded-full" />
+                  <div className="absolute top-3.5 right-3.5 h-6 w-28 bg-zinc-300 rounded-full" />
+                </div>
+                <div className="p-6 space-y-3 flex-1 flex flex-col justify-between">
+                  <div className="space-y-2.5">
+                    <div className="h-4 bg-zinc-200 rounded w-1/3" />
+                    <div className="h-5 bg-zinc-200 rounded w-3/4" />
+                    <div className="h-4 bg-zinc-200 rounded w-1/2" />
+                    <div className="h-3 bg-zinc-200 rounded w-full" />
+                    <div className="h-3 bg-zinc-200 rounded w-5/6" />
+                  </div>
+                  <div className="pt-4 border-t border-zinc-100 flex items-center justify-between">
+                    <div className="h-4 bg-zinc-200 rounded w-20" />
+                    <div className="h-8 bg-zinc-200 rounded-xl w-28" />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : filteredEvents.length === 0 ? (
           /* Empty State */
-          <div className="bg-white border border-zinc-200 rounded-2xl p-12 text-center space-y-4 shadow-xs">
-            <div className="h-14 w-14 rounded-2xl bg-zinc-100 flex items-center justify-center mx-auto text-zinc-400">
-              <Search className="h-7 w-7" />
+          <div className="bg-white border border-zinc-200/90 rounded-3xl p-14 text-center space-y-4 shadow-sm max-w-xl mx-auto">
+            <div className="h-16 w-16 rounded-2xl bg-amber-50 flex items-center justify-center mx-auto text-amber-500 border border-amber-200/80 shadow-2xs">
+              <Search className="h-8 w-8" />
             </div>
-            <div className="space-y-1">
-              <h3 className="text-base font-extrabold text-zinc-900">No exhibitions match your filters</h3>
-              <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-                Try clearing your search query or selecting another category or city to explore more trade fairs.
+            <div className="space-y-1.5">
+              <h3 className="text-xl font-black text-zinc-950">No exhibitions match your search</h3>
+              <p className="text-xs sm:text-sm text-zinc-500 max-w-sm mx-auto leading-relaxed">
+                Try searching with a broader keyword, or explore other categories and cities to discover exciting trade shows.
               </p>
             </div>
             <button
               type="button"
               onClick={handleResetFilters}
-              className="px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+              className="px-6 py-2.5 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-[#FFCC00] text-xs font-black transition-all shadow-md cursor-pointer"
             >
               Clear all filters
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
             {paginatedEvents.map((evt, idx) => {
               const eventSlug = evt.slug || evt.id;
-              const isFollowing = followedSlugs.has((evt.slug || evt.id || '').toLowerCase().trim());
               const isSaved = savedEventIds.has(evt.id);
               const isClaimed = claimedPassIds.has(evt.id);
-              const charSum = (evt.title || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 17);
-              const resolvedRating = evt.rating || (4.5 + ((charSum % 5) * 0.1)).toFixed(1);
-              const resolvedReviews = evt.reviewCount || (60 + (charSum % 140));
-              const resolvedEdition = evt.edition || `${6 + (charSum % 18)}th Edition`;
               const wpImg =
                 wpEventImages[String(evt.slug || '').toLowerCase()] ||
                 wpEventImages[String(evt.id)] ||
                 wpEventImages[String(evt.wpPostId)] ||
-                evt.image;
+                evt.image ||
+                'https://visitexpo.in/wp-content/uploads/2026/08/Refining-India-2026.jpg';
 
               return (
                 <article
                   key={evt.id || idx}
-                  className="bg-white border border-zinc-200/90 rounded-2xl overflow-hidden hover:border-zinc-300 hover:shadow-lg transition-all duration-200 flex flex-col group"
+                  className="bg-white border border-zinc-200/90 rounded-3xl overflow-hidden hover:border-amber-400/80 hover:shadow-2xl hover:shadow-amber-500/10 hover:-translate-y-2 transition-all duration-300 flex flex-col group relative"
                 >
                   {/* Card Media Header */}
-                  <div className="relative h-48 w-full overflow-hidden bg-zinc-950 flex items-center justify-center">
-                    {/* Ambient backdrop */}
-                    <img
-                      src={wpImg}
-                      alt=""
-                      aria-hidden="true"
-                      className="absolute inset-0 w-full h-full object-cover blur-lg opacity-35 scale-110"
-                    />
-                    {/* Centered Poster Banner */}
+                  <div className="relative aspect-[16/10] w-full overflow-hidden bg-zinc-100">
                     <img
                       src={wpImg}
                       alt={evt.title}
-                      className="relative z-10 max-h-full max-w-full w-auto h-auto object-contain transition-transform duration-300 group-hover:scale-103"
+                      className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-108"
                       onError={(e) => {
                         e.currentTarget.src =
                           evt.fallbackImage || 'https://visitexpo.in/wp-content/uploads/2026/08/Refining-India-2026.jpg';
                       }}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none z-10" />
 
-                    {/* Top Badges */}
-                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-20">
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-zinc-900/80 text-white backdrop-blur-xs border border-white/20">
+                    {/* Gradient Overlay for Crisp Badge Readability */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/35 pointer-events-none" />
+
+                    {/* Top Badges Row */}
+                    <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between z-10 pointer-events-none">
+                      {/* Category Badge on Left */}
+                      <span className="px-3.5 py-1 rounded-full text-[11px] font-black bg-zinc-950/80 text-white shadow-lg border border-white/20 backdrop-blur-md">
                         {evt.category || 'Trade Show'}
                       </span>
 
-                      <div className="flex items-center gap-1.5">
+                      {/* Free Visitor Pass Badge + Bookmark Button on Right */}
+                      <div className="flex items-center gap-1.5 pointer-events-auto">
+                        <span className="px-3.5 py-1 rounded-full text-[11px] font-black bg-gradient-to-r from-[#FFCC00] to-amber-400 text-zinc-950 shadow-lg tracking-tight">
+                          Free Visitor Pass
+                        </span>
+
                         <button
                           type="button"
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            handleToggleFollow(evt);
+                            handleToggleSave(evt.id);
                           }}
-                          className={`p-2 rounded-full backdrop-blur-xs transition-all cursor-pointer ${
-                            isFollowing
-                              ? 'bg-blue-600 text-white shadow-md ring-2 ring-white/40'
-                              : 'bg-black/50 text-white hover:bg-black/80'
-                          }`}
-                          title={isFollowing ? 'Following event updates' : 'Follow this event'}
-                          aria-label="Follow exhibition"
-                        >
-                          <Bell className={`h-3.5 w-3.5 ${isFollowing ? 'fill-white' : ''}`} />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleToggleSave(evt.id)}
-                          className={`p-2 rounded-full backdrop-blur-xs transition-colors cursor-pointer ${
+                          className={`p-2 rounded-full backdrop-blur-md transition-all shadow-md cursor-pointer hover:scale-110 active:scale-95 ${
                             isSaved
-                              ? 'bg-rose-500 text-white shadow-sm'
-                              : 'bg-black/50 text-white hover:bg-black/80'
+                              ? 'bg-rose-500 text-white shadow-rose-500/40 scale-105'
+                              : 'bg-black/40 text-white hover:bg-black/70'
                           }`}
                           aria-label="Save exhibition"
+                          title={isSaved ? 'Saved in bookmarks' : 'Save event'}
                         >
-                          <Bookmark className={`h-3.5 w-3.5 ${isSaved ? 'fill-white' : ''}`} />
+                          <Bookmark className={`h-3 w-3 ${isSaved ? 'fill-white' : ''}`} />
                         </button>
                       </div>
-                    </div>
-
-                    {/* Bottom Edition Pill */}
-                    <div className="absolute bottom-2.5 left-3 z-20">
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-600 text-white shadow-xs">
-                        {resolvedEdition}
-                      </span>
                     </div>
                   </div>
 
                   {/* Card Content Body */}
-                  <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                    <div className="space-y-2">
-                      {/* Dates */}
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-[#FF2E63]">
-                        <Calendar className="h-3.5 w-3.5 shrink-0" />
+                  <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                    <div className="space-y-2.5">
+                      {/* Dates in warm orange/amber with calendar icon */}
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200/80 text-xs font-bold text-amber-900">
+                        <Calendar className="h-3.5 w-3.5 shrink-0 text-amber-600" />
                         <span>{evt.dates || 'Upcoming 2026'}</span>
                       </div>
 
                       {/* Title */}
-                      <h2 className="text-base font-extrabold text-zinc-900 tracking-tight leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                      <h2 className="text-lg font-black text-zinc-950 leading-snug line-clamp-1 group-hover:text-amber-600 transition-colors">
                         <Link href={`/expo/${eventSlug}`}>
                           {evt.title}
                         </Link>
                       </h2>
 
-                      {/* Authentic WordPress Location & Proximity Badge */}
-                      <div className="flex items-center justify-between gap-2 text-xs text-zinc-600">
-                        <div className="flex items-center gap-1.5 truncate" title={evt.address || evt.venue || evt.city}>
-                          <MapPin className="h-3.5 w-3.5 text-[#FF2E63] shrink-0" />
-                          <span className="truncate">
-                            {evt.venue && evt.venue.toLowerCase() !== evt.city?.toLowerCase() && evt.venue.toLowerCase() !== 'exhibition center' ? (
-                              <>
-                                <span className="font-semibold text-zinc-800">{evt.venue}</span>
-                                <span className="text-zinc-400 font-normal"> • {evt.city}{evt.country && evt.country !== evt.city ? `, ${evt.country}` : ''}</span>
-                              </>
-                            ) : (
-                              `${evt.city}${evt.state && evt.state !== evt.city ? `, ${evt.state}` : ''}${evt.country ? `, ${evt.country}` : ''}`
-                            )}
-                          </span>
-                        </div>
+                      {/* Location / Venue with MapPin */}
+                      <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-medium" title={evt.address || evt.venue || evt.city}>
+                        <MapPin className="h-3.5 w-3.5 text-[#FF2E63] shrink-0" />
+                        <span className="truncate">
+                          {evt.venue && evt.venue.toLowerCase() !== evt.city?.toLowerCase() && evt.venue.toLowerCase() !== 'exhibition center' ? (
+                            <>
+                              <span className="font-bold text-zinc-800">{evt.venue}</span>
+                              <span className="text-zinc-500">, {evt.city || 'India'}</span>
+                            </>
+                          ) : (
+                            `${evt.city || 'Global'}${evt.state && evt.state !== evt.city ? `, ${evt.state}` : ''}${evt.country ? `, ${evt.country}` : ''}`
+                          )}
+                        </span>
                         {isNearbyActive && evt.distanceKm != null && (
-                          <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 text-[#FF2E63] border border-rose-200">
+                          <span className="shrink-0 ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-50 text-[#FF2E63] border border-rose-200">
                             <Navigation className="h-2.5 w-2.5" />
                             {formatDistance(evt.distanceKm)}
                           </span>
                         )}
                       </div>
 
-                      {/* Rating & Turnout */}
-                      <div className="flex items-center gap-3 text-xs text-zinc-500 pt-1">
-                        <span className="flex items-center gap-1 font-bold text-amber-700">
-                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                          {resolvedRating} ({resolvedReviews})
-                        </span>
-                        <span className="text-zinc-300">•</span>
-                        <span className="flex items-center gap-1 text-zinc-600 truncate">
-                          <Users className="h-3.5 w-3.5 text-zinc-400" />
-                          {evt.attendees || '12,000+ Attendees'}
-                        </span>
-                      </div>
+                      {/* Concise 2-line Description */}
+                      <p className="text-xs text-zinc-600 line-clamp-2 leading-relaxed min-h-[34px]">
+                        {evt.description || `Explore ${evt.title}, featuring international exhibitors, product showcases, and B2B business networking.`}
+                      </p>
                     </div>
 
-                    {/* Action Buttons Row */}
-                    <div className="pt-3 border-t border-zinc-100 flex items-center justify-between gap-2">
-                      <Link
-                        href={`/expo/${eventSlug}`}
-                        className="text-xs font-bold text-zinc-700 hover:text-zinc-950 transition-colors"
-                      >
-                        View Details
-                      </Link>
+                    {/* Footer Row: [Country] on Left, [Exhibit • Get Pass →] on Right */}
+                    <div className="pt-4 border-t border-zinc-100 flex items-center justify-between text-xs">
+                      {/* Left: Country / City with Globe */}
+                      <div className="flex items-center gap-1.5 text-zinc-500 font-semibold truncate max-w-[130px]">
+                        <Globe className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+                        <span className="truncate">{evt.country || evt.city || 'International'}</span>
+                      </div>
 
+                      {/* Right: Exhibit • Get Pass → */}
                       <div className="flex items-center gap-2">
-                        {/* Follow Button */}
-                        <button
-                          type="button"
-                          onClick={() => handleToggleFollow(evt)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
-                            isFollowing
-                              ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/20'
-                              : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200/80'
-                          }`}
-                          title={isFollowing ? 'You are following this event' : 'Follow this event'}
+                        <Link
+                          href="/login?role=exhibitor&signup=true"
+                          className="text-xs font-black text-[#FF2E63] hover:text-[#d91e52] hover:underline transition-colors px-1 py-0.5 cursor-pointer"
                         >
-                          <Bell className={`h-3 w-3 ${isFollowing ? 'fill-white' : ''}`} />
-                          <span>{isFollowing ? 'Following' : 'Follow'}</span>
-                        </button>
-
+                          Exhibit
+                        </Link>
+                        <span className="text-zinc-300 font-bold">•</span>
                         <button
                           type="button"
                           onClick={() => handleGetPass(evt)}
-                          className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-2xs ${
-                            isClaimed
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 ring-1 ring-amber-400'
-                          }`}
+                          className="cursor-pointer"
                         >
                           {isClaimed ? (
-                            <>
-                              <CheckCircle2 className="h-3 w-3" />
-                              <span>Pass Issued</span>
-                            </>
+                            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold shadow-2xs">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                              Pass Issued
+                            </span>
                           ) : (
-                            <>
+                            <span className="group/btn inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-zinc-950 text-[#FFCC00] hover:bg-[#FFCC00] hover:text-zinc-950 font-black text-xs transition-all duration-200 shadow-sm hover:shadow-md hover:scale-105 active:scale-95">
                               <span>Get Pass</span>
-                              <ArrowRight className="h-3 w-3" />
-                            </>
+                              <ArrowRight className="h-3 w-3 group-hover/btn:translate-x-0.5 transition-transform" />
+                            </span>
                           )}
                         </button>
                       </div>
@@ -809,13 +887,13 @@ export default function EventsDirectoryPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* PAGINATION CONTROLS                                                       */}
+        {/* PAGINATION CONTROLS (Modern & Sleek)                                      */}
         {/* ========================================================================= */}
         {totalPages > 1 && (
-          <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-zinc-200">
+          <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-zinc-200">
             <div className="text-xs text-zinc-500 font-medium">
-              Page <strong className="text-zinc-900">{currentPage}</strong> of{' '}
-              <strong className="text-zinc-900">{totalPages}</strong> ({filteredEvents.length.toLocaleString()} total exhibitions)
+              Page <strong className="text-zinc-950 font-bold">{currentPage}</strong> of{' '}
+              <strong className="text-zinc-950 font-bold">{totalPages}</strong> ({filteredEvents.length.toLocaleString()} total exhibitions)
             </div>
 
             <div className="flex items-center gap-1.5">
@@ -823,12 +901,12 @@ export default function EventsDirectoryPage() {
                 type="button"
                 onClick={() => {
                   setCurrentPage((p) => Math.max(p - 1, 1));
-                  window.scrollTo({ top: 280, behavior: 'smooth' });
+                  window.scrollTo({ top: 380, behavior: 'smooth' });
                 }}
                 disabled={currentPage === 1}
-                className="px-3 py-2 rounded-xl border border-zinc-200 bg-white text-xs font-bold text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
+                className="px-3.5 py-2 rounded-xl border border-zinc-200 bg-white text-xs font-bold text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1 shadow-2xs transition-all"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-3.5 w-3.5" />
                 <span>Prev</span>
               </button>
 
@@ -845,12 +923,12 @@ export default function EventsDirectoryPage() {
                         type="button"
                         onClick={() => {
                           setCurrentPage(pageNum);
-                          window.scrollTo({ top: 280, behavior: 'smooth' });
+                          window.scrollTo({ top: 380, behavior: 'smooth' });
                         }}
-                        className={`h-9 w-9 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                        className={`h-9 w-9 rounded-xl text-xs font-black transition-all cursor-pointer ${
                           currentPage === pageNum
-                            ? 'bg-zinc-900 text-white shadow-xs'
-                            : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50'
+                            ? 'bg-zinc-950 text-[#FFCC00] shadow-md shadow-zinc-950/20'
+                            : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300'
                         }`}
                       >
                         {pageNum}
@@ -863,86 +941,50 @@ export default function EventsDirectoryPage() {
                 type="button"
                 onClick={() => {
                   setCurrentPage((p) => Math.min(p + 1, totalPages));
-                  window.scrollTo({ top: 280, behavior: 'smooth' });
+                  window.scrollTo({ top: 380, behavior: 'smooth' });
                 }}
                 disabled={currentPage === totalPages}
-                className="px-3 py-2 rounded-xl border border-zinc-200 bg-white text-xs font-bold text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
+                className="px-3.5 py-2 rounded-xl border border-zinc-200 bg-white text-xs font-bold text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1 shadow-2xs transition-all"
               >
                 <span>Next</span>
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
         )}
 
         {/* ========================================================================= */}
-        {/* ORGANIZER CTA CARD                                                        */}
+        {/* ORGANIZER CTA CARD (Eye-Catchy Dark Gradient Glass)                       */}
         {/* ========================================================================= */}
-        <div className="bg-gradient-to-r from-zinc-900 via-zinc-950 to-zinc-900 text-white rounded-3xl p-6 sm:p-10 border border-zinc-800 shadow-xl relative overflow-hidden">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
-            <div className="space-y-2 text-center md:text-left">
-              <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-[#FFCC00]/20 text-[#FFCC00] border border-[#FFCC00]/30 inline-block">
-                For Trade Show Organizers &amp; Venue Managers
-              </span>
-              <h3 className="text-xl sm:text-2xl font-extrabold tracking-tight">
-                Are you organizing or managing an exhibition?
-              </h3>
-              <p className="text-xs sm:text-sm text-zinc-300 max-w-xl">
-                Claim your official expo listing on VisitExpo to promote your floorplan, manage attendee pre-registrations, and sell exhibition booth spaces.
-              </p>
-            </div>
+        <div className="relative bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 border border-zinc-800 rounded-3xl p-8 sm:p-10 shadow-2xl text-white overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
+          {/* Ambient Glow */}
+          <div className="absolute -right-24 -top-24 w-80 h-80 bg-[#FFCC00]/15 rounded-full blur-3xl pointer-events-none" />
 
-            <div className="flex items-center gap-3 shrink-0">
-              <Link
-                href="/login?role=organizer&signup=true"
-                className="px-6 py-3.5 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-extrabold text-xs sm:text-sm transition-all shadow-md hover:scale-102 cursor-pointer"
-              >
-                Claim or List Your Expo
-              </Link>
-            </div>
+          <div className="space-y-2 text-center md:text-left relative z-10 max-w-xl">
+            <span className="px-3 py-1 rounded-full text-xs font-black bg-[#FFCC00] text-zinc-950 inline-block shadow-md">
+              ★ For Exhibition Organizers &amp; Venue Owners
+            </span>
+            <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              Are you organizing a trade show or B2B expo?
+            </h3>
+            <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed font-normal">
+              List your exhibition on VisitExpo to showcase your floorplan, capture attendee pre-registrations, and connect directly with verified exhibitors worldwide.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0 relative z-10">
+            <Link
+              href="/login?role=organizer&signup=true"
+              className="px-6 py-3.5 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-black text-xs sm:text-sm transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer"
+            >
+              <span>List or Claim Your Expo</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         </div>
       </main>
 
-      {/* Gated Auth Modal */}
-      {gatedContext && (
-        <GatedAuthModal
-          isOpen={true}
-          onClose={() => setGatedContext(null)}
-          action={gatedContext.action}
-          event={gatedContext.event}
-          onSuccess={() => {
-            if (gatedContext.action === 'follow' && gatedContext.event) {
-              const slug = (gatedContext.event.slug || gatedContext.event.id || '').toLowerCase().trim();
-              if (slug) {
-                setFollowedSlugs(prev => new Set(prev).add(slug));
-                showToast(`Welcome! You are now following ${gatedContext.event.title}!`);
-                axios.post(`/api/events/${encodeURIComponent(slug)}/social`, {
-                  actionType: 'follower',
-                  eventTitle: gatedContext.event.title,
-                  eventCity: gatedContext.event.city,
-                  eventVenue: gatedContext.event.venue,
-                  eventDates: gatedContext.event.dates,
-                  eventCategory: gatedContext.event.category,
-                  eventImage: gatedContext.event.image,
-                  user: {
-                    id: user?.id || user?._id,
-                    name: user?.name,
-                    email: user?.email,
-                    role: user?.role
-                  }
-                }).catch(() => {});
-              }
-            } else if (gatedContext.event?.id) {
-              const next = new Set(claimedPassIds);
-              next.add(gatedContext.event.id);
-              setClaimedPassIds(next);
-              showToast('Welcome! Your pass has been issued.');
-            }
-            setGatedContext(null);
-          }}
-        />
-      )}
+
 
       {/* Floating Toast Notification */}
       {toastMessage && (

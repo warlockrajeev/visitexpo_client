@@ -63,6 +63,16 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
 
+  // Standard Signup Mobile OTP States
+  const [signupPhone, setSignupPhone] = useState('');
+  const [signupOtpSessionId, setSignupOtpSessionId] = useState('');
+  const [signupOtpCode, setSignupOtpCode] = useState('');
+  const [signupOtpSending, setSignupOtpSending] = useState(false);
+  const [signupOtpVerifying, setSignupOtpVerifying] = useState(false);
+  const [signupPhoneVerified, setSignupPhoneVerified] = useState(false);
+  const [signupVerificationToken, setSignupVerificationToken] = useState('');
+  const [signupOtpTimer, setSignupOtpTimer] = useState(0);
+
   // Google Auth Pending Basic Details Form State
   const [googlePendingUser, setGooglePendingUser] = useState(null);
   const [googleDetailsForm, setGoogleDetailsForm] = useState({
@@ -76,19 +86,60 @@ export default function LoginPage() {
     industry: 'Industrial & Manufacturing'
   });
 
+  // Google Registration Mobile OTP States
+  const [googleOtpSessionId, setGoogleOtpSessionId] = useState('');
+  const [googleOtpCode, setGoogleOtpCode] = useState('');
+  const [googleOtpSending, setGoogleOtpSending] = useState(false);
+  const [googleOtpVerifying, setGoogleOtpVerifying] = useState(false);
+  const [googlePhoneVerified, setGooglePhoneVerified] = useState(false);
+  const [googleVerificationToken, setGoogleVerificationToken] = useState('');
+  const [googleOtpTimer, setGoogleOtpTimer] = useState(0);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     organizationName: '',
-    phone: '',
     city: ''
   });
+
+  // Countdown timers for OTP resend
+  useEffect(() => {
+    let interval = null;
+    if (signupOtpTimer > 0) {
+      interval = setInterval(() => {
+        setSignupOtpTimer(prev => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [signupOtpTimer]);
+
+  useEffect(() => {
+    let interval = null;
+    if (googleOtpTimer > 0) {
+      interval = setInterval(() => {
+        setGoogleOtpTimer(prev => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [googleOtpTimer]);
+
+  const [redirectUrl, setRedirectUrl] = useState('');
+
+  // Helper to determine destination URL upon successful login / signup
+  const getSuccessRedirect = (targetRole) => {
+    if (redirectUrl) return redirectUrl;
+    return targetRole === 'visitor' ? '/' : '/dashboard';
+  };
 
   // Read URL query params for visitor/event redirects
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
+      const redirectParam = params.get('redirect');
+      if (redirectParam) {
+        setRedirectUrl(redirectParam);
+      }
       const roleParam = params.get('role');
       if (roleParam === 'visitor' || params.get('event')) {
         setUserRole('visitor');
@@ -106,15 +157,119 @@ export default function LoginPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (!loading && user) {
-      router.push(user.role === 'visitor' ? '/' : '/dashboard');
+      router.push(getSuccessRedirect(user.role));
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, redirectUrl]);
 
   const handleFormChange = (e) => {
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value
     }));
+  };
+
+  // Dispatch OTP for standard signup
+  const handleSendSignupOtp = async () => {
+    const cleanPhone = signupPhone.replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length < 10) {
+      setFormError('Please enter a valid 10-digit mobile number for OTP.');
+      return;
+    }
+    setSignupOtpSending(true);
+    setFormError('');
+    try {
+      const res = await axios.post(`${API_URL}/auth/otp/send`, { phone: cleanPhone });
+      if (res.data?.success && res.data?.sessionId) {
+        setSignupOtpSessionId(res.data.sessionId);
+        setSignupOtpTimer(30);
+      } else {
+        setFormError(res.data?.error || 'Failed to dispatch OTP.');
+      }
+    } catch (err) {
+      setFormError(err.response?.data?.error || 'Failed to send SMS OTP. Please check the number.');
+    } finally {
+      setSignupOtpSending(false);
+    }
+  };
+
+  // Verify OTP for standard signup
+  const handleVerifySignupOtp = async () => {
+    const cleanOtp = signupOtpCode.trim();
+    if (!cleanOtp || cleanOtp.length < 4) {
+      setFormError('Please enter the 6-digit OTP code received on your phone.');
+      return;
+    }
+    setSignupOtpVerifying(true);
+    setFormError('');
+    try {
+      const res = await axios.post(`${API_URL}/auth/otp/verify`, {
+        phone: signupPhone.replace(/\D/g, ''),
+        sessionId: signupOtpSessionId,
+        otp: cleanOtp
+      });
+      if (res.data?.success && res.data?.verificationToken) {
+        setSignupPhoneVerified(true);
+        setSignupVerificationToken(res.data.verificationToken);
+      } else {
+        setFormError(res.data?.error || 'OTP verification failed.');
+      }
+    } catch (err) {
+      setFormError(err.response?.data?.error || 'Incorrect OTP code. Please check and try again.');
+    } finally {
+      setSignupOtpVerifying(false);
+    }
+  };
+
+  // Dispatch OTP for Google registration
+  const handleSendGoogleOtp = async () => {
+    const cleanPhone = googleDetailsForm.phone.replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length < 10) {
+      setFormError('Please enter a valid 10-digit mobile number for OTP.');
+      return;
+    }
+    setGoogleOtpSending(true);
+    setFormError('');
+    try {
+      const res = await axios.post(`${API_URL}/auth/otp/send`, { phone: cleanPhone });
+      if (res.data?.success && res.data?.sessionId) {
+        setGoogleOtpSessionId(res.data.sessionId);
+        setGoogleOtpTimer(30);
+      } else {
+        setFormError(res.data?.error || 'Failed to dispatch OTP.');
+      }
+    } catch (err) {
+      setFormError(err.response?.data?.error || 'Failed to send SMS OTP. Please check the number.');
+    } finally {
+      setGoogleOtpSending(false);
+    }
+  };
+
+  // Verify OTP for Google registration
+  const handleVerifyGoogleOtp = async () => {
+    const cleanOtp = googleOtpCode.trim();
+    if (!cleanOtp || cleanOtp.length < 4) {
+      setFormError('Please enter the 6-digit OTP code received on your phone.');
+      return;
+    }
+    setGoogleOtpVerifying(true);
+    setFormError('');
+    try {
+      const res = await axios.post(`${API_URL}/auth/otp/verify`, {
+        phone: googleDetailsForm.phone.replace(/\D/g, ''),
+        sessionId: googleOtpSessionId,
+        otp: cleanOtp
+      });
+      if (res.data?.success && res.data?.verificationToken) {
+        setGooglePhoneVerified(true);
+        setGoogleVerificationToken(res.data.verificationToken);
+      } else {
+        setFormError(res.data?.error || 'OTP verification failed.');
+      }
+    } catch (err) {
+      setFormError(err.response?.data?.error || 'Incorrect OTP code. Please check and try again.');
+    } finally {
+      setGoogleOtpVerifying(false);
+    }
   };
 
   // Google Authentication Handler
@@ -142,13 +297,13 @@ export default function LoginPage() {
           role: userRole
         });
 
-        if (checkRes.data?.exists && (userRole === 'visitor' || checkRes.data?.user?.hasDetails)) {
-          // Existing user with registered details (or visitor): login directly
+        if (checkRes.data?.exists && checkRes.data?.user?.hasDetails) {
+          // Existing user with registered details AND verified phone: login directly
           const res = await loginWithGoogle(basePayload);
           if (!res.success) {
             setFormError(res.error || 'Google login failed.');
           } else {
-            router.push(userRole === 'visitor' ? '/' : '/dashboard');
+            router.push(getSuccessRedirect(userRole));
           }
           return;
         }
@@ -160,18 +315,8 @@ export default function LoginPage() {
         console.warn('Pre-check skipped, opening registration form for details:', checkErr.message);
       }
 
-      // New visitor: can immediately proceed to website with active session
-      if (userRole === 'visitor') {
-        const res = await loginWithGoogle(basePayload);
-        if (!res.success) {
-          setFormError(res.error || 'Google login failed.');
-        } else {
-          router.push('/');
-        }
-        return;
-      }
-
-      // New organizer/exhibitor: Prompt for basic registration details form
+      // User does NOT exist or has not verified mobile phone:
+      // Prompt for mandatory mobile OTP verification to complete registration!
       setGooglePendingUser(basePayload);
       setGoogleDetailsForm({
         name: fbUser.displayName || fbUser.email.split('@')[0],
@@ -183,6 +328,11 @@ export default function LoginPage() {
         website: '',
         industry: userRole === 'exhibitor' ? 'Industrial & Manufacturing' : ''
       });
+      setGooglePhoneVerified(false);
+      setGoogleOtpSessionId('');
+      setGoogleOtpCode('');
+      setGoogleVerificationToken('');
+      setGoogleOtpTimer(0);
     } catch (err) {
       console.error('Firebase Google sign-in error:', err);
       if (err.code === 'auth/popup-closed-by-user') {
@@ -197,22 +347,22 @@ export default function LoginPage() {
     }
   };
 
-  // Submit Google Basic Details Registration Form (for Organizers / Exhibitors)
+  // Submit Google Basic Details Registration Form (with verified Phone OTP)
   const handleGoogleDetailsSubmit = async (e) => {
     e.preventDefault();
     if (!googlePendingUser) return;
 
-    if (!googleDetailsForm.organizationName.trim()) {
+    if (!googlePhoneVerified || !googleVerificationToken) {
+      setFormError('Please verify your mobile number with OTP before completing registration.');
+      return;
+    }
+
+    if (googleDetailsForm.role !== 'visitor' && !googleDetailsForm.organizationName.trim()) {
       setFormError(
         googleDetailsForm.role === 'exhibitor'
           ? 'Company / Brand Name is required.'
           : 'Organization Name is required.'
       );
-      return;
-    }
-
-    if (!googleDetailsForm.phone.trim()) {
-      setFormError('Contact Phone / WhatsApp number is required.');
       return;
     }
 
@@ -226,6 +376,7 @@ export default function LoginPage() {
         role: googleDetailsForm.role,
         organizationName: googleDetailsForm.organizationName.trim(),
         phone: googleDetailsForm.phone.trim(),
+        phoneVerificationToken: googleVerificationToken,
         city: googleDetailsForm.city.trim(),
         website: googleDetailsForm.website.trim(),
         industry: googleDetailsForm.industry,
@@ -236,7 +387,7 @@ export default function LoginPage() {
       if (!res.success) {
         setFormError(res.error || 'Registration failed. Please try again.');
       } else {
-        router.push('/');
+        router.push(getSuccessRedirect(googleDetailsForm.role));
       }
     } catch (err) {
       console.error('Google details submission error:', err);
@@ -246,7 +397,7 @@ export default function LoginPage() {
     }
   };
 
-  // Regular Email/Password Form Submit
+  // Regular Email/Password Form Submit (with verified Phone OTP)
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
@@ -256,6 +407,11 @@ export default function LoginPage() {
       if (isSignup) {
         if (!formData.name || !formData.email || !formData.password) {
           setFormError('Name, email, and password are required.');
+          setSubmitting(false);
+          return;
+        }
+        if (!signupPhoneVerified || !signupVerificationToken) {
+          setFormError('Please verify your mobile number with OTP before completing registration.');
           setSubmitting(false);
           return;
         }
@@ -273,12 +429,17 @@ export default function LoginPage() {
           formData.email,
           formData.password,
           userRole !== 'visitor' ? formData.organizationName : '',
-          userRole
+          userRole,
+          {
+            phone: signupPhone,
+            phoneVerificationToken: signupVerificationToken,
+            city: formData.city
+          }
         );
         if (!res.success) {
           setFormError(res.error || 'Registration failed.');
         } else {
-          router.push('/');
+          router.push(getSuccessRedirect(userRole));
         }
       } else {
         if (!formData.email || !formData.password) {
@@ -290,7 +451,7 @@ export default function LoginPage() {
         if (!res.success) {
           setFormError(res.error || 'Invalid credentials.');
         } else {
-          router.push(userRole === 'visitor' ? '/' : '/dashboard');
+          router.push(getSuccessRedirect(userRole));
         }
       }
     } catch (err) {
@@ -302,30 +463,31 @@ export default function LoginPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-zinc-950">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      <div className="flex h-screen w-screen items-center justify-center bg-white">
+        <Loader2 className="h-10 w-10 animate-spin text-[#FFCC00]" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-4 font-sans relative overflow-hidden">
-      {/* Decorative Gradients */}
-      <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-primary/10 blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-96 h-96 rounded-full bg-indigo-500/10 blur-[100px] pointer-events-none" />
+    <div className="flex min-h-screen items-center justify-center bg-white p-4 font-sans relative overflow-hidden">
+      {/* Decorative Warm Ambient Glows */}
+      <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-[#FFCC00]/10 via-transparent to-transparent pointer-events-none" />
+      <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-amber-400/10 blur-[120px] pointer-events-none" />
+      <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full bg-indigo-500/5 blur-[120px] pointer-events-none" />
 
-      <div className="w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-900/60 backdrop-blur-md p-7 sm:p-8 shadow-2xl relative z-10 space-y-6">
+      <div className="w-full max-w-lg rounded-3xl border border-zinc-200/90 bg-white p-7 sm:p-8 shadow-xl shadow-zinc-900/5 relative z-10 space-y-6">
         
         {/* Top Header */}
-        <div className="flex items-center justify-between pb-2 border-b border-zinc-800/60">
+        <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-400 hover:text-primary transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-zinc-950 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" /> Back to VisitExpo Home
           </Link>
-          <span className="text-[10px] font-bold text-zinc-500 tracking-wider uppercase flex items-center gap-1">
-            <ShieldCheck className="h-3.5 w-3.5 text-primary" /> Secure Auth Hub
+          <span className="text-[10px] font-bold text-zinc-400 tracking-wider uppercase flex items-center gap-1">
+            <ShieldCheck className="h-3.5 w-3.5 text-amber-500" /> Secure Auth Hub
           </span>
         </div>
 
@@ -333,8 +495,8 @@ export default function LoginPage() {
         {googlePendingUser ? (
           <div className="space-y-5 animate-in fade-in zoom-in-95 duration-200">
             {/* Google Identity Verification Banner */}
-            <div className="flex items-center gap-3.5 p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
-              <div className="h-11 w-11 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-base shrink-0 overflow-hidden">
+            <div className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-zinc-50 border border-zinc-200/80">
+              <div className="h-11 w-11 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 font-bold text-base shrink-0 overflow-hidden">
                 {googlePendingUser.photoURL ? (
                   <img src={googlePendingUser.photoURL} alt="Google Avatar" className="h-full w-full object-cover" />
                 ) : (
@@ -343,128 +505,228 @@ export default function LoginPage() {
               </div>
               <div className="space-y-0.5 flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-zinc-100 truncate">{googlePendingUser.name}</span>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.2 rounded-full">
+                  <span className="text-xs font-bold text-zinc-900 truncate">{googlePendingUser.name}</span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-0.2 rounded-full">
                     <CheckCircle2 className="h-3 w-3" /> Verified
                   </span>
                 </div>
-                <p className="text-[11px] text-zinc-400 truncate">{googlePendingUser.email}</p>
+                <p className="text-[11px] text-zinc-500 truncate">{googlePendingUser.email}</p>
               </div>
             </div>
 
             <div className="text-center space-y-1">
-              <h2 className="text-xl font-bold text-zinc-100 tracking-tight flex items-center justify-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-amber-400" />
-                Complete {googleDetailsForm.role === 'exhibitor' ? 'Exhibitor' : 'Organizer'} Registration
+              <h2 className="text-xl font-bold text-zinc-900 tracking-tight flex items-center justify-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-amber-500" />
+                Complete {googleDetailsForm.role === 'visitor' ? 'Visitor Pass' : googleDetailsForm.role === 'exhibitor' ? 'Exhibitor' : 'Organizer'} Registration
               </h2>
-              <p className="text-xs text-zinc-400">
-                Provide your basic business details to initialize your portal and access your dashboard.
+              <p className="text-xs text-zinc-500">
+                {googleDetailsForm.role === 'visitor'
+                  ? 'Verify your mobile number via OTP to activate your account and access passes.'
+                  : 'Verify your mobile number via OTP and provide business details to access your portal.'}
               </p>
             </div>
 
             {formError && (
-              <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3.5 text-xs text-red-400">
-                <Lock className="h-4 w-4 flex-shrink-0" />
+              <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 p-3.5 text-xs text-red-700">
+                <Lock className="h-4 w-4 flex-shrink-0 text-red-600" />
                 <span>{formError}</span>
               </div>
             )}
 
-            {/* Role switch toggle in Google step */}
-            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-semibold">
+            {/* Role switch toggle in Google step (Organizer, Exhibitor, Visitor) */}
+            <div className="grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-zinc-100 border border-zinc-200/80 text-xs font-semibold">
               <button
                 type="button"
                 onClick={() => setGoogleDetailsForm(prev => ({ ...prev, role: 'organizer' }))}
-                className={`py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                className={`py-2 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   googleDetailsForm.role === 'organizer'
-                    ? 'bg-zinc-800 text-white shadow-xs font-bold border border-zinc-700'
-                    : 'text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-white text-zinc-950 shadow-sm font-bold border border-zinc-200/90'
+                    : 'text-zinc-500 hover:text-zinc-900'
                 }`}
               >
-                <Building className="h-3.5 w-3.5 text-amber-400" />
-                <span>Organizer</span>
+                <Building className="h-3.5 w-3.5 text-amber-500" />
+                <span className="truncate">Organizer</span>
               </button>
               <button
                 type="button"
                 onClick={() => setGoogleDetailsForm(prev => ({ ...prev, role: 'exhibitor' }))}
-                className={`py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                className={`py-2 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   googleDetailsForm.role === 'exhibitor'
-                    ? 'bg-zinc-800 text-white shadow-xs font-bold border border-zinc-700'
-                    : 'text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-white text-zinc-950 shadow-sm font-bold border border-zinc-200/90'
+                    : 'text-zinc-500 hover:text-zinc-900'
                 }`}
               >
-                <Briefcase className="h-3.5 w-3.5 text-indigo-400" />
-                <span>Exhibitor</span>
+                <Briefcase className="h-3.5 w-3.5 text-indigo-600" />
+                <span className="truncate">Exhibitor</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setGoogleDetailsForm(prev => ({ ...prev, role: 'visitor' }))}
+                className={`py-2 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  googleDetailsForm.role === 'visitor'
+                    ? 'bg-white text-zinc-950 shadow-sm font-bold border border-zinc-200/90'
+                    : 'text-zinc-500 hover:text-zinc-900'
+                }`}
+              >
+                <Ticket className="h-3.5 w-3.5 text-amber-500" />
+                <span className="truncate">Visitor</span>
               </button>
             </div>
 
             {/* Basic Details Form */}
             <form onSubmit={handleGoogleDetailsSubmit} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-zinc-400 mb-1 uppercase tracking-wider">
-                  {googleDetailsForm.role === 'exhibitor' ? 'Company / Exhibitor Brand Name *' : 'Organization Name *'}
-                </label>
-                <div className="relative">
-                  <Building className="absolute left-3 top-2.5 h-4.5 w-4.5 text-zinc-500" />
-                  <input
-                    type="text"
-                    required
-                    value={googleDetailsForm.organizationName}
-                    onChange={(e) => setGoogleDetailsForm(prev => ({ ...prev, organizationName: e.target.value }))}
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 py-2 pl-10 pr-4 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                    placeholder={googleDetailsForm.role === 'exhibitor' ? 'e.g. Apex Industrial Solutions Ltd' : 'e.g. Global Tech Expos Pvt Ltd'}
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
+              {googleDetailsForm.role !== 'visitor' && (
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 mb-1 uppercase tracking-wider">
-                    Contact Phone / WhatsApp *
+                  <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">
+                    {googleDetailsForm.role === 'exhibitor' ? 'Company / Exhibitor Brand Name *' : 'Organization Name *'}
                   </label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-2.5 h-4.5 w-4.5 text-zinc-500" />
-                    <input
-                      type="tel"
-                      required
-                      value={googleDetailsForm.phone}
-                      onChange={(e) => setGoogleDetailsForm(prev => ({ ...prev, phone: e.target.value }))}
-                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 py-2 pl-10 pr-4 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                      placeholder="+91 98765 43210"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 mb-1 uppercase tracking-wider">
-                    City / Location
-                  </label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-2.5 h-4.5 w-4.5 text-zinc-500" />
+                    <Building className="absolute left-3 top-3 h-4.5 w-4.5 text-zinc-400" />
                     <input
                       type="text"
-                      value={googleDetailsForm.city}
-                      onChange={(e) => setGoogleDetailsForm(prev => ({ ...prev, city: e.target.value }))}
-                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 py-2 pl-10 pr-4 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                      placeholder="e.g. Mumbai, New Delhi"
+                      required
+                      value={googleDetailsForm.organizationName}
+                      onChange={(e) => setGoogleDetailsForm(prev => ({ ...prev, organizationName: e.target.value }))}
+                      className="w-full rounded-xl border border-zinc-300 bg-zinc-50/60 focus:bg-white py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all"
+                      placeholder={googleDetailsForm.role === 'exhibitor' ? 'e.g. Apex Industrial Solutions Ltd' : 'e.g. Global Tech Expos Pvt Ltd'}
                     />
                   </div>
+                </div>
+              )}
+
+              {/* Mobile Number with Mandatory 2Factor OTP Verification */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[10px] font-bold text-zinc-600 uppercase tracking-wider">
+                    Mobile Number (Mandatory OTP Verification) *
+                  </label>
+                  {googlePhoneVerified && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Verified
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <div className="absolute left-3 top-3 flex items-center gap-1 text-zinc-500 text-xs font-bold pointer-events-none">
+                      <span>🇮🇳</span>
+                      <span>+91</span>
+                    </div>
+                    <input
+                      type="tel"
+                      maxLength={10}
+                      disabled={googlePhoneVerified}
+                      value={googleDetailsForm.phone}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        setGoogleDetailsForm(prev => ({ ...prev, phone: val }));
+                        setGooglePhoneVerified(false);
+                        setGoogleOtpSessionId('');
+                        setGoogleOtpCode('');
+                        setGoogleVerificationToken('');
+                      }}
+                      placeholder="9876543210"
+                      className={`w-full rounded-xl border py-2.5 pl-16 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none transition-all ${
+                        googlePhoneVerified
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-800 font-bold'
+                          : 'border-zinc-300 bg-zinc-50/60 focus:bg-white focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent'
+                      }`}
+                    />
+                  </div>
+
+                  {!googlePhoneVerified ? (
+                    <button
+                      type="button"
+                      disabled={googleOtpSending || (googleDetailsForm.phone || '').length < 10 || googleOtpTimer > 0}
+                      onClick={handleSendGoogleOtp}
+                      className="px-3.5 py-2 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] disabled:opacity-40 disabled:bg-zinc-100 disabled:text-zinc-400 text-zinc-950 text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5"
+                    >
+                      {googleOtpSending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : googleOtpTimer > 0 ? (
+                        `Resend ${googleOtpTimer}s`
+                      ) : googleOtpSessionId ? (
+                        'Resend OTP'
+                      ) : (
+                        'Send OTP'
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGooglePhoneVerified(false);
+                        setGoogleOtpSessionId('');
+                        setGoogleOtpCode('');
+                        setGoogleVerificationToken('');
+                      }}
+                      className="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-medium transition-all shrink-0 cursor-pointer"
+                    >
+                      Change
+                    </button>
+                  )}
+                </div>
+
+                {/* 6-digit OTP Input for Google Auth */}
+                {googleOtpSessionId && !googlePhoneVerified && (
+                  <div className="mt-2.5 p-3 rounded-xl bg-amber-50/80 border border-amber-200/80 space-y-2 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-zinc-800 font-medium">Enter 6-digit OTP sent to +91 {googleDetailsForm.phone}:</span>
+                      {googleOtpTimer > 0 && <span className="text-amber-700 text-[11px] font-bold">{googleOtpTimer}s</span>}
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        maxLength={6}
+                        value={googleOtpCode}
+                        onChange={(e) => setGoogleOtpCode(e.target.value.replace(/\D/g, ''))}
+                        placeholder="6-digit OTP"
+                        className="flex-1 rounded-xl border border-zinc-300 bg-white py-2 px-3 text-center text-sm font-mono tracking-widest text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00]"
+                      />
+                      <button
+                        type="button"
+                        disabled={googleOtpVerifying || googleOtpCode.length < 4}
+                        onClick={handleVerifyGoogleOtp}
+                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5"
+                      >
+                        {googleOtpVerifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Verify'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">
+                  City / Location
+                </label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-3 h-4.5 w-4.5 text-zinc-400" />
+                  <input
+                    type="text"
+                    value={googleDetailsForm.city}
+                    onChange={(e) => setGoogleDetailsForm(prev => ({ ...prev, city: e.target.value }))}
+                    className="w-full rounded-xl border border-zinc-300 bg-zinc-50/60 focus:bg-white py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all"
+                    placeholder="e.g. Mumbai, New Delhi"
+                  />
                 </div>
               </div>
 
               {googleDetailsForm.role === 'exhibitor' && (
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 mb-1 uppercase tracking-wider">
+                  <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">
                     Industry Sector / Product Category
                   </label>
                   <div className="relative">
-                    <Briefcase className="absolute left-3 top-2.5 h-4.5 w-4.5 text-zinc-500" />
+                    <Briefcase className="absolute left-3 top-3 h-4.5 w-4.5 text-zinc-400" />
                     <select
                       value={googleDetailsForm.industry}
                       onChange={(e) => setGoogleDetailsForm(prev => ({ ...prev, industry: e.target.value }))}
-                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 py-2 pl-10 pr-4 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all cursor-pointer"
+                      className="w-full rounded-xl border border-zinc-300 bg-zinc-50/60 focus:bg-white py-2.5 pl-10 pr-4 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all cursor-pointer"
                     >
                       {INDUSTRY_OPTIONS.map((ind) => (
-                        <option key={ind} value={ind} className="bg-zinc-900 text-zinc-200">
+                        <option key={ind} value={ind} className="bg-white text-zinc-900">
                           {ind}
                         </option>
                       ))}
@@ -473,27 +735,29 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <div>
-                <label className="block text-[10px] font-bold text-zinc-400 mb-1 uppercase tracking-wider">
-                  Website / Portfolio (Optional)
-                </label>
-                <div className="relative">
-                  <Globe className="absolute left-3 top-2.5 h-4.5 w-4.5 text-zinc-500" />
-                  <input
-                    type="url"
-                    value={googleDetailsForm.website}
-                    onChange={(e) => setGoogleDetailsForm(prev => ({ ...prev, website: e.target.value }))}
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 py-2 pl-10 pr-4 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                    placeholder="https://..."
-                  />
+              {googleDetailsForm.role !== 'visitor' && (
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">
+                    Website / Portfolio (Optional)
+                  </label>
+                  <div className="relative">
+                    <Globe className="absolute left-3 top-3 h-4.5 w-4.5 text-zinc-400" />
+                    <input
+                      type="url"
+                      value={googleDetailsForm.website}
+                      onChange={(e) => setGoogleDetailsForm(prev => ({ ...prev, website: e.target.value }))}
+                      className="w-full rounded-xl border border-zinc-300 bg-zinc-50/60 focus:bg-white py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all"
+                      placeholder="https://..."
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="pt-2 flex flex-col sm:flex-row items-center gap-2.5">
                 <button
                   type="submit"
-                  disabled={submitting}
-                  className="w-full flex-1 flex items-center justify-center gap-2 rounded-lg bg-primary hover:bg-primary/95 text-primary-foreground font-semibold py-2.5 px-4 text-sm transition-all shadow-lg shadow-primary/10 cursor-pointer disabled:opacity-50"
+                  disabled={submitting || !googlePhoneVerified}
+                  className="w-full flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold py-3 px-4 text-sm transition-all shadow-md shadow-amber-500/10 cursor-pointer disabled:opacity-50"
                 >
                   {submitting ? (
                     <>
@@ -501,7 +765,7 @@ export default function LoginPage() {
                     </>
                   ) : (
                     <>
-                      <span>Complete Registration &amp; Enter Dashboard</span>
+                      <span>Complete Registration &amp; Proceed</span>
                       <ArrowRight className="h-4 w-4" />
                     </>
                   )}
@@ -513,7 +777,7 @@ export default function LoginPage() {
                     setGooglePendingUser(null);
                     setFormError('');
                   }}
-                  className="w-full sm:w-auto px-4 py-2.5 rounded-lg border border-zinc-800 bg-zinc-950/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-semibold transition-all cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-3 rounded-xl border border-zinc-200 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-semibold transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -531,7 +795,7 @@ export default function LoginPage() {
                   className="h-14 w-14 object-contain"
                 />
               </div>
-              <h2 className="text-2xl font-bold text-zinc-50 tracking-tight">
+              <h2 className="text-2xl font-black text-zinc-900 tracking-tight">
                 {isSignup
                   ? userRole === 'visitor'
                     ? 'Create Visitor Pass Account'
@@ -540,7 +804,7 @@ export default function LoginPage() {
                     : 'Create Organizer Account'
                   : 'Welcome to VisitExpo'}
               </h2>
-              <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+              <p className="text-xs text-zinc-500 max-w-sm mx-auto leading-relaxed">
                 {userRole === 'visitor'
                   ? 'Sign in to browse live trade expos, get free entry passes, and access QR badges'
                   : userRole === 'exhibitor'
@@ -552,20 +816,20 @@ export default function LoginPage() {
             </div>
 
             {/* 3-Role Selector: Organizer, Exhibitor, Visitor */}
-            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-semibold">
+            <div className="grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-zinc-100 border border-zinc-200/80 text-xs font-semibold">
               <button
                 type="button"
                 onClick={() => {
                   setUserRole('organizer');
                   setFormError('');
                 }}
-                className={`py-2 px-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                className={`py-2 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   userRole === 'organizer'
-                    ? 'bg-zinc-800 text-white shadow-xs font-bold border border-zinc-700'
-                    : 'text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-white text-zinc-950 shadow-sm font-bold border border-zinc-200/90'
+                    : 'text-zinc-500 hover:text-zinc-900'
                 }`}
               >
-                <Building className="h-3.5 w-3.5 text-amber-400" />
+                <Building className="h-3.5 w-3.5 text-amber-500" />
                 <span className="truncate">Organizer</span>
               </button>
               <button
@@ -574,13 +838,13 @@ export default function LoginPage() {
                   setUserRole('exhibitor');
                   setFormError('');
                 }}
-                className={`py-2 px-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                className={`py-2 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   userRole === 'exhibitor'
-                    ? 'bg-zinc-800 text-white shadow-xs font-bold border border-zinc-700'
-                    : 'text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-white text-zinc-950 shadow-sm font-bold border border-zinc-200/90'
+                    : 'text-zinc-500 hover:text-zinc-900'
                 }`}
               >
-                <Briefcase className="h-3.5 w-3.5 text-indigo-400" />
+                <Briefcase className="h-3.5 w-3.5 text-indigo-600" />
                 <span className="truncate">Exhibitor</span>
               </button>
               <button
@@ -589,22 +853,22 @@ export default function LoginPage() {
                   setUserRole('visitor');
                   setFormError('');
                 }}
-                className={`py-2 px-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                className={`py-2 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   userRole === 'visitor'
-                    ? 'bg-zinc-800 text-white shadow-xs font-bold border border-zinc-700'
-                    : 'text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-white text-zinc-950 shadow-sm font-bold border border-zinc-200/90'
+                    : 'text-zinc-500 hover:text-zinc-900'
                 }`}
               >
-                <Ticket className="h-3.5 w-3.5 text-primary" />
+                <Ticket className="h-3.5 w-3.5 text-amber-500" />
                 <span className="truncate">Visitor</span>
               </button>
             </div>
 
             {formError && (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3.5 text-xs text-red-400">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl bg-red-50 border border-red-200 p-3.5 text-xs text-red-700">
                 <div className="flex items-center gap-2">
-                  <Lock className="h-4 w-4 flex-shrink-0" />
-                  <span>{formError}</span>
+                  <Lock className="h-4 w-4 flex-shrink-0 text-red-600" />
+                  <span className="font-medium">{formError}</span>
                 </div>
                 {formError.includes('Organizer tab') && userRole !== 'organizer' && (
                   <button
@@ -613,7 +877,7 @@ export default function LoginPage() {
                       setUserRole('organizer');
                       setFormError('');
                     }}
-                    className="self-start sm:self-auto font-bold underline hover:text-red-300 text-[11px] cursor-pointer shrink-0"
+                    className="self-start sm:self-auto font-bold underline hover:text-red-900 text-[11px] cursor-pointer shrink-0"
                   >
                     Switch to Organizer &rarr;
                   </button>
@@ -625,7 +889,7 @@ export default function LoginPage() {
                       setUserRole('exhibitor');
                       setFormError('');
                     }}
-                    className="self-start sm:self-auto font-bold underline hover:text-red-300 text-[11px] cursor-pointer shrink-0"
+                    className="self-start sm:self-auto font-bold underline hover:text-red-900 text-[11px] cursor-pointer shrink-0"
                   >
                     Switch to Exhibitor &rarr;
                   </button>
@@ -637,7 +901,7 @@ export default function LoginPage() {
                       setUserRole('visitor');
                       setFormError('');
                     }}
-                    className="self-start sm:self-auto font-bold underline hover:text-red-300 text-[11px] cursor-pointer shrink-0"
+                    className="self-start sm:self-auto font-bold underline hover:text-red-900 text-[11px] cursor-pointer shrink-0"
                   >
                     Switch to Visitor &rarr;
                   </button>
@@ -650,10 +914,10 @@ export default function LoginPage() {
               type="button"
               onClick={handleGoogleLogin}
               disabled={googleSubmitting || submitting}
-              className="w-full flex items-center justify-center gap-3 rounded-lg border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-800 active:bg-zinc-750 text-zinc-100 font-semibold py-2.5 px-4 text-sm transition-all shadow-sm hover:border-zinc-500 cursor-pointer disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-3 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 active:bg-zinc-100 text-zinc-800 font-semibold py-2.5 px-4 text-sm transition-all shadow-sm hover:shadow hover:border-zinc-300 cursor-pointer disabled:opacity-50"
             >
               {googleSubmitting ? (
-                <Loader2 className="h-4.5 w-4.5 animate-spin text-zinc-300" />
+                <Loader2 className="h-4.5 w-4.5 animate-spin text-zinc-500" />
               ) : (
                 <>
                   <svg className="h-4.5 w-4.5" viewBox="0 0 24 24">
@@ -687,11 +951,11 @@ export default function LoginPage() {
 
             {/* Divider */}
             <div className="relative flex items-center justify-center">
-              <div className="w-full border-t border-zinc-800" />
-              <span className="bg-zinc-900/90 px-3 text-[10px] uppercase font-bold tracking-wider text-zinc-500 shrink-0">
+              <div className="w-full border-t border-zinc-200" />
+              <span className="bg-white px-3 text-[10px] uppercase font-bold tracking-wider text-zinc-400 shrink-0">
                 or continue with email
               </span>
-              <div className="w-full border-t border-zinc-800" />
+              <div className="w-full border-t border-zinc-200" />
             </div>
 
             {/* Email Form */}
@@ -699,16 +963,16 @@ export default function LoginPage() {
               {isSignup && (
                 <>
                   <div>
-                    <label className="block text-[10px] font-bold text-zinc-400 mb-1 uppercase tracking-wider">Full Name</label>
+                    <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">Full Name</label>
                     <div className="relative">
-                      <User className="absolute left-3 top-2.5 h-4.5 w-4.5 text-zinc-500" />
+                      <User className="absolute left-3 top-3 h-4.5 w-4.5 text-zinc-400" />
                       <input
                         type="text"
                         name="name"
                         required
                         value={formData.name}
                         onChange={handleFormChange}
-                        className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 py-2 pl-10 pr-4 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                        className="w-full rounded-xl border border-zinc-300 bg-zinc-50/60 focus:bg-white py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all"
                         placeholder="John Doe"
                       />
                     </div>
@@ -716,59 +980,176 @@ export default function LoginPage() {
 
                   {userRole !== 'visitor' && (
                     <div>
-                      <label className="block text-[10px] font-bold text-zinc-400 mb-1 uppercase tracking-wider">
-                        {userRole === 'exhibitor' ? 'Company / Exhibitor Name' : 'Organization Name'}
+                      <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">
+                        {userRole === 'exhibitor' ? 'Company / Exhibitor Name *' : 'Organization Name *'}
                       </label>
                       <div className="relative">
-                        <Building className="absolute left-3 top-2.5 h-4.5 w-4.5 text-zinc-500" />
+                        <Building className="absolute left-3 top-3 h-4.5 w-4.5 text-zinc-400" />
                         <input
                           type="text"
                           name="organizationName"
                           required
                           value={formData.organizationName}
                           onChange={handleFormChange}
-                          className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 py-2 pl-10 pr-4 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                          className="w-full rounded-xl border border-zinc-300 bg-zinc-50/60 focus:bg-white py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all"
                           placeholder={userRole === 'exhibitor' ? 'e.g. Apex Industrial Solutions' : 'e.g. Expo Masters Ltd'}
                         />
                       </div>
                     </div>
                   )}
+
+                  {/* Mobile Number with Mandatory 2Factor OTP Verification */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[10px] font-bold text-zinc-600 uppercase tracking-wider">
+                        Mobile Number (OTP Verification Mandatory) *
+                      </label>
+                      {signupPhoneVerified && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Verified
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <div className="absolute left-3 top-3 flex items-center gap-1 text-zinc-500 text-xs font-bold pointer-events-none">
+                          <span>🇮🇳</span>
+                          <span>+91</span>
+                        </div>
+                        <input
+                          type="tel"
+                          maxLength={10}
+                          disabled={signupPhoneVerified}
+                          value={signupPhone}
+                          onChange={(e) => {
+                            setSignupPhone(e.target.value.replace(/\D/g, ''));
+                            setSignupPhoneVerified(false);
+                            setSignupOtpSessionId('');
+                            setSignupOtpCode('');
+                            setSignupVerificationToken('');
+                          }}
+                          placeholder="9876543210"
+                          className={`w-full rounded-xl border py-2.5 pl-16 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none transition-all ${
+                            signupPhoneVerified
+                              ? 'border-emerald-500 bg-emerald-50 text-emerald-800 font-bold'
+                              : 'border-zinc-300 bg-zinc-50/60 focus:bg-white focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent'
+                          }`}
+                        />
+                      </div>
+
+                      {!signupPhoneVerified ? (
+                        <button
+                          type="button"
+                          disabled={signupOtpSending || signupPhone.length < 10 || signupOtpTimer > 0}
+                          onClick={handleSendSignupOtp}
+                          className="px-3.5 py-2 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] disabled:opacity-40 disabled:bg-zinc-100 disabled:text-zinc-400 text-zinc-950 text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5"
+                        >
+                          {signupOtpSending ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : signupOtpTimer > 0 ? (
+                            `Resend ${signupOtpTimer}s`
+                          ) : signupOtpSessionId ? (
+                            'Resend OTP'
+                          ) : (
+                            'Send OTP'
+                          )}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSignupPhoneVerified(false);
+                            setSignupOtpSessionId('');
+                            setSignupOtpCode('');
+                            setSignupVerificationToken('');
+                          }}
+                          className="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-medium transition-all shrink-0 cursor-pointer"
+                        >
+                          Change
+                        </button>
+                      )}
+                    </div>
+
+                    {/* 6-Digit OTP Input Box */}
+                    {signupOtpSessionId && !signupPhoneVerified && (
+                      <div className="mt-2.5 p-3 rounded-xl bg-amber-50/80 border border-amber-200/80 space-y-2 animate-in fade-in slide-in-from-top-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-zinc-800 font-medium">Enter 6-digit OTP sent to +91 {signupPhone}:</span>
+                          {signupOtpTimer > 0 && <span className="text-amber-700 text-[11px] font-bold">{signupOtpTimer}s</span>}
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            maxLength={6}
+                            value={signupOtpCode}
+                            onChange={(e) => setSignupOtpCode(e.target.value.replace(/\D/g, ''))}
+                            placeholder="6-digit OTP"
+                            className="flex-1 rounded-xl border border-zinc-300 bg-white py-2 px-3 text-center text-sm font-mono tracking-widest text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00]"
+                          />
+                          <button
+                            type="button"
+                            disabled={signupOtpVerifying || signupOtpCode.length < 4}
+                            onClick={handleVerifySignupOtp}
+                            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5"
+                          >
+                            {signupOtpVerifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Verify'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">City / Location (Optional)</label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-3 h-4.5 w-4.5 text-zinc-400" />
+                      <input
+                        type="text"
+                        name="city"
+                        value={formData.city}
+                        onChange={handleFormChange}
+                        className="w-full rounded-xl border border-zinc-300 bg-zinc-50/60 focus:bg-white py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all"
+                        placeholder="e.g. Mumbai, New Delhi"
+                      />
+                    </div>
+                  </div>
                 </>
               )}
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-400 mb-1 uppercase tracking-wider">Email Address</label>
+                <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">Email Address</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-2.5 h-4.5 w-4.5 text-zinc-500" />
+                  <Mail className="absolute left-3 top-3 h-4.5 w-4.5 text-zinc-400" />
                   <input
                     type="email"
                     name="email"
                     required
                     value={formData.email}
                     onChange={handleFormChange}
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 py-2 pl-10 pr-4 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                    className="w-full rounded-xl border border-zinc-300 bg-zinc-50/60 focus:bg-white py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all"
                     placeholder="user@example.com"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-400 mb-1 uppercase tracking-wider">Password</label>
+                <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">Password</label>
                 <div className="relative">
-                  <Key className="absolute left-3 top-2.5 h-4.5 w-4.5 text-zinc-500" />
+                  <Key className="absolute left-3 top-3 h-4.5 w-4.5 text-zinc-400" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     name="password"
                     required
                     value={formData.password}
                     onChange={handleFormChange}
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 py-2 pl-10 pr-10 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                    className="w-full rounded-xl border border-zinc-300 bg-zinc-50/60 focus:bg-white py-2.5 pl-10 pr-10 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all"
                     placeholder="••••••••"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-2.5 text-zinc-500 hover:text-zinc-300"
+                    className="absolute right-3 top-3 text-zinc-400 hover:text-zinc-600"
                   >
                     {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
                   </button>
@@ -777,8 +1158,8 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                disabled={submitting}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary hover:bg-primary/95 text-primary-foreground font-semibold py-2.5 text-sm transition-all shadow-lg shadow-primary/10 mt-6 cursor-pointer"
+                disabled={submitting || (isSignup && !signupPhoneVerified)}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold py-3 text-sm transition-all shadow-md shadow-amber-500/10 mt-6 cursor-pointer disabled:opacity-50"
               >
                 {submitting ? (
                   <Loader2 className="h-4.5 w-4.5 animate-spin" />
@@ -804,8 +1185,13 @@ export default function LoginPage() {
                 onClick={() => {
                   setIsSignup(!isSignup);
                   setFormError('');
+                  setSignupPhoneVerified(false);
+                  setSignupOtpSessionId('');
+                  setSignupOtpCode('');
+                  setSignupVerificationToken('');
+                  setSignupOtpTimer(0);
                 }}
-                className="text-xs text-zinc-400 hover:text-primary transition-colors font-medium block mx-auto cursor-pointer"
+                className="text-xs text-zinc-600 hover:text-zinc-950 transition-colors font-medium block mx-auto cursor-pointer"
               >
                 {isSignup
                   ? 'Already have an account? Sign In'
@@ -816,10 +1202,10 @@ export default function LoginPage() {
                   : 'Need an organizer account? Register here'}
               </button>
 
-              <div className="border-t border-zinc-800 pt-3 flex flex-col gap-2">
+              <div className="border-t border-zinc-100 pt-3 flex flex-col gap-2">
                 <Link
-                  href="/expos"
-                  className="text-xs font-semibold text-primary hover:underline flex items-center justify-center gap-1"
+                  href="/events"
+                  className="text-xs font-bold text-amber-700 hover:text-amber-800 flex items-center justify-center gap-1"
                 >
                   🎫 Browse Live Exhibitions &amp; Visitor Passes &rarr;
                 </Link>
