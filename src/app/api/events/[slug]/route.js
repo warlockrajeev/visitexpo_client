@@ -12,7 +12,14 @@ const BACKEND_API_URL =
 
 // Cache for single event details
 const singleEventCache = new Map();
-const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+const CACHE_TTL = 30 * 1000; // 30 seconds max
+
+const NO_CACHE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+  'Pragma': 'no-cache',
+  'Expires': '0',
+  'Surrogate-Control': 'no-store'
+};
 
 let cachedWpDocs = null;
 let cachedWpDocsTimestamp = 0;
@@ -219,10 +226,13 @@ export async function GET(request, { params }) {
 
     const cleanSlug = decodeURIComponent(slug).toLowerCase().trim();
 
+    const { searchParams } = new URL(request.url);
+    const forceRefresh = searchParams.get('refresh') === 'true' || searchParams.has('_t') || searchParams.has('t');
+
     // 1. Check cache
     const cached = singleEventCache.get(cleanSlug);
-    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
-      return NextResponse.json({ success: true, data: cached.data });
+    if (!forceRefresh && cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+      return NextResponse.json({ success: true, data: cached.data }, { headers: NO_CACHE_HEADERS });
     }
 
     // 2. Prioritize WordPress Event Lookup via cached docs
@@ -345,7 +355,7 @@ export async function GET(request, { params }) {
       };
 
       singleEventCache.set(cleanSlug, { data: formatted, timestamp: Date.now() });
-      return NextResponse.json({ success: true, data: formatted });
+      return NextResponse.json({ success: true, data: formatted }, { headers: NO_CACHE_HEADERS });
     }
 
     // 3. Fallback to native MongoDB backend for platform-only events
@@ -397,16 +407,16 @@ export async function GET(request, { params }) {
             isRealImage: !!(e.banner || (e.gallery && e.gallery[0]))
           };
           singleEventCache.set(cleanSlug, { data: formatted, timestamp: Date.now() });
-          return NextResponse.json({ success: true, data: formatted });
+          return NextResponse.json({ success: true, data: formatted }, { headers: NO_CACHE_HEADERS });
         }
       }
     } catch (mErr) {
       console.warn('MongoDB fallback lookup failed:', mErr.message);
     }
 
-    return NextResponse.json({ success: false, error: 'Event not found' }, { status: 404 });
+    return NextResponse.json({ success: false, error: 'Event not found' }, { status: 404, headers: NO_CACHE_HEADERS });
   } catch (error) {
     console.error('Error fetching single event:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: error.message }, { status: 500, headers: NO_CACHE_HEADERS });
   }
 }

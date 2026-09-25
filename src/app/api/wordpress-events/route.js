@@ -9,7 +9,7 @@ const BACKEND_API_URL =
   (process.env.NODE_ENV === 'production' ? 'https://api.visitexpo.in/api' : 'http://localhost:5000/api');
 
 // Persistent in-memory cache across Next.js module evaluations
-const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const CACHE_TTL_MS = 30 * 1000; // 30 seconds max to guarantee freshness
 if (!globalThis._wpEventsMemoryCache) {
   globalThis._wpEventsMemoryCache = {
     events: null,
@@ -415,7 +415,7 @@ function formatDateRange(startDate, endDate) {
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const forceRefresh = searchParams.get('refresh') === 'true';
+    const forceRefresh = searchParams.get('refresh') === 'true' || searchParams.has('_t') || searchParams.has('t');
 
     // 0. Check in-memory cache first for sub-millisecond response
     const now = Date.now();
@@ -430,7 +430,10 @@ export async function GET(request) {
         },
         {
           headers: {
-            'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600'
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'Surrogate-Control': 'no-store'
           }
         }
       );
@@ -624,7 +627,10 @@ export async function GET(request) {
       },
       {
         headers: {
-          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600'
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'Surrogate-Control': 'no-store'
         }
       }
     );

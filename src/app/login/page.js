@@ -135,7 +135,32 @@ export default function LoginPage() {
         role: userRole
       };
 
-      // Visitors can immediately proceed to website with active session
+      // Check if user already exists and validate role matching for ALL roles
+      try {
+        const checkRes = await axios.post(`${API_URL}/auth/google/check`, {
+          email: fbUser.email,
+          role: userRole
+        });
+
+        if (checkRes.data?.exists && (userRole === 'visitor' || checkRes.data?.user?.hasDetails)) {
+          // Existing user with registered details (or visitor): login directly
+          const res = await loginWithGoogle(basePayload);
+          if (!res.success) {
+            setFormError(res.error || 'Google login failed.');
+          } else {
+            router.push(userRole === 'visitor' ? '/' : '/dashboard');
+          }
+          return;
+        }
+      } catch (checkErr) {
+        if (checkErr.response?.status === 409) {
+          setFormError(checkErr.response?.data?.error || 'Account already registered under another role.');
+          return;
+        }
+        console.warn('Pre-check skipped, opening registration form for details:', checkErr.message);
+      }
+
+      // New visitor: can immediately proceed to website with active session
       if (userRole === 'visitor') {
         const res = await loginWithGoogle(basePayload);
         if (!res.success) {
@@ -144,27 +169,6 @@ export default function LoginPage() {
           router.push('/');
         }
         return;
-      }
-
-      // For Organizers and Exhibitors: Check if user already exists with an established profile
-      try {
-        const checkRes = await axios.post(`${API_URL}/auth/google/check`, {
-          email: fbUser.email,
-          role: userRole
-        });
-
-        if (checkRes.data?.exists && checkRes.data?.user?.hasDetails) {
-          // Existing user with registered details: login directly
-          const res = await loginWithGoogle(basePayload);
-          if (!res.success) {
-            setFormError(res.error || 'Google login failed.');
-          } else {
-            router.push('/');
-          }
-          return;
-        }
-      } catch (checkErr) {
-        console.warn('Pre-check skipped, opening registration form for details:', checkErr.message);
       }
 
       // New organizer/exhibitor: Prompt for basic registration details form
@@ -282,11 +286,11 @@ export default function LoginPage() {
           setSubmitting(false);
           return;
         }
-        const res = await login(formData.email, formData.password);
+        const res = await login(formData.email, formData.password, userRole);
         if (!res.success) {
           setFormError(res.error || 'Invalid credentials.');
         } else {
-          router.push('/');
+          router.push(userRole === 'visitor' ? '/' : '/dashboard');
         }
       }
     } catch (err) {
@@ -597,9 +601,47 @@ export default function LoginPage() {
             </div>
 
             {formError && (
-              <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3.5 text-xs text-red-400">
-                <Lock className="h-4 w-4 flex-shrink-0" />
-                <span>{formError}</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3.5 text-xs text-red-400">
+                <div className="flex items-center gap-2">
+                  <Lock className="h-4 w-4 flex-shrink-0" />
+                  <span>{formError}</span>
+                </div>
+                {formError.includes('Organizer tab') && userRole !== 'organizer' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserRole('organizer');
+                      setFormError('');
+                    }}
+                    className="self-start sm:self-auto font-bold underline hover:text-red-300 text-[11px] cursor-pointer shrink-0"
+                  >
+                    Switch to Organizer &rarr;
+                  </button>
+                )}
+                {formError.includes('Exhibitor tab') && userRole !== 'exhibitor' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserRole('exhibitor');
+                      setFormError('');
+                    }}
+                    className="self-start sm:self-auto font-bold underline hover:text-red-300 text-[11px] cursor-pointer shrink-0"
+                  >
+                    Switch to Exhibitor &rarr;
+                  </button>
+                )}
+                {formError.includes('Visitor tab') && userRole !== 'visitor' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserRole('visitor');
+                      setFormError('');
+                    }}
+                    className="self-start sm:self-auto font-bold underline hover:text-red-300 text-[11px] cursor-pointer shrink-0"
+                  >
+                    Switch to Visitor &rarr;
+                  </button>
+                )}
               </div>
             )}
 

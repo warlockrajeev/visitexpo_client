@@ -166,7 +166,7 @@ export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) 
 
     try {
       if (mode === 'login') {
-        const res = await login(email, password);
+        const res = await login(email, password, selectedRole);
         if (res.success) {
           if (onSuccess) onSuccess(res.user);
           onClose();

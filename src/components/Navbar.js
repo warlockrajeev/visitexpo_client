@@ -36,7 +36,7 @@ export const Logo = ({ className = "w-9 h-9" }) => (
 );
 
 export default function Navbar({ solid = false }) {
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   const pathname = usePathname();
   const isSolid = solid || (pathname && pathname !== '/');
   const [scrolled, setScrolled] = useState(false);
@@ -134,8 +134,10 @@ export default function Navbar({ solid = false }) {
         </nav>
 
         {/* Desktop Actions */}
-        <div className="hidden sm:flex items-center gap-3">
-          {user ? (
+        <div className="hidden md:flex items-center gap-3">
+          {loading && !user ? (
+            <div className="h-8 w-20 rounded-full bg-zinc-850/80 border border-zinc-700/60 animate-pulse" />
+          ) : user ? (
             /* Logged In User Profile Pill & Dropdown */
             <div className="relative" ref={profileDropdownRef}>
               <button
@@ -305,7 +307,9 @@ export default function Navbar({ solid = false }) {
 
         {/* Mobile Actions & Toggle Button */}
         <div className="flex md:hidden items-center gap-2">
-          {user ? (
+          {loading && !user ? (
+            <div className="h-7 w-16 rounded-full bg-zinc-850/80 border border-zinc-700/60 animate-pulse" />
+          ) : user ? (
             <Link
               href="/dashboard"
               className="inline-flex items-center gap-1 rounded-full bg-[#FFCC00] text-zinc-950 font-bold px-3 py-1 text-xs shadow-xs"
@@ -413,7 +417,9 @@ export default function Navbar({ solid = false }) {
 
           {/* Mobile Footer Actions */}
           <div className="pt-3 border-t border-zinc-800">
-            {user ? (
+            {loading && !user ? (
+              <div className="h-9 w-full rounded-full bg-zinc-850/80 border border-zinc-700/60 animate-pulse" />
+            ) : user ? (
               <div className="space-y-2">
                 <Link
                   href="/settings"

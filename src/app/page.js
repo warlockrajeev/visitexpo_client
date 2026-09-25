@@ -188,38 +188,31 @@ export default function LandingPage() {
     );
   }, [faqsList, activeFaqCategory]);
 
-  // 1. Instant hydration from client storage (0 ms perceived latency on reload / repeat visits)
+  // 1. Purge any stale event cache from previous sessions so old data never appears
   useEffect(() => {
     try {
-      const cached = sessionStorage.getItem('visitexpo_landing_events_v1') || localStorage.getItem('visitexpo_landing_events_v1');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setEvents(parsed);
-          setIsFetchingWp(false);
-        }
-      }
+      localStorage.removeItem('visitexpo_landing_events_v1');
+      sessionStorage.removeItem('visitexpo_landing_events_v1');
     } catch (e) {
-      // Storage unavailable or quota, continue
+      // Storage unavailable, continue
     }
   }, []);
 
-  // 2. Fetch fresh events directly from WordPress website via route handler
+  // 2. Fetch fresh events directly from WordPress website via route handler (always live, never cached)
   useEffect(() => {
     let isMounted = true;
     const fetchWordPressEvents = async () => {
       try {
-        const res = await axios.get('/api/wordpress-events');
+        const res = await axios.get(`/api/wordpress-events?_t=${Date.now()}`, {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
         if (isMounted && res.data?.success && Array.isArray(res.data?.events) && res.data.events.length > 0) {
           setEvents(res.data.events);
           setWpSource(res.data.source || 'wordpress_direct');
-          try {
-            const serialized = JSON.stringify(res.data.events);
-            sessionStorage.setItem('visitexpo_landing_events_v1', serialized);
-            localStorage.setItem('visitexpo_landing_events_v1', serialized);
-          } catch (storageErr) {
-            // Ignore quota errors
-          }
         }
       } catch (err) {
         console.error('Failed to fetch WordPress events:', err);
