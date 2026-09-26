@@ -309,6 +309,25 @@ html.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
   color: #f4f4f5 !important;
 }
 
+.visitexpo-swal-popup .swal2-close {
+  color: #a1a1aa !important;
+  font-size: 1.75rem !important;
+  font-weight: 400 !important;
+  transition: all 0.15s ease !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.visitexpo-swal-popup .swal2-close:hover {
+  color: #f4f4f5 !important;
+  transform: scale(1.1) !important;
+}
+
+.visitexpo-swal-popup .swal2-close:focus {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
 .visitexpo-swal-title {
   font-size: 1.35rem !important;
   font-weight: 800 !important;

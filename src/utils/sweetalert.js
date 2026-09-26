@@ -55,6 +55,7 @@ export const showSweetAlert = (messageOrOptions, type = 'info', title = '') => {
   let icon = type;
   let customTitle = title;
   let confirmText = 'OK';
+  let extraOptions = {};
 
   if (typeof messageOrOptions === 'object' && messageOrOptions !== null) {
     text = messageOrOptions.text || messageOrOptions.message || '';
@@ -62,6 +63,10 @@ export const showSweetAlert = (messageOrOptions, type = 'info', title = '') => {
     icon = messageOrOptions.icon || type;
     customTitle = messageOrOptions.title || customTitle;
     confirmText = messageOrOptions.confirmButtonText || confirmText;
+
+    // Forward any extra SweetAlert2 options (showConfirmButton, showCloseButton, etc.)
+    const { text: _t, message: _m, html: _h, icon: _i, title: _tt, confirmButtonText: _c, ...rest } = messageOrOptions;
+    extraOptions = rest;
   } else {
     const rawStr = String(messageOrOptions || '');
     if (/<[a-z][\s\S]*>/i.test(rawStr)) {
@@ -94,7 +99,8 @@ export const showSweetAlert = (messageOrOptions, type = 'info', title = '') => {
     title: customTitle,
     ...(html ? { html } : { text }),
     icon,
-    confirmButtonText: confirmText
+    confirmButtonText: confirmText,
+    ...extraOptions
   });
 };
 

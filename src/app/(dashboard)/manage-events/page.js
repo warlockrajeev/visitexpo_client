@@ -804,10 +804,12 @@ export default function EventsPage() {
         </div>
       `;
 
-      showSweetWarning({
+      showSweetAlert({
         title: 'Required Fields Missing',
         html: missingListHtml,
-        confirmButtonText: 'Review Form'
+        icon: 'warning',
+        showConfirmButton: false,
+        showCloseButton: true
       });
 
       if (modalScrollRef.current) {
