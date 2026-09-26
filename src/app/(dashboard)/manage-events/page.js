@@ -46,6 +46,21 @@ const API_URL =
     ? 'https://api.visitexpo.in/api'
     : 'http://localhost:5000/api');
 
+// Clean HTML tags and decode entities for previewing descriptions cleanly on cards
+export function stripHtmlAndEntities(text) {
+  if (!text || typeof text !== 'string') return '';
+  return text
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export default function EventsPage() {
   const { user, accessToken } = useAuth();
   const [events, setEvents] = useState([]);
@@ -60,6 +75,7 @@ export default function EventsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [currentEventId, setCurrentEventId] = useState(null);
+  const [originalTitle, setOriginalTitle] = useState('');
 
   // Form State
   const [eventForm, setEventForm] = useState({
@@ -115,6 +131,17 @@ export default function EventsPage() {
       return;
     }
 
+    // In edit mode, if the title has not changed from original, it's the same event
+    if (editMode && originalTitle && rawTitle.toLowerCase() === originalTitle.trim().toLowerCase()) {
+      setDuplicateCheck({
+        checking: false,
+        isDuplicate: false,
+        existingEvent: null,
+        similarEvents: []
+      });
+      return;
+    }
+
     setDuplicateCheck(prev => ({ ...prev, checking: true }));
 
     const timer = setTimeout(async () => {
@@ -136,7 +163,7 @@ export default function EventsPage() {
     }, 350);
 
     return () => clearTimeout(timer);
-  }, [eventForm.title, editMode, currentEventId]);
+  }, [eventForm.title, editMode, currentEventId, originalTitle]);
 
   const bannerFileInputRef = React.useRef(null);
   const [bannerValidation, setBannerValidation] = useState(null);
@@ -151,6 +178,7 @@ export default function EventsPage() {
   const [newFaq, setNewFaq] = useState({ question: '', answer: '' });
   const [newSchedule, setNewSchedule] = useState({ name: '', date: '' });
   const [formErrors, setFormErrors] = useState({});
+  const [validationSummary, setValidationSummary] = useState(null);
   const modalScrollRef = React.useRef(null);
 
   const handleBannerUpload = async (e) => {
@@ -514,9 +542,11 @@ export default function EventsPage() {
   const openCreateModal = () => {
     setEditMode(false);
     setCurrentEventId(null);
+    setOriginalTitle('');
     setIsCustomIndustry(false);
     setBannerValidation(null);
     setFormErrors({});
+    setValidationSummary(null);
     setDuplicateCheck({ checking: false, isDuplicate: false, existingEvent: null, similarEvents: [] });
     setEventForm({
       title: '',
@@ -554,8 +584,10 @@ export default function EventsPage() {
   const openEditModal = async (event) => {
     setEditMode(true);
     setCurrentEventId(event._id);
+    setOriginalTitle(event.title || '');
     setBannerValidation(null);
     setFormErrors({});
+    setValidationSummary(null);
     setDuplicateCheck({ checking: false, isDuplicate: false, existingEvent: null, similarEvents: [] });
     
     // Format dates for input tags (YYYY-MM-DD)
@@ -789,29 +821,7 @@ export default function EventsPage() {
 
     if (!isValid) {
       setFormErrors(validationErrors);
-
-      const missingListHtml = `
-        <div style="text-align: left; font-size: 13px; line-height: 1.6; margin-top: 8px;">
-          <p style="font-weight: 600; margin-bottom: 8px; color: #f59e0b;">
-            Please complete or correct the following ${missingFields.length} required field${missingFields.length > 1 ? 's' : ''}:
-          </p>
-          <ul style="list-style-type: disc; padding-left: 20px; color: inherit;">
-            ${missingFields.map(f => `<li style="margin-bottom: 4px;"><strong>${f}</strong></li>`).join('')}
-          </ul>
-          <p style="margin-top: 10px; font-size: 11px; opacity: 0.8;">
-            Fields are highlighted with red borders inside the form.
-          </p>
-        </div>
-      `;
-
-      showSweetAlert({
-        title: 'Required Fields Missing',
-        html: missingListHtml,
-        icon: 'warning',
-        showConfirmButton: false,
-        showCloseButton: true,
-        allowOutsideClick: true
-      });
+      setValidationSummary(missingFields);
 
       if (modalScrollRef.current) {
         modalScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
@@ -820,6 +830,7 @@ export default function EventsPage() {
     }
 
     setFormErrors({});
+    setValidationSummary(null);
 
     // Process categories selection to array
     const categoriesArray = [eventForm.category, eventForm.industry].filter(Boolean);
@@ -1038,14 +1049,14 @@ export default function EventsPage() {
                     </div>
                   )}
                   {/* Status Badge */}
-                  <span className={`absolute top-3 right-3 rounded-full px-2.5 py-0.5 text-xs font-bold border shadow-sm ${
+                  <span className={`absolute top-3 right-3 rounded-full px-2.5 py-0.5 text-xs font-bold border shadow-sm backdrop-blur-md ${
                     evt.status === 'published'
-                      ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                      ? 'bg-card/90 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
                       : evt.status === 'draft'
-                      ? 'bg-zinc-500/10 text-zinc-500 border-zinc-500/20'
+                      ? 'bg-card/90 text-zinc-600 dark:text-zinc-400 border-zinc-500/30'
                       : evt.status === 'completed'
-                      ? 'bg-blue-500/10 text-blue-500 border-blue-500/20'
-                      : 'bg-destructive/10 text-destructive border-destructive/20'
+                      ? 'bg-card/90 text-blue-600 dark:text-blue-400 border-blue-500/30'
+                      : 'bg-card/90 text-destructive border-destructive/30'
                   }`}>
                     {evt.status.toUpperCase()}
                   </span>
@@ -1055,7 +1066,9 @@ export default function EventsPage() {
                 <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                   <div className="space-y-2">
                     <h3 className="font-bold text-lg leading-tight text-foreground line-clamp-1">{evt.title}</h3>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{evt.description}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                      {stripHtmlAndEntities(evt.description) || 'No description provided.'}
+                    </p>
                   </div>
 
                   <div className="space-y-1.5 border-t border-border/60 pt-3">
@@ -1150,6 +1163,40 @@ export default function EventsPage() {
             </button>
             <h3 className="text-xl font-bold text-foreground mb-4">{editMode ? 'Edit Event Details' : 'Create Event'}</h3>
 
+            {/* Inline Validation Summary */}
+            {validationSummary && validationSummary.length > 0 && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 mb-2 relative animate-in fade-in">
+                <button
+                  type="button"
+                  onClick={() => setValidationSummary(null)}
+                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Dismiss validation summary"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-bold text-foreground">Required Fields Missing</p>
+                    <p className="text-xs text-amber-500 font-medium mt-1">
+                      Please complete or correct the following {validationSummary.length} required field{validationSummary.length > 1 ? 's' : ''}:
+                    </p>
+                    <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                      {validationSummary.map((field, i) => (
+                        <li key={i} className="flex items-center gap-1.5">
+                          <span className="h-1 w-1 rounded-full bg-amber-500 shrink-0" />
+                          <span className="font-semibold text-foreground">{field}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-[10px] text-muted-foreground mt-2 opacity-80">
+                      Fields are highlighted with red borders below.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleFormSubmit} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className={duplicateCheck.isDuplicate ? 'sm:col-span-2' : ''}>
@@ -1194,7 +1241,7 @@ export default function EventsPage() {
                         <div className="flex items-center gap-2">
                           <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
                           <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
-                            Duplicate Event Detected — Cannot Create
+                            Duplicate Event Detected — Cannot {editMode ? 'Update' : 'Create'}
                           </span>
                         </div>
                         <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300">
@@ -1209,7 +1256,7 @@ export default function EventsPage() {
                         </p>
                       </div>
                       <p className="text-[11px] text-amber-600 dark:text-amber-400">
-                        An event with this title already exists in the system. Duplicate events cannot be created. Please use a distinctive title to proceed.
+                        An event with this title already exists in the system. Duplicate events cannot be {editMode ? 'saved' : 'created'}. Please use a distinctive title to proceed.
                       </p>
                     </div>
                   )}
