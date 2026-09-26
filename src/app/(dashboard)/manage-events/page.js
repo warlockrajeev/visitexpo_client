@@ -333,33 +333,47 @@ export default function EventsPage() {
     setError('');
     try {
       const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
-      const res = await axios.get(`${API_URL}/events?limit=100&all=true`, { headers });
+      const orgId = user?.organization?._id || user?.organization;
+      const userId = user?._id || user?.id;
+      const isSuperAdmin = user?.role === 'super_admin';
+
+      // Use server-side filtering via organizerId (same approach as Dashboard Hub)
+      const eventsUrl = isSuperAdmin
+        ? `${API_URL}/events?limit=100&all=true`
+        : `${API_URL}/events?limit=100&all=true&organizerId=${orgId || userId}`;
+
+      const res = await axios.get(eventsUrl, { headers });
       
       if (res.data && res.data.success) {
         const allDocs = res.data.data?.docs || [];
 
-        // Filter to only include events created by or belonging to the logged in user
-        const myEvents = allDocs.filter(evt => {
-          if (!user) return false;
+        if (isSuperAdmin) {
+          // Super admins see all events
+          setEvents(allDocs);
+        } else {
+          // Apply additional client-side ownership filter as safeguard
+          const userIdStr = String(userId || '');
+          const userEmail = (user?.email || '').toLowerCase().trim();
+          const userOrgIdStr = String(orgId || '');
 
-          const userId = String(user._id || user.id || '');
-          const userEmail = (user.email || '').toLowerCase().trim();
-          const userOrgId = String(user.organization?._id || user.organization || '');
+          const myEvents = allDocs.filter(evt => {
+            const evtOrgId = String(evt.organizer?._id || evt.organizer || '');
+            const evtClaimedBy = String(evt.claimedBy?._id || evt.claimedBy || '');
+            const evtCreatedBy = String(evt.createdBy?._id || evt.createdBy || evt.user?._id || evt.user || '');
+            const evtOrgEmail = (evt.orgEmail || '').toLowerCase().trim();
 
-          const evtOrgId = String(evt.organizer?._id || evt.organizer || '');
-          const evtClaimedBy = String(evt.claimedBy?._id || evt.claimedBy || '');
-          const evtCreatedBy = String(evt.createdBy?._id || evt.createdBy || evt.user?._id || evt.user || '');
-          const evtOrgEmail = (evt.orgEmail || '').toLowerCase().trim();
+            return (
+              (userIdStr && evtClaimedBy && evtClaimedBy === userIdStr) ||
+              (userIdStr && evtCreatedBy && evtCreatedBy === userIdStr) ||
+              (userOrgIdStr && evtOrgId && evtOrgId === userOrgIdStr) ||
+              (userIdStr && evtOrgId && evtOrgId === userIdStr) ||
+              (userEmail && evtOrgEmail && evtOrgEmail === userEmail)
+            );
+          });
 
-          return (
-            (userId && evtClaimedBy === userId) ||
-            (userId && evtCreatedBy === userId) ||
-            (userOrgId && evtOrgId === userOrgId) ||
-            (userEmail && evtOrgEmail === userEmail)
-          );
-        });
-
-        setEvents(myEvents);
+          // Use server-filtered results if client filter returns empty but server returned data
+          setEvents(myEvents.length > 0 ? myEvents : allDocs);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch events', err);
