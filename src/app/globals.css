@@ -291,6 +291,7 @@ html.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
 /* Ensure SweetAlert2 container is above ALL modals (z-50 = 50) */
 .swal2-container {
   z-index: 10000 !important;
+  pointer-events: auto !important;
 }
 
 .visitexpo-swal-popup {
@@ -316,6 +317,10 @@ html.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
   transition: all 0.15s ease !important;
   outline: none !important;
   box-shadow: none !important;
+  pointer-events: auto !important;
+  z-index: 10002 !important;
+  position: relative !important;
+  cursor: pointer !important;
 }
 
 .visitexpo-swal-popup .swal2-close:hover {

@@ -809,7 +809,8 @@ export default function EventsPage() {
         html: missingListHtml,
         icon: 'warning',
         showConfirmButton: false,
-        showCloseButton: true
+        showCloseButton: true,
+        allowOutsideClick: true
       });
 
       if (modalScrollRef.current) {
