@@ -273,15 +273,25 @@ html.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
 .wysiwyg-editor font[size="6"] { font-size: 30px; }
 .wysiwyg-editor font[size="7"] { font-size: 36px; }
 
-/* Tactile Pressing Effect for Buttons */
+/* Tactile Pressing Effect & Global Pointer Cursor for Buttons */
+button:not(:disabled),
+[role="button"]:not(:disabled) {
+  cursor: pointer;
+}
+
 .btn-press {
-  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), filter 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.12s cubic-bezier(0.4, 0, 0.2, 1), filter 0.12s ease, box-shadow 0.12s ease;
   user-select: none;
+  cursor: pointer !important;
+}
+
+.btn-press:hover:not(:disabled) {
+  filter: brightness(1.05);
 }
 
 .btn-press:active:not(:disabled) {
-  transform: scale(0.96) translateY(1.5px) !important;
-  filter: brightness(0.93);
+  transform: scale(0.95) translateY(1.5px) !important;
+  filter: brightness(0.92);
 }
 
 /* ============================================================

@@ -392,7 +392,7 @@ export default function DashboardLayout({ children }) {
                 {user?.role === 'organizer' && hasExhibitorProfile && (
                   <button
                     onClick={handleToggleView}
-                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all shadow-sm cursor-pointer ${
+                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all shadow-sm cursor-pointer btn-press active:scale-95 ${
                       isExhibitorView
                         ? 'bg-amber-500/10 border-amber-500/20 text-amber-500 hover:bg-amber-500/20'
                         : 'bg-primary/10 border-primary/20 text-primary hover:bg-primary/20'
@@ -412,7 +412,7 @@ export default function DashboardLayout({ children }) {
                 {!isExhibitorView && (
                   <Link
                     href="/events/wizard"
-                    className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"
+                    className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all cursor-pointer btn-press active:scale-95"
                   >
                     <Wand2 className="h-3.5 w-3.5" /> Start Onboarding
                   </Link>

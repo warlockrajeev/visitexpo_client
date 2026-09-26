@@ -993,7 +993,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
           {/* Embed Widget Button */}
           <button
             onClick={() => setShowEmbedModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-all shadow-xs cursor-pointer btn-press active:scale-95 select-none"
           >
             <Code className="h-3.5 w-3.5 text-amber-500" />
             &lt;/&gt; Embed Widget
@@ -1008,7 +1008,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                 window.open('/expos', '_blank');
               }
             }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-medium transition-colors shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-medium transition-all shadow-sm cursor-pointer btn-press active:scale-95 select-none"
           >
             <ExternalLink className="h-3.5 w-3.5" />
             Live Preview
@@ -1017,7 +1017,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
           {/* Add Manual Lead Button */}
           <button
             onClick={openAddLeadModal}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border transition-colors"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border transition-all shadow-2xs cursor-pointer btn-press active:scale-95 select-none"
           >
             <Plus className="h-3.5 w-3.5" />
             Add Lead
@@ -1032,7 +1032,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
           {/* Tab 1: High-Intent Buyers */}
           <button
             onClick={() => setActiveTab('high_intent')}
-            className={`relative pb-3 font-medium transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+            className={`relative pb-3 font-medium transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none ${
               activeTab === 'high_intent'
                 ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
                 : 'text-muted-foreground hover:text-foreground'
@@ -1051,7 +1051,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
           {/* Tab 2: Verified Delegates */}
           <button
             onClick={() => setActiveTab('verified_delegates')}
-            className={`relative pb-3 font-medium transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+            className={`relative pb-3 font-medium transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none ${
               activeTab === 'verified_delegates'
                 ? 'text-amber-600 dark:text-amber-400 font-semibold'
                 : 'text-muted-foreground hover:text-foreground'
@@ -1070,7 +1070,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
           {/* Tab 3: Stall Inquiries with "New" Tag */}
           <button
             onClick={() => setActiveTab('stall_inquiries')}
-            className={`relative pb-3 font-medium transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+            className={`relative pb-3 font-medium transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none ${
               activeTab === 'stall_inquiries'
                 ? 'text-rose-600 dark:text-rose-400 font-semibold'
                 : 'text-muted-foreground hover:text-foreground'
@@ -1089,7 +1089,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
           {/* Tab 4: All Inquiries */}
           <button
             onClick={() => setActiveTab('all')}
-            className={`relative pb-3 font-medium transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+            className={`relative pb-3 font-medium transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none ${
               activeTab === 'all'
                 ? 'text-foreground font-semibold'
                 : 'text-muted-foreground hover:text-foreground'
@@ -1110,7 +1110,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
           {/* Generate Digital Badges */}
           <button
             onClick={() => setShowBadgeModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-sky-600 hover:bg-sky-700 text-white transition-colors shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-700 text-white transition-all shadow-xs cursor-pointer btn-press active:scale-95 select-none"
           >
             <QrCode className="h-3.5 w-3.5" />
             Digital Badges
@@ -1119,7 +1119,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
           {/* Broadcast Message */}
           <button
             onClick={() => setShowBroadcastModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-xs cursor-pointer btn-press active:scale-95 select-none"
           >
             <Send className="h-3.5 w-3.5" />
             Broadcast Update
@@ -1128,7 +1128,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
           {/* Bulk Import */}
           <button
             onClick={() => setShowBulkImportModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-teal-600 hover:bg-teal-700 text-white transition-colors shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-600 hover:bg-teal-700 text-white transition-all shadow-xs cursor-pointer btn-press active:scale-95 select-none"
           >
             <Upload className="h-3.5 w-3.5" />
             Bulk Import
@@ -1137,7 +1137,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
           {/* Export CSV List */}
           <button
             onClick={handleExportCsv}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 dark:bg-zinc-700 dark:hover:bg-zinc-600 transition-colors shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 dark:bg-zinc-700 dark:hover:bg-zinc-600 transition-all shadow-xs cursor-pointer btn-press active:scale-95 select-none"
           >
             <Download className="h-3.5 w-3.5" />
             Export CSV
@@ -1175,7 +1175,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
               />
               <button
                 type="button"
-                className="absolute right-2 top-2 p-0.5 text-muted-foreground hover:text-foreground"
+                className="absolute right-2 top-2 p-0.5 text-muted-foreground hover:text-foreground cursor-pointer active:scale-90 transition-transform"
               >
                 <Search className="h-3.5 w-3.5" />
               </button>
@@ -1208,7 +1208,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full appearance-none rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground pr-8 focus:outline-none focus:ring-1 focus:ring-primary font-medium"
+                className="w-full appearance-none rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground pr-8 focus:outline-none focus:ring-1 focus:ring-primary font-medium cursor-pointer"
               >
                 <option value="all">All Status</option>
                 <option value="new">New Inflow</option>
@@ -1227,7 +1227,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                 type="date"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary dark:[color-scheme:dark]"
+                className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary dark:[color-scheme:dark] cursor-pointer"
                 title="Filter by Registration Date"
               />
             </div>
@@ -1235,7 +1235,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
             {/* Reset Button */}
             <button
               onClick={handleResetFilters}
-              className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:text-amber-700 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:text-amber-700 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg transition-all cursor-pointer btn-press active:scale-95 select-none"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               Reset
@@ -1334,14 +1334,14 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                     window.open('/expos', '_blank');
                   }
                 }}
-                className="px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs uppercase tracking-wider transition-colors shadow-sm"
+                className="px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all shadow-sm cursor-pointer btn-press active:scale-95 select-none"
               >
                 PREVIEW EXPO PAGE
               </button>
 
               <button
                 onClick={() => setShowBulkImportModal(true)}
-                className="px-4 py-2.5 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground font-semibold text-xs transition-colors"
+                className="px-4 py-2.5 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground font-semibold text-xs transition-all cursor-pointer btn-press active:scale-95 select-none"
               >
                 Import Demo Leads
               </button>
@@ -1516,7 +1516,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                             <a
                               href={`tel:${item.phone}`}
                               onClick={(e) => e.stopPropagation()}
-                              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer btn-press active:scale-90"
                               title="Call Lead"
                             >
                               <Phone className="h-3.5 w-3.5" />
@@ -1526,7 +1526,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                           <a
                             href={`mailto:${item.email}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer btn-press active:scale-90"
                             title="Send Email"
                           >
                             <Mail className="h-3.5 w-3.5" />
@@ -1537,7 +1537,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                               e.stopPropagation();
                               setDrawerLead(item);
                             }}
-                            className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all cursor-pointer btn-press active:scale-90"
                             title="Open CRM Intelligence"
                           >
                             <Eye className="h-3.5 w-3.5" />
@@ -1548,7 +1548,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                               e.stopPropagation();
                               openEditLeadModal(item);
                             }}
-                            className="p-1.5 rounded-md text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-all cursor-pointer btn-press active:scale-90"
                             title="Edit Lead Details"
                           >
                             <Edit className="h-3.5 w-3.5" />
@@ -1556,7 +1556,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                           {/* Delete Lead */}
                           <button
                             onClick={(e) => handleDeleteLead(item._id, e)}
-                            className="p-1.5 rounded-md text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-all cursor-pointer btn-press active:scale-90"
                             title="Delete Lead"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -1607,14 +1607,14 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => openEditLeadModal(drawerLead)}
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-all cursor-pointer btn-press active:scale-90 select-none"
                   title="Edit Lead Details"
                 >
                   <Edit className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => setDrawerLead(null)}
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer btn-press active:scale-90 select-none"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -1734,7 +1734,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                   />
                   <button
                     type="submit"
-                    className="px-3 py-1.5 bg-primary text-primary-foreground font-semibold text-xs rounded-lg hover:bg-primary/90 transition-colors shadow-xs"
+                    className="px-3 py-1.5 bg-primary text-primary-foreground font-semibold text-xs rounded-lg hover:bg-primary/90 transition-all shadow-xs cursor-pointer btn-press active:scale-95 select-none"
                   >
                     Log
                   </button>
@@ -1794,7 +1794,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                   </div>
                   <button
                     type="submit"
-                    className="w-full py-1.5 bg-secondary hover:bg-secondary/80 text-foreground border border-border font-semibold text-xs rounded-lg transition-colors"
+                    className="w-full py-1.5 bg-secondary hover:bg-secondary/80 text-foreground border border-border font-semibold text-xs rounded-lg transition-all cursor-pointer btn-press active:scale-95 select-none"
                   >
                     Schedule Follow-up
                   </button>
@@ -1823,7 +1823,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
               </div>
               <button
                 onClick={() => setShowEmbedModal(false)}
-                className="p-1 rounded-lg text-muted-foreground hover:text-foreground"
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground transition-all cursor-pointer btn-press active:scale-90"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1837,7 +1837,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                 </pre>
                 <button
                   onClick={handleCopyEmbed}
-                  className="absolute right-3 top-3 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition-colors cursor-pointer"
+                  className="absolute right-3 top-3 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition-all cursor-pointer btn-press active:scale-95 select-none"
                 >
                   {copiedEmbed ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                   {copiedEmbed ? 'Copied!' : 'Copy Code'}
@@ -1851,7 +1851,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
             <div className="flex justify-end pt-3 border-t border-border">
               <button
                 onClick={() => setShowEmbedModal(false)}
-                className="px-4 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-colors"
+                className="px-4 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-all cursor-pointer btn-press active:scale-95 select-none"
               >
                 Close
               </button>
@@ -1881,7 +1881,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
               </div>
               <button
                 onClick={() => setShowBroadcastModal(false)}
-                className="p-1 rounded-lg text-muted-foreground hover:text-foreground"
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground transition-all cursor-pointer btn-press active:scale-90"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1931,14 +1931,14 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                     <button
                       type="button"
                       onClick={() => setShowBroadcastModal(false)}
-                      className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-colors"
+                      className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-all cursor-pointer btn-press active:scale-95 select-none"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={broadcastSending}
-                      className="px-4 py-2 text-xs font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-colors flex items-center gap-1.5"
+                      className="px-4 py-2 text-xs font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none"
                     >
                       {broadcastSending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                       Send Broadcast
@@ -1972,7 +1972,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                   setShowBulkImportModal(false);
                   resetBulkSheetState();
                 }}
-                className="p-1 rounded-lg text-muted-foreground hover:text-foreground"
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground transition-all cursor-pointer btn-press active:scale-90"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -2004,7 +2004,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                       <button
                         type="button"
                         onClick={() => handleDownloadTemplate('xlsx')}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 transition-colors shadow-xs"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 transition-all shadow-xs cursor-pointer btn-press active:scale-95 select-none"
                         title="Download sample Excel spreadsheet template"
                       >
                         <FileSpreadsheet className="h-3.5 w-3.5" />
@@ -2013,7 +2013,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                       <button
                         type="button"
                         onClick={() => handleDownloadTemplate('csv')}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border transition-colors"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border transition-all cursor-pointer btn-press active:scale-95 select-none"
                         title="Download sample CSV template"
                       >
                         <Download className="h-3.5 w-3.5" />
@@ -2028,7 +2028,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                   <button
                     type="button"
                     onClick={() => setSheetUploadTab('upload')}
-                    className={`flex-1 py-1.5 rounded-md font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 py-1.5 rounded-md font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none ${
                       sheetUploadTab === 'upload'
                         ? 'bg-background text-foreground shadow-xs'
                         : 'text-muted-foreground hover:text-foreground'
@@ -2040,7 +2040,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                   <button
                     type="button"
                     onClick={() => setSheetUploadTab('paste')}
-                    className={`flex-1 py-1.5 rounded-md font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 py-1.5 rounded-md font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none ${
                       sheetUploadTab === 'paste'
                         ? 'bg-background text-foreground shadow-xs'
                         : 'text-muted-foreground hover:text-foreground'
@@ -2066,7 +2066,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                       {!uploadedSheetFile ? (
                         <div
                           onClick={() => sheetFileInputRef.current?.click()}
-                          className="border-2 border-dashed border-border hover:border-teal-500 rounded-2xl p-6 text-center bg-muted/10 cursor-pointer transition-colors space-y-2 group"
+                          className="border-2 border-dashed border-border hover:border-teal-500 rounded-2xl p-6 text-center bg-muted/10 cursor-pointer transition-all space-y-2 group btn-press active:scale-[0.99] select-none"
                         >
                           <div className="h-10 w-10 mx-auto rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center group-hover:scale-110 transition-transform">
                             <Upload className="h-5 w-5" />
@@ -2096,7 +2096,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                                 resetBulkSheetState();
                                 sheetFileInputRef.current?.click();
                               }}
-                              className="text-xs font-semibold text-primary hover:underline cursor-pointer"
+                              className="text-xs font-semibold text-primary hover:underline cursor-pointer btn-press active:scale-95 select-none transition-transform inline-block"
                             >
                               Choose Different File
                             </button>
@@ -2163,7 +2163,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                         <button
                           type="button"
                           onClick={handleLoadSampleLeads}
-                          className="text-xs font-semibold text-primary hover:underline cursor-pointer"
+                          className="text-xs font-semibold text-primary hover:underline cursor-pointer btn-press active:scale-95 select-none transition-transform inline-block"
                         >
                           Load Sample Leads
                         </button>
@@ -2192,14 +2192,14 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
                         setShowBulkImportModal(false);
                         resetBulkSheetState();
                       }}
-                      className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-colors"
+                      className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-all cursor-pointer btn-press active:scale-95 select-none"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={bulkImporting || (sheetUploadTab === 'upload' ? parsedSheetLeads.length === 0 : !bulkCsvText.trim())}
-                      className="px-4 py-2 text-xs font-bold rounded-lg bg-teal-600 hover:bg-teal-700 text-white shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-4 py-2 text-xs font-bold rounded-lg bg-teal-600 hover:bg-teal-700 text-white shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer btn-press active:scale-95 select-none"
                     >
                       {bulkImporting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                       <Upload className="h-3.5 w-3.5" />
@@ -2233,7 +2233,7 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
               </div>
               <button
                 onClick={() => setShowBadgeModal(false)}
-                className="p-1 rounded-lg text-muted-foreground hover:text-foreground"
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground transition-all cursor-pointer btn-press active:scale-90"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -2281,14 +2281,14 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
               <div className="flex gap-2">
                 <button
                   onClick={() => window.print()}
-                  className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-colors flex items-center gap-1.5"
+                  className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-all flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none"
                 >
                   <Printer className="h-3.5 w-3.5" />
                   Print Passes
                 </button>
                 <button
                   onClick={() => setShowBadgeModal(false)}
-                  className="px-4 py-2 text-xs font-bold rounded-lg bg-sky-600 hover:bg-sky-700 text-white shadow-xs transition-colors"
+                  className="px-4 py-2 text-xs font-bold rounded-lg bg-sky-600 hover:bg-sky-700 text-white shadow-xs transition-all cursor-pointer btn-press active:scale-95 select-none"
                 >
                   Done
                 </button>
@@ -2321,7 +2321,7 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
               </div>
               <button
                 onClick={() => setShowLeadModal(false)}
-                className="p-1 rounded-lg text-muted-foreground hover:text-foreground"
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground transition-all cursor-pointer btn-press active:scale-90"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -2482,14 +2482,14 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
                 <button
                   type="button"
                   onClick={() => setShowLeadModal(false)}
-                  className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-colors"
+                  className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-all cursor-pointer btn-press active:scale-95 select-none"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingLead}
-                  className="px-4 py-2 text-xs font-bold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 text-xs font-bold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer btn-press active:scale-95 select-none"
                 >
                   {isSubmittingLead && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                   {isEditMode ? 'Update Lead' : 'Save Lead'}
