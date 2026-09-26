@@ -428,73 +428,23 @@ export default function LeadsCRMPage() {
     }
   };
 
-  // Export CSV of filtered or selected leads
-  const handleExportCsv = () => {
-    const listToExport =
-      selectedLeadIds.size > 0
-        ? leads.filter((l) => selectedLeadIds.has(l._id))
-        : filteredLeads;
-
-    if (listToExport.length === 0) {
-      showSweetWarning('No leads available to export.', 'Export CSV');
-      return;
+  // Helper to trigger browser download of CSV text with UTF-8 BOM
+  const triggerCsvDownload = (csvText, fileName) => {
+    try {
+      const blob = new Blob(['\uFEFF' + csvText], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return true;
+    } catch (e) {
+      console.error('Trigger CSV download error:', e);
+      return false;
     }
-
-    const headers = ['Date', 'Name', 'Email', 'Phone', 'Company', 'Designation', 'Country', 'Score', 'Status', 'Source'];
-    const rows = listToExport.map((l) => [
-      new Date(l.createdAt).toLocaleDateString(),
-      `"${(l.name || '').replace(/"/g, '""')}"`,
-      `"${(l.email || '').replace(/"/g, '""')}"`,
-      `"${(l.phone || '').replace(/"/g, '""')}"`,
-      `"${(l.company || '').replace(/"/g, '""')}"`,
-      `"${(l.designation || '').replace(/"/g, '""')}"`,
-      `"${(l.country || 'India').replace(/"/g, '""')}"`,
-      l.leadScore || 0,
-      l.status || 'new',
-      l.source || 'website'
-    ]);
-
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `VisitExpo_Buyer_Leads_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Handle Embed Widget Copy
-  const getEmbedCode = () => {
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://visitexpo.in';
-    const targetId = selectedEventId || 'all';
-    return `<iframe\n  src="${origin}/embed/lead-form/${targetId}"\n  width="100%"\n  height="540"\n  style="border:none;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,0.08);"\n  title="VisitExpo Attendee Registration"\n></iframe>`;
-  };
-
-  const handleCopyEmbed = () => {
-    navigator.clipboard.writeText(getEmbedCode());
-    setCopiedEmbed(true);
-    setTimeout(() => setCopiedEmbed(false), 2500);
-  };
-
-  // Handle Broadcast Submission
-  const handleSendBroadcast = async (e) => {
-    e.preventDefault();
-    if (!broadcastSubject.trim() || !broadcastMessage.trim()) return;
-
-    setBroadcastSending(true);
-    // Simulate sending broadcast email/SMS campaign
-    setTimeout(() => {
-      setBroadcastSending(false);
-      setBroadcastSuccess(true);
-      setTimeout(() => {
-        setBroadcastSuccess(false);
-        setShowBroadcastModal(false);
-        setBroadcastSubject('');
-        setBroadcastMessage('');
-      }, 1800);
-    }, 1200);
   };
 
   // Helper to download example template sheet (Excel .xlsx or CSV)
@@ -547,19 +497,20 @@ export default function LeadsCRMPage() {
     ];
 
     if (format === 'csv') {
-      const headers = Object.keys(sampleData[0]).join(',');
-      const rows = sampleData.map(row =>
-        Object.values(row).map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')
-      ).join('\n');
-      const blob = new Blob([`${headers}\n${rows}`], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'VisitExpo_Leads_Template.csv';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const ws = XLSX.utils.json_to_sheet(sampleData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Leads Template');
+      let downloaded = false;
+      try {
+        XLSX.writeFile(wb, 'VisitExpo_Leads_Template.csv', { bookType: 'csv' });
+        downloaded = true;
+      } catch (err) {
+        console.warn('XLSX.writeFile failed, using fallback:', err);
+      }
+      if (!downloaded) {
+        const csvText = XLSX.utils.sheet_to_csv(ws);
+        triggerCsvDownload(csvText, 'VisitExpo_Leads_Template.csv');
+      }
     } else {
       const ws = XLSX.utils.json_to_sheet(sampleData);
       ws['!cols'] = [
@@ -577,6 +528,127 @@ export default function LeadsCRMPage() {
       XLSX.utils.book_append_sheet(wb, ws, 'Leads Template');
       XLSX.writeFile(wb, 'VisitExpo_Leads_Template.xlsx');
     }
+  };
+
+  // Export CSV of filtered, selected, or available leads with intelligent fallback
+  const handleExportCsv = () => {
+    try {
+      // 1. Determine list of leads to export
+      let listToExport = [];
+      let exportContext = '';
+
+      if (selectedLeadIds.size > 0) {
+        listToExport = leads.filter((l) => selectedLeadIds.has(l._id));
+        exportContext = `${listToExport.length} selected lead${listToExport.length === 1 ? '' : 's'}`;
+      } else if (filteredLeads.length > 0) {
+        listToExport = filteredLeads;
+        exportContext = `${listToExport.length} lead${listToExport.length === 1 ? '' : 's'}`;
+      } else if (leads.length > 0) {
+        listToExport = leads;
+        exportContext = `all ${listToExport.length} lead${listToExport.length === 1 ? '' : 's'}`;
+      }
+
+      // 2. If no leads are recorded in this active edition, download standard template so a file is ALWAYS exported
+      if (listToExport.length === 0) {
+        handleDownloadTemplate('csv');
+        showSweetInfo(
+          'No buyer leads found for the active edition yet. Downloaded standard VisitExpo Leads CSV template with example records instead.',
+          'Export CSV'
+        );
+        return;
+      }
+
+      // 3. Prepare structured export rows with safe type conversions
+      const exportRows = listToExport.map((l) => ({
+        'Date': l.createdAt ? new Date(l.createdAt).toLocaleDateString() : new Date().toLocaleDateString(),
+        'Full Name': String(l.name || '').trim(),
+        'Work Email': String(l.email || '').trim(),
+        'Phone Number': String(l.phone || '').trim(),
+        'Company': String(l.company || 'Individual Attendee').trim(),
+        'Designation': String(l.designation || 'Trade Visitor').trim(),
+        'Country': String(l.country || 'India').trim(),
+        'Intent Score': Number(l.leadScore) || 0,
+        'Pipeline Stage': String(l.status || 'new').trim(),
+        'Lead Source': String(l.source || 'website').trim(),
+        'Notes': String(l.notes || '').trim()
+      }));
+
+      // 4. Build filename based on current event name and current date
+      const cleanEventName = currentEvent?.title
+        ? currentEvent.title.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30)
+        : 'VisitExpo';
+      const dateStr = new Date().toISOString().split('T')[0];
+      const fileName = `${cleanEventName}_Buyer_Leads_${dateStr}.csv`;
+
+      // 5. Construct SheetJS workbook
+      const ws = XLSX.utils.json_to_sheet(exportRows);
+      ws['!cols'] = [
+        { wch: 14 },
+        { wch: 22 },
+        { wch: 28 },
+        { wch: 18 },
+        { wch: 26 },
+        { wch: 22 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 16 },
+        { wch: 16 },
+        { wch: 35 }
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Buyer Leads');
+
+      // 6. Trigger download (XLSX.writeFile with fallback)
+      let downloaded = false;
+      try {
+        XLSX.writeFile(wb, fileName, { bookType: 'csv' });
+        downloaded = true;
+      } catch (xlsxErr) {
+        console.warn('XLSX.writeFile fallback triggered:', xlsxErr);
+      }
+
+      if (!downloaded) {
+        const csvText = XLSX.utils.sheet_to_csv(ws);
+        triggerCsvDownload(csvText, fileName);
+      }
+
+      showSweetSuccess(`Successfully exported ${exportContext} to ${fileName}!`);
+    } catch (err) {
+      console.error('Error in handleExportCsv:', err);
+      showSweetError('Failed to generate CSV export. Please try again.');
+    }
+  };
+
+  // Handle Embed Widget Copy
+  const getEmbedCode = () => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://visitexpo.in';
+    const targetId = selectedEventId || 'all';
+    return `<iframe\n  src="${origin}/embed/lead-form/${targetId}"\n  width="100%"\n  height="540"\n  style="border:none;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,0.08);"\n  title="VisitExpo Attendee Registration"\n></iframe>`;
+  };
+
+  const handleCopyEmbed = () => {
+    navigator.clipboard.writeText(getEmbedCode());
+    setCopiedEmbed(true);
+    setTimeout(() => setCopiedEmbed(false), 2500);
+  };
+
+  // Handle Broadcast Submission
+  const handleSendBroadcast = async (e) => {
+    e.preventDefault();
+    if (!broadcastSubject.trim() || !broadcastMessage.trim()) return;
+
+    setBroadcastSending(true);
+    // Simulate sending broadcast email/SMS campaign
+    setTimeout(() => {
+      setBroadcastSending(false);
+      setBroadcastSuccess(true);
+      setTimeout(() => {
+        setBroadcastSuccess(false);
+        setShowBroadcastModal(false);
+        setBroadcastSubject('');
+        setBroadcastMessage('');
+      }, 1800);
+    }, 1200);
   };
 
   // Handle Spreadsheet File Selection (.xlsx, .xls, .csv)
@@ -1136,8 +1208,14 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
 
           {/* Export CSV List */}
           <button
-            onClick={handleExportCsv}
+            type="button"
+            id="btn-export-csv"
+            onClick={(e) => {
+              e.preventDefault();
+              handleExportCsv();
+            }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 dark:bg-zinc-700 dark:hover:bg-zinc-600 transition-all shadow-xs cursor-pointer btn-press active:scale-95 select-none"
+            title="Export leads to CSV spreadsheet"
           >
             <Download className="h-3.5 w-3.5" />
             Export CSV
