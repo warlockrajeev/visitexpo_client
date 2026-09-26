@@ -4,8 +4,14 @@
  * @file page.js (Settings & Profile)
  * @description Settings configuration panel dynamically customized by role:
  *  - Visitors: Attendee Profile (Name, Email, WhatsApp/Phone, City, Company, Designation) & Account Security
- *  - Organizers: Branding parameters, GST, Profile, API key retrieval, and Security
+ *  - Organizers: Branding parameters, GST, Profile, and Security
  *  - Exhibitors: Booth profile, Company parameters, and Security
+ *  Features:
+ *  - Comprehensive form validation (email, phone, GST, URL)
+ *  - Mobile number change detection with mandatory OTP verification via 2Factor.in
+ *  - Google Auth user password setup (no current password required, allows dual sign-in)
+ *  - Standard user password change (requires current password)
+ *  - Eye button toggle for viewing/hiding passwords
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -32,7 +38,10 @@ import {
   Trash2,
   Briefcase,
   Ticket,
-  Lock
+  Lock,
+  Eye,
+  EyeOff,
+  KeyRound
 } from 'lucide-react';
 
 const API_URL =
@@ -57,6 +66,11 @@ export default function SettingsPage() {
   const [savingSecurity, setSavingSecurity] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
+  // Password Visibility States
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   // Visitor Profile State
   const [visitorForm, setVisitorForm] = useState({
     name: user?.name || '',
@@ -67,19 +81,30 @@ export default function SettingsPage() {
     city: user?.city || ''
   });
 
+  // Visitor Phone OTP States
+  const [initialVisitorPhone, setInitialVisitorPhone] = useState('');
+  const [visitorOtpSessionId, setVisitorOtpSessionId] = useState('');
+  const [visitorOtpCode, setVisitorOtpCode] = useState('');
+  const [visitorOtpSent, setVisitorOtpSent] = useState(false);
+  const [visitorOtpSending, setVisitorOtpSending] = useState(false);
+  const [visitorOtpVerifying, setVisitorOtpVerifying] = useState(false);
+  const [visitorOtpTimer, setVisitorOtpTimer] = useState(0);
+  const [visitorPhoneVerified, setVisitorPhoneVerified] = useState(true);
+  const [visitorPhoneVerificationToken, setVisitorPhoneVerificationToken] = useState('');
+
   // User General Profile State (for organizers/exhibitors security tab)
   const [userProfileForm, setUserProfileForm] = useState({
     name: user?.name || '',
     email: user?.email || ''
   });
 
-  // Organization Form State (for organizers)
+  // Organization Form State (for organizers/exhibitors)
   const [orgForm, setOrgForm] = useState({
     name: user?.organization?.name || '',
     description: user?.organization?.description || '',
     website: user?.organization?.website || '',
     email: user?.organization?.contact?.email || user?.email || '',
-    phone: user?.organization?.contact?.phone || '',
+    phone: user?.organization?.contact?.phone || user?.phone || '',
     address: typeof user?.organization?.address === 'string' ? user?.organization?.address : user?.organization?.address?.street || '',
     gstNumber: user?.organization?.gst || '',
     logoUrl: user?.organization?.logo || '',
@@ -89,6 +114,17 @@ export default function SettingsPage() {
     socialX: user?.organization?.social?.x || ''
   });
 
+  // Org Phone OTP States
+  const [initialOrgPhone, setInitialOrgPhone] = useState('');
+  const [orgOtpSessionId, setOrgOtpSessionId] = useState('');
+  const [orgOtpCode, setOrgOtpCode] = useState('');
+  const [orgOtpSent, setOrgOtpSent] = useState(false);
+  const [orgOtpSending, setOrgOtpSending] = useState(false);
+  const [orgOtpVerifying, setOrgOtpVerifying] = useState(false);
+  const [orgOtpTimer, setOrgOtpTimer] = useState(0);
+  const [orgPhoneVerified, setOrgPhoneVerified] = useState(true);
+  const [orgPhoneVerificationToken, setOrgPhoneVerificationToken] = useState('');
+
   // Password / Security Form
   const [securityForm, setSecurityForm] = useState({
     currentPassword: '',
@@ -96,7 +132,53 @@ export default function SettingsPage() {
     confirmPassword: ''
   });
 
-  // Keep tabs sanitized if role switches or loads
+  // Clean phone number helper (extract last 10 digits)
+  const cleanDigits = (val) => String(val || '').replace(/\D/g, '').slice(-10);
+
+  // Validation Helpers
+  const isValidEmail = (email) => {
+    if (!email) return false;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  };
+
+  const isValidGst = (gst) => {
+    if (!gst) return true;
+    const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i;
+    return gstRegex.test(gst.trim());
+  };
+
+  const isValidUrl = (url) => {
+    if (!url) return true;
+    try {
+      const formatted = url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`;
+      new URL(formatted);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Google User Check (without custom password)
+  const isGoogleWithoutPassword = user?.authProvider === 'google' && !user?.hasCustomPassword;
+
+  // OTP Timers
+  useEffect(() => {
+    let interval = null;
+    if (orgOtpTimer > 0) {
+      interval = setInterval(() => setOrgOtpTimer((t) => t - 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [orgOtpTimer]);
+
+  useEffect(() => {
+    let interval = null;
+    if (visitorOtpTimer > 0) {
+      interval = setInterval(() => setVisitorOtpTimer((t) => t - 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [visitorOtpTimer]);
+
+  // Keep tabs sanitized
   useEffect(() => {
     if (activeTab === 'api') {
       setActiveTab('profile');
@@ -106,14 +188,22 @@ export default function SettingsPage() {
   // Sync state when user context is updated or loaded
   useEffect(() => {
     if (user) {
+      const userPhone = user.phone || '';
+      const orgContactPhone = user.organization?.contact?.phone || user.phone || '';
+
       setVisitorForm({
         name: user.name || '',
         email: user.email || '',
-        phone: user.phone || '',
+        phone: userPhone,
         company: user.company || '',
         designation: user.designation || '',
         city: user.city || ''
       });
+      setInitialVisitorPhone(userPhone);
+      setVisitorPhoneVerified(true);
+      setVisitorOtpSent(false);
+      setVisitorOtpCode('');
+      setVisitorPhoneVerificationToken('');
 
       setUserProfileForm({
         name: user.name || '',
@@ -126,7 +216,7 @@ export default function SettingsPage() {
           description: user.organization.description || '',
           website: user.organization.website || '',
           email: user.organization.contact?.email || user.email || '',
-          phone: user.organization.contact?.phone || '',
+          phone: orgContactPhone,
           address: typeof user.organization.address === 'string' ? user.organization.address : user.organization.address?.street || '',
           gstNumber: user.organization.gst || '',
           logoUrl: user.organization.logo || '',
@@ -135,9 +225,167 @@ export default function SettingsPage() {
           socialInstagram: user.organization.social?.instagram || '',
           socialX: user.organization.social?.x || ''
         });
+        setInitialOrgPhone(orgContactPhone);
+        setOrgPhoneVerified(true);
+        setOrgOtpSent(false);
+        setOrgOtpCode('');
+        setOrgPhoneVerificationToken('');
       }
     }
   }, [user]);
+
+  // Phone Change Handlers
+  const handleOrgPhoneChange = (val) => {
+    setOrgForm((prev) => ({ ...prev, phone: val }));
+    const digits = cleanDigits(val);
+    const initialDigits = cleanDigits(initialOrgPhone);
+    if (digits === initialDigits) {
+      setOrgPhoneVerified(true);
+      setOrgOtpSent(false);
+      setOrgOtpCode('');
+    } else {
+      setOrgPhoneVerified(false);
+    }
+  };
+
+  const handleVisitorPhoneChange = (val) => {
+    setVisitorForm((prev) => ({ ...prev, phone: val }));
+    const digits = cleanDigits(val);
+    const initialDigits = cleanDigits(initialVisitorPhone);
+    if (digits === initialDigits) {
+      setVisitorPhoneVerified(true);
+      setVisitorOtpSent(false);
+      setVisitorOtpCode('');
+    } else {
+      setVisitorPhoneVerified(false);
+    }
+  };
+
+  // Dispatch OTP for Organizer Phone
+  const handleSendOrgOtp = async () => {
+    const digits = cleanDigits(orgForm.phone);
+    if (!digits || digits.length !== 10 || !/^[6-9]\d{9}$/.test(digits)) {
+      setErrorMessage('Please enter a valid 10-digit Indian mobile number (e.g. 9876543210).');
+      setTimeout(() => setErrorMessage(''), 4000);
+      return;
+    }
+    setOrgOtpSending(true);
+    setErrorMessage('');
+    try {
+      const res = await axios.post(`${API_URL}/auth/otp/send`, { phone: digits });
+      if (res.data && res.data.success) {
+        setOrgOtpSessionId(res.data.sessionId);
+        setOrgOtpSent(true);
+        setOrgOtpTimer(30);
+        setSaveSuccess(`OTP code sent successfully to +91 ${digits}`);
+        setTimeout(() => setSaveSuccess(''), 4000);
+      } else {
+        setErrorMessage(res.data?.error || 'Failed to dispatch OTP.');
+        setTimeout(() => setErrorMessage(''), 4000);
+      }
+    } catch (err) {
+      setErrorMessage(err.response?.data?.error || 'Failed to dispatch OTP. Please check mobile number.');
+      setTimeout(() => setErrorMessage(''), 4000);
+    } finally {
+      setOrgOtpSending(false);
+    }
+  };
+
+  // Verify OTP for Organizer Phone
+  const handleVerifyOrgOtp = async () => {
+    const digits = cleanDigits(orgForm.phone);
+    if (!orgOtpCode || orgOtpCode.trim().length < 4) {
+      setErrorMessage('Please enter the 6-digit OTP code received on your mobile.');
+      setTimeout(() => setErrorMessage(''), 4000);
+      return;
+    }
+    setOrgOtpVerifying(true);
+    setErrorMessage('');
+    try {
+      const res = await axios.post(`${API_URL}/auth/otp/verify`, {
+        sessionId: orgOtpSessionId,
+        otp: orgOtpCode.trim(),
+        phone: digits
+      });
+      if (res.data && res.data.success) {
+        setOrgPhoneVerified(true);
+        setOrgPhoneVerificationToken(res.data.verificationToken);
+        setSaveSuccess('Mobile number verified successfully via OTP!');
+        setTimeout(() => setSaveSuccess(''), 4000);
+      } else {
+        setErrorMessage(res.data?.error || 'OTP verification failed. Please check the code.');
+        setTimeout(() => setErrorMessage(''), 4000);
+      }
+    } catch (err) {
+      setErrorMessage(err.response?.data?.error || 'Invalid or expired OTP code.');
+      setTimeout(() => setErrorMessage(''), 4000);
+    } finally {
+      setOrgOtpVerifying(false);
+    }
+  };
+
+  // Dispatch OTP for Visitor Phone
+  const handleSendVisitorOtp = async () => {
+    const digits = cleanDigits(visitorForm.phone);
+    if (!digits || digits.length !== 10 || !/^[6-9]\d{9}$/.test(digits)) {
+      setErrorMessage('Please enter a valid 10-digit Indian mobile number (e.g. 9876543210).');
+      setTimeout(() => setErrorMessage(''), 4000);
+      return;
+    }
+    setVisitorOtpSending(true);
+    setErrorMessage('');
+    try {
+      const res = await axios.post(`${API_URL}/auth/otp/send`, { phone: digits });
+      if (res.data && res.data.success) {
+        setVisitorOtpSessionId(res.data.sessionId);
+        setVisitorOtpSent(true);
+        setVisitorOtpTimer(30);
+        setSaveSuccess(`OTP code sent successfully to +91 ${digits}`);
+        setTimeout(() => setSaveSuccess(''), 4000);
+      } else {
+        setErrorMessage(res.data?.error || 'Failed to dispatch OTP.');
+        setTimeout(() => setErrorMessage(''), 4000);
+      }
+    } catch (err) {
+      setErrorMessage(err.response?.data?.error || 'Failed to dispatch OTP. Please check mobile number.');
+      setTimeout(() => setErrorMessage(''), 4000);
+    } finally {
+      setVisitorOtpSending(false);
+    }
+  };
+
+  // Verify OTP for Visitor Phone
+  const handleVerifyVisitorOtp = async () => {
+    const digits = cleanDigits(visitorForm.phone);
+    if (!visitorOtpCode || visitorOtpCode.trim().length < 4) {
+      setErrorMessage('Please enter the 6-digit OTP code received on your mobile.');
+      setTimeout(() => setErrorMessage(''), 4000);
+      return;
+    }
+    setVisitorOtpVerifying(true);
+    setErrorMessage('');
+    try {
+      const res = await axios.post(`${API_URL}/auth/otp/verify`, {
+        sessionId: visitorOtpSessionId,
+        otp: visitorOtpCode.trim(),
+        phone: digits
+      });
+      if (res.data && res.data.success) {
+        setVisitorPhoneVerified(true);
+        setVisitorPhoneVerificationToken(res.data.verificationToken);
+        setSaveSuccess('Mobile number verified successfully via OTP!');
+        setTimeout(() => setSaveSuccess(''), 4000);
+      } else {
+        setErrorMessage(res.data?.error || 'OTP verification failed. Please check the code.');
+        setTimeout(() => setErrorMessage(''), 4000);
+      }
+    } catch (err) {
+      setErrorMessage(err.response?.data?.error || 'Invalid or expired OTP code.');
+      setTimeout(() => setErrorMessage(''), 4000);
+    } finally {
+      setVisitorOtpVerifying(false);
+    }
+  };
 
   // Handle Visitor Profile Submit
   const handleVisitorSubmit = async (e) => {
@@ -146,17 +394,50 @@ export default function SettingsPage() {
     setSaveSuccess('');
     setErrorMessage('');
 
+    // Validations
+    if (!visitorForm.name || visitorForm.name.trim().length < 2) {
+      setErrorMessage('Full Name is required (minimum 2 characters).');
+      setTimeout(() => setErrorMessage(''), 4000);
+      setSavingProfile(false);
+      return;
+    }
+
+    if (!visitorForm.email || !isValidEmail(visitorForm.email)) {
+      setErrorMessage('Please provide a valid email address.');
+      setTimeout(() => setErrorMessage(''), 4000);
+      setSavingProfile(false);
+      return;
+    }
+
+    const cleanVisitorDigits = cleanDigits(visitorForm.phone);
+    if (visitorForm.phone && (cleanVisitorDigits.length !== 10 || !/^[6-9]\d{9}$/.test(cleanVisitorDigits))) {
+      setErrorMessage('Please enter a valid 10-digit Indian mobile number.');
+      setTimeout(() => setErrorMessage(''), 4000);
+      setSavingProfile(false);
+      return;
+    }
+
+    const initialVisDigits = cleanDigits(initialVisitorPhone);
+    const isVisitorPhoneChanged = cleanVisitorDigits && cleanVisitorDigits !== initialVisDigits;
+    if (isVisitorPhoneChanged && !visitorPhoneVerified) {
+      setErrorMessage('You modified your mobile number. Please verify it via OTP before saving.');
+      setTimeout(() => setErrorMessage(''), 4000);
+      setSavingProfile(false);
+      return;
+    }
+
     try {
       const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
       const res = await axios.put(
         `${API_URL}/auth/profile`,
         {
-          name: visitorForm.name,
-          email: visitorForm.email,
-          phone: visitorForm.phone,
+          name: visitorForm.name.trim(),
+          email: visitorForm.email.trim(),
+          phone: cleanVisitorDigits || visitorForm.phone,
           company: visitorForm.company,
           designation: visitorForm.designation,
-          city: visitorForm.city
+          city: visitorForm.city,
+          ...(isVisitorPhoneChanged ? { phoneVerificationToken: visitorPhoneVerificationToken } : {})
         },
         { headers }
       );
@@ -165,6 +446,11 @@ export default function SettingsPage() {
         if (res.data.user && updateUser) {
           updateUser(res.data.user);
         }
+        setInitialVisitorPhone(cleanVisitorDigits || visitorForm.phone);
+        setVisitorPhoneVerified(true);
+        setVisitorOtpSent(false);
+        setVisitorOtpCode('');
+        setVisitorPhoneVerificationToken('');
         setSaveSuccess('Attendee profile details updated and saved successfully!');
         setTimeout(() => setSaveSuccess(''), 4000);
       }
@@ -206,8 +492,8 @@ export default function SettingsPage() {
       };
       const res = await axios.post(`${API_URL}/upload`, uploadData, { headers });
       if (res.data && res.data.success) {
-        setOrgForm(prev => ({ ...prev, logoUrl: res.data.url }));
-        setSaveSuccess('Logo uploaded! Click "Save Organizer Profile" to persist changes.');
+        setOrgForm((prev) => ({ ...prev, logoUrl: res.data.url }));
+        setSaveSuccess('Logo uploaded! Click "Save Profile" to persist changes.');
         setTimeout(() => setSaveSuccess(''), 4000);
       }
     } catch (err) {
@@ -227,23 +513,70 @@ export default function SettingsPage() {
     setSaveSuccess('');
     setErrorMessage('');
 
+    // Validations
+    if (!orgForm.name || orgForm.name.trim().length < 2) {
+      setErrorMessage('Organization / Brand Name is required (minimum 2 characters).');
+      setTimeout(() => setErrorMessage(''), 4000);
+      setSavingOrg(false);
+      return;
+    }
+
+    if (orgForm.email && !isValidEmail(orgForm.email)) {
+      setErrorMessage('Please enter a valid business email address.');
+      setTimeout(() => setErrorMessage(''), 4000);
+      setSavingOrg(false);
+      return;
+    }
+
+    const cleanPhoneDigits = cleanDigits(orgForm.phone);
+    if (orgForm.phone && (cleanPhoneDigits.length !== 10 || !/^[6-9]\d{9}$/.test(cleanPhoneDigits))) {
+      setErrorMessage('Please enter a valid 10-digit Indian mobile number (e.g. 9876543210).');
+      setTimeout(() => setErrorMessage(''), 4000);
+      setSavingOrg(false);
+      return;
+    }
+
+    const initialDigits = cleanDigits(initialOrgPhone);
+    const isPhoneChanged = cleanPhoneDigits && cleanPhoneDigits !== initialDigits;
+    if (isPhoneChanged && !orgPhoneVerified) {
+      setErrorMessage('You modified your contact phone number. Please verify it via OTP before saving.');
+      setTimeout(() => setErrorMessage(''), 4000);
+      setSavingOrg(false);
+      return;
+    }
+
+    if (orgForm.gstNumber && !isValidGst(orgForm.gstNumber)) {
+      setErrorMessage('Invalid GST format. Must be a valid 15-character GSTIN (e.g. 07AAAAA1111A1Z1).');
+      setTimeout(() => setErrorMessage(''), 4000);
+      setSavingOrg(false);
+      return;
+    }
+
+    if (orgForm.website && !isValidUrl(orgForm.website)) {
+      setErrorMessage('Please enter a valid website URL (e.g. https://example.com).');
+      setTimeout(() => setErrorMessage(''), 4000);
+      setSavingOrg(false);
+      return;
+    }
+
     try {
       const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
       const res = await axios.put(
         `${API_URL}/auth/organization`,
         {
-          name: orgForm.name,
+          name: orgForm.name.trim(),
           description: orgForm.description,
           website: orgForm.website,
           email: orgForm.email,
-          phone: orgForm.phone,
+          phone: cleanPhoneDigits || orgForm.phone,
           address: orgForm.address,
-          gst: orgForm.gstNumber,
+          gst: orgForm.gstNumber ? orgForm.gstNumber.trim().toUpperCase() : '',
           logo: orgForm.logoUrl,
           socialLinkedIn: orgForm.socialLinkedIn,
           socialFacebook: orgForm.socialFacebook,
           socialInstagram: orgForm.socialInstagram,
-          socialX: orgForm.socialX
+          socialX: orgForm.socialX,
+          ...(isPhoneChanged ? { phoneVerificationToken: orgPhoneVerificationToken } : {})
         },
         { headers }
       );
@@ -252,6 +585,11 @@ export default function SettingsPage() {
         if (res.data.user && updateUser) {
           updateUser(res.data.user);
         }
+        setInitialOrgPhone(cleanPhoneDigits || orgForm.phone);
+        setOrgPhoneVerified(true);
+        setOrgOtpSent(false);
+        setOrgOtpCode('');
+        setOrgPhoneVerificationToken('');
         setSaveSuccess('Organizer profile details updated and saved successfully!');
         setTimeout(() => setSaveSuccess(''), 4000);
       }
@@ -274,37 +612,121 @@ export default function SettingsPage() {
     try {
       const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
 
-      // 1. If name or email changed (for organizer view)
+      // 1. If name or email changed (for organizer/exhibitor view)
       if (!isVisitor && (userProfileForm.name !== user?.name || userProfileForm.email !== user?.email)) {
-        await axios.put(
-          `${API_URL}/auth/profile`,
-          {
-            name: userProfileForm.name,
-            email: userProfileForm.email
-          },
-          { headers }
-        );
-      }
-
-      // 2. Update Password if provided
-      if (securityForm.currentPassword || securityForm.newPassword) {
-        if (securityForm.newPassword !== securityForm.confirmPassword) {
-          setErrorMessage('New passwords do not match');
+        if (!userProfileForm.name || userProfileForm.name.trim().length < 2) {
+          setErrorMessage('Active Account Name is required (minimum 2 characters).');
+          setTimeout(() => setErrorMessage(''), 4000);
           setSavingSecurity(false);
           return;
         }
-        await axios.put(
-          `${API_URL}/auth/change-password`,
+        if (!userProfileForm.email || !isValidEmail(userProfileForm.email)) {
+          setErrorMessage('Please provide a valid login email address.');
+          setTimeout(() => setErrorMessage(''), 4000);
+          setSavingSecurity(false);
+          return;
+        }
+
+        const profileRes = await axios.put(
+          `${API_URL}/auth/profile`,
           {
-            currentPassword: securityForm.currentPassword,
-            newPassword: securityForm.newPassword
+            name: userProfileForm.name.trim(),
+            email: userProfileForm.email.trim()
           },
           { headers }
         );
-        setSecurityForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        if (profileRes.data?.user && updateUser) {
+          updateUser(profileRes.data.user);
+        }
       }
 
-      setSaveSuccess('Security credentials updated successfully!');
+      // 2. Update Password Logic
+      if (isGoogleWithoutPassword) {
+        // Google auth user without custom password: only require new password
+        if (securityForm.newPassword || securityForm.confirmPassword) {
+          if (!securityForm.newPassword || securityForm.newPassword.length < 6) {
+            setErrorMessage('New password must be at least 6 characters long.');
+            setTimeout(() => setErrorMessage(''), 4000);
+            setSavingSecurity(false);
+            return;
+          }
+          if (securityForm.newPassword !== securityForm.confirmPassword) {
+            setErrorMessage('New password and confirmation password do not match.');
+            setTimeout(() => setErrorMessage(''), 4000);
+            setSavingSecurity(false);
+            return;
+          }
+
+          const res = await axios.put(
+            `${API_URL}/auth/change-password`,
+            { newPassword: securityForm.newPassword },
+            { headers }
+          );
+
+          if (res.data?.user && updateUser) {
+            updateUser(res.data.user);
+          } else if (updateUser) {
+            updateUser({ ...user, hasCustomPassword: true });
+          }
+
+          setSecurityForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+          setSaveSuccess(
+            res.data.message || 'Password set successfully! You can now log in with your email & password or Google.'
+          );
+          setTimeout(() => setSaveSuccess(''), 5000);
+          setSavingSecurity(false);
+          return;
+        }
+      } else {
+        // Standard user or Google user who already created a password: require current password
+        if (securityForm.currentPassword || securityForm.newPassword || securityForm.confirmPassword) {
+          if (!securityForm.currentPassword) {
+            setErrorMessage('Current password is required to authorize password change.');
+            setTimeout(() => setErrorMessage(''), 4000);
+            setSavingSecurity(false);
+            return;
+          }
+          if (!securityForm.newPassword || securityForm.newPassword.length < 6) {
+            setErrorMessage('New password must be at least 6 characters long.');
+            setTimeout(() => setErrorMessage(''), 4000);
+            setSavingSecurity(false);
+            return;
+          }
+          if (securityForm.newPassword !== securityForm.confirmPassword) {
+            setErrorMessage('New password and confirmation password do not match.');
+            setTimeout(() => setErrorMessage(''), 4000);
+            setSavingSecurity(false);
+            return;
+          }
+          if (securityForm.currentPassword === securityForm.newPassword) {
+            setErrorMessage('New password cannot be the same as your current password.');
+            setTimeout(() => setErrorMessage(''), 4000);
+            setSavingSecurity(false);
+            return;
+          }
+
+          const res = await axios.put(
+            `${API_URL}/auth/change-password`,
+            {
+              currentPassword: securityForm.currentPassword,
+              newPassword: securityForm.newPassword
+            },
+            { headers }
+          );
+
+          if (res.data?.user && updateUser) {
+            updateUser(res.data.user);
+          }
+
+          setSecurityForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+          setSaveSuccess(res.data.message || 'Security credentials updated successfully!');
+          setTimeout(() => setSaveSuccess(''), 4000);
+          setSavingSecurity(false);
+          return;
+        }
+      }
+
+      setSaveSuccess('Security profile updated successfully!');
       setTimeout(() => setSaveSuccess(''), 4000);
     } catch (err) {
       console.error('Update security error:', err);
@@ -390,7 +812,7 @@ export default function SettingsPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex w-full items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              className={`flex w-full items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === tab.id
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
@@ -453,7 +875,7 @@ export default function SettingsPage() {
                       type="text"
                       required
                       value={visitorForm.name}
-                      onChange={(e) => setVisitorForm(prev => ({ ...prev, name: e.target.value }))}
+                      onChange={(e) => setVisitorForm((prev) => ({ ...prev, name: e.target.value }))}
                       placeholder="e.g. Rajeev Haldar"
                       className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     />
@@ -467,7 +889,7 @@ export default function SettingsPage() {
                       type="email"
                       required
                       value={visitorForm.email}
-                      onChange={(e) => setVisitorForm(prev => ({ ...prev, email: e.target.value }))}
+                      onChange={(e) => setVisitorForm((prev) => ({ ...prev, email: e.target.value }))}
                       placeholder="your.email@example.com"
                       className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     />
@@ -484,11 +906,96 @@ export default function SettingsPage() {
                     <input
                       type="tel"
                       value={visitorForm.phone}
-                      onChange={(e) => setVisitorForm(prev => ({ ...prev, phone: e.target.value }))}
+                      onChange={(e) => handleVisitorPhoneChange(e.target.value)}
                       placeholder="+91 98765 43210"
                       className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
+
+                  {/* Visitor Phone Change OTP Verification Box */}
+                  {cleanDigits(visitorForm.phone) !== cleanDigits(initialVisitorPhone) && (
+                    <div className="mt-2 p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400">
+                          <AlertCircle className="h-4 w-4 shrink-0" />
+                          <span>Number Changed — Verify via OTP</span>
+                        </div>
+                        {visitorPhoneVerified ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Verified
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                            Unverified
+                          </span>
+                        )}
+                      </div>
+
+                      {!visitorPhoneVerified && (
+                        <div className="space-y-2 pt-1">
+                          {!visitorOtpSent ? (
+                            <button
+                              type="button"
+                              onClick={handleSendVisitorOtp}
+                              disabled={visitorOtpSending || cleanDigits(visitorForm.phone).length !== 10}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                            >
+                              {visitorOtpSending ? (
+                                <>
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending OTP...
+                                </>
+                              ) : (
+                                <>
+                                  <Phone className="h-3.5 w-3.5" /> Send Verification OTP
+                                </>
+                              )}
+                            </button>
+                          ) : (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <input
+                                type="text"
+                                maxLength={6}
+                                value={visitorOtpCode}
+                                onChange={(e) => setVisitorOtpCode(e.target.value.replace(/\D/g, ''))}
+                                placeholder="Enter 6-digit OTP"
+                                className="w-36 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-mono font-bold tracking-widest text-center text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleVerifyVisitorOtp}
+                                disabled={visitorOtpVerifying || visitorOtpCode.length < 4}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                              >
+                                {visitorOtpVerifying ? (
+                                  <>
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Verifying...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Check className="h-3.5 w-3.5" /> Verify Code
+                                  </>
+                                )}
+                              </button>
+                              {visitorOtpTimer > 0 ? (
+                                <span className="text-[11px] text-muted-foreground font-medium">
+                                  Resend in {visitorOtpTimer}s
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={handleSendVisitorOtp}
+                                  disabled={visitorOtpSending}
+                                  className="text-[11px] text-primary hover:underline font-bold cursor-pointer"
+                                >
+                                  Resend OTP
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">City / Location</label>
@@ -497,7 +1004,7 @@ export default function SettingsPage() {
                     <input
                       type="text"
                       value={visitorForm.city}
-                      onChange={(e) => setVisitorForm(prev => ({ ...prev, city: e.target.value }))}
+                      onChange={(e) => setVisitorForm((prev) => ({ ...prev, city: e.target.value }))}
                       placeholder="e.g. New Delhi, Mumbai, Bangalore"
                       className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     />
@@ -520,7 +1027,7 @@ export default function SettingsPage() {
                       <input
                         type="text"
                         value={visitorForm.company}
-                        onChange={(e) => setVisitorForm(prev => ({ ...prev, company: e.target.value }))}
+                        onChange={(e) => setVisitorForm((prev) => ({ ...prev, company: e.target.value }))}
                         placeholder="Company or Business Name"
                         className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                       />
@@ -533,7 +1040,7 @@ export default function SettingsPage() {
                       <input
                         type="text"
                         value={visitorForm.designation}
-                        onChange={(e) => setVisitorForm(prev => ({ ...prev, designation: e.target.value }))}
+                        onChange={(e) => setVisitorForm((prev) => ({ ...prev, designation: e.target.value }))}
                         placeholder="e.g. Procurement Lead, Buyer, Architect"
                         className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                       />
@@ -545,8 +1052,8 @@ export default function SettingsPage() {
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={savingProfile}
-                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-md disabled:opacity-50"
+                  disabled={savingProfile || (cleanDigits(visitorForm.phone) !== cleanDigits(initialVisitorPhone) && !visitorPhoneVerified)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-md disabled:opacity-50 cursor-pointer active:scale-95"
                 >
                   {savingProfile ? (
                     <>
@@ -609,7 +1116,7 @@ export default function SettingsPage() {
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isUploadingLogo}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-primary text-primary-foreground hover:bg-primary/90 px-3.5 py-2 text-xs font-bold transition-all shadow-sm disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-primary text-primary-foreground hover:bg-primary/90 px-3.5 py-2 text-xs font-bold transition-all shadow-sm disabled:opacity-50 cursor-pointer active:scale-95"
                       >
                         {isUploadingLogo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
                         Upload Logo File
@@ -619,10 +1126,10 @@ export default function SettingsPage() {
                         <button
                           type="button"
                           onClick={() => {
-                            setOrgForm(prev => ({ ...prev, logoUrl: '' }));
+                            setOrgForm((prev) => ({ ...prev, logoUrl: '' }));
                             setLogoValidation(null);
                           }}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white px-3.5 py-2 text-xs font-bold transition-all"
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white px-3.5 py-2 text-xs font-bold transition-all cursor-pointer active:scale-95"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                           Remove
@@ -634,7 +1141,7 @@ export default function SettingsPage() {
                       <input
                         type="text"
                         value={orgForm.logoUrl}
-                        onChange={(e) => setOrgForm(prev => ({ ...prev, logoUrl: e.target.value }))}
+                        onChange={(e) => setOrgForm((prev) => ({ ...prev, logoUrl: e.target.value }))}
                         placeholder="https://example.com/logo.png (or click Upload above)"
                         className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                       />
@@ -650,7 +1157,7 @@ export default function SettingsPage() {
                     type="text"
                     required
                     value={orgForm.name}
-                    onChange={(e) => setOrgForm(prev => ({ ...prev, name: e.target.value }))}
+                    onChange={(e) => setOrgForm((prev) => ({ ...prev, name: e.target.value }))}
                     placeholder="e.g. Global Tech Events Ltd"
                     className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   />
@@ -660,10 +1167,12 @@ export default function SettingsPage() {
                   <input
                     type="text"
                     value={orgForm.gstNumber}
-                    onChange={(e) => setOrgForm(prev => ({ ...prev, gstNumber: e.target.value }))}
+                    onChange={(e) => setOrgForm((prev) => ({ ...prev, gstNumber: e.target.value.toUpperCase() }))}
                     placeholder="e.g. 07AAAAA1111A1Z1"
+                    maxLength={15}
                     className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary uppercase"
                   />
+                  <p className="text-[10px] text-muted-foreground mt-1">15-digit GSTIN (e.g. 07AAAAA1111A1Z1)</p>
                 </div>
               </div>
 
@@ -672,7 +1181,7 @@ export default function SettingsPage() {
                 <textarea
                   rows={3}
                   value={orgForm.description}
-                  onChange={(e) => setOrgForm(prev => ({ ...prev, description: e.target.value }))}
+                  onChange={(e) => setOrgForm((prev) => ({ ...prev, description: e.target.value }))}
                   placeholder="Provide a brief overview of your organization..."
                   className="w-full rounded-xl border border-border bg-background p-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 />
@@ -686,8 +1195,8 @@ export default function SettingsPage() {
                     <input
                       type="url"
                       value={orgForm.website}
-                      onChange={(e) => setOrgForm(prev => ({ ...prev, website: e.target.value }))}
-                      placeholder="https://..."
+                      onChange={(e) => setOrgForm((prev) => ({ ...prev, website: e.target.value }))}
+                      placeholder="https://example.com"
                       className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
@@ -699,7 +1208,7 @@ export default function SettingsPage() {
                     <input
                       type="email"
                       value={orgForm.email}
-                      onChange={(e) => setOrgForm(prev => ({ ...prev, email: e.target.value }))}
+                      onChange={(e) => setOrgForm((prev) => ({ ...prev, email: e.target.value }))}
                       placeholder="contact@company.com"
                       className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     />
@@ -715,11 +1224,96 @@ export default function SettingsPage() {
                     <input
                       type="text"
                       value={orgForm.phone}
-                      onChange={(e) => setOrgForm(prev => ({ ...prev, phone: e.target.value }))}
+                      onChange={(e) => handleOrgPhoneChange(e.target.value)}
                       placeholder="+91 98765 43210"
                       className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
+
+                  {/* Organizer Phone Change OTP Verification Box */}
+                  {cleanDigits(orgForm.phone) !== cleanDigits(initialOrgPhone) && (
+                    <div className="mt-2 p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400">
+                          <AlertCircle className="h-4 w-4 shrink-0" />
+                          <span>Number Changed — Verify via OTP</span>
+                        </div>
+                        {orgPhoneVerified ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Verified
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                            Unverified
+                          </span>
+                        )}
+                      </div>
+
+                      {!orgPhoneVerified && (
+                        <div className="space-y-2 pt-1">
+                          {!orgOtpSent ? (
+                            <button
+                              type="button"
+                              onClick={handleSendOrgOtp}
+                              disabled={orgOtpSending || cleanDigits(orgForm.phone).length !== 10}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                            >
+                              {orgOtpSending ? (
+                                <>
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending OTP...
+                                </>
+                              ) : (
+                                <>
+                                  <Phone className="h-3.5 w-3.5" /> Send Verification OTP
+                                </>
+                              )}
+                            </button>
+                          ) : (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <input
+                                type="text"
+                                maxLength={6}
+                                value={orgOtpCode}
+                                onChange={(e) => setOrgOtpCode(e.target.value.replace(/\D/g, ''))}
+                                placeholder="Enter 6-digit OTP"
+                                className="w-36 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-mono font-bold tracking-widest text-center text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleVerifyOrgOtp}
+                                disabled={orgOtpVerifying || orgOtpCode.length < 4}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                              >
+                                {orgOtpVerifying ? (
+                                  <>
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Verifying...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Check className="h-3.5 w-3.5" /> Verify Code
+                                  </>
+                                )}
+                              </button>
+                              {orgOtpTimer > 0 ? (
+                                <span className="text-[11px] text-muted-foreground font-medium">
+                                  Resend in {orgOtpTimer}s
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={handleSendOrgOtp}
+                                  disabled={orgOtpSending}
+                                  className="text-[11px] text-primary hover:underline font-bold cursor-pointer"
+                                >
+                                  Resend OTP
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">HQ Address</label>
@@ -728,7 +1322,7 @@ export default function SettingsPage() {
                     <input
                       type="text"
                       value={orgForm.address}
-                      onChange={(e) => setOrgForm(prev => ({ ...prev, address: e.target.value }))}
+                      onChange={(e) => setOrgForm((prev) => ({ ...prev, address: e.target.value }))}
                       placeholder="City, Country or Street Address"
                       className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     />
@@ -745,28 +1339,28 @@ export default function SettingsPage() {
                   <input
                     type="url"
                     value={orgForm.socialLinkedIn}
-                    onChange={(e) => setOrgForm(prev => ({ ...prev, socialLinkedIn: e.target.value }))}
+                    onChange={(e) => setOrgForm((prev) => ({ ...prev, socialLinkedIn: e.target.value }))}
                     placeholder="LinkedIn URL"
                     className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none"
                   />
                   <input
                     type="url"
                     value={orgForm.socialFacebook}
-                    onChange={(e) => setOrgForm(prev => ({ ...prev, socialFacebook: e.target.value }))}
+                    onChange={(e) => setOrgForm((prev) => ({ ...prev, socialFacebook: e.target.value }))}
                     placeholder="Facebook URL"
                     className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none"
                   />
                   <input
                     type="url"
                     value={orgForm.socialInstagram}
-                    onChange={(e) => setOrgForm(prev => ({ ...prev, socialInstagram: e.target.value }))}
+                    onChange={(e) => setOrgForm((prev) => ({ ...prev, socialInstagram: e.target.value }))}
                     placeholder="Instagram URL"
                     className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none"
                   />
                   <input
                     type="url"
                     value={orgForm.socialX}
-                    onChange={(e) => setOrgForm(prev => ({ ...prev, socialX: e.target.value }))}
+                    onChange={(e) => setOrgForm((prev) => ({ ...prev, socialX: e.target.value }))}
                     placeholder="X / Twitter URL"
                     className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none"
                   />
@@ -775,8 +1369,8 @@ export default function SettingsPage() {
 
               <button
                 type="submit"
-                disabled={savingOrg}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-md mt-2 disabled:opacity-50"
+                disabled={savingOrg || (cleanDigits(orgForm.phone) !== cleanDigits(initialOrgPhone) && !orgPhoneVerified)}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-md mt-2 disabled:opacity-50 cursor-pointer active:scale-95"
               >
                 {savingOrg ? (
                   <>
@@ -793,7 +1387,7 @@ export default function SettingsPage() {
 
           {/* Tab 2: Security & Password */}
           {activeTab === 'security' && (
-            <form onSubmit={handleSecuritySubmit} className="space-y-4">
+            <form onSubmit={handleSecuritySubmit} className="space-y-5">
               <h3 className="text-base font-bold text-foreground pb-2 border-b border-border flex items-center gap-1.5">
                 <Shield className="h-5 w-5 text-primary" /> Security &amp; Password Credentials
               </h3>
@@ -808,7 +1402,7 @@ export default function SettingsPage() {
                         type="text"
                         required
                         value={userProfileForm.name}
-                        onChange={(e) => setUserProfileForm(prev => ({ ...prev, name: e.target.value }))}
+                        onChange={(e) => setUserProfileForm((prev) => ({ ...prev, name: e.target.value }))}
                         className="w-full rounded-xl border border-border bg-background py-2 pl-10 pr-4 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </div>
@@ -822,7 +1416,7 @@ export default function SettingsPage() {
                         type="email"
                         required
                         value={userProfileForm.email}
-                        onChange={(e) => setUserProfileForm(prev => ({ ...prev, email: e.target.value }))}
+                        onChange={(e) => setUserProfileForm((prev) => ({ ...prev, email: e.target.value }))}
                         className="w-full rounded-xl border border-border bg-background py-2 pl-10 pr-4 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </div>
@@ -833,41 +1427,96 @@ export default function SettingsPage() {
               <div className="border-t border-border/80 pt-4 mt-2 space-y-4">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <Lock className="h-4 w-4 text-primary" /> Update Account Password
+                    <Lock className="h-4 w-4 text-primary" /> {isGoogleWithoutPassword ? 'Set Account Password' : 'Update Account Password'}
                   </h4>
                 </div>
+
+                {/* Google Auth Notice Banner */}
+                {isGoogleWithoutPassword && (
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs">
+                    <KeyRound className="h-5 w-5 shrink-0 mt-0.5 text-amber-500" />
+                    <div className="space-y-1">
+                      <p className="font-bold text-amber-600 dark:text-amber-400">Google Account Detected</p>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        You signed in using Google authentication. No current password is set.
+                        Create a password below to allow sign-in using both Google and standard email &amp; password.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 
-                <div>
-                  <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Current Password</label>
-                  <input
-                    type="password"
-                    value={securityForm.currentPassword}
-                    onChange={(e) => setSecurityForm(prev => ({ ...prev, currentPassword: e.target.value }))}
-                    placeholder="Enter current password to authorize change"
-                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
+                {/* Current Password Field (Only shown for non-Google users or Google users who already set a custom password) */}
+                {!isGoogleWithoutPassword && (
+                  <div>
+                    <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Current Password</label>
+                    <div className="relative">
+                      <input
+                        type={showCurrentPassword ? 'text' : 'password'}
+                        value={securityForm.currentPassword}
+                        onChange={(e) => setSecurityForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
+                        placeholder="Enter current password to authorize change"
+                        className="w-full rounded-xl border border-border bg-background py-2 pl-3.5 pr-10 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-all cursor-pointer p-1 active:scale-90"
+                        title={showCurrentPassword ? 'Hide password' : 'Show password'}
+                        tabIndex={-1}
+                      >
+                        {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">New Password</label>
-                    <input
-                      type="password"
-                      value={securityForm.newPassword}
-                      onChange={(e) => setSecurityForm(prev => ({ ...prev, newPassword: e.target.value }))}
-                      placeholder="Min. 6 characters"
-                      className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
+                    <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">
+                      {isGoogleWithoutPassword ? 'New Password *' : 'New Password'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showNewPassword ? 'text' : 'password'}
+                        value={securityForm.newPassword}
+                        onChange={(e) => setSecurityForm((prev) => ({ ...prev, newPassword: e.target.value }))}
+                        placeholder="Min. 6 characters"
+                        className="w-full rounded-xl border border-border bg-background py-2 pl-3.5 pr-10 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-all cursor-pointer p-1 active:scale-90"
+                        title={showNewPassword ? 'Hide password' : 'Show password'}
+                        tabIndex={-1}
+                      >
+                        {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
+
                   <div>
-                    <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Confirm New Password</label>
-                    <input
-                      type="password"
-                      value={securityForm.confirmPassword}
-                      onChange={(e) => setSecurityForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                      placeholder="Re-enter new password"
-                      className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
+                    <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">
+                      {isGoogleWithoutPassword ? 'Confirm Password *' : 'Confirm New Password'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        value={securityForm.confirmPassword}
+                        onChange={(e) => setSecurityForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                        placeholder="Re-enter new password"
+                        className="w-full rounded-xl border border-border bg-background py-2 pl-3.5 pr-10 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-all cursor-pointer p-1 active:scale-90"
+                        title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                        tabIndex={-1}
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -875,11 +1524,15 @@ export default function SettingsPage() {
               <button
                 type="submit"
                 disabled={savingSecurity}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-md mt-4 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-md mt-4 disabled:opacity-50 cursor-pointer active:scale-95"
               >
                 {savingSecurity ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" /> Saving Security Settings...
+                  </>
+                ) : isGoogleWithoutPassword ? (
+                  <>
+                    <KeyRound className="h-4 w-4" /> Set Account Password
                   </>
                 ) : (
                   <>

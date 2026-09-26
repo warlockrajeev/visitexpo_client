@@ -286,7 +286,14 @@ export const AuthProvider = ({ children }) => {
       signup,
       loginWithGoogle,
       logout,
-      updateUser: (updatedUser) => setUser(updatedUser),
+      updateUser: (updatedUser) => {
+        setUser(updatedUser);
+        if (typeof window !== 'undefined' && updatedUser) {
+          try {
+            localStorage.setItem('visitexpo_user', JSON.stringify(updatedUser));
+          } catch (e) {}
+        }
+      },
       isExhibitorView,
       setIsExhibitorView,
       toggleDashboardView,
