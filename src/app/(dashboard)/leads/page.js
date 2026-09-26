@@ -38,6 +38,7 @@ import {
   Send,
   QrCode,
   Eye,
+  Edit,
   Trash2,
   Clock,
   User,
@@ -92,7 +93,9 @@ export default function LeadsCRMPage() {
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [showBadgeModal, setShowBadgeModal] = useState(false);
-  const [showAddLeadModal, setShowAddLeadModal] = useState(false);
+  const [showLeadModal, setShowLeadModal] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [currentLeadId, setCurrentLeadId] = useState(null);
 
   // Form states for modals
   const [copiedEmbed, setCopiedEmbed] = useState(false);
@@ -106,8 +109,8 @@ export default function LeadsCRMPage() {
   const [bulkImporting, setBulkImporting] = useState(false);
   const [bulkImportResult, setBulkImportResult] = useState(null);
 
-  // Add Lead form state
-  const [newLeadForm, setNewLeadForm] = useState({
+  // Add / Edit Lead form state
+  const [leadForm, setLeadForm] = useState({
     name: '',
     email: '',
     phone: '',
@@ -119,7 +122,8 @@ export default function LeadsCRMPage() {
     leadScore: 65,
     notes: ''
   });
-  const [creatingLead, setCreatingLead] = useState(false);
+  const [leadFormErrors, setLeadFormErrors] = useState({});
+  const [isSubmittingLead, setIsSubmittingLead] = useState(false);
 
   // 1. Fetch Events
   useEffect(() => {
@@ -550,42 +554,171 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
     setBulkCsvText(sample);
   };
 
-  // Handle Manual Single Lead Creation
-  const handleCreateLead = async (e) => {
+  // Validate Lead Form
+  const validateLeadForm = (data) => {
+    const errors = {};
+
+    // 1. Name validation
+    if (!data.name || !data.name.trim()) {
+      errors.name = 'Full Name is required.';
+    } else if (data.name.trim().length < 2) {
+      errors.name = 'Full Name must be at least 2 characters.';
+    } else if (/^[0-9]+$/.test(data.name.trim())) {
+      errors.name = 'Full Name cannot consist solely of numbers.';
+    }
+
+    // 2. Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!data.email || !data.email.trim()) {
+      errors.email = 'Work Email is required.';
+    } else if (!emailRegex.test(data.email.trim())) {
+      errors.email = 'Please enter a valid work email address (e.g. name@company.com).';
+    }
+
+    // 3. Phone validation - Strictly disallow alphabets
+    if (data.phone) {
+      const phoneTrim = data.phone.trim();
+      if (/[a-zA-Z]/.test(phoneTrim)) {
+        errors.phone = 'Phone number cannot contain alphabets. Only digits and valid phone symbols (+, -, space) are allowed.';
+      } else {
+        const digitsOnly = phoneTrim.replace(/\D/g, '');
+        if (digitsOnly.length > 0 && digitsOnly.length < 7) {
+          errors.phone = 'Phone number is too short (min 7 digits).';
+        } else if (digitsOnly.length > 15) {
+          errors.phone = 'Phone number cannot exceed 15 digits.';
+        }
+      }
+    }
+
+    return {
+      isValid: Object.keys(errors).length === 0,
+      errors
+    };
+  };
+
+  // Sanitized Phone Number Input Handler - Automatically strips alphabets on the fly
+  const handlePhoneChange = (e) => {
+    const rawVal = e.target.value;
+    // Strip alphabets and non-phone characters immediately so letters cannot be typed
+    const sanitizedVal = rawVal.replace(/[a-zA-Z]/g, '').replace(/[^0-9+\s\-()]/g, '');
+    setLeadForm(prev => ({ ...prev, phone: sanitizedVal }));
+    if (leadFormErrors.phone) {
+      setLeadFormErrors(prev => ({ ...prev, phone: null }));
+    }
+  };
+
+  // Open modal in Add mode
+  const openAddLeadModal = () => {
+    setIsEditMode(false);
+    setCurrentLeadId(null);
+    setLeadForm({
+      name: '',
+      email: '',
+      phone: '',
+      company: '',
+      designation: '',
+      country: 'India',
+      source: 'website',
+      status: 'new',
+      leadScore: 65,
+      notes: ''
+    });
+    setLeadFormErrors({});
+    setShowLeadModal(true);
+  };
+
+  // Open modal in Edit mode
+  const openEditLeadModal = (lead) => {
+    setIsEditMode(true);
+    setCurrentLeadId(lead._id);
+    setLeadForm({
+      name: lead.name || '',
+      email: lead.email || '',
+      phone: lead.phone || '',
+      company: lead.company || '',
+      designation: lead.designation || '',
+      country: lead.country || 'India',
+      source: lead.source || 'website',
+      status: lead.status || 'new',
+      leadScore: lead.leadScore !== undefined ? lead.leadScore : 65,
+      notes: lead.notes || ''
+    });
+    setLeadFormErrors({});
+    setShowLeadModal(true);
+  };
+
+  // Handle Manual Lead Creation or Update
+  const handleSaveLead = async (e) => {
     e.preventDefault();
-    if (!newLeadForm.name || !newLeadForm.email || !selectedEventId) {
-      showSweetWarning('Name and Email are required.');
+
+    if (!selectedEventId && !isEditMode) {
+      showSweetWarning('Please select an expo edition before adding leads.');
       return;
     }
 
-    setCreatingLead(true);
+    const { isValid, errors } = validateLeadForm(leadForm);
+    if (!isValid) {
+      setLeadFormErrors(errors);
+      showSweetWarning('Please fix the validation errors in the form.');
+      return;
+    }
+
+    setIsSubmittingLead(true);
     try {
-      const res = await axios.post(
-        `${API_URL}/leads`,
-        { ...newLeadForm, eventId: selectedEventId },
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      if (res.data && res.data.success) {
-        setLeads((prev) => [res.data.lead, ...prev]);
-        setShowAddLeadModal(false);
-        setNewLeadForm({
-          name: '',
-          email: '',
-          phone: '',
-          company: '',
-          designation: '',
-          country: 'India',
-          source: 'website',
-          status: 'new',
-          leadScore: 65,
-          notes: ''
-        });
+      if (isEditMode && currentLeadId) {
+        // Edit existing lead
+        const res = await axios.put(
+          `${API_URL}/leads/${currentLeadId}`,
+          {
+            name: leadForm.name.trim(),
+            email: leadForm.email.toLowerCase().trim(),
+            phone: leadForm.phone.trim(),
+            company: leadForm.company.trim(),
+            designation: leadForm.designation.trim(),
+            country: leadForm.country.trim() || 'India',
+            status: leadForm.status,
+            leadScore: Number(leadForm.leadScore) || 50,
+            notes: leadForm.notes.trim()
+          },
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+
+        if (res.data && res.data.success) {
+          const updated = res.data.lead;
+          setLeads(prev => prev.map(l => (l._id === currentLeadId ? updated : l)));
+          if (drawerLead && drawerLead._id === currentLeadId) {
+            setDrawerLead(updated);
+          }
+          setShowLeadModal(false);
+          showSweetSuccess('Lead details updated successfully!');
+        }
+      } else {
+        // Create new lead
+        const res = await axios.post(
+          `${API_URL}/leads`,
+          {
+            ...leadForm,
+            name: leadForm.name.trim(),
+            email: leadForm.email.toLowerCase().trim(),
+            phone: leadForm.phone.trim(),
+            company: leadForm.company.trim(),
+            designation: leadForm.designation.trim(),
+            eventId: selectedEventId
+          },
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (res.data && res.data.success) {
+          setLeads(prev => [res.data.lead, ...prev]);
+          setShowLeadModal(false);
+          showSweetSuccess('Buyer lead added successfully!');
+        }
       }
     } catch (err) {
-      console.error('Error creating lead', err);
-      showSweetError('Failed to create lead.');
+      console.error('Error saving lead', err);
+      const serverMsg = err.response?.data?.error || err.response?.data?.message || 'Failed to save lead.';
+      showSweetError(serverMsg);
     } finally {
-      setCreatingLead(false);
+      setIsSubmittingLead(false);
     }
   };
 
@@ -654,7 +787,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
 
           {/* Add Manual Lead Button */}
           <button
-            onClick={() => setShowAddLeadModal(true)}
+            onClick={openAddLeadModal}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -1180,6 +1313,17 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                           >
                             <Eye className="h-3.5 w-3.5" />
                           </button>
+                          {/* Edit Lead Details */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditLeadModal(item);
+                            }}
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
+                            title="Edit Lead Details"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
                           {/* Delete Lead */}
                           <button
                             onClick={(e) => handleDeleteLead(item._id, e)}
@@ -1231,12 +1375,21 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                 </div>
               </div>
 
-              <button
-                onClick={() => setDrawerLead(null)}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => openEditLeadModal(drawerLead)}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
+                  title="Edit Lead Details"
+                >
+                  <Edit className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setDrawerLead(null)}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
             {/* Quick Contact Bar */}
@@ -1737,30 +1890,35 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
       )}
 
       {/* 11. MODAL: ADD SINGLE MANUAL LEAD */}
-      {showAddLeadModal && (
+      {/* 8. ADD / EDIT BUYER LEAD MODAL */}
+      {showLeadModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="w-full max-w-lg bg-card border border-border rounded-2xl p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                  <Plus className="h-5 w-5" />
+                  {isEditMode ? <Edit className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-foreground">Add Buyer Lead Manually</h3>
+                  <h3 className="text-base font-bold text-foreground">
+                    {isEditMode ? 'Edit Buyer Lead Details' : 'Add Buyer Lead Manually'}
+                  </h3>
                   <p className="text-xs text-muted-foreground">
-                    Record a walk-in, trade inquiry, or directly contacted buyer.
+                    {isEditMode
+                      ? 'Update contact details, qualification stage, or notes for this buyer.'
+                      : 'Record a walk-in, trade inquiry, or directly contacted buyer.'}
                   </p>
                 </div>
               </div>
               <button
-                onClick={() => setShowAddLeadModal(false)}
+                onClick={() => setShowLeadModal(false)}
                 className="p-1 rounded-lg text-muted-foreground hover:text-foreground"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateLead} className="space-y-3">
+            <form onSubmit={handleSaveLead} className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
@@ -1768,12 +1926,23 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
                   </label>
                   <input
                     type="text"
-                    required
                     placeholder="e.g. Rahul Kapoor"
-                    value={newLeadForm.name}
-                    onChange={(e) => setNewLeadForm({ ...newLeadForm, name: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    value={leadForm.name}
+                    onChange={(e) => {
+                      setLeadForm({ ...leadForm, name: e.target.value });
+                      if (leadFormErrors.name) setLeadFormErrors(prev => ({ ...prev, name: null }));
+                    }}
+                    className={`w-full rounded-lg border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none transition-colors ${
+                      leadFormErrors.name
+                        ? 'border-destructive ring-1 ring-destructive focus:ring-destructive'
+                        : 'border-border focus:ring-1 focus:ring-primary'
+                    }`}
                   />
+                  {leadFormErrors.name && (
+                    <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" /> {leadFormErrors.name}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
@@ -1781,12 +1950,23 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
                   </label>
                   <input
                     type="email"
-                    required
                     placeholder="rahul@company.com"
-                    value={newLeadForm.email}
-                    onChange={(e) => setNewLeadForm({ ...newLeadForm, email: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    value={leadForm.email}
+                    onChange={(e) => {
+                      setLeadForm({ ...leadForm, email: e.target.value });
+                      if (leadFormErrors.email) setLeadFormErrors(prev => ({ ...prev, email: null }));
+                    }}
+                    className={`w-full rounded-lg border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none transition-colors ${
+                      leadFormErrors.email
+                        ? 'border-destructive ring-1 ring-destructive focus:ring-destructive'
+                        : 'border-border focus:ring-1 focus:ring-primary'
+                    }`}
                   />
+                  {leadFormErrors.email && (
+                    <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" /> {leadFormErrors.email}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1797,11 +1977,25 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
                   </label>
                   <input
                     type="text"
+                    inputMode="tel"
                     placeholder="+91 98765 43210"
-                    value={newLeadForm.phone}
-                    onChange={(e) => setNewLeadForm({ ...newLeadForm, phone: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    value={leadForm.phone}
+                    onChange={handlePhoneChange}
+                    className={`w-full rounded-lg border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none transition-colors font-mono ${
+                      leadFormErrors.phone
+                        ? 'border-destructive ring-1 ring-destructive focus:ring-destructive'
+                        : 'border-border focus:ring-1 focus:ring-primary'
+                    }`}
                   />
+                  {leadFormErrors.phone ? (
+                    <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" /> {leadFormErrors.phone}
+                    </p>
+                  ) : (
+                    <p className="mt-0.5 text-[10px] text-muted-foreground">
+                      Digits and symbols (+, -, space) only. No letters.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
@@ -1810,14 +2004,14 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
                   <input
                     type="text"
                     placeholder="e.g. Kapoor Enterprises"
-                    value={newLeadForm.company}
-                    onChange={(e) => setNewLeadForm({ ...newLeadForm, company: e.target.value })}
+                    value={leadForm.company}
+                    onChange={(e) => setLeadForm({ ...leadForm, company: e.target.value })}
                     className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
                     Designation / Role
@@ -1825,8 +2019,8 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
                   <input
                     type="text"
                     placeholder="e.g. Sourcing Manager"
-                    value={newLeadForm.designation}
-                    onChange={(e) => setNewLeadForm({ ...newLeadForm, designation: e.target.value })}
+                    value={leadForm.designation}
+                    onChange={(e) => setLeadForm({ ...leadForm, designation: e.target.value })}
                     className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
@@ -1835,8 +2029,8 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
                     Stage
                   </label>
                   <select
-                    value={newLeadForm.status}
-                    onChange={(e) => setNewLeadForm({ ...newLeadForm, status: e.target.value })}
+                    value={leadForm.status}
+                    onChange={(e) => setLeadForm({ ...leadForm, status: e.target.value })}
                     className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   >
                     <option value="new">New Inflow</option>
@@ -1847,6 +2041,19 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
                     <option value="lost">Lost</option>
                   </select>
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
+                    Intent Score (0-100)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={leadForm.leadScore}
+                    onChange={(e) => setLeadForm({ ...leadForm, leadScore: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                  />
+                </div>
               </div>
 
               <div>
@@ -1856,8 +2063,8 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
                 <textarea
                   rows={2}
                   placeholder="Inquiry requirements or stall preference..."
-                  value={newLeadForm.notes}
-                  onChange={(e) => setNewLeadForm({ ...newLeadForm, notes: e.target.value })}
+                  value={leadForm.notes}
+                  onChange={(e) => setLeadForm({ ...leadForm, notes: e.target.value })}
                   className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
                 />
               </div>
@@ -1865,18 +2072,18 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
               <div className="flex justify-end gap-2 pt-3 border-t border-border">
                 <button
                   type="button"
-                  onClick={() => setShowAddLeadModal(false)}
+                  onClick={() => setShowLeadModal(false)}
                   className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={creatingLead}
-                  className="px-4 py-2 text-xs font-bold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs transition-colors flex items-center gap-1.5"
+                  disabled={isSubmittingLead}
+                  className="px-4 py-2 text-xs font-bold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {creatingLead && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  Save Lead
+                  {isSubmittingLead && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {isEditMode ? 'Update Lead' : 'Save Lead'}
                 </button>
               </div>
             </form>
