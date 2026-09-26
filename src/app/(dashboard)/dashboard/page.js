@@ -9,6 +9,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
+import SearchableSelect from '../../../components/SearchableSelect.js';
 import {
   Users,
   Target,
@@ -918,22 +919,16 @@ function ExhibitorDashboard() {
               <label className="block text-xs font-bold text-muted-foreground uppercase mb-1.5">
                 Target Exhibition / Expo Event *
               </label>
-              <select
-                required
+              <SearchableSelect
+                options={availableEvents.map(evt => ({
+                  value: evt._id,
+                  label: `${evt.title}${evt.city ? ` (${evt.city})` : ''}`
+                }))}
                 value={setupForm.eventId}
-                onChange={(e) => setSetupForm(prev => ({ ...prev, eventId: e.target.value }))}
-                className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-xs md:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer font-medium"
-              >
-                {availableEvents.length === 0 ? (
-                  <option value="">Loading live events...</option>
-                ) : (
-                  availableEvents.map(evt => (
-                    <option key={evt._id} value={evt._id}>
-                      {evt.title} ({evt.city || 'India'})
-                    </option>
-                  ))
-                )}
-              </select>
+                onChange={(val) => setSetupForm(prev => ({ ...prev, eventId: val }))}
+                placeholder={availableEvents.length === 0 ? 'Loading live events...' : 'Select Expo Event...'}
+                searchPlaceholder="Search events..."
+              />
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -1036,21 +1031,21 @@ function ExhibitorDashboard() {
     <div className="space-y-6 max-w-6xl mx-auto pb-12">
       {/* Booth/Event Switcher & Add Booth Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card border border-border p-4 rounded-2xl shadow-sm">
-        <div className="flex items-center gap-3 flex-1">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-1 min-w-[280px]">
           <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
             Active Booth / Expo:
           </span>
-          <select
-            value={selectedIdx}
-            onChange={(e) => setSelectedIdx(Number(e.target.value))}
-            className="rounded-xl border border-border bg-background px-4 py-2 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary max-w-md cursor-pointer"
-          >
-            {profiles.map((p, idx) => (
-              <option key={p._id} value={idx}>
-                {p.name} at {p.event?.title || 'Expo Event'} ({p.status?.toUpperCase()})
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            options={profiles.map((p, idx) => ({
+              value: String(idx),
+              label: `${p.name} at ${p.event?.title || 'Expo Event'} (${p.status?.toUpperCase()})`
+            }))}
+            value={String(selectedIdx)}
+            onChange={(val) => setSelectedIdx(Number(val))}
+            placeholder="Select active booth..."
+            searchPlaceholder="Search booth or event..."
+            className="w-full sm:max-w-md py-1.5 text-xs font-semibold"
+          />
         </div>
 
         <button
@@ -1144,18 +1139,16 @@ function ExhibitorDashboard() {
             <form onSubmit={handleQuickSetup} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">Target Expo Event *</label>
-                <select
-                  required
+                <SearchableSelect
+                  options={availableEvents.map(evt => ({
+                    value: evt._id,
+                    label: `${evt.title}${evt.city ? ` (${evt.city})` : ''}`
+                  }))}
                   value={setupForm.eventId}
-                  onChange={(e) => setSetupForm(prev => ({ ...prev, eventId: e.target.value }))}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-medium cursor-pointer"
-                >
-                  {availableEvents.map(evt => (
-                    <option key={evt._id} value={evt._id}>
-                      {evt.title} ({evt.city || 'India'})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setSetupForm(prev => ({ ...prev, eventId: val }))}
+                  placeholder="Select target expo event..."
+                  searchPlaceholder="Search events..."
+                />
               </div>
 
               <div>

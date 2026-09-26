@@ -11,6 +11,7 @@ import Link from 'next/link';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
 import { validateEventImage } from '../../../utils/imageValidation.js';
+import SearchableSelect from '../../../components/SearchableSelect.js';
 import {
   Calendar,
   MapPin,
@@ -36,7 +37,8 @@ import {
   Building
 } from 'lucide-react';
 
-import { renderRichText, RichTextEditor, SPONSOR_TIER_GROUPS, PRESET_SPONSOR_TIERS, CATEGORY_SUBSECTORS } from '../events/wizard/page.js';
+import { renderRichText, RichTextEditor, SPONSOR_TIER_GROUPS, PRESET_SPONSOR_TIERS, CATEGORY_SUBSECTORS, CURRENCY_OPTIONS, getCurrencySymbol } from '../events/wizard/page.js';
+import { showSweetAlert, showSweetConfirm, showSweetWarning, showSweetError } from '../../../utils/sweetalert.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -85,6 +87,7 @@ export default function EventsPage() {
     contactShortcode: '',
     isFreeEvent: true,
     paidTicketPrice: '499',
+    currency: 'INR',
     seo: {
       metaTitle: '',
       metaDescription: ''
@@ -147,6 +150,8 @@ export default function EventsPage() {
 
   const [newFaq, setNewFaq] = useState({ question: '', answer: '' });
   const [newSchedule, setNewSchedule] = useState({ name: '', date: '' });
+  const [formErrors, setFormErrors] = useState({});
+  const modalScrollRef = React.useRef(null);
 
   const handleBannerUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -183,7 +188,7 @@ export default function EventsPage() {
       }
     } catch (err) {
       console.error('Event banner upload error:', err);
-      alert(err.response?.data?.error || 'Failed to upload event banner.');
+      showSweetError(err.response?.data?.error || 'Failed to upload event banner.', 'Upload Failed');
     } finally {
       setIsBannerUploading(false);
     }
@@ -195,7 +200,7 @@ export default function EventsPage() {
 
     const validation = await validateEventImage(file, 'logo');
     if (!validation.isValid) {
-      alert(validation.error);
+      showSweetWarning(validation.error, 'Invalid Logo Dimensions');
       return;
     }
 
@@ -212,7 +217,7 @@ export default function EventsPage() {
       }
     } catch (err) {
       console.error('Org logo upload error:', err);
-      alert('Failed to upload logo.');
+      showSweetError('Failed to upload logo.', 'Upload Failed');
     } finally {
       setIsUploading(false);
     }
@@ -224,7 +229,7 @@ export default function EventsPage() {
 
     const validation = await validateEventImage(file, 'logo');
     if (!validation.isValid) {
-      alert(validation.error);
+      showSweetWarning(validation.error, 'Invalid Sponsor Logo Dimensions');
       return;
     }
 
@@ -241,14 +246,14 @@ export default function EventsPage() {
       }
     } catch (err) {
       console.error('Sponsor logo upload error:', err);
-      alert('Failed to upload sponsor logo.');
+      showSweetError('Failed to upload sponsor logo.', 'Upload Failed');
     } finally {
       setIsSponsorUploading(false);
     }
   };
 
   const addSponsor = () => {
-    if (!newSponsor.name) return alert('Sponsor name is required');
+    if (!newSponsor.name) return showSweetWarning('Sponsor name is required');
     const finalTier = newSponsor.tier?.trim() || 'Platinum Sponsor';
     setEventForm(prev => ({
       ...prev,
@@ -266,7 +271,7 @@ export default function EventsPage() {
   };
 
   const addFaq = () => {
-    if (!newFaq.question || !newFaq.answer) return alert('Question and Answer are required');
+    if (!newFaq.question || !newFaq.answer) return showSweetWarning('Question and Answer are required');
     setEventForm(prev => ({
       ...prev,
       faqsList: [...(prev.faqsList || []), { ...newFaq }]
@@ -282,10 +287,35 @@ export default function EventsPage() {
   };
 
   const addSchedule = () => {
-    if (!newSchedule.name || !newSchedule.date) return alert('Day/Name and Date are required');
+    const trimmedName = (newSchedule.name || '').trim();
+    if (!trimmedName) {
+      return showSweetWarning('Day / Session Name is required.', 'Schedule Validation');
+    }
+    if (/^\d+$/.test(trimmedName)) {
+      return showSweetWarning(
+        'Day / Session Name cannot contain only numbers. Please enter a descriptive title (e.g., "Day 1", "Session 1 - Keynote").',
+        'Invalid Day / Session Name'
+      );
+    }
+    if (trimmedName.length < 2) {
+      return showSweetWarning('Day / Session Name must be at least 2 characters long.', 'Schedule Validation');
+    }
+    if (trimmedName.length > 80) {
+      return showSweetWarning('Day / Session Name cannot exceed 80 characters.', 'Schedule Validation');
+    }
+    if (!newSchedule.date) {
+      return showSweetWarning('Please select a valid date for this schedule entry.', 'Schedule Date Required');
+    }
+    const isDup = (eventForm.schedules || []).some(
+      s => s.name?.toLowerCase().trim() === trimmedName.toLowerCase() && s.date === newSchedule.date
+    );
+    if (isDup) {
+      return showSweetWarning('A schedule entry with this exact name and date already exists.', 'Duplicate Schedule Entry');
+    }
+
     setEventForm(prev => ({
       ...prev,
-      schedules: [...(prev.schedules || []), { ...newSchedule }]
+      schedules: [...(prev.schedules || []), { name: trimmedName, date: newSchedule.date }]
     }));
     setNewSchedule({ name: '', date: '' });
   };
@@ -356,10 +386,55 @@ export default function EventsPage() {
   // Handle Input Changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'slug') {
+      let rawVal = value;
+      if (/^https?:\/\//i.test(rawVal) || /^www\./i.test(rawVal) || rawVal.includes('://')) {
+        try {
+          const urlStr = rawVal.startsWith('http') ? rawVal : `https://${rawVal}`;
+          const parsed = new URL(urlStr);
+          const segments = parsed.pathname.split('/').filter(Boolean);
+          rawVal = segments.length > 0 ? segments[segments.length - 1] : '';
+        } catch {
+          rawVal = rawVal.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+        }
+      } else if (/^[a-zA-Z0-9.-]+\.(com|in|org|net|co|io|ai)(\/.*)?$/i.test(rawVal)) {
+        try {
+          const parsed = new URL(`https://${rawVal}`);
+          const segments = parsed.pathname.split('/').filter(Boolean);
+          rawVal = segments.length > 0 ? segments[segments.length - 1] : '';
+        } catch {
+          rawVal = '';
+        }
+      }
+      let clean = rawVal
+        .toLowerCase()
+        .replace(/[\s_\/\\]+/g, '-')
+        .replace(/[^a-z0-9-]/g, '')
+        .replace(/-+/g, '-');
+      if (clean.startsWith('-')) clean = clean.replace(/^-+/, '');
+      setEventForm(prev => ({ ...prev, slug: clean }));
+      if (formErrors.slug) {
+        setFormErrors(prev => {
+          const next = { ...prev };
+          delete next.slug;
+          return next;
+        });
+      }
+      return;
+    }
+
     setEventForm(prev => ({
       ...prev,
       [name]: value
     }));
+
+    if (formErrors[name]) {
+      setFormErrors(prev => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
   };
 
   // Generate mock slug if empty
@@ -371,6 +446,13 @@ export default function EventsPage() {
         .replace(/\s+/g, '-')
         .replace(/[^\w\-]+/g, '');
       setEventForm(prev => ({ ...prev, slug: mockSlug }));
+      if (formErrors.slug) {
+        setFormErrors(prev => {
+          const next = { ...prev };
+          delete next.slug;
+          return next;
+        });
+      }
     }
   };
   // Time picker helpers for Daily Timings
@@ -420,6 +502,8 @@ export default function EventsPage() {
     setCurrentEventId(null);
     setIsCustomIndustry(false);
     setBannerValidation(null);
+    setFormErrors({});
+    setDuplicateCheck({ checking: false, isDuplicate: false, existingEvent: null, similarEvents: [] });
     setEventForm({
       title: '',
       slug: '',
@@ -446,6 +530,7 @@ export default function EventsPage() {
       contactShortcode: '',
       isFreeEvent: true,
       paidTicketPrice: '499',
+      currency: 'INR',
       seo: { metaTitle: '', metaDescription: '' }
     });
     setIsModalOpen(true);
@@ -456,6 +541,8 @@ export default function EventsPage() {
     setEditMode(true);
     setCurrentEventId(event._id);
     setBannerValidation(null);
+    setFormErrors({});
+    setDuplicateCheck({ checking: false, isDuplicate: false, existingEvent: null, similarEvents: [] });
     
     // Format dates for input tags (YYYY-MM-DD)
     const fmtStartDate = event.startDate ? new Date(event.startDate).toISOString().split('T')[0] : '';
@@ -508,8 +595,9 @@ export default function EventsPage() {
       sponsorsList: event.sponsorsList || [],
       faqsList: event.faqsList || [],
       contactShortcode: event.contactShortcode || '',
-      isFreeEvent: true,
-      paidTicketPrice: '499',
+      isFreeEvent: event.isFreeEvent !== false,
+      paidTicketPrice: event.paidTicketPrice !== undefined ? String(event.paidTicketPrice) : '499',
+      currency: event.currency || 'INR',
       seo: {
         metaTitle: event.seo?.metaTitle || '',
         metaDescription: event.seo?.metaDescription || ''
@@ -527,7 +615,8 @@ export default function EventsPage() {
         setEventForm(prev => ({
           ...prev,
           isFreeEvent: defaultTier.type === 'free',
-          paidTicketPrice: String(defaultTier.price || 0)
+          paidTicketPrice: String(defaultTier.price || 0),
+          currency: defaultTier.currency || prev.currency || 'INR'
         }));
       }
     } catch (ticketErr) {
@@ -537,19 +626,183 @@ export default function EventsPage() {
     setIsModalOpen(true);
   };
 
+  // Validate entire Event Form
+  const validateEventForm = (data) => {
+    const errs = {};
+    const missing = [];
+
+    // Title
+    const trimmedTitle = (data.title || '').trim();
+    if (!trimmedTitle) {
+      errs.title = 'Event Title is required.';
+      missing.push('Event Title');
+    } else if (trimmedTitle.length < 3) {
+      errs.title = 'Event Title must be at least 3 characters.';
+      missing.push('Event Title (minimum 3 characters)');
+    }
+
+    // Slug
+    const trimmedSlug = (data.slug || '').trim();
+    if (!trimmedSlug) {
+      errs.slug = 'Public URL Slug is required.';
+      missing.push('URL Slug');
+    } else if (
+      /^(https?|ftp):\/\//i.test(trimmedSlug) ||
+      /^www\./i.test(trimmedSlug) ||
+      trimmedSlug.includes('://') ||
+      trimmedSlug.includes('/') ||
+      /\.(com|in|org|net|co|io|ai|biz|info|me|app|dev|xyz|gov|edu)(\/|$|\?|#)/i.test(trimmedSlug)
+    ) {
+      errs.slug = 'URLs/links are not allowed in slug. Use simple words with hyphens (e.g. tech-expo-2026).';
+      missing.push('URL Slug (links not allowed)');
+    } else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(trimmedSlug)) {
+      errs.slug = 'Slug can only contain lowercase letters, numbers, and hyphens (e.g. tech-expo-2026).';
+      missing.push('URL Slug (valid format)');
+    }
+
+    // Description
+    const cleanDesc = (data.description || '').replace(/<[^>]*>/g, '').trim();
+    if (!cleanDesc) {
+      errs.description = 'Event Description is required.';
+      missing.push('Event Description');
+    } else if (cleanDesc.length < 20) {
+      errs.description = `Event Description must be at least 20 characters (currently ${cleanDesc.length}).`;
+      missing.push(`Event Description (min 20 characters, currently ${cleanDesc.length})`);
+    }
+
+    // Venue
+    const trimmedVenue = (data.venue || '').trim();
+    if (!trimmedVenue) {
+      errs.venue = 'Venue Hall / Address is required.';
+      missing.push('Venue Hall / Address');
+    } else if (trimmedVenue.length < 2) {
+      errs.venue = 'Venue Hall / Address must be at least 2 characters.';
+      missing.push('Venue Hall / Address');
+    }
+
+    // City
+    const trimmedCity = (data.city || '').trim();
+    if (!trimmedCity) {
+      errs.city = 'City is required.';
+      missing.push('City');
+    } else if (/\d/.test(trimmedCity)) {
+      errs.city = 'City name cannot contain numbers.';
+      missing.push('City (letters only, no numbers)');
+    }
+
+    // Country
+    const trimmedCountry = (data.country || '').trim();
+    if (!trimmedCountry) {
+      errs.country = 'Country is required.';
+      missing.push('Country');
+    } else if (/\d/.test(trimmedCountry)) {
+      errs.country = 'Country name cannot contain numbers.';
+      missing.push('Country (letters only, no numbers)');
+    }
+
+    // Start Date
+    if (!data.startDate) {
+      errs.startDate = 'Event Start Date is required.';
+      missing.push('Start Date');
+    }
+
+    // End Date
+    if (!data.endDate) {
+      errs.endDate = 'Event End Date is required.';
+      missing.push('End Date');
+    } else if (data.startDate && new Date(data.endDate) < new Date(data.startDate)) {
+      errs.endDate = 'End Date cannot be earlier than Start Date.';
+      missing.push('End Date (must be on or after Start Date)');
+    }
+
+    // Primary Category
+    if (!data.category && !data.categories) {
+      errs.category = 'Primary Category is required.';
+      missing.push('Primary Category');
+    }
+
+    // Ticketing Price (if paid ticket)
+    if (!data.isFreeEvent) {
+      const price = parseFloat(data.paidTicketPrice);
+      if (isNaN(price) || price <= 0) {
+        errs.paidTicketPrice = `Paid ticket price must be greater than 0 (${data.currency || 'INR'}).`;
+        missing.push('Ticket Price (must be > 0 for paid tickets)');
+      }
+    }
+
+    // Optional field formats if provided
+    if (data.orgEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.orgEmail.trim())) {
+      errs.orgEmail = 'Please enter a valid organizer contact email address.';
+      missing.push('Organizer Email (valid format)');
+    }
+
+    if (data.orgPhone) {
+      const trimmedPhone = data.orgPhone.trim();
+      if (!/^\+\d{1,4}/.test(trimmedPhone)) {
+        errs.orgPhone = 'Phone number must include country code starting with + (e.g. +91).';
+        missing.push('Organizer Phone (country code required)');
+      } else if (trimmedPhone.startsWith('+91')) {
+        const digits = trimmedPhone.replace(/\D/g, '').slice(2);
+        if (digits.length !== 10 || !/^[789]/.test(digits)) {
+          errs.orgPhone = 'Indian mobile number must be 10 digits starting with 7, 8, or 9.';
+          missing.push('Organizer Phone (valid 10-digit Indian mobile)');
+        }
+      }
+    }
+
+    if (data.orgWebsite && !/^https?:\/\/.+/i.test(data.orgWebsite.trim())) {
+      errs.orgWebsite = 'Website must be a valid URL starting with http:// or https://';
+      missing.push('Organizer Website (valid URL)');
+    }
+
+    return {
+      isValid: Object.keys(errs).length === 0,
+      errors: errs,
+      missingFields: missing
+    };
+  };
+
   // Handle Form Submit
   const handleFormSubmit = async (e) => {
     e.preventDefault();
 
     if (duplicateCheck.isDuplicate) {
-      alert(`Cannot save duplicate event: An event titled "${duplicateCheck.existingEvent?.title}" already exists. Duplicate events cannot be created.`);
+      showSweetError(`Cannot save duplicate event: An event titled "${duplicateCheck.existingEvent?.title}" already exists. Duplicate events cannot be created.`, 'Duplicate Event');
       return;
     }
 
-    if (!eventForm.title || !eventForm.description || !eventForm.venue || !eventForm.startDate || !eventForm.endDate) {
-      alert('Please fill out all required fields');
+    const { isValid, errors: validationErrors, missingFields } = validateEventForm(eventForm);
+
+    if (!isValid) {
+      setFormErrors(validationErrors);
+
+      const missingListHtml = `
+        <div style="text-align: left; font-size: 13px; line-height: 1.6; margin-top: 8px;">
+          <p style="font-weight: 600; margin-bottom: 8px; color: #f59e0b;">
+            Please complete or correct the following ${missingFields.length} required field${missingFields.length > 1 ? 's' : ''}:
+          </p>
+          <ul style="list-style-type: disc; padding-left: 20px; color: inherit;">
+            ${missingFields.map(f => `<li style="margin-bottom: 4px;"><strong>${f}</strong></li>`).join('')}
+          </ul>
+          <p style="margin-top: 10px; font-size: 11px; opacity: 0.8;">
+            Fields are highlighted with red borders inside the form.
+          </p>
+        </div>
+      `;
+
+      showSweetWarning({
+        title: 'Required Fields Missing',
+        html: missingListHtml,
+        confirmButtonText: 'Review Form'
+      });
+
+      if (modalScrollRef.current) {
+        modalScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
       return;
     }
+
+    setFormErrors({});
 
     // Process categories selection to array
     const categoriesArray = [eventForm.category, eventForm.industry].filter(Boolean);
@@ -558,7 +811,8 @@ export default function EventsPage() {
       ...eventForm,
       categories: categoriesArray,
       isFreeEvent: eventForm.isFreeEvent,
-      paidTicketPrice: eventForm.isFreeEvent ? 0 : (eventForm.paidTicketPrice || 0)
+      paidTicketPrice: eventForm.isFreeEvent ? 0 : (parseFloat(eventForm.paidTicketPrice) || 0),
+      currency: eventForm.currency || 'INR'
     };
 
     try {
@@ -583,7 +837,7 @@ export default function EventsPage() {
     } catch (err) {
       console.error('Error saving event', err);
       if (err.response?.status === 409) {
-        alert(err.response.data?.error || 'A duplicate event with this title already exists.');
+        showSweetError(err.response.data?.error || 'A duplicate event with this title already exists.', 'Duplicate Event');
         if (err.response.data?.existingEvent) {
           setDuplicateCheck({
             checking: false,
@@ -594,13 +848,21 @@ export default function EventsPage() {
         }
         return;
       }
-      alert(err.response?.data?.error || 'Failed to save event details');
+      showSweetError(err.response?.data?.error || 'Failed to save event details');
     }
   };
 
   // Handle Delete Event
   const handleDeleteEvent = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this event? This will also affect tickets and registries.')) return;
+    const confirmed = await showSweetConfirm({
+      title: 'Delete Event?',
+      text: 'Are you sure you want to delete this event? This will permanently remove its tickets and registrations.',
+      icon: 'warning',
+      confirmButtonText: 'Yes, Delete Event',
+      cancelButtonText: 'Cancel',
+      isDanger: true
+    });
+    if (!confirmed) return;
     try {
       const res = await axios.delete(`${API_URL}/events/${id}`, {
         headers: { Authorization: `Bearer ${accessToken}` }
@@ -610,7 +872,7 @@ export default function EventsPage() {
       }
     } catch (err) {
       console.error('Error deleting event', err);
-      alert('Error deleting event.');
+      showSweetError('Error deleting event.');
     }
   };
 
@@ -627,7 +889,7 @@ export default function EventsPage() {
       }
     } catch (err) {
       console.error('Error updating status', err);
-      alert('Could not update status.');
+      showSweetError(err.response?.data?.error || 'Could not update status.', 'Status Update Failed');
     }
   };
 
@@ -862,7 +1124,7 @@ export default function EventsPage() {
       {/* Create / Edit Form Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-2xl rounded-2xl border border-border bg-card p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+          <div ref={modalScrollRef} className="relative w-full max-w-2xl rounded-2xl border border-border bg-card p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
             <button
               onClick={() => setIsModalOpen(false)}
               className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
@@ -886,12 +1148,11 @@ export default function EventsPage() {
                     <input
                       type="text"
                       name="title"
-                      required
                       value={eventForm.title}
                       onChange={handleInputChange}
                       onBlur={handleTitleBlur}
                       className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none transition-all ${
-                        duplicateCheck.isDuplicate
+                        formErrors.title || duplicateCheck.isDuplicate
                           ? 'border-destructive ring-2 ring-destructive/20 focus:ring-destructive pr-10'
                           : 'border-border focus:ring-2 focus:ring-primary'
                       }`}
@@ -903,6 +1164,11 @@ export default function EventsPage() {
                       </div>
                     )}
                   </div>
+                  {formErrors.title && !duplicateCheck.isDuplicate && (
+                    <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {formErrors.title}
+                    </p>
+                  )}
 
                   {/* Duplicate event alert card */}
                   {duplicateCheck.isDuplicate && duplicateCheck.existingEvent && (
@@ -947,12 +1213,20 @@ export default function EventsPage() {
                   <input
                     type="text"
                     name="slug"
-                    required
                     value={eventForm.slug}
                     onChange={handleInputChange}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none transition-all ${
+                      formErrors.slug
+                        ? 'border-destructive ring-2 ring-destructive/20 focus:ring-destructive'
+                        : 'border-border focus:ring-2 focus:ring-primary'
+                    }`}
                     placeholder="global-tech-expo-2026"
                   />
+                  {formErrors.slug && (
+                    <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {formErrors.slug}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -963,11 +1237,7 @@ export default function EventsPage() {
                     Event Banner Cover (Recommended: 1920 × 1080 px | Min: 1200 × 630 px)
                   </label>
                   {bannerValidation?.dimensions && eventForm.banner && (
-                    <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${
-                      bannerValidation.qualityScore === 'optimal'
-                        ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
-                        : 'bg-amber-500/10 text-amber-600 border-amber-500/30'
-                    }`}>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
                       <CheckCircle2 className="h-3 w-3" />
                       {bannerValidation.dimensions.width} × {bannerValidation.dimensions.height} px
                     </span>
@@ -980,16 +1250,6 @@ export default function EventsPage() {
                     <div>
                       <strong className="font-bold">Image Resolution Rejected: </strong>
                       {bannerValidation.error}
-                    </div>
-                  </div>
-                )}
-
-                {bannerValidation?.warning && eventForm.banner && (
-                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-600 text-xs flex items-start gap-2">
-                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="font-semibold">Quality Recommendation: </strong>
-                      {bannerValidation.warning}
                     </div>
                   </div>
                 )}
@@ -1041,12 +1301,28 @@ export default function EventsPage() {
 
               <div>
                 <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Event Description *</label>
-                <RichTextEditor
-                  value={eventForm.description}
-                  onChange={(val) => setEventForm(prev => ({ ...prev, description: val }))}
-                  placeholder="Provide a comprehensive explanation of this expo event."
-                  rows={5}
-                />
+                <div className={formErrors.description ? 'ring-2 ring-destructive/40 rounded-xl overflow-hidden' : ''}>
+                  <RichTextEditor
+                    value={eventForm.description}
+                    onChange={(val) => {
+                      setEventForm(prev => ({ ...prev, description: val }));
+                      if (formErrors.description) {
+                        setFormErrors(prev => {
+                          const next = { ...prev };
+                          delete next.description;
+                          return next;
+                        });
+                      }
+                    }}
+                    placeholder="Provide a comprehensive explanation of this expo event."
+                    rows={5}
+                  />
+                </div>
+                {formErrors.description && (
+                  <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {formErrors.description}
+                  </p>
+                )}
               </div>
 
               <div className="grid gap-4 sm:grid-cols-3">
@@ -1055,24 +1331,40 @@ export default function EventsPage() {
                   <input
                     type="text"
                     name="venue"
-                    required
                     value={eventForm.venue}
                     onChange={handleInputChange}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none transition-all ${
+                      formErrors.venue
+                        ? 'border-destructive ring-2 ring-destructive/20 focus:ring-destructive'
+                        : 'border-border focus:ring-2 focus:ring-primary'
+                    }`}
                     placeholder="E.g. Hall 5, Pragati Maidan"
                   />
+                  {formErrors.venue && (
+                    <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {formErrors.venue}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">City *</label>
                   <input
                     type="text"
                     name="city"
-                    required
                     value={eventForm.city}
                     onChange={handleInputChange}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none transition-all ${
+                      formErrors.city
+                        ? 'border-destructive ring-2 ring-destructive/20 focus:ring-destructive'
+                        : 'border-border focus:ring-2 focus:ring-primary'
+                    }`}
                     placeholder="New Delhi"
                   />
+                  {formErrors.city && (
+                    <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {formErrors.city}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1082,22 +1374,38 @@ export default function EventsPage() {
                   <input
                     type="date"
                     name="startDate"
-                    required
                     value={eventForm.startDate}
                     onChange={handleInputChange}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary dark:[color-scheme:dark]"
+                    className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none transition-all dark:[color-scheme:dark] ${
+                      formErrors.startDate
+                        ? 'border-destructive ring-2 ring-destructive/20 focus:ring-destructive'
+                        : 'border-border focus:ring-2 focus:ring-primary'
+                    }`}
                   />
+                  {formErrors.startDate && (
+                    <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {formErrors.startDate}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">End Date *</label>
                   <input
                     type="date"
                     name="endDate"
-                    required
                     value={eventForm.endDate}
                     onChange={handleInputChange}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary dark:[color-scheme:dark]"
+                    className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none transition-all dark:[color-scheme:dark] ${
+                      formErrors.endDate
+                        ? 'border-destructive ring-2 ring-destructive/20 focus:ring-destructive'
+                        : 'border-border focus:ring-2 focus:ring-primary'
+                    }`}
                   />
+                  {formErrors.endDate && (
+                    <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {formErrors.endDate}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Daily Timings</label>
@@ -1128,11 +1436,11 @@ export default function EventsPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Primary Category *</label>
-                  <select
-                    name="category"
+                  <SearchableSelect
+                    options={Object.keys(CATEGORY_SUBSECTORS)}
                     value={eventForm.category || 'Technology & AI'}
-                    onChange={(e) => {
-                      const newCat = e.target.value;
+                    error={formErrors.category}
+                    onChange={(newCat) => {
                       const subList = CATEGORY_SUBSECTORS[newCat] || [];
                       setEventForm(prev => ({
                         ...prev,
@@ -1140,15 +1448,22 @@ export default function EventsPage() {
                         industry: subList[0] || ''
                       }));
                       setIsCustomIndustry(false);
+                      if (formErrors.category) {
+                        setFormErrors(prev => {
+                          const next = { ...prev };
+                          delete next.category;
+                          return next;
+                        });
+                      }
                     }}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-medium"
-                  >
-                    {Object.keys(CATEGORY_SUBSECTORS).map(catKey => (
-                      <option key={catKey} value={catKey}>
-                        {catKey}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select category..."
+                    searchPlaceholder="Search categories..."
+                  />
+                  {formErrors.category && (
+                    <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {formErrors.category}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -1166,10 +1481,10 @@ export default function EventsPage() {
 
                     return (
                       <div className="space-y-1.5">
-                        <select
+                        <SearchableSelect
+                          options={currentSubSectors}
                           value={selectValue}
-                          onChange={(e) => {
-                            const val = e.target.value;
+                          onChange={(val) => {
                             if (val === 'CUSTOM') {
                               setIsCustomIndustry(true);
                               setEventForm(prev => ({ ...prev, industry: '' }));
@@ -1178,15 +1493,11 @@ export default function EventsPage() {
                               setEventForm(prev => ({ ...prev, industry: val }));
                             }
                           }}
-                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-medium"
-                        >
-                          {currentSubSectors.map(sub => (
-                            <option key={sub} value={sub}>
-                              {sub}
-                            </option>
-                          ))}
-                          <option value="CUSTOM">+ Custom Sub-Sector...</option>
-                        </select>
+                          placeholder="Select sub-sector..."
+                          searchPlaceholder="Search sub-sectors..."
+                          allowCustom={true}
+                          customOptionLabel="+ Custom Sub-Sector..."
+                        />
 
                         {(isCustomIndustry || (!isPreset && eventForm.industry !== '' && eventForm.industry !== undefined)) && (
                           <input
@@ -1262,7 +1573,8 @@ export default function EventsPage() {
                       name="orgName"
                       value={eventForm.orgName}
                       onChange={handleInputChange}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none"
+                      placeholder="E.g. Confederation of Indian Industry (CII)"
+                      className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
                   <div>
@@ -1272,8 +1584,14 @@ export default function EventsPage() {
                       name="orgEmail"
                       value={eventForm.orgEmail}
                       onChange={handleInputChange}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none"
+                      placeholder="E.g. events@cii.in"
+                      className={`w-full rounded-lg border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none transition-all ${
+                        formErrors.orgEmail ? 'border-destructive ring-1 ring-destructive/40' : 'border-border focus:ring-1 focus:ring-primary'
+                      }`}
                     />
+                    {formErrors.orgEmail && (
+                      <p className="mt-1 text-[10px] font-semibold text-destructive">{formErrors.orgEmail}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-muted-foreground mb-1 uppercase">Phone</label>
@@ -1282,8 +1600,14 @@ export default function EventsPage() {
                       name="orgPhone"
                       value={eventForm.orgPhone}
                       onChange={handleInputChange}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none"
+                      placeholder="E.g. +91 98765 43210"
+                      className={`w-full rounded-lg border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none transition-all ${
+                        formErrors.orgPhone ? 'border-destructive ring-1 ring-destructive/40' : 'border-border focus:ring-1 focus:ring-primary'
+                      }`}
                     />
+                    {formErrors.orgPhone && (
+                      <p className="mt-1 text-[10px] font-semibold text-destructive">{formErrors.orgPhone}</p>
+                    )}
                   </div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -1294,8 +1618,14 @@ export default function EventsPage() {
                       name="orgWebsite"
                       value={eventForm.orgWebsite}
                       onChange={handleInputChange}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none"
+                      placeholder="https://www.cii.in"
+                      className={`w-full rounded-lg border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none transition-all ${
+                        formErrors.orgWebsite ? 'border-destructive ring-1 ring-destructive/40' : 'border-border focus:ring-1 focus:ring-primary'
+                      }`}
                     />
+                    {formErrors.orgWebsite && (
+                      <p className="mt-1 text-[10px] font-semibold text-destructive">{formErrors.orgWebsite}</p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
@@ -1337,7 +1667,8 @@ export default function EventsPage() {
                     value={eventForm.orgDesc}
                     onChange={handleInputChange}
                     rows={2}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none"
+                    placeholder="Brief description about the organizer, association, or hosting company..."
+                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -1348,23 +1679,38 @@ export default function EventsPage() {
                   Event Schedule Days
                 </h4>
                 <div className="grid gap-3 sm:grid-cols-3 items-end bg-card p-3 rounded-lg border border-border">
-                  <input
-                    type="text"
-                    value={newSchedule.name}
-                    onChange={e => setNewSchedule(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Day / Session Name"
-                    className="rounded-lg border border-border bg-background px-3 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                  <input
-                    type="date"
-                    value={newSchedule.date}
-                    onChange={e => setNewSchedule(prev => ({ ...prev, date: e.target.value }))}
-                    className="rounded-lg border border-border bg-background px-3 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary dark:[color-scheme:dark]"
-                  />
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Day / Session Name</label>
+                    <input
+                      type="text"
+                      value={newSchedule.name}
+                      onChange={e => setNewSchedule(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="e.g. Day 1, Opening Keynote"
+                      className={`w-full rounded-lg border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none transition-all ${
+                        newSchedule.name && /^\d+$/.test(newSchedule.name.trim())
+                          ? 'border-destructive ring-1 ring-destructive/40'
+                          : 'border-border focus:ring-1 focus:ring-primary'
+                      }`}
+                    />
+                    {newSchedule.name && /^\d+$/.test(newSchedule.name.trim()) && (
+                      <p className="text-[10px] text-destructive font-medium flex items-center gap-0.5">
+                        <AlertCircle className="h-3 w-3 shrink-0" /> Cannot be numbers only
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Date</label>
+                    <input
+                      type="date"
+                      value={newSchedule.date}
+                      onChange={e => setNewSchedule(prev => ({ ...prev, date: e.target.value }))}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary dark:[color-scheme:dark]"
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={addSchedule}
-                    className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/95 text-white font-bold text-xs h-[30px]"
+                    className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/95 text-white font-bold text-xs h-[32px] transition-colors"
                   >
                     Add Day
                   </button>
@@ -1396,22 +1742,30 @@ export default function EventsPage() {
                   Official Sponsors &amp; Partners
                 </h4>
                 <div className="grid gap-3 sm:grid-cols-4 items-end bg-card p-3 rounded-lg border border-border">
-                  <input
-                    type="text"
-                    value={newSponsor.name}
-                    onChange={e => setNewSponsor(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Sponsor Name"
-                    className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
-                  />
-                  <input
-                    type="url"
-                    value={newSponsor.link}
-                    onChange={e => setNewSponsor(prev => ({ ...prev, link: e.target.value }))}
-                    placeholder="Link"
-                    className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
-                  />
-                  <div className="flex flex-col gap-1">
-                    <select
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Sponsor Name</label>
+                    <input
+                      type="text"
+                      value={newSponsor.name}
+                      onChange={e => setNewSponsor(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="e.g. Acme Corp"
+                      className="w-full rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary h-[30px]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Website Link</label>
+                    <input
+                      type="url"
+                      value={newSponsor.link}
+                      onChange={e => setNewSponsor(prev => ({ ...prev, link: e.target.value }))}
+                      placeholder="https://acme.com"
+                      className="w-full rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary h-[30px]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Sponsor Tier</label>
+                    <SearchableSelect
+                      options={PRESET_SPONSOR_TIERS}
                       value={
                         isCustomSponsorTier
                           ? 'CUSTOM'
@@ -1421,8 +1775,7 @@ export default function EventsPage() {
                           ? 'CUSTOM'
                           : 'Platinum Sponsor'
                       }
-                      onChange={e => {
-                        const val = e.target.value;
+                      onChange={(val) => {
                         if (val === 'CUSTOM') {
                           setIsCustomSponsorTier(true);
                           setNewSponsor(prev => ({ ...prev, tier: '' }));
@@ -1431,28 +1784,19 @@ export default function EventsPage() {
                           setNewSponsor(prev => ({ ...prev, tier: val }));
                         }
                       }}
-                      className="rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground focus:outline-none"
-                    >
-                      {SPONSOR_TIER_GROUPS.map(group => (
-                        <optgroup key={group.label} label={group.label}>
-                          {group.options.map(opt => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                      <optgroup label="Custom">
-                        <option value="CUSTOM">+ Custom Tier / Label...</option>
-                      </optgroup>
-                    </select>
+                      placeholder="Select Sponsor Tier..."
+                      searchPlaceholder="Search sponsor tier..."
+                      allowCustom={true}
+                      customOptionLabel="+ Custom Tier / Label..."
+                      className="py-1 px-2.5 text-xs h-[30px]"
+                    />
                     {(isCustomSponsorTier || (!PRESET_SPONSOR_TIERS.includes(newSponsor.tier) && newSponsor.tier !== '')) && (
                       <input
                         type="text"
                         value={newSponsor.tier}
                         onChange={e => setNewSponsor(prev => ({ ...prev, tier: e.target.value }))}
-                        placeholder="Custom label..."
-                        className="w-full rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                        placeholder="Type custom label..."
+                        className="w-full rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary mt-1"
                         autoFocus
                       />
                     )}
@@ -1512,15 +1856,15 @@ export default function EventsPage() {
                     type="text"
                     value={newFaq.question}
                     onChange={e => setNewFaq(prev => ({ ...prev, question: e.target.value }))}
-                    placeholder="FAQ Question"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-1 text-xs text-foreground focus:outline-none"
+                    placeholder="E.g. What are the daily exhibition hours?"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                   <textarea
                     value={newFaq.answer}
                     onChange={e => setNewFaq(prev => ({ ...prev, answer: e.target.value }))}
-                    placeholder="FAQ Answer"
-                    rows={1}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-1 text-xs text-foreground focus:outline-none"
+                    placeholder="E.g. The exhibition is open daily from 10:00 AM to 6:00 PM with free visitor registration."
+                    rows={2}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                   <button
                     type="button"
@@ -1599,20 +1943,72 @@ export default function EventsPage() {
                     </div>
                   </div>
                 </div>
-                {!eventForm.isFreeEvent && (
-                  <div className="w-full sm:w-1/2">
-                    <label className="block text-[10px] font-bold text-muted-foreground mb-1 uppercase">Ticket Price (INR ₹)</label>
-                    <input
-                      type="number"
-                      name="paidTicketPrice"
-                      value={eventForm.paidTicketPrice}
-                      onChange={handleInputChange}
-                      min="1"
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono"
-                    />
-                  </div>
-                )}
+                {!eventForm.isFreeEvent && (() => {
+                  const currentCurrency = CURRENCY_OPTIONS.find(c => c.code === (eventForm.currency || 'INR')) || CURRENCY_OPTIONS[0];
+                  return (
+                    <div className="grid gap-3 sm:grid-cols-2 bg-muted/10 p-3 rounded-xl border border-border/80">
+                      <div>
+                        <label className="block text-[10px] font-bold text-muted-foreground mb-1 uppercase">Currency *</label>
+                        <SearchableSelect
+                          options={CURRENCY_OPTIONS.map(c => ({
+                            value: c.code,
+                            label: `${c.flag} ${c.code} (${c.symbol}) - ${c.name}`,
+                            subtext: `${c.name} ${c.symbol}`,
+                            flag: c.flag
+                          }))}
+                          value={eventForm.currency || 'INR'}
+                          onChange={(val) => setEventForm(prev => ({ ...prev, currency: val }))}
+                          placeholder="Select currency..."
+                          searchPlaceholder="Search currency (e.g. USD, EUR, INR)..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-muted-foreground mb-1 uppercase">
+                          Ticket Price ({currentCurrency.code} {currentCurrency.symbol}) *
+                        </label>
+                        <div className="relative flex items-center">
+                          <span className="bg-muted px-3 py-2 rounded-l-lg border border-r-0 border-border text-xs text-muted-foreground font-bold shrink-0">
+                            {currentCurrency.symbol}
+                          </span>
+                          <input
+                            type="number"
+                            name="paidTicketPrice"
+                            value={eventForm.paidTicketPrice}
+                            onChange={handleInputChange}
+                            min="1"
+                            step="any"
+                            className={`w-full rounded-r-lg border bg-background px-3 py-2 text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono ${
+                              formErrors.paidTicketPrice ? 'border-destructive ring-2 ring-destructive/20' : 'border-border'
+                            }`}
+                          />
+                        </div>
+                        {formErrors.paidTicketPrice && (
+                          <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
+                            <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {formErrors.paidTicketPrice}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
+
+              {/* Validation Summary Card if any errors exist */}
+              {Object.keys(formErrors).length > 0 && (
+                <div className="p-3.5 rounded-xl border border-destructive/40 bg-destructive/10 text-destructive text-xs space-y-1.5 animate-in fade-in-50">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>Please correct the following {Object.keys(formErrors).length} required field{Object.keys(formErrors).length > 1 ? 's' : ''} to save:</span>
+                  </div>
+                  <ul className="list-disc list-inside space-y-1 pl-1 text-[11px]">
+                    {Object.entries(formErrors).map(([key, msg]) => (
+                      <li key={key}>
+                        <span className="font-semibold">{msg}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {/* Action buttons */}
               <div className="flex justify-end gap-3 pt-4 border-t border-border">

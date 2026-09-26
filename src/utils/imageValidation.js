@@ -83,69 +83,57 @@ export const validateEventImage = async (file, imageType = 'banner') => {
     if (imageType === 'banner') {
       const MIN_WIDTH = 1200;
       const MIN_HEIGHT = 630;
-      const REC_WIDTH = 1920;
-      const REC_HEIGHT = 1080;
 
-      // 1. Check minimum requirements
+      // 1. Check minimum dimension requirements
       if (width < MIN_WIDTH || height < MIN_HEIGHT) {
         return {
           isValid: false,
           dimensions,
-          error: `Banner resolution (${width}×${height}px) is below minimum requirement (${MIN_WIDTH}×${MIN_HEIGHT}px).`,
+          error: `Banner resolution (${width}×${height}px) is below the minimum required resolution (${MIN_WIDTH}×${MIN_HEIGHT}px). Image was not uploaded.`,
           warning: null,
           qualityScore: 'error'
         };
       }
 
-      // 2. Check optimal recommendations
-      let warning = null;
-      let qualityScore = 'optimal';
-
-      if (width < REC_WIDTH || height < REC_HEIGHT) {
-        warning = `Banner resolution is ${width}×${height}px. Recommended resolution for high quality display is ${REC_WIDTH}×${REC_HEIGHT}px (16:9).`;
-        qualityScore = 'warning';
-      } else if (Math.abs(numericRatio - 16 / 9) > 0.3) {
-        warning = `Banner aspect ratio (${aspectRatio}) deviates from standard 16:9 format. Image may crop on wide screens.`;
-        qualityScore = 'warning';
+      // 2. Check orientation: banner must be a landscape image
+      if (width < height) {
+        return {
+          isValid: false,
+          dimensions,
+          error: `Banner must be a landscape image (minimum ${MIN_WIDTH}×${MIN_HEIGHT}px). Selected image is portrait (${width}×${height}px). Image was not uploaded.`,
+          warning: null,
+          qualityScore: 'error'
+        };
       }
 
       return {
         isValid: true,
         dimensions,
         error: null,
-        warning,
-        qualityScore
+        warning: null,
+        qualityScore: 'optimal'
       };
     }
 
     if (imageType === 'logo') {
       const MIN_SIZE = 100;
-      const REC_SIZE = 200;
 
       if (width < MIN_SIZE || height < MIN_SIZE) {
         return {
           isValid: false,
           dimensions,
-          error: `Logo resolution (${width}×${height}px) is too small. Minimum required size is ${MIN_SIZE}×${MIN_SIZE}px.`,
+          error: `Logo resolution (${width}×${height}px) is too small. Minimum required size is ${MIN_SIZE}×${MIN_SIZE}px. Image was not uploaded.`,
           warning: null,
           qualityScore: 'error'
         };
-      }
-
-      let warning = null;
-      let qualityScore = 'optimal';
-
-      if (width < REC_SIZE || height < REC_SIZE) {
-        warning = `Logo resolution is ${width}×${height}px. Recommended minimum size is ${REC_SIZE}×${REC_SIZE}px for sharp rendering.`;
-        qualityScore = 'warning';
       }
 
       return {
         isValid: true,
         dimensions,
         error: null,
-        warning,
-        qualityScore
+        warning: null,
+        qualityScore: 'optimal'
       };
     }
 

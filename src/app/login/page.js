@@ -29,9 +29,11 @@ import {
   MapPin,
   Globe,
   CheckCircle2,
-  ShieldCheck
+  ShieldCheck,
+  AlertCircle
 } from 'lucide-react';
 import { auth, googleProvider, signInWithPopup } from '../../lib/firebase.js';
+import { showSweetAlert, showSweetWarning, showSweetError, showSweetSuccess } from '../../utils/sweetalert.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -103,6 +105,19 @@ export default function LoginPage() {
     city: ''
   });
 
+  // Dedicated validation error tracking for standard registration & Google completion
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [googleFieldErrors, setGoogleFieldErrors] = useState({});
+
+  const isValidEmail = (val) => {
+    return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test((val || '').trim());
+  };
+
+  const isValidIndianPhone = (val) => {
+    const digits = (val || '').replace(/\D/g, '');
+    return /^[6-9]\d{9}$/.test(digits);
+  };
+
   // Countdown timers for OTP resend
   useEffect(() => {
     let interval = null;
@@ -162,19 +177,39 @@ export default function LoginPage() {
   }, [user, loading, router, redirectUrl]);
 
   const handleFormChange = (e) => {
+    const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [name]: value
     }));
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => ({ ...prev, [name]: '' }));
+    }
+    if (formError) setFormError('');
   };
 
-  // Dispatch OTP for standard signup
+  const handleGoogleFormChange = (field, value) => {
+    setGoogleDetailsForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    if (googleFieldErrors[field]) {
+      setGoogleFieldErrors(prev => ({ ...prev, [field]: '' }));
+    }
+    if (formError) setFormError('');
+  };
+
+  // Dispatch OTP for standard signup with strict Indian 10-digit mobile validation
   const handleSendSignupOtp = async () => {
     const cleanPhone = signupPhone.replace(/\D/g, '');
-    if (!cleanPhone || cleanPhone.length < 10) {
-      setFormError('Please enter a valid 10-digit mobile number for OTP.');
+    if (!cleanPhone || cleanPhone.length !== 10 || !isValidIndianPhone(cleanPhone)) {
+      const msg = 'Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.';
+      setFieldErrors(prev => ({ ...prev, phone: msg }));
+      setFormError(msg);
+      showSweetWarning(msg, 'Invalid Mobile Number');
       return;
     }
+    setFieldErrors(prev => ({ ...prev, phone: '' }));
     setSignupOtpSending(true);
     setFormError('');
     try {
@@ -182,11 +217,16 @@ export default function LoginPage() {
       if (res.data?.success && res.data?.sessionId) {
         setSignupOtpSessionId(res.data.sessionId);
         setSignupOtpTimer(30);
+        showSweetSuccess(`6-digit OTP code dispatched to +91 ${cleanPhone}. Please enter it to verify.`, 'OTP Sent');
       } else {
-        setFormError(res.data?.error || 'Failed to dispatch OTP.');
+        const err = res.data?.error || 'Failed to dispatch OTP.';
+        setFormError(err);
+        showSweetError(err, 'OTP Dispatch Failed');
       }
     } catch (err) {
-      setFormError(err.response?.data?.error || 'Failed to send SMS OTP. Please check the number.');
+      const errText = err.response?.data?.error || 'Failed to send SMS OTP. Please check the number.';
+      setFormError(errText);
+      showSweetError(errText, 'OTP Dispatch Failed');
     } finally {
       setSignupOtpSending(false);
     }
@@ -196,7 +236,9 @@ export default function LoginPage() {
   const handleVerifySignupOtp = async () => {
     const cleanOtp = signupOtpCode.trim();
     if (!cleanOtp || cleanOtp.length < 4) {
-      setFormError('Please enter the 6-digit OTP code received on your phone.');
+      const msg = 'Please enter the 6-digit OTP code received on your phone.';
+      setFormError(msg);
+      showSweetWarning(msg, 'OTP Code Required');
       return;
     }
     setSignupOtpVerifying(true);
@@ -210,23 +252,33 @@ export default function LoginPage() {
       if (res.data?.success && res.data?.verificationToken) {
         setSignupPhoneVerified(true);
         setSignupVerificationToken(res.data.verificationToken);
+        setFieldErrors(prev => ({ ...prev, phone: '' }));
+        showSweetSuccess('Mobile number verified successfully!', 'Verified');
       } else {
-        setFormError(res.data?.error || 'OTP verification failed.');
+        const err = res.data?.error || 'OTP verification failed.';
+        setFormError(err);
+        showSweetError(err, 'Verification Failed');
       }
     } catch (err) {
-      setFormError(err.response?.data?.error || 'Incorrect OTP code. Please check and try again.');
+      const errText = err.response?.data?.error || 'Incorrect OTP code. Please check and try again.';
+      setFormError(errText);
+      showSweetError(errText, 'Invalid OTP');
     } finally {
       setSignupOtpVerifying(false);
     }
   };
 
-  // Dispatch OTP for Google registration
+  // Dispatch OTP for Google registration with strict Indian 10-digit mobile validation
   const handleSendGoogleOtp = async () => {
-    const cleanPhone = googleDetailsForm.phone.replace(/\D/g, '');
-    if (!cleanPhone || cleanPhone.length < 10) {
-      setFormError('Please enter a valid 10-digit mobile number for OTP.');
+    const cleanPhone = (googleDetailsForm.phone || '').replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length !== 10 || !isValidIndianPhone(cleanPhone)) {
+      const msg = 'Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.';
+      setGoogleFieldErrors(prev => ({ ...prev, phone: msg }));
+      setFormError(msg);
+      showSweetWarning(msg, 'Invalid Mobile Number');
       return;
     }
+    setGoogleFieldErrors(prev => ({ ...prev, phone: '' }));
     setGoogleOtpSending(true);
     setFormError('');
     try {
@@ -234,11 +286,16 @@ export default function LoginPage() {
       if (res.data?.success && res.data?.sessionId) {
         setGoogleOtpSessionId(res.data.sessionId);
         setGoogleOtpTimer(30);
+        showSweetSuccess(`6-digit OTP code dispatched to +91 ${cleanPhone}. Please enter it to verify.`, 'OTP Sent');
       } else {
-        setFormError(res.data?.error || 'Failed to dispatch OTP.');
+        const err = res.data?.error || 'Failed to dispatch OTP.';
+        setFormError(err);
+        showSweetError(err, 'OTP Dispatch Failed');
       }
     } catch (err) {
-      setFormError(err.response?.data?.error || 'Failed to send SMS OTP. Please check the number.');
+      const errText = err.response?.data?.error || 'Failed to send SMS OTP. Please check the number.';
+      setFormError(errText);
+      showSweetError(errText, 'OTP Dispatch Failed');
     } finally {
       setGoogleOtpSending(false);
     }
@@ -248,25 +305,33 @@ export default function LoginPage() {
   const handleVerifyGoogleOtp = async () => {
     const cleanOtp = googleOtpCode.trim();
     if (!cleanOtp || cleanOtp.length < 4) {
-      setFormError('Please enter the 6-digit OTP code received on your phone.');
+      const msg = 'Please enter the 6-digit OTP code received on your phone.';
+      setFormError(msg);
+      showSweetWarning(msg, 'OTP Code Required');
       return;
     }
     setGoogleOtpVerifying(true);
     setFormError('');
     try {
       const res = await axios.post(`${API_URL}/auth/otp/verify`, {
-        phone: googleDetailsForm.phone.replace(/\D/g, ''),
+        phone: (googleDetailsForm.phone || '').replace(/\D/g, ''),
         sessionId: googleOtpSessionId,
         otp: cleanOtp
       });
       if (res.data?.success && res.data?.verificationToken) {
         setGooglePhoneVerified(true);
         setGoogleVerificationToken(res.data.verificationToken);
+        setGoogleFieldErrors(prev => ({ ...prev, phone: '' }));
+        showSweetSuccess('Mobile number verified successfully!', 'Verified');
       } else {
-        setFormError(res.data?.error || 'OTP verification failed.');
+        const err = res.data?.error || 'OTP verification failed.';
+        setFormError(err);
+        showSweetError(err, 'Verification Failed');
       }
     } catch (err) {
-      setFormError(err.response?.data?.error || 'Incorrect OTP code. Please check and try again.');
+      const errText = err.response?.data?.error || 'Incorrect OTP code. Please check and try again.';
+      setFormError(errText);
+      showSweetError(errText, 'Invalid OTP');
     } finally {
       setGoogleOtpVerifying(false);
     }
@@ -347,22 +412,42 @@ export default function LoginPage() {
     }
   };
 
-  // Submit Google Basic Details Registration Form (with verified Phone OTP)
+  // Submit Google Basic Details Registration Form (with mandatory fields & verified Phone OTP)
   const handleGoogleDetailsSubmit = async (e) => {
     e.preventDefault();
     if (!googlePendingUser) return;
 
-    if (!googlePhoneVerified || !googleVerificationToken) {
-      setFormError('Please verify your mobile number with OTP before completing registration.');
-      return;
+    const errors = {};
+
+    if (googleDetailsForm.role !== 'visitor') {
+      if (!googleDetailsForm.organizationName || googleDetailsForm.organizationName.trim().length < 2) {
+        errors.organizationName =
+          googleDetailsForm.role === 'exhibitor'
+            ? 'Company / Exhibitor Brand Name is required (minimum 2 characters).'
+            : 'Organization Name is required (minimum 2 characters).';
+      }
     }
 
-    if (googleDetailsForm.role !== 'visitor' && !googleDetailsForm.organizationName.trim()) {
-      setFormError(
-        googleDetailsForm.role === 'exhibitor'
-          ? 'Company / Brand Name is required.'
-          : 'Organization Name is required.'
-      );
+    const cleanPhone = (googleDetailsForm.phone || '').replace(/\D/g, '');
+    if (!cleanPhone || !isValidIndianPhone(cleanPhone)) {
+      errors.phone = 'A valid 10-digit Indian mobile number starting with 6, 7, 8, or 9 is mandatory.';
+    } else if (!googlePhoneVerified || !googleVerificationToken) {
+      errors.phone = 'Mobile number OTP verification is mandatory. Please send and verify OTP.';
+    }
+
+    if (!googleDetailsForm.city || googleDetailsForm.city.trim().length < 2) {
+      errors.city = 'City / Location is mandatory (minimum 2 characters).';
+    }
+
+    if (googleDetailsForm.role === 'exhibitor' && (!googleDetailsForm.industry || !googleDetailsForm.industry.trim())) {
+      errors.industry = 'Please select an Industry Sector / Product Category.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setGoogleFieldErrors(errors);
+      const firstMsg = Object.values(errors)[0];
+      setFormError(firstMsg);
+      showSweetWarning(firstMsg, 'Mandatory Fields Required');
       return;
     }
 
@@ -372,92 +457,149 @@ export default function LoginPage() {
     try {
       const fullPayload = {
         ...googlePendingUser,
-        name: googleDetailsForm.name,
+        name: (googleDetailsForm.name || googlePendingUser.name || 'User').trim(),
         role: googleDetailsForm.role,
-        organizationName: googleDetailsForm.organizationName.trim(),
-        phone: googleDetailsForm.phone.trim(),
+        organizationName: (googleDetailsForm.organizationName || '').trim(),
+        phone: cleanPhone,
         phoneVerificationToken: googleVerificationToken,
-        city: googleDetailsForm.city.trim(),
-        website: googleDetailsForm.website.trim(),
+        city: (googleDetailsForm.city || '').trim(),
+        website: (googleDetailsForm.website || '').trim(),
         industry: googleDetailsForm.industry,
-        company: googleDetailsForm.organizationName.trim()
+        company: (googleDetailsForm.organizationName || '').trim()
       };
 
       const res = await loginWithGoogle(fullPayload);
       if (!res.success) {
         setFormError(res.error || 'Registration failed. Please try again.');
+        showSweetError(res.error || 'Registration failed. Please try again.', 'Registration Failed');
       } else {
+        showSweetSuccess('Account setup completed successfully! Welcome to VisitExpo.', 'Welcome!');
         router.push(getSuccessRedirect(googleDetailsForm.role));
       }
     } catch (err) {
       console.error('Google details submission error:', err);
-      setFormError(err.response?.data?.error || 'Failed to complete registration.');
+      const errText = err.response?.data?.error || 'Failed to complete registration.';
+      setFormError(errText);
+      showSweetError(errText, 'Registration Failed');
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Regular Email/Password Form Submit (with verified Phone OTP)
+  // Regular Email/Password Form Submit with strict field validation
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
-    setSubmitting(true);
 
-    try {
-      if (isSignup) {
-        if (!formData.name || !formData.email || !formData.password) {
-          setFormError('Name, email, and password are required.');
-          setSubmitting(false);
-          return;
-        }
-        if (!signupPhoneVerified || !signupVerificationToken) {
-          setFormError('Please verify your mobile number with OTP before completing registration.');
-          setSubmitting(false);
-          return;
-        }
-        if ((userRole === 'organizer' || userRole === 'exhibitor') && !formData.organizationName) {
-          setFormError(
+    if (isSignup) {
+      const errors = {};
+
+      if (!formData.name || formData.name.trim().length < 2) {
+        errors.name = 'Full Name is required (minimum 2 characters).';
+      }
+
+      if (userRole !== 'visitor') {
+        if (!formData.organizationName || formData.organizationName.trim().length < 2) {
+          errors.organizationName =
             userRole === 'exhibitor'
-              ? 'Company / Exhibitor name is required.'
-              : 'Organization name is required.'
-          );
-          setSubmitting(false);
-          return;
+              ? 'Company / Exhibitor Name is required (minimum 2 characters).'
+              : 'Organization Name is required (minimum 2 characters).';
         }
+      }
+
+      const cleanPhone = signupPhone.replace(/\D/g, '');
+      if (!cleanPhone || !isValidIndianPhone(cleanPhone)) {
+        errors.phone = 'Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.';
+      } else if (!signupPhoneVerified || !signupVerificationToken) {
+        errors.phone = 'Mobile number OTP verification is mandatory. Please send and verify OTP.';
+      }
+
+      if (!formData.city || formData.city.trim().length < 2) {
+        errors.city = 'City / Location is required (minimum 2 characters).';
+      }
+
+      if (!formData.email || !formData.email.trim()) {
+        errors.email = 'Email address is required.';
+      } else if (!isValidEmail(formData.email)) {
+        errors.email = 'Please enter a valid email address (e.g. user@example.com).';
+      }
+
+      if (!formData.password) {
+        errors.password = 'Password is required.';
+      } else if (formData.password.length < 6) {
+        errors.password = 'Password must be at least 6 characters long.';
+      }
+
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors);
+        const firstMsg = Object.values(errors)[0];
+        setFormError(firstMsg);
+        showSweetWarning(firstMsg, 'Validation Required');
+        return;
+      }
+
+      setSubmitting(true);
+      try {
         const res = await signup(
-          formData.name,
-          formData.email,
+          formData.name.trim(),
+          formData.email.trim(),
           formData.password,
-          userRole !== 'visitor' ? formData.organizationName : '',
+          userRole !== 'visitor' ? formData.organizationName.trim() : '',
           userRole,
           {
-            phone: signupPhone,
+            phone: cleanPhone,
             phoneVerificationToken: signupVerificationToken,
-            city: formData.city
+            city: formData.city.trim()
           }
         );
         if (!res.success) {
           setFormError(res.error || 'Registration failed.');
+          showSweetError(res.error || 'Registration failed.', 'Registration Failed');
         } else {
+          showSweetSuccess('Registration successful! Welcome to VisitExpo.', 'Account Created');
           router.push(getSuccessRedirect(userRole));
         }
-      } else {
-        if (!formData.email || !formData.password) {
-          setFormError('Email and Password are required.');
-          setSubmitting(false);
-          return;
-        }
-        const res = await login(formData.email, formData.password, userRole);
+      } catch (err) {
+        const errText = err.response?.data?.error || 'An unexpected error occurred. Please try again.';
+        setFormError(errText);
+        showSweetError(errText, 'Registration Failed');
+      } finally {
+        setSubmitting(false);
+      }
+    } else {
+      // Standard Login validation
+      if (!formData.email || !formData.email.trim()) {
+        setFormError('Email address is required.');
+        showSweetWarning('Please enter your email address.', 'Login Required');
+        return;
+      }
+      if (!isValidEmail(formData.email)) {
+        setFormError('Please enter a valid email address.');
+        showSweetWarning('Please enter a valid email address.', 'Invalid Email');
+        return;
+      }
+      if (!formData.password) {
+        setFormError('Password is required.');
+        showSweetWarning('Please enter your password.', 'Login Required');
+        return;
+      }
+
+      setSubmitting(true);
+      try {
+        const res = await login(formData.email.trim(), formData.password, userRole);
         if (!res.success) {
           setFormError(res.error || 'Invalid credentials.');
+          showSweetError(res.error || 'Invalid credentials.', 'Login Failed');
         } else {
           router.push(getSuccessRedirect(userRole));
         }
+      } catch (err) {
+        const errText = err.response?.data?.error || 'An unexpected error occurred. Please try again.';
+        setFormError(errText);
+        showSweetError(errText, 'Login Failed');
+      } finally {
+        setSubmitting(false);
       }
-    } catch (err) {
-      setFormError('An unexpected error occurred. Please try again.');
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -537,7 +679,11 @@ export default function LoginPage() {
             <div className="grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-zinc-100 border border-zinc-200/80 text-xs font-semibold">
               <button
                 type="button"
-                onClick={() => setGoogleDetailsForm(prev => ({ ...prev, role: 'organizer' }))}
+                onClick={() => {
+                  setGoogleDetailsForm(prev => ({ ...prev, role: 'organizer' }));
+                  setGoogleFieldErrors({});
+                  setFormError('');
+                }}
                 className={`py-2 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   googleDetailsForm.role === 'organizer'
                     ? 'bg-white text-zinc-950 shadow-sm font-bold border border-zinc-200/90'
@@ -549,7 +695,11 @@ export default function LoginPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setGoogleDetailsForm(prev => ({ ...prev, role: 'exhibitor' }))}
+                onClick={() => {
+                  setGoogleDetailsForm(prev => ({ ...prev, role: 'exhibitor', industry: prev.industry || 'Industrial & Manufacturing' }));
+                  setGoogleFieldErrors({});
+                  setFormError('');
+                }}
                 className={`py-2 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   googleDetailsForm.role === 'exhibitor'
                     ? 'bg-white text-zinc-950 shadow-sm font-bold border border-zinc-200/90'
@@ -561,7 +711,11 @@ export default function LoginPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setGoogleDetailsForm(prev => ({ ...prev, role: 'visitor' }))}
+                onClick={() => {
+                  setGoogleDetailsForm(prev => ({ ...prev, role: 'visitor' }));
+                  setGoogleFieldErrors({});
+                  setFormError('');
+                }}
                 className={`py-2 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   googleDetailsForm.role === 'visitor'
                     ? 'bg-white text-zinc-950 shadow-sm font-bold border border-zinc-200/90'
@@ -586,11 +740,20 @@ export default function LoginPage() {
                       type="text"
                       required
                       value={googleDetailsForm.organizationName}
-                      onChange={(e) => setGoogleDetailsForm(prev => ({ ...prev, organizationName: e.target.value }))}
-                      className="w-full rounded-xl border border-zinc-300 bg-zinc-50/60 focus:bg-white py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all"
+                      onChange={(e) => handleGoogleFormChange('organizationName', e.target.value)}
+                      className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none transition-all ${
+                        googleFieldErrors.organizationName
+                          ? 'border-red-400 bg-red-50/20 focus:ring-2 focus:ring-red-400'
+                          : 'border-zinc-300 bg-zinc-50/60 focus:bg-white focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent'
+                      }`}
                       placeholder={googleDetailsForm.role === 'exhibitor' ? 'e.g. Apex Industrial Solutions Ltd' : 'e.g. Global Tech Expos Pvt Ltd'}
                     />
                   </div>
+                  {googleFieldErrors.organizationName && (
+                    <p className="mt-1 text-[11px] text-red-600 font-medium flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" /> {googleFieldErrors.organizationName}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -620,7 +783,7 @@ export default function LoginPage() {
                       value={googleDetailsForm.phone}
                       onChange={(e) => {
                         const val = e.target.value.replace(/\D/g, '');
-                        setGoogleDetailsForm(prev => ({ ...prev, phone: val }));
+                        handleGoogleFormChange('phone', val);
                         setGooglePhoneVerified(false);
                         setGoogleOtpSessionId('');
                         setGoogleOtpCode('');
@@ -630,6 +793,8 @@ export default function LoginPage() {
                       className={`w-full rounded-xl border py-2.5 pl-16 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none transition-all ${
                         googlePhoneVerified
                           ? 'border-emerald-500 bg-emerald-50 text-emerald-800 font-bold'
+                          : googleFieldErrors.phone
+                          ? 'border-red-400 bg-red-50/20 focus:ring-2 focus:ring-red-400'
                           : 'border-zinc-300 bg-zinc-50/60 focus:bg-white focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent'
                       }`}
                     />
@@ -660,6 +825,7 @@ export default function LoginPage() {
                         setGoogleOtpSessionId('');
                         setGoogleOtpCode('');
                         setGoogleVerificationToken('');
+                        setGoogleFieldErrors(prev => ({ ...prev, phone: '' }));
                       }}
                       className="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-medium transition-all shrink-0 cursor-pointer"
                     >
@@ -667,6 +833,12 @@ export default function LoginPage() {
                     </button>
                   )}
                 </div>
+
+                {googleFieldErrors.phone && (
+                  <p className="mt-1 text-[11px] text-red-600 font-medium flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3 shrink-0" /> {googleFieldErrors.phone}
+                  </p>
+                )}
 
                 {/* 6-digit OTP Input for Google Auth */}
                 {googleOtpSessionId && !googlePhoneVerified && (
@@ -699,31 +871,45 @@ export default function LoginPage() {
 
               <div>
                 <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">
-                  City / Location
+                  City / Location *
                 </label>
                 <div className="relative">
                   <MapPin className="absolute left-3 top-3 h-4.5 w-4.5 text-zinc-400" />
                   <input
                     type="text"
+                    required
                     value={googleDetailsForm.city}
-                    onChange={(e) => setGoogleDetailsForm(prev => ({ ...prev, city: e.target.value }))}
-                    className="w-full rounded-xl border border-zinc-300 bg-zinc-50/60 focus:bg-white py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all"
+                    onChange={(e) => handleGoogleFormChange('city', e.target.value)}
+                    className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none transition-all ${
+                      googleFieldErrors.city
+                        ? 'border-red-400 bg-red-50/20 focus:ring-2 focus:ring-red-400'
+                        : 'border-zinc-300 bg-zinc-50/60 focus:bg-white focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent'
+                    }`}
                     placeholder="e.g. Mumbai, New Delhi"
                   />
                 </div>
+                {googleFieldErrors.city && (
+                  <p className="mt-1 text-[11px] text-red-600 font-medium flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3 shrink-0" /> {googleFieldErrors.city}
+                  </p>
+                )}
               </div>
 
               {googleDetailsForm.role === 'exhibitor' && (
                 <div>
                   <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">
-                    Industry Sector / Product Category
+                    Industry Sector / Product Category *
                   </label>
                   <div className="relative">
                     <Briefcase className="absolute left-3 top-3 h-4.5 w-4.5 text-zinc-400" />
                     <select
                       value={googleDetailsForm.industry}
-                      onChange={(e) => setGoogleDetailsForm(prev => ({ ...prev, industry: e.target.value }))}
-                      className="w-full rounded-xl border border-zinc-300 bg-zinc-50/60 focus:bg-white py-2.5 pl-10 pr-4 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all cursor-pointer"
+                      onChange={(e) => handleGoogleFormChange('industry', e.target.value)}
+                      className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-zinc-900 focus:outline-none transition-all cursor-pointer ${
+                        googleFieldErrors.industry
+                          ? 'border-red-400 bg-red-50/20 focus:ring-2 focus:ring-red-400'
+                          : 'border-zinc-300 bg-zinc-50/60 focus:bg-white focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent'
+                      }`}
                     >
                       {INDUSTRY_OPTIONS.map((ind) => (
                         <option key={ind} value={ind} className="bg-white text-zinc-900">
@@ -732,6 +918,11 @@ export default function LoginPage() {
                       ))}
                     </select>
                   </div>
+                  {googleFieldErrors.industry && (
+                    <p className="mt-1 text-[11px] text-red-600 font-medium flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" /> {googleFieldErrors.industry}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -745,7 +936,7 @@ export default function LoginPage() {
                     <input
                       type="url"
                       value={googleDetailsForm.website}
-                      onChange={(e) => setGoogleDetailsForm(prev => ({ ...prev, website: e.target.value }))}
+                      onChange={(e) => handleGoogleFormChange('website', e.target.value)}
                       className="w-full rounded-xl border border-zinc-300 bg-zinc-50/60 focus:bg-white py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all"
                       placeholder="https://..."
                     />
@@ -756,7 +947,7 @@ export default function LoginPage() {
               <div className="pt-2 flex flex-col sm:flex-row items-center gap-2.5">
                 <button
                   type="submit"
-                  disabled={submitting || !googlePhoneVerified}
+                  disabled={submitting}
                   className="w-full flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold py-3 px-4 text-sm transition-all shadow-md shadow-amber-500/10 cursor-pointer disabled:opacity-50"
                 >
                   {submitting ? (
@@ -776,6 +967,7 @@ export default function LoginPage() {
                   onClick={() => {
                     setGooglePendingUser(null);
                     setFormError('');
+                    setGoogleFieldErrors({});
                   }}
                   className="w-full sm:w-auto px-4 py-3 rounded-xl border border-zinc-200 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-semibold transition-all cursor-pointer"
                 >
@@ -822,6 +1014,7 @@ export default function LoginPage() {
                 onClick={() => {
                   setUserRole('organizer');
                   setFormError('');
+                  setFieldErrors({});
                 }}
                 className={`py-2 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   userRole === 'organizer'
@@ -837,6 +1030,7 @@ export default function LoginPage() {
                 onClick={() => {
                   setUserRole('exhibitor');
                   setFormError('');
+                  setFieldErrors({});
                 }}
                 className={`py-2 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   userRole === 'exhibitor'
@@ -852,6 +1046,7 @@ export default function LoginPage() {
                 onClick={() => {
                   setUserRole('visitor');
                   setFormError('');
+                  setFieldErrors({});
                 }}
                 className={`py-2 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   userRole === 'visitor'
@@ -963,7 +1158,9 @@ export default function LoginPage() {
               {isSignup && (
                 <>
                   <div>
-                    <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">Full Name</label>
+                    <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">
+                      Full Name *
+                    </label>
                     <div className="relative">
                       <User className="absolute left-3 top-3 h-4.5 w-4.5 text-zinc-400" />
                       <input
@@ -972,10 +1169,19 @@ export default function LoginPage() {
                         required
                         value={formData.name}
                         onChange={handleFormChange}
-                        className="w-full rounded-xl border border-zinc-300 bg-zinc-50/60 focus:bg-white py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all"
+                        className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none transition-all ${
+                          fieldErrors.name
+                            ? 'border-red-400 bg-red-50/20 focus:ring-2 focus:ring-red-400'
+                            : 'border-zinc-300 bg-zinc-50/60 focus:bg-white focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent'
+                        }`}
                         placeholder="John Doe"
                       />
                     </div>
+                    {fieldErrors.name && (
+                      <p className="mt-1 text-[11px] text-red-600 font-medium flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.name}
+                      </p>
+                    )}
                   </div>
 
                   {userRole !== 'visitor' && (
@@ -991,10 +1197,19 @@ export default function LoginPage() {
                           required
                           value={formData.organizationName}
                           onChange={handleFormChange}
-                          className="w-full rounded-xl border border-zinc-300 bg-zinc-50/60 focus:bg-white py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all"
+                          className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none transition-all ${
+                            fieldErrors.organizationName
+                              ? 'border-red-400 bg-red-50/20 focus:ring-2 focus:ring-red-400'
+                              : 'border-zinc-300 bg-zinc-50/60 focus:bg-white focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent'
+                          }`}
                           placeholder={userRole === 'exhibitor' ? 'e.g. Apex Industrial Solutions' : 'e.g. Expo Masters Ltd'}
                         />
                       </div>
+                      {fieldErrors.organizationName && (
+                        <p className="mt-1 text-[11px] text-red-600 font-medium flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.organizationName}
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -1023,16 +1238,22 @@ export default function LoginPage() {
                           disabled={signupPhoneVerified}
                           value={signupPhone}
                           onChange={(e) => {
-                            setSignupPhone(e.target.value.replace(/\D/g, ''));
+                            const val = e.target.value.replace(/\D/g, '');
+                            setSignupPhone(val);
                             setSignupPhoneVerified(false);
                             setSignupOtpSessionId('');
                             setSignupOtpCode('');
                             setSignupVerificationToken('');
+                            if (fieldErrors.phone) {
+                              setFieldErrors(prev => ({ ...prev, phone: '' }));
+                            }
                           }}
                           placeholder="9876543210"
                           className={`w-full rounded-xl border py-2.5 pl-16 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none transition-all ${
                             signupPhoneVerified
                               ? 'border-emerald-500 bg-emerald-50 text-emerald-800 font-bold'
+                              : fieldErrors.phone
+                              ? 'border-red-400 bg-red-50/20 focus:ring-2 focus:ring-red-400'
                               : 'border-zinc-300 bg-zinc-50/60 focus:bg-white focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent'
                           }`}
                         />
@@ -1063,6 +1284,7 @@ export default function LoginPage() {
                             setSignupOtpSessionId('');
                             setSignupOtpCode('');
                             setSignupVerificationToken('');
+                            setFieldErrors(prev => ({ ...prev, phone: '' }));
                           }}
                           className="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-medium transition-all shrink-0 cursor-pointer"
                         >
@@ -1070,6 +1292,12 @@ export default function LoginPage() {
                         </button>
                       )}
                     </div>
+
+                    {fieldErrors.phone && (
+                      <p className="mt-1 text-[11px] text-red-600 font-medium flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.phone}
+                      </p>
+                    )}
 
                     {/* 6-Digit OTP Input Box */}
                     {signupOtpSessionId && !signupPhoneVerified && (
@@ -1101,24 +1329,38 @@ export default function LoginPage() {
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">City / Location (Optional)</label>
+                    <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">
+                      City / Location *
+                    </label>
                     <div className="relative">
                       <MapPin className="absolute left-3 top-3 h-4.5 w-4.5 text-zinc-400" />
                       <input
                         type="text"
                         name="city"
+                        required
                         value={formData.city}
                         onChange={handleFormChange}
-                        className="w-full rounded-xl border border-zinc-300 bg-zinc-50/60 focus:bg-white py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all"
+                        className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none transition-all ${
+                          fieldErrors.city
+                            ? 'border-red-400 bg-red-50/20 focus:ring-2 focus:ring-red-400'
+                            : 'border-zinc-300 bg-zinc-50/60 focus:bg-white focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent'
+                        }`}
                         placeholder="e.g. Mumbai, New Delhi"
                       />
                     </div>
+                    {fieldErrors.city && (
+                      <p className="mt-1 text-[11px] text-red-600 font-medium flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.city}
+                      </p>
+                    )}
                   </div>
                 </>
               )}
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">Email Address</label>
+                <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">
+                  Email Address *
+                </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 h-4.5 w-4.5 text-zinc-400" />
                   <input
@@ -1127,14 +1369,25 @@ export default function LoginPage() {
                     required
                     value={formData.email}
                     onChange={handleFormChange}
-                    className="w-full rounded-xl border border-zinc-300 bg-zinc-50/60 focus:bg-white py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all"
+                    className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none transition-all ${
+                      fieldErrors.email
+                        ? 'border-red-400 bg-red-50/20 focus:ring-2 focus:ring-red-400'
+                        : 'border-zinc-300 bg-zinc-50/60 focus:bg-white focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent'
+                    }`}
                     placeholder="user@example.com"
                   />
                 </div>
+                {fieldErrors.email && (
+                  <p className="mt-1 text-[11px] text-red-600 font-medium flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.email}
+                  </p>
+                )}
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">Password</label>
+                <label className="block text-[10px] font-bold text-zinc-600 mb-1 uppercase tracking-wider">
+                  Password *
+                </label>
                 <div className="relative">
                   <Key className="absolute left-3 top-3 h-4.5 w-4.5 text-zinc-400" />
                   <input
@@ -1143,22 +1396,31 @@ export default function LoginPage() {
                     required
                     value={formData.password}
                     onChange={handleFormChange}
-                    className="w-full rounded-xl border border-zinc-300 bg-zinc-50/60 focus:bg-white py-2.5 pl-10 pr-10 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent transition-all"
+                    className={`w-full rounded-xl border py-2.5 pl-10 pr-10 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none transition-all ${
+                      fieldErrors.password
+                        ? 'border-red-400 bg-red-50/20 focus:ring-2 focus:ring-red-400'
+                        : 'border-zinc-300 bg-zinc-50/60 focus:bg-white focus:ring-2 focus:ring-[#FFCC00] focus:border-transparent'
+                    }`}
                     placeholder="••••••••"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3 text-zinc-400 hover:text-zinc-600"
+                    className="absolute right-3 top-3 text-zinc-400 hover:text-zinc-600 cursor-pointer"
                   >
                     {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
                   </button>
                 </div>
+                {fieldErrors.password && (
+                  <p className="mt-1 text-[11px] text-red-600 font-medium flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.password}
+                  </p>
+                )}
               </div>
 
               <button
                 type="submit"
-                disabled={submitting || (isSignup && !signupPhoneVerified)}
+                disabled={submitting}
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold py-3 text-sm transition-all shadow-md shadow-amber-500/10 mt-6 cursor-pointer disabled:opacity-50"
               >
                 {submitting ? (
@@ -1185,6 +1447,7 @@ export default function LoginPage() {
                 onClick={() => {
                   setIsSignup(!isSignup);
                   setFormError('');
+                  setFieldErrors({});
                   setSignupPhoneVerified(false);
                   setSignupOtpSessionId('');
                   setSignupOtpCode('');

@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
+import SearchableSelect from '../../../components/SearchableSelect.js';
 import {
   Ticket,
   Plus,
@@ -41,6 +42,8 @@ import {
   Mail,
   Phone
 } from 'lucide-react';
+import { CURRENCY_OPTIONS, getCurrencySymbol } from '../events/wizard/page.js';
+import { showSweetAlert, showSweetConfirm, showSweetSuccess, showSweetError, showSweetWarning } from '../../../utils/sweetalert.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -218,7 +221,7 @@ export default function TicketingPage() {
   const handleCreateTier = async (e) => {
     e.preventDefault();
     if (!newTier.title || newTier.capacity === undefined) {
-      alert('Ticket name and Capacity are required');
+      showSweetWarning('Ticket name and Capacity are required');
       return;
     }
 
@@ -239,10 +242,11 @@ export default function TicketingPage() {
           currency: 'INR',
           capacity: 500
         });
+        showSweetSuccess(`Ticket tier "${res.data.ticket?.title}" created successfully!`);
       }
     } catch (err) {
       console.error('Error creating ticket tier', err);
-      alert('Failed to save ticket tier');
+      showSweetError('Failed to save ticket tier');
     }
   };
 
@@ -250,7 +254,7 @@ export default function TicketingPage() {
   const handleSimulateCheckout = async (e) => {
     e.preventDefault();
     if (!simulateForm.ticketId || !simulateForm.buyer.name || !simulateForm.buyer.email) {
-      alert('Please select a ticket tier and fill name/email.');
+      showSweetWarning('Please select a ticket tier and fill name/email.');
       return;
     }
 
@@ -264,7 +268,7 @@ export default function TicketingPage() {
       });
 
       if (res.data && res.data.success) {
-        alert(`Purchase successful!\nOrder: ${res.data.orderNumber}\nStatus: ${res.data.status}`);
+        showSweetSuccess(`Order: ${res.data.orderNumber}\nStatus: ${res.data.status}`, 'Purchase Successful!');
         setIsSimulateModalOpen(false);
         setSimulateForm({
           ticketId: tickets[0]?._id || '',
@@ -276,7 +280,7 @@ export default function TicketingPage() {
       }
     } catch (err) {
       console.error('Error in simulation checkout', err);
-      alert(err.response?.data?.error || 'Simulated purchase failed');
+      showSweetError(err.response?.data?.error || 'Simulated purchase failed');
     } finally {
       setSimulating(false);
     }
@@ -284,7 +288,15 @@ export default function TicketingPage() {
 
   // Delete Ticket Tier
   const handleDeleteTier = async (id) => {
-    if (!window.confirm('Are you sure you want to remove this ticket tier?')) return;
+    const confirmed = await showSweetConfirm({
+      title: 'Remove Ticket Tier?',
+      text: 'Are you sure you want to remove this ticket tier? Existing orders will not be affected.',
+      icon: 'warning',
+      confirmButtonText: 'Yes, Remove',
+      cancelButtonText: 'Cancel',
+      isDanger: true
+    });
+    if (!confirmed) return;
     try {
       const res = await axios.delete(`${API_URL}/tickets/${id}`, {
         headers: { Authorization: `Bearer ${accessToken}` }
@@ -294,7 +306,7 @@ export default function TicketingPage() {
       }
     } catch (err) {
       console.error('Delete tier failed', err);
-      alert('Failed to delete tier');
+      showSweetError('Failed to delete tier');
     }
   };
 
@@ -302,7 +314,7 @@ export default function TicketingPage() {
   const handleRaiseSupportTicket = async (e) => {
     e.preventDefault();
     if (!newSupportTicket.title || !newSupportTicket.description) {
-      alert('Ticket title and description are required.');
+      showSweetWarning('Ticket title and description are required.');
       return;
     }
 
@@ -318,7 +330,7 @@ export default function TicketingPage() {
       );
 
       if (res.data && res.data.success) {
-        alert(`Support Ticket ${res.data.ticket.ticketId} submitted successfully!`);
+        showSweetSuccess(`Support Ticket ${res.data.ticket.ticketId} submitted successfully!`);
         setIsRaiseTicketModalOpen(false);
         setNewSupportTicket({
           title: '',
@@ -331,7 +343,7 @@ export default function TicketingPage() {
       }
     } catch (err) {
       console.error('Error raising support ticket', err);
-      alert(err.response?.data?.error || 'Failed to submit support ticket.');
+      showSweetError(err.response?.data?.error || 'Failed to submit support ticket.');
     } finally {
       setRaisingTicket(false);
     }
@@ -357,7 +369,7 @@ export default function TicketingPage() {
       }
     } catch (err) {
       console.error('Error posting reply', err);
-      alert('Failed to send reply');
+      showSweetError('Failed to send reply');
     } finally {
       setPostingReply(false);
     }
@@ -379,7 +391,7 @@ export default function TicketingPage() {
       }
     } catch (err) {
       console.error('Error marking resolved', err);
-      alert('Failed to update ticket status');
+      showSweetError('Failed to update ticket status');
     }
   };
 
@@ -456,25 +468,25 @@ export default function TicketingPage() {
         <>
           {/* Active Event Selector Header */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-xl border border-border shadow-sm">
-            <div className="flex items-center gap-3">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Event:</label>
-              <select
-                value={selectedEventId}
-                onChange={(e) => setSelectedEventId(e.target.value)}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary w-64"
-              >
-                {events.map((evt) => {
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-[280px]">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider shrink-0">Active Event:</label>
+              <SearchableSelect
+                options={events.map((evt) => {
                   const userOrgId = user?.organization?._id || user?.organization;
                   const userId = user?._id || user?.id;
                   const aOrg = evt.organizer?._id || evt.organizer;
                   const isMine = (userOrgId && aOrg?.toString() === userOrgId?.toString()) || (userId && evt.claimedBy?.toString() === userId?.toString());
-                  return (
-                    <option key={evt._id} value={evt._id}>
-                      {isMine ? `⭐ ${evt.title} (Your Event)` : evt.title}
-                    </option>
-                  );
+                  return {
+                    value: evt._id,
+                    label: isMine ? `⭐ ${evt.title} (Your Event)` : evt.title
+                  };
                 })}
-              </select>
+                value={selectedEventId}
+                onChange={(val) => setSelectedEventId(val)}
+                placeholder="Select active event..."
+                searchPlaceholder="Search active event..."
+                className="w-full sm:w-72"
+              />
             </div>
             <div className="flex gap-2">
               <button
@@ -559,7 +571,7 @@ export default function TicketingPage() {
                       </div>
                       <div className="text-right">
                         <span className="text-lg font-extrabold text-foreground font-mono">
-                          {t.price === 0 ? 'FREE' : `₹${t.price.toLocaleString()}`}
+                          {t.price === 0 ? 'FREE' : `${getCurrencySymbol(t.currency)}${t.price.toLocaleString()}`}
                         </span>
                       </div>
                     </div>
@@ -627,7 +639,7 @@ export default function TicketingPage() {
                               ))}
                             </td>
                             <td className="px-5 py-3.5 font-bold font-mono text-foreground">
-                              ₹{ord.totalAmount?.toLocaleString()}
+                              {getCurrencySymbol(ord.currency)}{ord.totalAmount?.toLocaleString()}
                             </td>
                             <td className="px-5 py-3.5">
                               <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
@@ -901,18 +913,16 @@ export default function TicketingPage() {
 
               <div>
                 <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Related Event (Optional)</label>
-                <select
+                <SearchableSelect
+                  options={[
+                    { value: '', label: '-- General Account Ticket --' },
+                    ...events.map(evt => ({ value: evt._id, label: evt.title }))
+                  ]}
                   value={newSupportTicket.eventId}
-                  onChange={(e) => setNewSupportTicket(prev => ({ ...prev, eventId: e.target.value }))}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="">-- General Account Ticket --</option>
-                  {events.map((evt) => (
-                    <option key={evt._id} value={evt._id}>
-                      {evt.title}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setNewSupportTicket(prev => ({ ...prev, eventId: val }))}
+                  placeholder="Select related event..."
+                  searchPlaceholder="Search events..."
+                />
               </div>
 
               <div>
@@ -1138,26 +1148,38 @@ export default function TicketingPage() {
               {newTier.type !== 'free' && (
                 <div className="grid gap-4 grid-cols-2">
                   <div>
-                    <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Price *</label>
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      value={newTier.price}
-                      onChange={(e) => setNewTier(prev => ({ ...prev, price: parseInt(e.target.value) || 0 }))}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+                    <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Currency *</label>
+                    <SearchableSelect
+                      options={CURRENCY_OPTIONS.map(c => ({
+                        value: c.code,
+                        label: `${c.flag} ${c.code} (${c.symbol}) - ${c.name}`,
+                        subtext: `${c.name} ${c.symbol}`,
+                        flag: c.flag
+                      }))}
+                      value={newTier.currency || 'INR'}
+                      onChange={(val) => setNewTier(prev => ({ ...prev, currency: val }))}
+                      placeholder="Select currency..."
+                      searchPlaceholder="Search currency (e.g. USD, EUR, INR)..."
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Currency</label>
-                    <select
-                      value={newTier.currency}
-                      onChange={(e) => setNewTier(prev => ({ ...prev, currency: e.target.value }))}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono"
-                    >
-                      <option value="INR">INR (₹)</option>
-                      <option value="USD">USD ($)</option>
-                    </select>
+                    <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">
+                      Price ({getCurrencySymbol(newTier.currency)}) *
+                    </label>
+                    <div className="relative flex items-center">
+                      <span className="bg-muted px-3 py-2 rounded-l-lg border border-r-0 border-border text-xs text-muted-foreground font-bold shrink-0">
+                        {getCurrencySymbol(newTier.currency)}
+                      </span>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        step="any"
+                        value={newTier.price}
+                        onChange={(e) => setNewTier(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                        className="w-full rounded-r-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -1197,18 +1219,16 @@ export default function TicketingPage() {
             <form onSubmit={handleSimulateCheckout} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Select Ticket Tier *</label>
-                <select
-                  required
+                <SearchableSelect
+                  options={tickets.map(t => ({
+                    value: t._id,
+                    label: `${t.title} (${t.price === 0 ? 'FREE' : `${getCurrencySymbol(t.currency)}${t.price.toLocaleString()}`})`
+                  }))}
                   value={simulateForm.ticketId}
-                  onChange={(e) => setSimulateForm(prev => ({ ...prev, ticketId: e.target.value }))}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  {tickets.map(t => (
-                    <option key={t._id} value={t._id}>
-                      {t.title} ({t.price === 0 ? 'FREE' : `₹${t.price.toLocaleString()}`})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setSimulateForm(prev => ({ ...prev, ticketId: val }))}
+                  placeholder="Select ticket tier..."
+                  searchPlaceholder="Search ticket tier..."
+                />
               </div>
 
               <div className="grid gap-4 grid-cols-2">
@@ -1443,10 +1463,10 @@ export default function TicketingPage() {
                             x{item.quantity}
                           </td>
                           <td className="px-4 py-3 text-right font-mono text-muted-foreground">
-                            {item.price === 0 ? 'FREE' : `₹${item.price?.toLocaleString()}`}
+                            {item.price === 0 ? 'FREE' : `${getCurrencySymbol(selectedOrder.currency)}${item.price?.toLocaleString()}`}
                           </td>
                           <td className="px-4 py-3 text-right font-mono font-bold text-foreground">
-                            {item.price * item.quantity === 0 ? 'FREE' : `₹${(item.price * item.quantity).toLocaleString()}`}
+                            {item.price * item.quantity === 0 ? 'FREE' : `${getCurrencySymbol(selectedOrder.currency)}${(item.price * item.quantity).toLocaleString()}`}
                           </td>
                         </tr>
                       ))}
@@ -1463,7 +1483,7 @@ export default function TicketingPage() {
                 </div>
                 <div className="text-right">
                   <span className="text-2xl font-black font-mono text-primary">
-                    {selectedOrder.totalAmount === 0 ? 'FREE' : `₹${selectedOrder.totalAmount?.toLocaleString()}`}
+                    {selectedOrder.totalAmount === 0 ? 'FREE' : `${getCurrencySymbol(selectedOrder.currency)}${selectedOrder.totalAmount?.toLocaleString()}`}
                   </span>
                 </div>
               </div>

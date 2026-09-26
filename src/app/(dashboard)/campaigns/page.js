@@ -9,6 +9,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
+import SearchableSelect from '../../../components/SearchableSelect.js';
 import {
   Mail,
   Send,
@@ -238,19 +239,16 @@ export default function CampaignsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex flex-col">
+          <div className="flex flex-col min-w-[280px]">
             <label className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Active Event</label>
-            <select
+            <SearchableSelect
+              options={events.map((evt) => ({ value: evt._id, label: evt.title }))}
               value={selectedEventId}
-              onChange={(e) => setSelectedEventId(e.target.value)}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary w-60"
-            >
-              {events.map((evt) => (
-                <option key={evt._id} value={evt._id}>
-                  {evt.title}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedEventId(val)}
+              placeholder="Select active event..."
+              searchPlaceholder="Search active event..."
+              className="w-full"
+            />
           </div>
           <button
             onClick={() => setIsCreateModalOpen(true)}
@@ -429,15 +427,17 @@ export default function CampaignsPage() {
               <div className="grid gap-4 grid-cols-2">
                 <div className="col-span-2">
                   <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Channel</label>
-                  <select
+                  <SearchableSelect
+                    options={[
+                      { value: 'email', label: 'Email Broadcast' },
+                      { value: 'whatsapp', label: 'WhatsApp Message' },
+                      { value: 'sms', label: 'SMS Text' }
+                    ]}
                     value={newCampaign.channel}
-                    onChange={(e) => setNewCampaign(prev => ({ ...prev, channel: e.target.value }))}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="email">Email Broadcast</option>
-                    <option value="whatsapp">WhatsApp Message</option>
-                    <option value="sms">SMS Text</option>
-                  </select>
+                    onChange={(val) => setNewCampaign(prev => ({ ...prev, channel: val }))}
+                    placeholder="Select broadcast channel..."
+                    searchPlaceholder="Search channel..."
+                  />
                 </div>
               </div>
 

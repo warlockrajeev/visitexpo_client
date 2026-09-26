@@ -8,6 +8,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
+import SearchableSelect from '../../../components/SearchableSelect.js';
+import { showSweetAlert, showSweetConfirm, showSweetSuccess, showSweetError, showSweetWarning } from '../../../utils/sweetalert.js';
 import {
   Users,
   Search,
@@ -169,7 +171,7 @@ export default function VisitorsCRMPage() {
       }
     } catch (err) {
       console.error('Checkin error', err);
-      alert(err.response?.data?.error || 'Check-in failed');
+      showSweetError(err.response?.data?.error || 'Check-in failed');
     }
   };
 
@@ -186,7 +188,7 @@ export default function VisitorsCRMPage() {
       }
     } catch (err) {
       console.error('Virtual join error', err);
-      alert(err.response?.data?.error || 'Virtual join failed');
+      showSweetError(err.response?.data?.error || 'Virtual join failed');
     }
   };
 
@@ -194,7 +196,7 @@ export default function VisitorsCRMPage() {
   const handleOnboardSubmit = async (e) => {
     e.preventDefault();
     if (!newVisitor.name || !newVisitor.email || !newVisitor.phone) {
-      alert('Name, Email, and Phone are required.');
+      showSweetWarning('Name, Email, and Phone are required.');
       return;
     }
 
@@ -222,13 +224,21 @@ export default function VisitorsCRMPage() {
       }
     } catch (err) {
       console.error('Failed to register visitor', err);
-      alert('Error: ' + (err.response?.data?.error || err.message));
+      showSweetError('Error: ' + (err.response?.data?.error || err.message));
     }
   };
 
   // 6. Handle Delete Individual Visitor
   const handleDeleteVisitor = async (id) => {
-    if (!window.confirm('Are you sure you want to remove this visitor record?')) return;
+    const confirmed = await showSweetConfirm({
+      title: 'Remove Visitor?',
+      text: 'Are you sure you want to remove this visitor record?',
+      icon: 'warning',
+      confirmButtonText: 'Yes, Remove',
+      cancelButtonText: 'Cancel',
+      isDanger: true
+    });
+    if (!confirmed) return;
     try {
       const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
       const res = await axios.delete(`${API_URL}/visitors/${id}`, { headers });
@@ -237,7 +247,7 @@ export default function VisitorsCRMPage() {
       }
     } catch (err) {
       console.error('Failed to delete visitor', err);
-      alert('Error deleting visitor: ' + (err.response?.data?.error || err.message));
+      showSweetError('Error deleting visitor: ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -278,19 +288,16 @@ export default function VisitorsCRMPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex flex-col">
+          <div className="flex flex-col min-w-[280px] sm:min-w-[320px]">
             <label className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Active Event</label>
-            <select
+            <SearchableSelect
+              options={events.map((evt) => ({ value: evt._id, label: evt.title }))}
               value={selectedEventId}
-              onChange={(e) => setSelectedEventId(e.target.value)}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              {events.map((evt) => (
-                <option key={evt._id} value={evt._id}>
-                  {evt.title}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedEventId(val)}
+              placeholder="Select active event..."
+              searchPlaceholder="Search active event..."
+              className="w-full"
+            />
           </div>
           <button
             onClick={() => setIsModalOpen(true)}
@@ -778,14 +785,16 @@ export default function VisitorsCRMPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Attendance Type</label>
-                  <select
+                  <SearchableSelect
+                    options={[
+                      { value: 'in_person', label: 'In Person (QR Access)' },
+                      { value: 'virtual', label: 'Virtual (Digital Stream)' }
+                    ]}
                     value={newVisitor.attendanceType}
-                    onChange={(e) => setNewVisitor(prev => ({ ...prev, attendanceType: e.target.value }))}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="in_person">In Person (QR Access)</option>
-                    <option value="virtual">Virtual (Digital Stream)</option>
-                  </select>
+                    onChange={(val) => setNewVisitor(prev => ({ ...prev, attendanceType: val }))}
+                    placeholder="Select attendance type..."
+                    searchPlaceholder="Search type..."
+                  />
                 </div>
               </div>
 

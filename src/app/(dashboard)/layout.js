@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 
 import axios from 'axios';
+import { initSweetAlertInterceptors } from '../../utils/sweetalert.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -46,6 +47,10 @@ export default function DashboardLayout({ children }) {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const { user, loading, logout, isExhibitorView, setIsExhibitorView, toggleDashboardView, hasExhibitorProfile } = useAuth();
+
+  useEffect(() => {
+    initSweetAlertInterceptors();
+  }, []);
 
   const handleToggleView = () => {
     if (typeof toggleDashboardView === 'function') {

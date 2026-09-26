@@ -8,6 +8,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
+import SearchableSelect from '../../../components/SearchableSelect.js';
+import { showSweetAlert, showSweetConfirm, showSweetSuccess, showSweetError, showSweetWarning } from '../../../utils/sweetalert.js';
 import {
   Building,
   Search,
@@ -136,13 +138,21 @@ export default function ExhibitorsPage() {
       }
     } catch (err) {
       console.error('Failed to update status', err);
-      alert('Error updating exhibitor status: ' + (err.response?.data?.error || err.message));
+      showSweetError('Error updating exhibitor status: ' + (err.response?.data?.error || err.message));
     }
   };
 
   // 4. Handle Delete
   const handleDeleteExhibitor = async (id) => {
-    if (!window.confirm('Are you sure you want to remove this exhibitor?')) return;
+    const confirmed = await showSweetConfirm({
+      title: 'Remove Exhibitor?',
+      text: 'Are you sure you want to remove this exhibitor from the event?',
+      icon: 'warning',
+      confirmButtonText: 'Yes, Remove',
+      cancelButtonText: 'Cancel',
+      isDanger: true
+    });
+    if (!confirmed) return;
 
     try {
       const res = await axios.delete(`${API_URL}/exhibitors/${id}`, {
@@ -153,14 +163,14 @@ export default function ExhibitorsPage() {
       }
     } catch (err) {
       console.error('Failed to delete exhibitor', err);
-      alert('Error deleting exhibitor.');
+      showSweetError('Error deleting exhibitor.');
     }
   };
 
   // 5. Add Staff Member in Form
   const addStaffMember = () => {
     if (!newStaffMember.name || !newStaffMember.email) {
-      alert('Staff name and email are required');
+      showSweetWarning('Staff name and email are required');
       return;
     }
     setNewExhibitor(prev => ({
@@ -182,11 +192,11 @@ export default function ExhibitorsPage() {
   const handleOnboardSubmit = async (e) => {
     e.preventDefault();
     if (!selectedEventId) {
-      alert('Please select an Active Event before onboarding an exhibitor.');
+      showSweetWarning('Please select an Active Event before onboarding an exhibitor.');
       return;
     }
     if (!newExhibitor.name || !newExhibitor.description || !newExhibitor.contactEmail || !newExhibitor.contactPhone) {
-      alert('Please fill out all required fields');
+      showSweetWarning('Please fill out all required fields');
       return;
     }
 
@@ -203,7 +213,7 @@ export default function ExhibitorsPage() {
         // Onboarded exhibitor goes to Admin for review & approval
         setExhibitors(prev => [created, ...prev]);
 
-        alert(`Exhibitor "${created.name}" onboarded successfully! Application has been forwarded to the Super Admin for review & approval.`);
+        showSweetSuccess(`Exhibitor "${created.name}" onboarded successfully! Application has been forwarded to the Super Admin for review & approval.`);
 
         // Reset form
         setNewExhibitor({
@@ -221,7 +231,7 @@ export default function ExhibitorsPage() {
       }
     } catch (err) {
       console.error('Failed to onboard exhibitor', err);
-      alert('Error onboarding exhibitor: ' + (err.response?.data?.error || err.message));
+      showSweetError('Error onboarding exhibitor: ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -254,19 +264,16 @@ export default function ExhibitorsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex flex-col">
+          <div className="flex flex-col min-w-[280px]">
             <label className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Active Event</label>
-            <select
+            <SearchableSelect
+              options={events.map((evt) => ({ value: evt._id, label: evt.title }))}
               value={selectedEventId}
-              onChange={(e) => setSelectedEventId(e.target.value)}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              {events.map((evt) => (
-                <option key={evt._id} value={evt._id}>
-                  {evt.title}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedEventId(val)}
+              placeholder="Select active event..."
+              searchPlaceholder="Search active event..."
+              className="w-full"
+            />
           </div>
           <button
             onClick={() => setIsModalOpen(true)}
@@ -503,17 +510,13 @@ export default function ExhibitorsPage() {
             <form onSubmit={handleOnboardSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Target Event *</label>
-                <select
-                  required
+                <SearchableSelect
+                  options={events.map(evt => ({ value: evt._id, label: `${evt.title}${evt.city ? ` (${evt.city})` : ''}` }))}
                   value={selectedEventId}
-                  onChange={(e) => setSelectedEventId(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-semibold"
-                >
-                  {events.length === 0 && <option value="">No events found. Please create an event first.</option>}
-                  {events.map(evt => (
-                    <option key={evt._id} value={evt._id}>{evt.title} ({evt.city})</option>
-                  ))}
-                </select>
+                  onChange={(val) => setSelectedEventId(val)}
+                  placeholder="Select target event..."
+                  searchPlaceholder="Search events..."
+                />
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
@@ -590,15 +593,17 @@ export default function ExhibitorsPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Booth Type</label>
-                  <select
+                  <SearchableSelect
+                    options={[
+                      { value: 'in_person', label: 'In Person Only' },
+                      { value: 'virtual', label: 'Virtual Only' },
+                      { value: 'hybrid', label: 'Hybrid' }
+                    ]}
                     value={newExhibitor.attendanceType}
-                    onChange={(e) => setNewExhibitor(prev => ({ ...prev, attendanceType: e.target.value }))}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="in_person">In Person Only</option>
-                    <option value="virtual">Virtual Only</option>
-                    <option value="hybrid">Hybrid</option>
-                  </select>
+                    onChange={(val) => setNewExhibitor(prev => ({ ...prev, attendanceType: val }))}
+                    placeholder="Select booth type..."
+                    searchPlaceholder="Search type..."
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Logo URL</label>

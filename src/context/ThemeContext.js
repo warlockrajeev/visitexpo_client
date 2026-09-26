@@ -6,6 +6,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { initSweetAlertInterceptors } from '../utils/sweetalert.js';
 
 const ThemeContext = createContext();
 
@@ -23,6 +24,7 @@ export const ThemeProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    initSweetAlertInterceptors();
     // Check localStorage or system settings
     const savedTheme = localStorage.getItem('visitexpo-theme');
     if (savedTheme) {

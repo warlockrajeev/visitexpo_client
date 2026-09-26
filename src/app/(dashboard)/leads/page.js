@@ -10,6 +10,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
+import SearchableSelect from '../../../components/SearchableSelect.js';
+import { showSweetAlert, showSweetConfirm, showSweetSuccess, showSweetError, showSweetWarning } from '../../../utils/sweetalert.js';
 import {
   Search,
   Filter,
@@ -319,14 +321,22 @@ export default function LeadsCRMPage() {
       }
     } catch (err) {
       console.error('Error updating lead status', err);
-      alert('Failed to update lead');
+      showSweetError('Failed to update lead');
     }
   };
 
   // Delete lead
   const handleDeleteLead = async (leadId, e) => {
     if (e) e.stopPropagation();
-    if (!window.confirm('Are you sure you want to remove this lead record?')) return;
+    const confirmed = await showSweetConfirm({
+      title: 'Remove Lead Record?',
+      text: 'Are you sure you want to remove this lead record? This action cannot be undone.',
+      icon: 'warning',
+      confirmButtonText: 'Yes, Delete',
+      cancelButtonText: 'Cancel',
+      isDanger: true
+    });
+    if (!confirmed) return;
     try {
       const res = await axios.delete(`${API_URL}/leads/${leadId}`, {
         headers: { Authorization: `Bearer ${accessToken}` }
@@ -344,7 +354,7 @@ export default function LeadsCRMPage() {
       }
     } catch (err) {
       console.error('Error deleting lead', err);
-      alert('Failed to delete lead');
+      showSweetError('Failed to delete lead');
     }
   };
 
@@ -365,7 +375,7 @@ export default function LeadsCRMPage() {
       }
     } catch (err) {
       console.error('Error adding activity', err);
-      alert('Failed to record activity log');
+      showSweetError('Failed to record activity log');
     }
   };
 
@@ -373,7 +383,7 @@ export default function LeadsCRMPage() {
   const handleAddFollowUp = async (e) => {
     e.preventDefault();
     if (!followUpTitle.trim() || !followUpDate || !drawerLead) {
-      alert('Please fill out follow-up task title and target date');
+      showSweetWarning('Please fill out follow-up task title and target date');
       return;
     }
     try {
@@ -391,7 +401,7 @@ export default function LeadsCRMPage() {
       }
     } catch (err) {
       console.error('Error scheduling follow-up', err);
-      alert('Failed to schedule follow-up');
+      showSweetError('Failed to schedule follow-up');
     }
   };
 
@@ -403,7 +413,7 @@ export default function LeadsCRMPage() {
         : filteredLeads;
 
     if (listToExport.length === 0) {
-      alert('No leads available to export.');
+      showSweetWarning('No leads available to export.', 'Export CSV');
       return;
     }
 
@@ -502,7 +512,7 @@ export default function LeadsCRMPage() {
       });
 
       if (parsedLeads.length === 0) {
-        alert('Could not parse any valid leads. Please format as: Name, Email, Phone, Company, Designation');
+        showSweetWarning('Could not parse any valid leads. Please format as: Name, Email, Phone, Company, Designation');
         setBulkImporting(false);
         return;
       }
@@ -524,7 +534,7 @@ export default function LeadsCRMPage() {
       }
     } catch (err) {
       console.error('Bulk import error', err);
-      alert('Bulk import failed. Please check your data format.');
+      showSweetError('Bulk import failed. Please check your data format.');
     } finally {
       setBulkImporting(false);
     }
@@ -544,7 +554,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
   const handleCreateLead = async (e) => {
     e.preventDefault();
     if (!newLeadForm.name || !newLeadForm.email || !selectedEventId) {
-      alert('Name and Email are required.');
+      showSweetWarning('Name and Email are required.');
       return;
     }
 
@@ -573,7 +583,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
       }
     } catch (err) {
       console.error('Error creating lead', err);
-      alert('Failed to create lead.');
+      showSweetError('Failed to create lead.');
     } finally {
       setCreatingLead(false);
     }
@@ -817,23 +827,18 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
             </span>
 
             {/* Event Edition Selector */}
-            <div className="relative min-w-[170px]">
-              <select
+            <div className="min-w-[200px] sm:min-w-[240px]">
+              <SearchableSelect
+                options={events.map((evt) => ({
+                  value: evt._id,
+                  label: evt.title
+                }))}
                 value={selectedEventId}
-                onChange={(e) => setSelectedEventId(e.target.value)}
-                className="w-full appearance-none rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground pr-8 focus:outline-none focus:ring-1 focus:ring-primary font-medium"
-              >
-                {events.length === 0 ? (
-                  <option value="">No Active Editions</option>
-                ) : (
-                  events.map((evt) => (
-                    <option key={evt._id} value={evt._id}>
-                      {evt.title?.length > 25 ? evt.title.substring(0, 25) + '...' : evt.title}
-                    </option>
-                  ))
-                )}
-              </select>
-              <ChevronDown className="h-3 w-3 text-muted-foreground absolute right-2.5 top-3 pointer-events-none" />
+                onChange={(val) => setSelectedEventId(val)}
+                placeholder={events.length === 0 ? 'No Active Editions' : 'Select Edition...'}
+                searchPlaceholder="Search editions..."
+                className="py-1.5 text-xs font-medium"
+              />
             </div>
 
             {/* Status Dropdown */}

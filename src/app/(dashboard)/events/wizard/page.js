@@ -20,6 +20,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../context/AuthContext.js';
 import axios from 'axios';
 import { validateEventImage } from '../../../../utils/imageValidation.js';
+import SearchableSelect from '../../../../components/SearchableSelect.js';
+import { showSweetAlert, showSweetConfirm, showSweetWarning, showSweetError } from '../../../../utils/sweetalert.js';
 import {
   Calendar,
   MapPin,
@@ -78,6 +80,34 @@ const API_URL =
   (typeof window !== 'undefined' && window.location.hostname.includes('visitexpo.in')
     ? 'https://api.visitexpo.in/api'
     : 'http://localhost:5000/api');
+
+export const CURRENCY_OPTIONS = [
+  { code: 'INR', symbol: '₹', name: 'Indian Rupee', flag: '🇮🇳' },
+  { code: 'USD', symbol: '$', name: 'US Dollar', flag: '🇺🇸' },
+  { code: 'EUR', symbol: '€', name: 'Euro', flag: '🇪🇺' },
+  { code: 'GBP', symbol: '£', name: 'British Pound', flag: '🇬🇧' },
+  { code: 'AED', symbol: 'AED', name: 'UAE Dirham', flag: '🇦🇪' },
+  { code: 'SAR', symbol: 'SAR', name: 'Saudi Riyal', flag: '🇸🇦' },
+  { code: 'SGD', symbol: 'S$', name: 'Singapore Dollar', flag: '🇸🇬' },
+  { code: 'CAD', symbol: 'CA$', name: 'Canadian Dollar', flag: '🇨🇦' },
+  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar', flag: '🇦🇺' },
+  { code: 'JPY', symbol: '¥', name: 'Japanese Yen', flag: '🇯🇵' },
+  { code: 'CHF', symbol: 'CHF', name: 'Swiss Franc', flag: '🇨🇭' },
+  { code: 'QAR', symbol: 'QAR', name: 'Qatari Riyal', flag: '🇶🇦' },
+  { code: 'KWD', symbol: 'KWD', name: 'Kuwaiti Dinar', flag: '🇰🇼' },
+  { code: 'BHD', symbol: 'BHD', name: 'Bahraini Dinar', flag: '🇧🇭' },
+  { code: 'OMR', symbol: 'OMR', name: 'Omani Rial', flag: '🇴🇲' },
+  { code: 'MYR', symbol: 'RM', name: 'Malaysian Ringgit', flag: '🇲🇾' },
+  { code: 'THB', symbol: '฿', name: 'Thai Baht', flag: '🇹🇭' },
+  { code: 'ZAR', symbol: 'R', name: 'South African Rand', flag: '🇿🇦' },
+  { code: 'BRL', symbol: 'R$', name: 'Brazilian Real', flag: '🇧🇷' },
+  { code: 'CNY', symbol: 'CN¥', name: 'Chinese Yuan', flag: '🇨🇳' }
+];
+
+export const getCurrencySymbol = (code) => {
+  const c = CURRENCY_OPTIONS.find(item => item.code === code);
+  return c ? c.symbol : (code || '₹');
+};
 
 export const COUNTRY_DIAL_CODES = [
   { code: '+91', country: 'India', flag: '🇮🇳' },
@@ -487,8 +517,6 @@ export function RichTextEditor({
   name = '',
   value = '',
   onChange,
-  onAiAssist,
-  isAiGenerating = false,
   placeholder = 'Describe your event highlights, target visitor profiles, exhibitor benefits, and key conference themes...',
   minHeight = '240px'
 }) {
@@ -632,17 +660,17 @@ export function RichTextEditor({
 
   return (
     <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden flex flex-col transition-all">
-      {/* Top Header Bar matching Screenshot */}
-      <div className="bg-[#0f172a] text-white px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 select-none">
+      {/* Top Header Bar matching Website Color Theme */}
+      <div className="bg-muted/40 dark:bg-muted/20 border-b border-border px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 select-none">
         {/* Editor Mode Tabs */}
-        <div className="inline-flex items-center gap-1 bg-slate-800/90 p-1 rounded-lg border border-slate-700/60 shadow-inner">
+        <div className="inline-flex items-center gap-1 bg-background dark:bg-card p-1 rounded-xl border border-border/80 shadow-2xs">
           <button
             type="button"
             onClick={() => handleModeSwitch('visual')}
-            className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
               mode === 'visual'
-                ? 'bg-[#e62e5c] text-white shadow'
-                : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
             <FileEdit className="h-3.5 w-3.5" />
@@ -651,10 +679,10 @@ export function RichTextEditor({
           <button
             type="button"
             onClick={() => handleModeSwitch('html')}
-            className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
               mode === 'html'
-                ? 'bg-[#e62e5c] text-white shadow'
-                : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
             <Code className="h-3.5 w-3.5" />
@@ -662,28 +690,10 @@ export function RichTextEditor({
           </button>
         </div>
 
-        {/* Word Counter & AI Assist on the Right */}
-        <div className="flex items-center gap-3">
-          {onAiAssist && (
-            <button
-              type="button"
-              onClick={onAiAssist}
-              disabled={isAiGenerating}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white shadow-sm transition-all disabled:opacity-50"
-              title="Auto-generate or polish event description with AI"
-            >
-              {isAiGenerating ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <Sparkles className="h-3 w-3 text-amber-300" />
-              )}
-              <span>AI Assist</span>
-            </button>
-          )}
-
-          <div className="text-xs text-slate-300 font-medium tracking-wide">
-            <span className="font-bold text-white">{wordCount}</span> / 2500 words
-          </div>
+        {/* Word Counter on the Right */}
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-background dark:bg-card border border-border/80 text-xs text-muted-foreground font-medium shadow-2xs">
+          <span className="font-bold text-foreground font-mono">{wordCount}</span>
+          <span className="text-muted-foreground/80">/ 2500 words</span>
         </div>
       </div>
 
@@ -1020,7 +1030,7 @@ export function RichTextEditor({
       <div className="flex flex-wrap justify-between items-center px-4 py-2.5 bg-muted/20 border-t border-border text-xs text-muted-foreground gap-2">
         <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
           <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
-          In-Place Visual Editor • Formatting is applied live without separate preview
+          In-Place Visual Editor 
         </span>
         <div>
           {cleanText.length >= 30 ? (
@@ -1090,6 +1100,7 @@ export const getInitialFormData = (user = null) => ({
   // Ticketing & Form
   isFreeEvent: true,
   paidTicketPrice: '499',
+  currency: 'INR',
   formFields: ['name', 'email', 'phone', 'company', 'designation'],
   // SEO
   metaTitle: '',
@@ -1109,6 +1120,33 @@ export default function EventWizardPage() {
   const [submitError, setSubmitError] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isCustomIndustry, setIsCustomIndustry] = useState(false);
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const [allCategoriesList, setAllCategoriesList] = useState(() => Object.keys(CATEGORY_SUBSECTORS));
+  const [isValidatingStep, setIsValidatingStep] = useState(false);
+  const [isNavigatingBack, setIsNavigatingBack] = useState(false);
+
+  // Dynamically load any custom categories created across the platform
+  useEffect(() => {
+    let isMounted = true;
+    const fetchPlatformCategories = async () => {
+      try {
+        const res = await fetch(`${API_URL}/categories`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data?.categories) && isMounted) {
+            const names = json.data.categories.map((c) => c.name).filter(Boolean);
+            setAllCategoriesList((prev) => Array.from(new Set([...prev, ...names])));
+          }
+        }
+      } catch (err) {
+        // Silently preserve presets
+      }
+    };
+    fetchPlatformCategories();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Form Validation Errors State
   const [errors, setErrors] = useState({});
@@ -1258,15 +1296,24 @@ export default function EventWizardPage() {
         return '';
       }
       case 'slug': {
-        const trimmed = (value || '').trim();
+        const trimmed = (value || '').trim().toLowerCase();
         if (!trimmed) return 'Public URL slug is required.';
+        if (
+          /^(https?|ftp):\/\//i.test(trimmed) ||
+          /^www\./i.test(trimmed) ||
+          trimmed.includes('://') ||
+          trimmed.includes('/') ||
+          /\.(com|in|org|net|co|io|ai|biz|info|me|app|dev|xyz|gov|edu)(\/|$|\?|#)/i.test(trimmed)
+        ) {
+          return 'URLs and website links (e.g. https://google.in) are not allowed in the slug. Please enter only slug keywords (e.g. tech-expo-2026).';
+        }
         if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(trimmed)) {
           return 'Slug can only contain lowercase letters, numbers, and single hyphens (e.g. tech-expo-2026).';
         }
         return '';
       }
       case 'category': {
-        if (!(value || '').trim()) return 'Please select a primary category.';
+        if (!(value || '').trim()) return 'Please select or enter a primary category.';
         return '';
       }
       case 'industry': {
@@ -1343,16 +1390,32 @@ export default function EventWizardPage() {
       }
       case 'orgPhone': {
         const trimmed = (value || '').trim();
-        if (!trimmed) return 'Hotline Phone is required.';
+        if (!trimmed) return 'Mobile number is required.';
         if (!/^\+\d{1,4}/.test(trimmed)) {
-          return 'Phone number must include a country code starting with + (e.g. +91, +1, +44).';
+          return 'Mobile number must include a country code starting with + (e.g. +91, +1, +44).';
         }
-        const digitsOnly = trimmed.replace(/\D/g, '');
-        if (digitsOnly.length < 7) {
-          return 'Please enter a valid phone number with at least 7 digits.';
+        const { code, number } = parsePhoneWithCountryCode(trimmed);
+        const numberDigits = number.replace(/\D/g, '');
+
+        if (code === '+91') {
+          if (!numberDigits) {
+            return 'Mobile number is required.';
+          }
+          if (!/^[789]/.test(numberDigits)) {
+            return 'Indian mobile number must start with 9, 8, or 7.';
+          }
+          if (numberDigits.length !== 10) {
+            return 'Indian mobile number must be exactly 10 digits.';
+          }
+          return '';
         }
-        if (digitsOnly.length > 15) {
-          return 'Phone number cannot exceed 15 digits.';
+
+        const totalDigits = trimmed.replace(/\D/g, '');
+        if (totalDigits.length < 7) {
+          return 'Please enter a valid mobile number with at least 7 digits.';
+        }
+        if (totalDigits.length > 15) {
+          return 'Mobile number cannot exceed 15 digits.';
         }
         return '';
       }
@@ -1373,7 +1436,7 @@ export default function EventWizardPage() {
         if (!allData.isFreeEvent) {
           const num = parseFloat(value);
           if (isNaN(num) || num <= 0) {
-            return 'Ticket price must be a valid amount greater than ₹0.';
+            return `Ticket price must be a valid amount greater than 0 (${allData.currency || 'INR'}).`;
           }
         }
         return '';
@@ -1458,19 +1521,29 @@ export default function EventWizardPage() {
   // Handle Category & Sub-Sector Changes
   const handleCategoryChange = (e) => {
     const selectedCat = e.target.value;
-    const subList = CATEGORY_SUBSECTORS[selectedCat] || [];
-    const defaultSub = subList[0] || '';
-    setFormData(prev => ({
-      ...prev,
-      category: selectedCat,
-      industry: defaultSub
-    }));
-    setIsCustomIndustry(false);
-    if (errors.category || errors.industry) {
-      setErrors(prev => {
+    if (selectedCat === 'CUSTOM') {
+      setIsCustomCategory(true);
+      setFormData((prev) => ({
+        ...prev,
+        category: '',
+        industry: ''
+      }));
+      setIsCustomIndustry(true);
+    } else {
+      setIsCustomCategory(false);
+      const subList = CATEGORY_SUBSECTORS[selectedCat] || [];
+      const defaultSub = subList[0] || '';
+      setFormData((prev) => ({
+        ...prev,
+        category: selectedCat,
+        industry: defaultSub
+      }));
+      setIsCustomIndustry(false);
+    }
+    if (errors.category) {
+      setErrors((prev) => {
         const next = { ...prev };
         delete next.category;
-        delete next.industry;
         return next;
       });
     }
@@ -1492,6 +1565,57 @@ export default function EventWizardPage() {
         });
       }
     }
+  };
+
+  // Handle slug change with URL blocking and auto-cleaning
+  const handleSlugChange = (e) => {
+    let rawVal = e.target.value;
+
+    // Detect and strip pasted URLs or domain links like https://google.in or https://10times.com/catch-fire-conference
+    if (/^https?:\/\//i.test(rawVal) || /^www\./i.test(rawVal) || rawVal.includes('://')) {
+      try {
+        const urlStr = rawVal.startsWith('http') ? rawVal : `https://${rawVal}`;
+        const parsed = new URL(urlStr);
+        const pathSegments = parsed.pathname.split('/').filter(Boolean);
+        if (pathSegments.length > 0) {
+          rawVal = pathSegments[pathSegments.length - 1];
+        } else {
+          rawVal = '';
+        }
+      } catch {
+        rawVal = rawVal.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+      }
+    } else if (/^[a-zA-Z0-9.-]+\.(com|in|org|net|co|io|ai)(\/.*)?$/i.test(rawVal)) {
+      try {
+        const parsed = new URL(`https://${rawVal}`);
+        const segments = parsed.pathname.split('/').filter(Boolean);
+        rawVal = segments.length > 0 ? segments[segments.length - 1] : '';
+      } catch {
+        rawVal = '';
+      }
+    }
+
+    // Clean characters: lowercase, replace spaces/slashes/underscores with hyphens, remove forbidden characters
+    let cleanSlug = rawVal
+      .toLowerCase()
+      .replace(/[\s_\/\\]+/g, '-')
+      .replace(/[^a-z0-9-]/g, '')
+      .replace(/-+/g, '-');
+    if (cleanSlug.startsWith('-')) cleanSlug = cleanSlug.replace(/^-+/, '');
+
+    setFormData(prev => ({ ...prev, slug: cleanSlug }));
+
+    // Instant validation feedback
+    const err = validateField('slug', cleanSlug, { ...formData, slug: cleanSlug });
+    setErrors(prev => {
+      const next = { ...prev };
+      if (err) {
+        next.slug = err;
+      } else {
+        delete next.slug;
+      }
+      return next;
+    });
   };
 
   // Handle input changes
@@ -1641,9 +1765,16 @@ export default function EventWizardPage() {
 
     if (!validation.isValid) {
       if (fileInputRef.current) fileInputRef.current.value = '';
-      setErrors(prev => ({ ...prev, bannerUrl: validation.error || 'Banner image dimensions are invalid.' }));
+      setErrors(prev => ({ ...prev, bannerUrl: validation.error || 'Banner image dimensions are invalid. Image was not uploaded.' }));
       return;
     }
+
+    // Clear any previous banner error before uploading valid image
+    setErrors(prev => {
+      const next = { ...prev };
+      delete next.bannerUrl;
+      return next;
+    });
 
     setIsUploading(true);
     const uploadData = new FormData();
@@ -1696,7 +1827,10 @@ export default function EventWizardPage() {
 
     const validation = await validateEventImage(file, 'logo');
     setOrgLogoValidation(validation);
-    if (!validation.isValid) return;
+    if (!validation.isValid) {
+      if (e.target) e.target.value = '';
+      return;
+    }
 
     setIsUploading(true);
     const uploadData = new FormData();
@@ -1723,7 +1857,10 @@ export default function EventWizardPage() {
 
     const validation = await validateEventImage(file, 'logo');
     setSponsorLogoValidation(validation);
-    if (!validation.isValid) return;
+    if (!validation.isValid) {
+      if (e.target) e.target.value = '';
+      return;
+    }
 
     setIsSponsorUploading(true);
     const uploadData = new FormData();
@@ -1745,7 +1882,7 @@ export default function EventWizardPage() {
   };
 
   const addSponsor = () => {
-    if (!newSponsor.name) return alert('Sponsor name is required');
+    if (!newSponsor.name) return showSweetWarning('Sponsor name is required');
     const finalTier = newSponsor.tier?.trim() || 'Platinum Sponsor';
     setFormData(prev => ({
       ...prev,
@@ -1763,7 +1900,7 @@ export default function EventWizardPage() {
   };
 
   const addFaq = () => {
-    if (!newFaq.question || !newFaq.answer) return alert('Question and Answer are required');
+    if (!newFaq.question || !newFaq.answer) return showSweetWarning('Question and Answer are required');
     setFormData(prev => ({
       ...prev,
       faqsList: [...prev.faqsList, { ...newFaq }]
@@ -1779,10 +1916,35 @@ export default function EventWizardPage() {
   };
 
   const addSchedule = () => {
-    if (!newSchedule.name || !newSchedule.date) return alert('Day/Name and Date are required');
+    const trimmedName = (newSchedule.name || '').trim();
+    if (!trimmedName) {
+      return showSweetWarning('Day / Session Name is required.', 'Schedule Validation');
+    }
+    if (/^\d+$/.test(trimmedName)) {
+      return showSweetWarning(
+        'Day / Session Name cannot contain only numbers. Please enter a descriptive title (e.g., "Day 1", "Session 1 - Keynote").',
+        'Invalid Day / Session Name'
+      );
+    }
+    if (trimmedName.length < 2) {
+      return showSweetWarning('Day / Session Name must be at least 2 characters long.', 'Schedule Validation');
+    }
+    if (trimmedName.length > 80) {
+      return showSweetWarning('Day / Session Name cannot exceed 80 characters.', 'Schedule Validation');
+    }
+    if (!newSchedule.date) {
+      return showSweetWarning('Please select a valid date for this schedule entry.', 'Schedule Date Required');
+    }
+    const isDup = (formData.schedules || []).some(
+      s => s.name?.toLowerCase().trim() === trimmedName.toLowerCase() && s.date === newSchedule.date
+    );
+    if (isDup) {
+      return showSweetWarning('A schedule entry with this exact name and date already exists.', 'Duplicate Schedule Entry');
+    }
+
     setFormData(prev => ({
       ...prev,
-      schedules: [...prev.schedules, { ...newSchedule }]
+      schedules: [...prev.schedules, { name: trimmedName, date: newSchedule.date }]
     }));
     setNewSchedule({ name: '', date: '' });
   };
@@ -1797,7 +1959,7 @@ export default function EventWizardPage() {
   // AI Description Generator
   const generateAiDescription = async () => {
     if (!formData.title) {
-      alert("Please enter the Event Title first so AI Assist can generate a relevant description.");
+      showSweetWarning("Please enter the Event Title first so AI Assist can generate a relevant description.");
       return;
     }
 
@@ -1903,58 +2065,73 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
 
   // Navigation handlers
   const nextStep = async () => {
-    // Validate current step before advancing
-    if (currentStep >= 2 && currentStep <= 6) {
-      const stepErrors = validateStep(currentStep, formData);
+    if (isValidatingStep || submitting) return;
+    setIsValidatingStep(true);
 
-      if (currentStep === 2) {
-        const check = await performDuplicateCheck(formData.title);
-        if (check.isDuplicate) {
-          setSubmitError(`Cannot proceed: An event titled "${check.existingEvent?.title || formData.title}" already exists on VisitExpo. Duplicate events cannot be created. Please modify your title or claim the existing listing.`);
-          setErrors(prev => ({ ...prev, title: 'An event with this title already exists on VisitExpo.' }));
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+    try {
+      // Validate current step before advancing
+      if (currentStep >= 2 && currentStep <= 6) {
+        const stepErrors = validateStep(currentStep, formData);
+
+        if (currentStep === 2) {
+          const check = await performDuplicateCheck(formData.title);
+          if (check.isDuplicate) {
+            setSubmitError(`Cannot proceed: An event titled "${check.existingEvent?.title || formData.title}" already exists on VisitExpo. Duplicate events cannot be created. Please modify your title or claim the existing listing.`);
+            setErrors(prev => ({ ...prev, title: 'An event with this title already exists on VisitExpo.' }));
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            setIsValidatingStep(false);
+            return;
+          }
+        }
+
+        if (Object.keys(stepErrors).length > 0) {
+          setErrors(prev => ({ ...prev, ...stepErrors }));
+          setSubmitError('Please complete all required fields highlighted in red before proceeding.');
+          const firstField = Object.keys(stepErrors)[0];
+          const el = document.querySelector(`[name="${firstField}"]`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.focus();
+          } else {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+          setIsValidatingStep(false);
           return;
         }
       }
 
-      if (Object.keys(stepErrors).length > 0) {
-        setErrors(prev => ({ ...prev, ...stepErrors }));
-        setSubmitError('Please complete all required fields highlighted in red before proceeding.');
-        const firstField = Object.keys(stepErrors)[0];
-        const el = document.querySelector(`[name="${firstField}"]`);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el.focus();
-        } else {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-        return;
+      // Auto-commit pending sponsor inputs if filled
+      if (currentStep === 5 && newSponsor.name && newSponsor.name.trim()) {
+        const finalTier = newSponsor.tier?.trim() || 'Platinum Sponsor';
+        setFormData(prev => ({
+          ...prev,
+          sponsorsList: [...(prev.sponsorsList || []), { ...newSponsor, tier: finalTier }]
+        }));
+        setNewSponsor({ name: '', link: '', logo: '', tier: 'Platinum Sponsor' });
+        setIsCustomSponsorTier(false);
       }
-    }
 
-    // Auto-commit pending sponsor inputs if filled
-    if (currentStep === 5 && newSponsor.name && newSponsor.name.trim()) {
-      const finalTier = newSponsor.tier?.trim() || 'Platinum Sponsor';
-      setFormData(prev => ({
-        ...prev,
-        sponsorsList: [...(prev.sponsorsList || []), { ...newSponsor, tier: finalTier }]
-      }));
-      setNewSponsor({ name: '', link: '', logo: '', tier: 'Platinum Sponsor' });
-      setIsCustomSponsorTier(false);
-    }
+      // Brief tactile loading transition (350ms) to give the user clear feedback that the form is verified and advancing
+      await new Promise(resolve => setTimeout(resolve, 350));
 
-    if (currentStep < STEPS.length) {
-      setSubmitError('');
-      setCurrentStep(prev => prev + 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (currentStep < STEPS.length) {
+        setSubmitError('');
+        setCurrentStep(prev => prev + 1);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } finally {
+      setIsValidatingStep(false);
     }
   };
 
-  const prevStep = () => {
-    if (currentStep > 1) {
+  const prevStep = async () => {
+    if (currentStep > 1 && !isNavigatingBack && !isValidatingStep) {
+      setIsNavigatingBack(true);
       setSubmitError('');
+      await new Promise(resolve => setTimeout(resolve, 150));
       setCurrentStep(prev => prev - 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      setIsNavigatingBack(false);
     }
   };
 
@@ -2016,6 +2193,8 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
         startDate: formData.startDate,
         endDate: formData.endDate,
         timings: formData.timings,
+        category: formData.category.trim(),
+        industry: formData.industry?.trim() || '',
         categories: categoriesArray,
         status: 'draft',
         orgName: formData.orgName.trim(),
@@ -2031,6 +2210,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
         // Ticketing data — server auto-creates a Ticket tier from this
         isFreeEvent: formData.isFreeEvent,
         paidTicketPrice: formData.isFreeEvent ? 0 : (parseFloat(formData.paidTicketPrice) || 0),
+        currency: formData.currency || 'INR',
         seo: {
           metaTitle: formData.metaTitle || `${formData.title} | VisitExpo`,
           metaDescription: formData.metaDescription || ''
@@ -2089,11 +2269,11 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               {/* Option A: Create New Event */}
               <div
                 onClick={nextStep}
-                className="group relative rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-primary/5 to-transparent p-6 hover:border-primary transition-all cursor-pointer shadow-sm hover:shadow-md"
+                className="btn-press group relative rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-primary/5 to-transparent p-6 hover:border-primary active:scale-[0.98] transition-all cursor-pointer shadow-sm hover:shadow-md select-none"
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold shadow-md">
-                    <Plus className="h-6 w-6" />
+                    {isValidatingStep ? <Loader2 className="h-6 w-6 animate-spin" /> : <Plus className="h-6 w-6" />}
                   </div>
                   <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">
                     Recommended
@@ -2106,15 +2286,19 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                   Start fresh with our step-by-step 10times wizard. Add event dates, venue location, organizer profile, media galleries, ticketing, and pre-publish SEO score check.
                 </p>
                 <div className="mt-6 flex items-center gap-2 text-xs font-bold text-primary">
-                  <span>Start Event Wizard</span>
-                  <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  <span>{isValidatingStep ? 'Starting Event Wizard...' : 'Start Event Wizard'}</span>
+                  {isValidatingStep ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  )}
                 </div>
               </div>
 
               {/* Option B: Claim Existing Event */}
               <div
                 onClick={() => router.push('/events/claim')}
-                className="group relative rounded-2xl border-2 border-border bg-card p-6 hover:border-foreground/40 transition-all cursor-pointer shadow-sm hover:shadow-md"
+                className="btn-press group relative rounded-2xl border-2 border-border bg-card p-6 hover:border-foreground/40 active:scale-[0.98] transition-all cursor-pointer shadow-sm hover:shadow-md select-none"
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-foreground font-bold border border-border">
@@ -2315,7 +2499,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                     type="text"
                     name="slug"
                     value={formData.slug}
-                    onChange={handleChange}
+                    onChange={handleSlugChange}
                     onBlur={handleBlur}
                     placeholder="india-tech-ai-summit-2026"
                     className={`w-full rounded-r-lg border bg-background px-3.5 py-2.5 text-sm text-foreground font-mono focus:outline-none transition-all ${
@@ -2339,28 +2523,65 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
                   Primary Category *
                 </label>
-                <select
-                  name="category"
-                  value={formData.category}
-                  onChange={handleCategoryChange}
-                  className={`w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none transition-all ${
-                    errors.category
-                      ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500'
-                      : 'border-border focus:ring-2 focus:ring-primary'
-                  }`}
-                >
-                  {Object.keys(CATEGORY_SUBSECTORS).map(catKey => (
-                    <option key={catKey} value={catKey}>
-                      {catKey}
-                    </option>
-                  ))}
-                </select>
-                {errors.category && (
-                  <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                    <span>{errors.category}</span>
-                  </p>
-                )}
+                {(() => {
+                  const isPresetCat = allCategoriesList.includes(formData.category);
+                  const selectCatValue = isCustomCategory
+                    ? 'CUSTOM'
+                    : isPresetCat
+                    ? formData.category
+                    : formData.category
+                    ? 'CUSTOM'
+                    : allCategoriesList[0] || 'Technology & AI';
+
+                  return (
+                    <div className="space-y-2">
+                      <SearchableSelect
+                        id="wizard-category-select"
+                        options={allCategoriesList}
+                        value={selectCatValue}
+                        onChange={(val) => handleCategoryChange({ target: { value: val } })}
+                        placeholder="Select Primary Category..."
+                        searchPlaceholder="Search categories..."
+                        allowCustom={true}
+                        customOptionLabel="+ Custom Category..."
+                        error={errors.category}
+                      />
+
+                      {(isCustomCategory || (!isPresetCat && formData.category !== '')) && (
+                        <input
+                          type="text"
+                          name="customCategory"
+                          value={formData.category}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setFormData((prev) => ({ ...prev, category: val }));
+                            if (errors.category && val.trim()) {
+                              setErrors((prev) => {
+                                const next = { ...prev };
+                                delete next.category;
+                                return next;
+                              });
+                            }
+                          }}
+                          placeholder="Enter custom category name (e.g. Robotics & Automation)..."
+                          className={`w-full rounded-lg border bg-background px-3.5 py-2 text-xs text-foreground focus:outline-none transition-all ${
+                            errors.category
+                              ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500'
+                              : 'border-border focus:ring-2 focus:ring-primary'
+                          }`}
+                          autoFocus
+                        />
+                      )}
+
+                      {errors.category && (
+                        <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
+                          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                          <span>{errors.category}</span>
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div>
@@ -2380,18 +2601,17 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
 
                   return (
                     <div className="space-y-2">
-                      <select
+                      <SearchableSelect
+                        id="wizard-subsector-select"
+                        options={currentSubSectors}
                         value={selectValue}
-                        onChange={handleSubSectorChange}
-                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      >
-                        {currentSubSectors.map(sub => (
-                          <option key={sub} value={sub}>
-                            {sub}
-                          </option>
-                        ))}
-                        <option value="CUSTOM">+ Custom Sub-Sector...</option>
-                      </select>
+                        onChange={(val) => handleSubSectorChange({ target: { value: val } })}
+                        placeholder="Select Industry Sub-Sector..."
+                        searchPlaceholder="Search sub-sectors..."
+                        allowCustom={true}
+                        customOptionLabel="+ Custom Sub-Sector..."
+                        error={errors.industry}
+                      />
 
                       {(isCustomIndustry || (!isPreset && formData.industry !== '')) && (
                         <input
@@ -2451,8 +2671,6 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                       });
                     }
                   }}
-                  onAiAssist={generateAiDescription}
-                  isAiGenerating={isAiGenerating}
                   placeholder="Describe your event highlights, target visitor profiles, exhibitor benefits, and key conference themes..."
                   minHeight="260px"
                 />
@@ -2723,6 +2941,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
 
   const renderStep4Content = ({ isScrollable = false } = {}) => {
     const phoneParts = parsePhoneWithCountryCode(formData.orgPhone);
+    const selectedCountry = COUNTRY_DIAL_CODES.find(c => c.code === phoneParts.code) || COUNTRY_DIAL_CODES[0];
     return (
       <div className="space-y-6">
             <div className="border-b border-border pb-4">
@@ -2780,7 +2999,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               </div>
             </div>
 
-            <div className="grid gap-6 sm:grid-cols-3">
+            <div className="grid gap-5 md:grid-cols-3">
               <div>
                 <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
                   Official Website
@@ -2847,21 +3066,25 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
 
               <div>
                 <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
-                  Hotline Phone (with Country Code) *
+                  Mobile Number *
                 </label>
                 <div className="relative">
-                  <div className={`flex rounded-lg border bg-background overflow-hidden transition-all ${
+                  <div className={`flex items-center rounded-lg border bg-background transition-all h-[42px] ${
                     errors.orgPhone
                       ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5'
                       : 'border-border focus-within:ring-2 focus-within:ring-primary focus-within:border-primary'
                   }`}>
-                    {/* Country Dial Code Dropdown */}
-                    <div className="relative border-r border-border bg-muted/40 shrink-0">
-                      <select
-                        aria-label="Country Dial Code"
+                    {/* Country Dial Code Searchable Dropdown */}
+                    <div className="relative w-[85px] shrink-0 h-full border-r border-border">
+                      <SearchableSelect
+                        options={COUNTRY_DIAL_CODES.map((item) => ({
+                          value: item.code,
+                          label: `${item.flag} ${item.code} (${item.country})`,
+                          subtext: item.country,
+                          flag: item.flag
+                        }))}
                         value={phoneParts.code}
-                        onChange={(e) => {
-                          const newCode = e.target.value;
+                        onChange={(newCode) => {
                           const newFull = `${newCode} ${phoneParts.number}`.trim();
                           setFormData(prev => ({ ...prev, orgPhone: newFull }));
                           if (errors.orgPhone) {
@@ -2877,17 +3100,18 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                             }
                           }
                         }}
-                        className="h-full bg-transparent pl-2.5 pr-6 py-2.5 text-xs font-bold text-foreground focus:outline-none cursor-pointer appearance-none"
-                      >
-                        {COUNTRY_DIAL_CODES.map((item) => (
-                          <option key={item.code + item.country} value={item.code} className="bg-card text-foreground">
-                            {item.flag} {item.code} ({item.country})
-                          </option>
-                        ))}
-                      </select>
-                      <div className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground">
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      </div>
+                        searchPlaceholder="Search country or code..."
+                        dropdownClassName="w-72"
+                        renderTrigger={({ isOpen }) => (
+                          <div className="w-[85px] shrink-0 h-[40px] bg-muted/40 hover:bg-muted/70 rounded-l-lg transition-colors flex items-center justify-between px-2.5 cursor-pointer select-none">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                              <span className="text-sm shrink-0 leading-none">{selectedCountry?.flag || '🌐'}</span>
+                              <span className="tabular-nums tracking-tight">{phoneParts.code}</span>
+                            </div>
+                            <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180 text-primary' : ''}`} />
+                          </div>
+                        )}
+                      />
                     </div>
 
                     {/* Phone Number Input */}
@@ -2896,7 +3120,16 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                       name="orgPhone"
                       value={phoneParts.number}
                       onChange={(e) => {
-                        const newNum = e.target.value;
+                        const raw = e.target.value;
+                        let newNum = raw;
+                        if (phoneParts.code === '+91') {
+                          // Allow digits, spaces, and hyphens; restrict digits to max 10
+                          newNum = raw.replace(/[^\d\s-]/g, '');
+                          const digitsOnly = newNum.replace(/\D/g, '');
+                          if (digitsOnly.length > 10) {
+                            return;
+                          }
+                        }
                         const newFull = `${phoneParts.code} ${newNum}`.trim();
                         setFormData(prev => ({ ...prev, orgPhone: newFull }));
                         if (errors.orgPhone) {
@@ -2924,8 +3157,9 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                           });
                         }
                       }}
-                      placeholder="98765 43210"
-                      className="w-full bg-transparent px-3 py-2.5 text-sm text-foreground focus:outline-none"
+                      placeholder={phoneParts.code === '+91' ? '98765 43210 (10 digits)' : '98765 43210'}
+                      maxLength={phoneParts.code === '+91' ? 14 : 20}
+                      className="flex-1 min-w-0 h-full bg-transparent px-3 py-2 text-sm font-medium text-foreground focus:outline-none placeholder:text-muted-foreground/40"
                     />
 
                     {errors.orgPhone && (
@@ -3077,11 +3311,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                   Event Main Banner Cover (Recommended: 1920 × 1080 px | Min: 1200 × 630 px) *
                 </label>
                 {bannerValidation?.dimensions && formData.bannerUrl && (
-                  <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
-                    bannerValidation.qualityScore === 'optimal'
-                      ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
-                      : 'bg-amber-500/10 text-amber-600 border-amber-500/30'
-                  }`}>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
                     <CheckCircle2 className="h-3 w-3" />
                     {bannerValidation.dimensions.width} × {bannerValidation.dimensions.height} px ({bannerValidation.dimensions.aspectRatio})
                   </span>
@@ -3104,16 +3334,6 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                   <div>
                     <strong className="font-bold">Image Resolution Rejected: </strong>
                     {bannerValidation.error}
-                  </div>
-                </div>
-              )}
-
-              {bannerValidation?.warning && formData.bannerUrl && (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-600 text-xs flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="font-semibold">Quality Recommendation: </strong>
-                    {bannerValidation.warning}
                   </div>
                 </div>
               )}
@@ -3229,7 +3449,8 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase">Tier / Label</label>
-                  <select
+                  <SearchableSelect
+                    options={PRESET_SPONSOR_TIERS}
                     value={
                       isCustomSponsorTier
                         ? 'CUSTOM'
@@ -3239,8 +3460,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                         ? 'CUSTOM'
                         : 'Platinum Sponsor'
                     }
-                    onChange={e => {
-                      const val = e.target.value;
+                    onChange={(val) => {
                       if (val === 'CUSTOM') {
                         setIsCustomSponsorTier(true);
                         setNewSponsor(prev => ({ ...prev, tier: '' }));
@@ -3249,21 +3469,12 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                         setNewSponsor(prev => ({ ...prev, tier: val }));
                       }
                     }}
-                    className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none"
-                  >
-                    {SPONSOR_TIER_GROUPS.map(group => (
-                      <optgroup key={group.label} label={group.label}>
-                        {group.options.map(opt => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                    <optgroup label="Custom">
-                      <option value="CUSTOM">+ Custom Tier / Label...</option>
-                    </optgroup>
-                  </select>
+                    placeholder="Select Sponsor Tier..."
+                    searchPlaceholder="Search sponsor tier..."
+                    allowCustom={true}
+                    customOptionLabel="+ Custom Tier / Label..."
+                    className="py-1.5 px-2.5 text-xs h-[34px]"
+                  />
                   {(isCustomSponsorTier || (!PRESET_SPONSOR_TIERS.includes(newSponsor.tier) && newSponsor.tier !== '')) && (
                     <input
                       type="text"
@@ -3299,6 +3510,9 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                     Add
                   </button>
                 </div>
+                {sponsorLogoValidation?.error && (
+                  <p className="text-[11px] font-semibold text-red-500 mt-1">{sponsorLogoValidation.error}</p>
+                )}
               </div>
 
               {/* Sponsor Grid Display */}
@@ -3391,39 +3605,68 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               </div>
             </div>
 
-            {!formData.isFreeEvent && (
-              <div className="w-full sm:w-1/2">
-                <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
-                  Ticket Price per Attendee (INR ₹) *
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    name="paidTicketPrice"
-                    value={formData.paidTicketPrice}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    placeholder="499"
-                    className={`w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm font-bold text-foreground focus:outline-none transition-all ${
-                      errors.paidTicketPrice
-                        ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500 pr-10'
-                        : 'border-border focus:ring-2 focus:ring-primary'
-                    }`}
-                  />
-                  {errors.paidTicketPrice && (
-                    <div className="absolute right-3 top-2.5 text-rose-500" title={errors.paidTicketPrice}>
-                      <AlertCircle className="h-5 w-5" />
+            {!formData.isFreeEvent && (() => {
+              const currentCurrency = CURRENCY_OPTIONS.find(c => c.code === (formData.currency || 'INR')) || CURRENCY_OPTIONS[0];
+              return (
+                <div className="grid gap-4 sm:grid-cols-2 bg-card p-4 rounded-xl border border-border">
+                  <div>
+                    <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
+                      Currency *
+                    </label>
+                    <SearchableSelect
+                      options={CURRENCY_OPTIONS.map(c => ({
+                        value: c.code,
+                        label: `${c.flag} ${c.code} (${c.symbol}) - ${c.name}`,
+                        subtext: `${c.name} ${c.symbol}`,
+                        flag: c.flag
+                      }))}
+                      value={formData.currency || 'INR'}
+                      onChange={(val) => {
+                        setFormData(prev => ({ ...prev, currency: val }));
+                      }}
+                      placeholder="Select currency..."
+                      searchPlaceholder="Search currency (e.g. USD, EUR, INR)..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
+                      Ticket Price per Attendee ({currentCurrency.code} {currentCurrency.symbol}) *
+                    </label>
+                    <div className="relative flex items-center">
+                      <span className="bg-muted px-3.5 py-2.5 rounded-l-lg border border-r-0 border-border text-xs text-muted-foreground font-bold shrink-0">
+                        {currentCurrency.symbol}
+                      </span>
+                      <input
+                        type="number"
+                        name="paidTicketPrice"
+                        min="1"
+                        step="any"
+                        value={formData.paidTicketPrice}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        className={`w-full rounded-r-lg border bg-background px-3.5 py-2.5 text-sm font-bold text-foreground focus:outline-none transition-all ${
+                          errors.paidTicketPrice
+                            ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500 pr-10'
+                            : 'border-border focus:ring-2 focus:ring-primary'
+                        }`}
+                      />
+                      {errors.paidTicketPrice && (
+                        <div className="absolute right-3 top-2.5 text-rose-500" title={errors.paidTicketPrice}>
+                          <AlertCircle className="h-5 w-5" />
+                        </div>
+                      )}
                     </div>
-                  )}
+                    {errors.paidTicketPrice && (
+                      <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                        <span>{errors.paidTicketPrice}</span>
+                      </p>
+                    )}
+                  </div>
                 </div>
-                {errors.paidTicketPrice && (
-                  <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                    <span>{errors.paidTicketPrice}</span>
-                  </p>
-                )}
-              </div>
-            )}
+              );
+            })()}
 
             {/* Form Fields Selector */}
             <div className="border border-border/80 rounded-2xl p-5 bg-muted/10 space-y-3">
@@ -3487,8 +3730,17 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                     value={newSchedule.name}
                     onChange={e => setNewSchedule(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="e.g. Day 1: Main Panel"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none"
+                    className={`w-full rounded-lg border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none transition-all ${
+                      newSchedule.name && /^\d+$/.test(newSchedule.name.trim())
+                        ? 'border-destructive ring-1 ring-destructive/40'
+                        : 'border-border focus:ring-1 focus:ring-primary'
+                    }`}
                   />
+                  {newSchedule.name && /^\d+$/.test(newSchedule.name.trim()) && (
+                    <p className="text-[10px] text-destructive font-medium flex items-center gap-0.5">
+                      <AlertCircle className="h-3 w-3 shrink-0" /> Cannot be numbers only
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase">Date Value</label>
@@ -3791,7 +4043,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                     { label: 'Event Banner Uploaded', pass: !!formData.bannerUrl },
                     { label: 'Start & End Dates Set', pass: !!formData.startDate && !!formData.endDate },
                     { label: 'Venue Location Confirmed', pass: !!formData.venueName && !!formData.city && !/\d/.test(formData.city) && !!formData.country && !/\d/.test(formData.country) },
-                    { label: 'Organizer Profile Complete', pass: !!formData.orgName && !!formData.orgEmail && /^\+\d{1,4}/.test(formData.orgPhone || '') },
+                    { label: 'Organizer Profile Complete', pass: !!formData.orgName && !!formData.orgEmail && !validateField('orgPhone', formData.orgPhone, formData) && !errors.orgPhone },
                     { label: 'Visitor Form Configured', pass: true },
                     { label: 'SEO Title & Description', pass: !!formData.metaTitle }
                   ].map((item, idx) => (
@@ -3917,9 +4169,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
       isComplete: Boolean(
         formData.orgName?.trim().length >= 2 &&
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.orgEmail?.trim() || '') &&
-        /^\+\d{1,4}/.test(formData.orgPhone?.trim() || '') &&
-        formData.orgPhone?.trim().replace(/\D/g, '').length >= 7 &&
-        formData.orgPhone?.trim().replace(/\D/g, '').length <= 15 &&
+        !validateField('orgPhone', formData.orgPhone, formData) &&
         !errors.orgName &&
         !errors.orgEmail &&
         !errors.orgPhone
@@ -4002,8 +4252,16 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
             {(formData.title || currentStep > 1) && (
               <button
                 type="button"
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to clear all fields and start fresh?')) {
+                onClick={async () => {
+                  const confirmed = await showSweetConfirm({
+                    title: 'Clear Event Form?',
+                    text: 'Are you sure you want to clear all fields and start fresh? All unsaved inputs will be cleared.',
+                    icon: 'warning',
+                    confirmButtonText: 'Yes, Clear Form',
+                    cancelButtonText: 'Cancel',
+                    isDanger: true
+                  });
+                  if (confirmed) {
                     handleResetForm();
                   }
                 }}
@@ -4029,7 +4287,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                     <button
                       onClick={() => step.id <= currentStep && setCurrentStep(step.id)}
                       disabled={step.id > currentStep}
-                      className={`flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold transition-all duration-200 ${
+                      className={`btn-press flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${
                         isCompleted
                           ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
                           : isCurrent
@@ -4061,7 +4319,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                   key={sec.id}
                   type="button"
                   onClick={() => scrollToSection(sec.anchor)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary active:scale-95 text-foreground text-xs font-semibold border border-border shrink-0 transition-all cursor-pointer hover:border-primary/40"
+                  className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary active:scale-95 text-foreground text-xs font-semibold border border-border shrink-0 transition-all cursor-pointer hover:border-primary/40"
                 >
                   <sec.icon className="h-3.5 w-3.5 text-primary" />
                   <span>{sec.label}</span>
@@ -4098,15 +4356,25 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
             )}
             <div className="flex items-center justify-between">
               <button
+                type="button"
                 onClick={prevStep}
-                disabled={currentStep === 1}
-                className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
+                disabled={currentStep === 1 || isNavigatingBack || isValidatingStep}
+                className={`btn-press inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all cursor-pointer ${
                   currentStep === 1
-                    ? 'opacity-0 cursor-default'
+                    ? 'opacity-0 cursor-default pointer-events-none'
                     : 'border border-border bg-secondary text-foreground hover:bg-secondary/80'
                 }`}
               >
-                <ArrowLeft className="h-4 w-4" /> Previous Step
+                {isNavigatingBack ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <span>Loading...</span>
+                  </>
+                ) : (
+                  <>
+                    <ArrowLeft className="h-4 w-4" /> Previous Step
+                  </>
+                )}
               </button>
 
               {currentStep === 7 ? (
@@ -4115,7 +4383,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                     <button
                       type="button"
                       onClick={() => setCurrentStep(2)}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow transition-all cursor-pointer"
+                      className="btn-press inline-flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow transition-all cursor-pointer"
                     >
                       ← Return to Step 2 to Edit Title
                     </button>
@@ -4130,11 +4398,22 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                   </div>
                 ) : (
                   <button
+                    type="button"
                     onClick={handleSubmitEvent}
                     disabled={submitting}
-                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
+                    className="btn-press inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-500/20 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    {submitting ? 'Submitting...' : 'Submit Event for Moderation'} <ArrowRight className="h-4 w-4" />
+                    {submitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Submitting Event for Moderation...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Submit Event for Moderation</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
                   </button>
                 )
               ) : currentStep === 2 && duplicateCheck.isDuplicate ? (
@@ -4148,10 +4427,22 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 </button>
               ) : (
                 <button
+                  type="button"
                   onClick={nextStep}
-                  className="inline-flex items-center gap-2 rounded-xl bg-primary hover:bg-primary/90 px-6 py-2.5 text-xs font-bold text-primary-foreground shadow-md transition-all"
+                  disabled={isValidatingStep}
+                  className="btn-press inline-flex items-center gap-2 rounded-xl bg-primary hover:bg-primary/90 px-6 py-2.5 text-xs font-bold text-primary-foreground shadow-md transition-all cursor-pointer disabled:opacity-85"
                 >
-                  Continue to Next Step <ArrowRight className="h-4 w-4" />
+                  {isValidatingStep ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin text-primary-foreground" />
+                      <span>Form Verified • Proceeding to Next Step...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Continue to Next Step</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
                 </button>
               )}
             </div>

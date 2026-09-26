@@ -20,6 +20,7 @@ import Link from 'next/link';
 import axios from 'axios';
 import wpEventImages from '@/data/wordpress-event-images.json';
 import { useAuth } from '../../../context/AuthContext.js';
+import { getCurrencySymbol } from '../../(dashboard)/events/wizard/page.js';
 import Navbar from '../../../components/Navbar.js';
 import Footer from '../../../components/Footer.js';
 import GatedAuthModal from '../../../components/GatedAuthModal.js';
@@ -334,7 +335,7 @@ export default function ExpoDetailsPage() {
             followersCount: found.followersCount || found.interestedCount || (1100 + (charSum % 2900)),
             edition: found.edition || `${8 + (charSum % 15)}th Edition`,
             timings: found.timings || '9:00 AM – 5:00 PM (General Admission)',
-            entryType: found.entryType || (found.isFreeEvent === false ? `Paid Admission — ₹${found.paidTicketPrice || 500}` : 'Free Ticket for Industry Professionals'),
+            entryType: found.entryType || (found.isFreeEvent === false ? `Paid Admission — ${getCurrencySymbol(found.currency || 'INR')}${found.paidTicketPrice || 500}` : 'Free Ticket for Industry Professionals'),
             boothCost: found.boothCost || 'Starts from 145 USD / sqm',
             turnout: found.turnout || '100,000+ Visitors • 2,000+ Exhibitors',
             format: found.format || (charSum % 4 === 0 ? 'Hybrid Expo' : 'In-Person Expo'),
