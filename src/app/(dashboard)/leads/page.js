@@ -12,6 +12,7 @@ import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
 import SearchableSelect from '../../../components/SearchableSelect.js';
 import { showSweetAlert, showSweetConfirm, showSweetSuccess, showSweetError, showSweetWarning } from '../../../utils/sweetalert.js';
+import * as XLSX from 'xlsx';
 import {
   Search,
   Filter,
@@ -19,6 +20,10 @@ import {
   Ticket,
   Download,
   Upload,
+  FileSpreadsheet,
+  FileDown,
+  Table,
+  FileUp,
   Code,
   ExternalLink,
   Mail,
@@ -104,10 +109,16 @@ export default function LeadsCRMPage() {
   const [broadcastSending, setBroadcastSending] = useState(false);
   const [broadcastSuccess, setBroadcastSuccess] = useState(false);
 
-  // Bulk import state
+  // Bulk Sheet Import state
+  const [sheetUploadTab, setSheetUploadTab] = useState('upload'); // 'upload' | 'paste'
+  const [uploadedSheetFile, setUploadedSheetFile] = useState(null);
+  const [parsedSheetLeads, setParsedSheetLeads] = useState([]);
+  const [skippedSheetRowsCount, setSkippedSheetRowsCount] = useState(0);
+  const [bulkParseError, setBulkParseError] = useState('');
   const [bulkCsvText, setBulkCsvText] = useState('');
   const [bulkImporting, setBulkImporting] = useState(false);
   const [bulkImportResult, setBulkImportResult] = useState(null);
+  const sheetFileInputRef = React.useRef(null);
 
   // Add / Edit Lead form state
   const [leadForm, setLeadForm] = useState({
@@ -150,11 +161,16 @@ export default function LeadsCRMPage() {
           setEvents(sorted);
           if (sorted.length > 0) {
             setSelectedEventId(sorted[0]._id);
+          } else {
+            setLoading(false);
           }
+        } else {
+          setLoading(false);
         }
       } catch (err) {
         console.error('Failed to load events', err);
         setError('Could not connect to API server. Ensure backend is running.');
+        setLoading(false);
       }
     };
     fetchEvents();
@@ -162,7 +178,10 @@ export default function LeadsCRMPage() {
 
   // 2. Fetch Leads for Active Event
   const fetchLeads = async () => {
-    if (!selectedEventId) return;
+    if (!selectedEventId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -478,73 +497,283 @@ export default function LeadsCRMPage() {
     }, 1200);
   };
 
+  // Helper to download example template sheet (Excel .xlsx or CSV)
+  const handleDownloadTemplate = (format = 'xlsx') => {
+    const sampleData = [
+      {
+        'Full Name': 'Rahul Kapoor',
+        'Work Email': 'rahul.kapoor@tatamotors.com',
+        'Phone Number': '+91 98765 43210',
+        'Company': 'Tata Motors Ltd',
+        'Designation': 'Procurement Director',
+        'Country': 'India',
+        'Stage': 'new',
+        'Intent Score': 85,
+        'Notes': 'Interested in commercial EV and Hall 3 exhibitors'
+      },
+      {
+        'Full Name': 'Priya Sharma',
+        'Work Email': 'priya.sharma@apexglobal.in',
+        'Phone Number': '+91 98110 54321',
+        'Company': 'Apex Global Logistics',
+        'Designation': 'VP Operations',
+        'Country': 'India',
+        'Stage': 'qualified',
+        'Intent Score': 75,
+        'Notes': 'Stall booking inquiry and vendor sourcing'
+      },
+      {
+        'Full Name': 'David Miller',
+        'Work Email': 'david.miller@omnisource.com',
+        'Phone Number': '+1 415 555 2671',
+        'Company': 'OmniSource International',
+        'Designation': 'Chief Sourcing Officer',
+        'Country': 'United States',
+        'Stage': 'contacted',
+        'Intent Score': 90,
+        'Notes': 'VIP buyer delegation from North America'
+      },
+      {
+        'Full Name': 'Ananya Sen',
+        'Work Email': 'ananya.sen@ecotech.co.in',
+        'Phone Number': '+91 98450 11223',
+        'Company': 'EcoTech Renewable Devices',
+        'Designation': 'Head of Sourcing',
+        'Country': 'India',
+        'Stage': 'proposal',
+        'Intent Score': 80,
+        'Notes': 'Looking for solar components'
+      }
+    ];
+
+    if (format === 'csv') {
+      const headers = Object.keys(sampleData[0]).join(',');
+      const rows = sampleData.map(row =>
+        Object.values(row).map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')
+      ).join('\n');
+      const blob = new Blob([`${headers}\n${rows}`], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'VisitExpo_Leads_Template.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } else {
+      const ws = XLSX.utils.json_to_sheet(sampleData);
+      ws['!cols'] = [
+        { wch: 20 },
+        { wch: 30 },
+        { wch: 18 },
+        { wch: 28 },
+        { wch: 24 },
+        { wch: 14 },
+        { wch: 12 },
+        { wch: 14 },
+        { wch: 45 }
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Leads Template');
+      XLSX.writeFile(wb, 'VisitExpo_Leads_Template.xlsx');
+    }
+  };
+
+  // Handle Spreadsheet File Selection (.xlsx, .xls, .csv)
+  const handleSheetFileSelect = (file) => {
+    if (!file) return;
+    setBulkParseError('');
+    setUploadedSheetFile(file);
+    setParsedSheetLeads([]);
+    setSkippedSheetRowsCount(0);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+          setBulkParseError('No worksheet found in the uploaded file.');
+          return;
+        }
+
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rawRows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+
+        if (!rawRows || rawRows.length === 0) {
+          setBulkParseError('The uploaded sheet is empty. Please ensure it has column headers and data rows.');
+          return;
+        }
+
+        const validLeads = [];
+        let skipped = 0;
+
+        rawRows.forEach((row) => {
+          // Normalize column headers to lowercase alphanumeric
+          const normalizedRow = {};
+          Object.keys(row).forEach((key) => {
+            const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+            normalizedRow[cleanKey] = String(row[key] ?? '').trim();
+          });
+
+          const getVal = (...keys) => {
+            for (const k of keys) {
+              const cleaned = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+              if (normalizedRow[cleaned] !== undefined && normalizedRow[cleaned] !== '') {
+                return normalizedRow[cleaned];
+              }
+            }
+            return '';
+          };
+
+          const name = getVal('fullname', 'name', 'attendeename', 'buyername', 'leadname', 'delegate');
+          const email = getVal('workemail', 'email', 'emailaddress', 'buyeremail', 'mail');
+          let phone = getVal('phonenumber', 'phone', 'mobile', 'mobilenumber', 'contact', 'contactnumber');
+          const company = getVal('company', 'organization', 'org', 'companyname', 'employer');
+          const designation = getVal('designation', 'role', 'jobtitle', 'title', 'position');
+          const country = getVal('country', 'location', 'region') || 'India';
+          const stage = getVal('stage', 'status', 'pipelinestage') || 'new';
+          const rawScore = getVal('intentscore', 'score', 'leadscore');
+          const notes = getVal('notes', 'remarks', 'comments', 'requirements');
+
+          // Strip any letters from phone
+          if (phone) {
+            phone = phone.replace(/[a-zA-Z]/g, '').trim();
+          }
+
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (name && email && emailRegex.test(email)) {
+            validLeads.push({
+              name,
+              email: email.toLowerCase(),
+              phone: phone || '',
+              company: company || '',
+              designation: designation || 'Trade Delegate',
+              country,
+              status: ['new', 'contacted', 'qualified', 'proposal', 'won', 'lost'].includes(stage.toLowerCase())
+                ? stage.toLowerCase()
+                : 'new',
+              leadScore: rawScore ? Math.min(100, Math.max(0, parseInt(rawScore) || 50)) : 65,
+              notes,
+              source: 'bulk_upload'
+            });
+          } else {
+            skipped++;
+          }
+        });
+
+        if (validLeads.length === 0) {
+          setBulkParseError('Could not find any valid leads with both Name and a valid Email. Please verify the sheet headers.');
+        } else {
+          setParsedSheetLeads(validLeads);
+          setSkippedSheetRowsCount(skipped);
+        }
+      } catch (err) {
+        console.error('Sheet parsing error:', err);
+        setBulkParseError('Failed to parse spreadsheet file. Please ensure it is a valid .xlsx, .xls, or .csv file.');
+      }
+    };
+    reader.onerror = () => {
+      setBulkParseError('Failed to read the file.');
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // Reset Bulk Sheet state
+  const resetBulkSheetState = () => {
+    setUploadedSheetFile(null);
+    setParsedSheetLeads([]);
+    setSkippedSheetRowsCount(0);
+    setBulkParseError('');
+    setBulkCsvText('');
+    setBulkImportResult(null);
+    if (sheetFileInputRef.current) {
+      sheetFileInputRef.current.value = '';
+    }
+  };
+
   // Handle Bulk Import Submission
   const handleBulkImportSubmit = async (e) => {
     e.preventDefault();
-    if (!bulkCsvText.trim() || !selectedEventId) return;
+    if (!selectedEventId) {
+      showSweetWarning('Please select an active expo edition first.');
+      return;
+    }
 
-    setBulkImporting(true);
-    setBulkImportResult(null);
+    let leadsToImport = [];
 
-    try {
-      // Parse CSV or tab-separated text: Name, Email, Phone, Company, Designation
+    if (sheetUploadTab === 'upload') {
+      if (parsedSheetLeads.length === 0) {
+        showSweetWarning('Please upload a spreadsheet with valid lead records first.');
+        return;
+      }
+      leadsToImport = parsedSheetLeads;
+    } else {
+      // Pasted CSV Text fallback
+      if (!bulkCsvText.trim()) return;
       const lines = bulkCsvText
         .split('\n')
         .map((l) => l.trim())
         .filter(Boolean);
 
-      const parsedLeads = [];
       lines.forEach((line, index) => {
-        // Skip header row if matches
         if (index === 0 && line.toLowerCase().includes('email') && line.toLowerCase().includes('name')) {
           return;
         }
         const parts = line.includes(',') ? line.split(',') : line.split('\t');
         if (parts.length >= 2) {
-          parsedLeads.push({
-            name: parts[0]?.trim() || 'Attendee',
-            email: parts[1]?.trim() || '',
-            phone: parts[2]?.trim() || '',
-            company: parts[3]?.trim() || '',
-            designation: parts[4]?.trim() || 'Delegate',
-            country: 'India',
-            leadScore: Math.floor(Math.random() * 40) + 50,
-            status: 'new',
-            source: 'walk_in'
-          });
+          const email = parts[1]?.trim() || '';
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (parts[0]?.trim() && emailRegex.test(email)) {
+            leadsToImport.push({
+              name: parts[0]?.trim() || 'Attendee',
+              email: email.toLowerCase(),
+              phone: (parts[2]?.trim() || '').replace(/[a-zA-Z]/g, ''),
+              company: parts[3]?.trim() || '',
+              designation: parts[4]?.trim() || 'Delegate',
+              country: 'India',
+              leadScore: Math.floor(Math.random() * 40) + 50,
+              status: 'new',
+              source: 'bulk_upload'
+            });
+          }
         }
       });
+    }
 
-      if (parsedLeads.length === 0) {
-        showSweetWarning('Could not parse any valid leads. Please format as: Name, Email, Phone, Company, Designation');
-        setBulkImporting(false);
-        return;
-      }
+    if (leadsToImport.length === 0) {
+      showSweetWarning('Could not parse any valid leads with name and email.');
+      return;
+    }
 
+    setBulkImporting(true);
+    setBulkImportResult(null);
+
+    try {
       const res = await axios.post(
         `${API_URL}/leads/bulk`,
-        { eventId: selectedEventId, leads: parsedLeads },
+        { eventId: selectedEventId, leads: leadsToImport },
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
 
       if (res.data && res.data.success) {
-        setBulkImportResult({ count: res.data.count || parsedLeads.length });
+        setBulkImportResult({ count: res.data.count || leadsToImport.length });
         fetchLeads();
         setTimeout(() => {
           setShowBulkImportModal(false);
-          setBulkCsvText('');
-          setBulkImportResult(null);
-        }, 1500);
+          resetBulkSheetState();
+        }, 1800);
       }
     } catch (err) {
       console.error('Bulk import error', err);
-      showSweetError('Bulk import failed. Please check your data format.');
+      const serverMsg = err.response?.data?.error || err.response?.data?.message || 'Bulk import failed. Please check your data format.';
+      showSweetError(serverMsg);
     } finally {
       setBulkImporting(false);
     }
   };
 
-  // Quick Load Demo Sample Leads
+  // Quick Load Demo Sample Leads (for Paste tab)
   const handleLoadSampleLeads = () => {
     const sample = `Aarav Mehta, aarav.mehta@techinfra.com, +91 98201 12345, TechInfra Solutions, Procurement Director
 Priya Sharma, priya.s@apexglobal.in, +91 98110 54321, Apex Global Logistics, VP Operations
@@ -1722,24 +1951,27 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
         </div>
       )}
 
-      {/* 9. MODAL: BULK IMPORT */}
+      {/* 9. MODAL: BULK SHEET & LEAD IMPORT */}
       {showBulkImportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-w-xl bg-card border border-border rounded-2xl p-6 shadow-2xl space-y-4">
+          <div className="w-full max-w-2xl bg-card border border-border rounded-2xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-border pb-3">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400">
-                  <Upload className="h-5 w-5" />
+                  <FileSpreadsheet className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-foreground">Bulk Import Buyer Leads</h3>
+                  <h3 className="text-base font-bold text-foreground">Bulk Import Buyer Leads (Excel / CSV)</h3>
                   <p className="text-xs text-muted-foreground">
-                    Import multiple delegates or buyer records via CSV or pasted text rows.
+                    Upload your attendee, buyer, or trade visitor sheet (.xlsx, .xls, .csv) with instant validation.
                   </p>
                 </div>
               </div>
               <button
-                onClick={() => setShowBulkImportModal(false)}
+                onClick={() => {
+                  setShowBulkImportModal(false);
+                  resetBulkSheetState();
+                }}
                 className="p-1 rounded-lg text-muted-foreground hover:text-foreground"
               >
                 <X className="h-5 w-5" />
@@ -1748,59 +1980,236 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
 
             {bulkImportResult ? (
               <div className="py-8 text-center space-y-2">
-                <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto" />
-                <h4 className="text-sm font-bold text-foreground">Import Completed!</h4>
+                <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto animate-bounce" />
+                <h4 className="text-base font-bold text-foreground">Import Completed Successfully!</h4>
                 <p className="text-xs text-muted-foreground">
-                  Successfully imported {bulkImportResult.count} leads into the active event.
+                  Successfully imported <strong className="text-foreground">{bulkImportResult.count}</strong> buyer leads into the active expo edition.
                 </p>
               </div>
             ) : (
-              <form onSubmit={handleBulkImportSubmit} className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-muted-foreground uppercase">
-                    Paste CSV Data (Name, Email, Phone, Company, Designation)
-                  </label>
+              <div className="space-y-4">
+                {/* Example Sheet / Template Download Card */}
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3.5 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <FileDown className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-bold text-foreground">Need the format? Download Example Sheet</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Use our ready-to-use template with predefined headers (Full Name, Work Email, Phone Number, Company, Designation, Country, Stage, Intent Score, Notes).
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadTemplate('xlsx')}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 transition-colors shadow-xs"
+                        title="Download sample Excel spreadsheet template"
+                      >
+                        <FileSpreadsheet className="h-3.5 w-3.5" />
+                        Excel (.xlsx)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadTemplate('csv')}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border transition-colors"
+                        title="Download sample CSV template"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        CSV (.csv)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tab Switcher: Upload Sheet File vs Paste CSV Text */}
+                <div className="flex rounded-lg border border-border p-1 bg-muted/20 text-xs">
                   <button
                     type="button"
-                    onClick={handleLoadSampleLeads}
-                    className="text-xs font-semibold text-primary hover:underline cursor-pointer"
+                    onClick={() => setSheetUploadTab('upload')}
+                    className={`flex-1 py-1.5 rounded-md font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                      sheetUploadTab === 'upload'
+                        ? 'bg-background text-foreground shadow-xs'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
                   >
-                    Load Sample Leads
+                    <FileUp className="h-3.5 w-3.5" />
+                    Upload Spreadsheet File (.xlsx, .xls, .csv)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSheetUploadTab('paste')}
+                    className={`flex-1 py-1.5 rounded-md font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                      sheetUploadTab === 'paste'
+                        ? 'bg-background text-foreground shadow-xs'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Table className="h-3.5 w-3.5" />
+                    Paste Raw Text
                   </button>
                 </div>
 
-                <textarea
-                  rows={6}
-                  required
-                  value={bulkCsvText}
-                  onChange={(e) => setBulkCsvText(e.target.value)}
-                  placeholder="Aarav Mehta, aarav@techinfra.com, +91 98201 12345, TechInfra Solutions, Procurement Director
+                <form onSubmit={handleBulkImportSubmit} className="space-y-4">
+                  {sheetUploadTab === 'upload' ? (
+                    <div className="space-y-3">
+                      {/* Hidden File Input */}
+                      <input
+                        type="file"
+                        ref={sheetFileInputRef}
+                        accept=".xlsx, .xls, .csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, text/csv"
+                        onChange={(e) => handleSheetFileSelect(e.target.files?.[0])}
+                        className="hidden"
+                      />
+
+                      {!uploadedSheetFile ? (
+                        <div
+                          onClick={() => sheetFileInputRef.current?.click()}
+                          className="border-2 border-dashed border-border hover:border-teal-500 rounded-2xl p-6 text-center bg-muted/10 cursor-pointer transition-colors space-y-2 group"
+                        >
+                          <div className="h-10 w-10 mx-auto rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Upload className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-foreground">Click to browse or drag & drop spreadsheet</p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              Supports Microsoft Excel (.xlsx, .xls) and CSV (.csv) sheets
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-border bg-card p-3 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="p-2 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400">
+                                <FileSpreadsheet className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-foreground truncate max-w-xs">{uploadedSheetFile.name}</p>
+                                <p className="text-[10px] text-muted-foreground">{(uploadedSheetFile.size / 1024).toFixed(1)} KB</p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                resetBulkSheetState();
+                                sheetFileInputRef.current?.click();
+                              }}
+                              className="text-xs font-semibold text-primary hover:underline cursor-pointer"
+                            >
+                              Choose Different File
+                            </button>
+                          </div>
+
+                          {/* Stats summary */}
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px] border border-emerald-500/20">
+                              <CheckCircle2 className="h-3 w-3" />
+                              {parsedSheetLeads.length} valid leads ready to import
+                            </span>
+                            {skippedSheetRowsCount > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold text-[11px] border border-amber-500/20">
+                                <AlertCircle className="h-3 w-3" />
+                                {skippedSheetRowsCount} rows skipped (missing name or email)
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Parsed Leads Preview Table */}
+                          {parsedSheetLeads.length > 0 && (
+                            <div className="rounded-lg border border-border overflow-hidden">
+                              <div className="bg-muted/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex justify-between">
+                                <span>Preview of Parsed Leads (showing first {Math.min(5, parsedSheetLeads.length)})</span>
+                                <span>Total: {parsedSheetLeads.length}</span>
+                              </div>
+                              <div className="overflow-x-auto max-h-36 divide-y divide-border text-xs">
+                                {parsedSheetLeads.slice(0, 5).map((l, idx) => (
+                                  <div key={idx} className="px-3 py-1.5 flex items-center justify-between gap-2 hover:bg-muted/10">
+                                    <div className="min-w-0">
+                                      <p className="font-semibold text-foreground truncate text-xs">{l.name}</p>
+                                      <p className="text-[10px] text-muted-foreground truncate">{l.email}</p>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                      <p className="text-[11px] text-foreground truncate">{l.company || '—'}</p>
+                                      <p className="text-[10px] text-muted-foreground font-mono">{l.phone || 'No phone'}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              {parsedSheetLeads.length > 5 && (
+                                <div className="bg-muted/20 px-3 py-1 text-[10px] text-muted-foreground text-center border-t border-border">
+                                  + {parsedSheetLeads.length - 5} more leads will be imported
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {bulkParseError && (
+                        <div className="p-3 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive text-xs flex items-start gap-2">
+                          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                          <span>{bulkParseError}</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <label className="text-xs font-bold text-muted-foreground uppercase">
+                          Paste CSV / Tab-Separated Data
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleLoadSampleLeads}
+                          className="text-xs font-semibold text-primary hover:underline cursor-pointer"
+                        >
+                          Load Sample Leads
+                        </button>
+                      </div>
+
+                      <textarea
+                        rows={6}
+                        required
+                        value={bulkCsvText}
+                        onChange={(e) => setBulkCsvText(e.target.value)}
+                        placeholder="Aarav Mehta, aarav@techinfra.com, +91 98201 12345, TechInfra Solutions, Procurement Director
 Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
-                  className="w-full rounded-xl border border-border bg-background p-3 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground resize-none"
-                />
+                        className="w-full rounded-xl border border-border bg-background p-3 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground resize-none"
+                      />
+                    </div>
+                  )}
 
-                <p className="text-[11px] text-muted-foreground">
-                  Target Event: <strong className="text-foreground">{currentEvent?.title || 'Selected Edition'}</strong>
-                </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Target Event: <strong className="text-foreground">{currentEvent?.title || 'Selected Edition'}</strong>
+                  </p>
 
-                <div className="flex justify-end gap-2 pt-3 border-t border-border">
-                  <button
-                    type="button"
-                    onClick={() => setShowBulkImportModal(false)}
-                    className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={bulkImporting || !bulkCsvText.trim()}
-                    className="px-4 py-2 text-xs font-bold rounded-lg bg-teal-600 hover:bg-teal-700 text-white shadow-xs transition-colors flex items-center gap-1.5"
-                  >
-                    {bulkImporting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                    Import Leads
-                  </button>
-                </div>
-              </form>
+                  <div className="flex justify-end gap-2 pt-3 border-t border-border">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowBulkImportModal(false);
+                        resetBulkSheetState();
+                      }}
+                      className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={bulkImporting || (sheetUploadTab === 'upload' ? parsedSheetLeads.length === 0 : !bulkCsvText.trim())}
+                      className="px-4 py-2 text-xs font-bold rounded-lg bg-teal-600 hover:bg-teal-700 text-white shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {bulkImporting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      <Upload className="h-3.5 w-3.5" />
+                      {sheetUploadTab === 'upload' && parsedSheetLeads.length > 0
+                        ? `Import ${parsedSheetLeads.length} Leads`
+                        : 'Import Leads'}
+                    </button>
+                  </div>
+                </form>
+              </div>
             )}
           </div>
         </div>

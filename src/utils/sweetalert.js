@@ -36,7 +36,13 @@ const getThemeConfig = () => {
       cancelButton: 'visitexpo-swal-cancel-btn',
       actions: 'visitexpo-swal-actions'
     },
-    buttonsStyling: false
+    buttonsStyling: false,
+    showClass: {
+      popup: 'swal2-show'
+    },
+    hideClass: {
+      popup: '' // Closes immediately without waiting for CSS animationend events
+    }
   };
 };
 
