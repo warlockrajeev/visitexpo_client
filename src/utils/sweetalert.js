@@ -38,10 +38,38 @@ const getThemeConfig = () => {
     },
     buttonsStyling: false,
     showClass: {
-      popup: 'swal2-show'
+      popup: 'swal2-show',
+      backdrop: 'swal2-backdrop-show'
     },
     hideClass: {
-      popup: '' // Closes immediately without waiting for CSS animationend events
+      popup: 'swal2-hide',
+      backdrop: 'swal2-backdrop-hide'
+    },
+    willClose: (popup) => {
+      try {
+        const container = popup?.closest('.swal2-container') || document.querySelector('.swal2-container');
+        if (container) {
+          container.style.pointerEvents = 'none';
+          // Fail-safe cleanup: guaranteed removal if animationend event doesn't fire
+          setTimeout(() => {
+            if (container && container.parentNode) {
+              container.remove();
+              document.body.classList.remove('swal2-shown', 'swal2-height-auto', 'swal2-no-backdrop');
+              document.documentElement.classList.remove('swal2-shown', 'swal2-height-auto');
+            }
+          }, 180);
+        }
+      } catch (e) {}
+    },
+    didClose: () => {
+      try {
+        const containers = document.querySelectorAll('.swal2-container');
+        containers.forEach((c) => {
+          if (c && c.parentNode) c.remove();
+        });
+        document.body.classList.remove('swal2-shown', 'swal2-height-auto', 'swal2-no-backdrop');
+        document.documentElement.classList.remove('swal2-shown', 'swal2-height-auto');
+      } catch (e) {}
     }
   };
 };
