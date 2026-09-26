@@ -16,13 +16,11 @@ import {
   Settings,
   Building,
   Shield,
-  Key,
   Globe,
   Mail,
   User,
   Phone,
   MapPin,
-  Clipboard,
   Check,
   Save,
   CheckCircle2,
@@ -51,8 +49,7 @@ export default function SettingsPage() {
   const isVisitor = user?.role === 'visitor';
   const isExhibitor = isExhibitorView;
 
-  const [activeTab, setActiveTab] = useState('profile'); // profile, security, api
-  const [copiedKey, setCopiedKey] = useState(false);
+  const [activeTab, setActiveTab] = useState('profile'); // profile, security
   const [saveSuccess, setSaveSuccess] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
@@ -101,10 +98,10 @@ export default function SettingsPage() {
 
   // Keep tabs sanitized if role switches or loads
   useEffect(() => {
-    if (isVisitor && activeTab === 'api') {
+    if (activeTab === 'api') {
       setActiveTab('profile');
     }
-  }, [isVisitor, activeTab]);
+  }, [activeTab]);
 
   // Sync state when user context is updated or loaded
   useEffect(() => {
@@ -318,12 +315,6 @@ export default function SettingsPage() {
     }
   };
 
-  const copyApiKey = () => {
-    navigator.clipboard.writeText('vxp_live_589b21fa7c1e30a7d90d9841');
-    setCopiedKey(true);
-    setTimeout(() => setCopiedKey(false), 2000);
-  };
-
   // Tab definitions based on user role
   const tabs = isVisitor
     ? [
@@ -337,8 +328,7 @@ export default function SettingsPage() {
       ]
     : [
         { id: 'profile', label: 'Organizer Profile', icon: Building },
-        { id: 'security', label: 'Security & Access', icon: Shield },
-        { id: 'api', label: 'Developer Webhooks', icon: Key }
+        { id: 'security', label: 'Security & Access', icon: Shield }
       ];
 
   return (
@@ -359,7 +349,7 @@ export default function SettingsPage() {
               ? 'Manage your personal attendee details, contact info for passes, and account security.'
               : isExhibitor
               ? 'Manage your exhibitor booth details, contact information, and security credentials.'
-              : 'Configure branding parameters, update security credentials, and retrieve VisitExpo API keys.'}
+              : 'Configure branding parameters, company information, and update security credentials.'}
           </p>
         </div>
 
@@ -898,57 +888,6 @@ export default function SettingsPage() {
                 )}
               </button>
             </form>
-          )}
-
-          {/* Tab 3: API & Webhooks (Organizers Only) */}
-          {activeTab === 'api' && !isVisitor && (
-            <div className="space-y-6">
-              <h3 className="text-base font-bold text-foreground pb-2 border-b border-border flex items-center gap-1.5">
-                <Key className="h-5 w-5 text-primary" /> Webhook Integration
-              </h3>
-
-              <div className="space-y-3 bg-muted/20 border border-border rounded-xl p-4">
-                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">How to connect VisitExpo Form Connector?</h4>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Install the **VisitExpo Form Connector** or copy the API integration script onto your website. Copy the secret API key below and paste it into the plugin configuration page. This will automatically sync forms data to your Lead and Visitor CRM.
-                </p>
-              </div>
-
-              {/* API key widget */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-muted-foreground uppercase">Live API Secret Key</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value="vxp_live_589b21fa7c1e30a7d90d9841"
-                    className="flex-1 rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
-                  />
-                  <button
-                    onClick={copyApiKey}
-                    className="inline-flex items-center justify-center rounded-xl border border-border bg-secondary hover:bg-secondary/85 px-4 text-xs font-bold text-foreground transition-all shadow-sm"
-                  >
-                    {copiedKey ? <Check className="h-4.5 w-4.5 text-emerald-500" /> : <Clipboard className="h-4.5 w-4.5" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Webhook details */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-muted-foreground uppercase">Incoming Webhook Endpoint</label>
-                <input
-                  type="text"
-                  readOnly
-                  value="https://visitexpo-server.onrender.com/api/orders/checkout"
-                  className="w-full rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs font-mono text-foreground focus:outline-none"
-                />
-              </div>
-
-              <div className="border-t border-border/80 pt-4 mt-4 text-xs text-muted-foreground flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>External form registration integration is active</span>
-              </div>
-            </div>
           )}
 
         </div>
