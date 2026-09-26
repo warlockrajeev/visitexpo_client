@@ -32,7 +32,6 @@ import {
   Clock,
   ArrowRight,
   ArrowLeft,
-  Save,
   Info,
   ShieldCheck,
   Search,
@@ -57,13 +56,21 @@ import {
   Quote,
   Code,
   Link as LinkIcon,
-  Edit3,
   Eraser,
   Loader2,
   Trash2,
   ScrollText,
   Compass,
-  X
+  AlertCircle,
+  ChevronDown,
+  X,
+  FileEdit,
+  Strikethrough,
+  Highlighter,
+  Minus,
+  Type,
+  Palette,
+  Sparkles
 } from 'lucide-react';
 
 const API_URL =
@@ -71,6 +78,80 @@ const API_URL =
   (typeof window !== 'undefined' && window.location.hostname.includes('visitexpo.in')
     ? 'https://api.visitexpo.in/api'
     : 'http://localhost:5000/api');
+
+export const COUNTRY_DIAL_CODES = [
+  { code: '+91', country: 'India', flag: '🇮🇳' },
+  { code: '+1', country: 'USA / Canada', flag: '🇺🇸' },
+  { code: '+44', country: 'United Kingdom', flag: '🇬🇧' },
+  { code: '+971', country: 'United Arab Emirates', flag: '🇦🇪' },
+  { code: '+49', country: 'Germany', flag: '🇩🇪' },
+  { code: '+65', country: 'Singapore', flag: '🇸🇬' },
+  { code: '+61', country: 'Australia', flag: '🇦🇺' },
+  { code: '+33', country: 'France', flag: '🇫🇷' },
+  { code: '+81', country: 'Japan', flag: '🇯🇵' },
+  { code: '+86', country: 'China', flag: '🇨🇳' },
+  { code: '+966', country: 'Saudi Arabia', flag: '🇸🇦' },
+  { code: '+39', country: 'Italy', flag: '🇮🇹' },
+  { code: '+34', country: 'Spain', flag: '🇪🇸' },
+  { code: '+31', country: 'Netherlands', flag: '🇳🇱' },
+  { code: '+41', country: 'Switzerland', flag: '🇨🇭' },
+  { code: '+82', country: 'South Korea', flag: '🇰🇷' },
+  { code: '+55', country: 'Brazil', flag: '🇧🇷' },
+  { code: '+27', country: 'South Africa', flag: '🇿🇦' },
+  { code: '+60', country: 'Malaysia', flag: '🇲🇾' },
+  { code: '+62', country: 'Indonesia', flag: '🇮🇩' },
+  { code: '+66', country: 'Thailand', flag: '🇹🇭' },
+  { code: '+84', country: 'Vietnam', flag: '🇻🇳' },
+  { code: '+90', country: 'Turkey', flag: '🇹🇷' },
+  { code: '+7', country: 'Russia', flag: '🇷🇺' },
+  { code: '+974', country: 'Qatar', flag: '🇶🇦' },
+  { code: '+968', country: 'Oman', flag: '🇴🇲' },
+  { code: '+965', country: 'Kuwait', flag: '🇰🇼' },
+  { code: '+973', country: 'Bahrain', flag: '🇧🇭' },
+  { code: '+880', country: 'Bangladesh', flag: '🇧🇩' },
+  { code: '+94', country: 'Sri Lanka', flag: '🇱🇰' },
+  { code: '+977', country: 'Nepal', flag: '🇳🇵' }
+];
+
+export const COMMON_COUNTRIES = [
+  'India',
+  'United States',
+  'United Arab Emirates',
+  'United Kingdom',
+  'Germany',
+  'Singapore',
+  'France',
+  'Japan',
+  'China',
+  'Australia',
+  'Canada',
+  'Saudi Arabia',
+  'Italy',
+  'Spain',
+  'Netherlands',
+  'Switzerland',
+  'South Korea',
+  'Brazil',
+  'South Africa',
+  'Malaysia',
+  'Indonesia',
+  'Thailand',
+  'Vietnam',
+  'Turkey',
+  'Qatar',
+  'Oman',
+  'Kuwait',
+  'Bahrain'
+];
+
+export const parsePhoneWithCountryCode = (phoneStr = '') => {
+  const trimmed = (phoneStr || '').trim();
+  const match = trimmed.match(/^(\+\d{1,4})\s*(.*)$/);
+  if (match) {
+    return { code: match[1], number: match[2] };
+  }
+  return { code: '+91', number: trimmed.replace(/^\+/, '') };
+};
 
 export const SPONSOR_TIER_GROUPS = [
   {
@@ -223,13 +304,99 @@ export const CATEGORY_SUBSECTORS = {
 
 
 
+// Convert Markdown or Plain Text to HTML
+export function markdownToHtml(content) {
+  if (!content) return '';
+  if (/<(p|h[1-6]|div|ul|ol|li|blockquote|table|hr|b|i|u|s|strong|em)[^>]*>/i.test(content)) {
+    return content;
+  }
+  const lines = content.split('\n');
+  let html = '';
+  let inUl = false;
+  let inOl = false;
+
+  const inline = (s) => s
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/(?<!\*)\*(.*?)\*(?!\*)/g, '<em>$1</em>')
+    .replace(/<u>(.*?)<\/u>/gi, '<u>$1</u>')
+    .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+  for (let line of lines) {
+    const t = line.trim();
+    if (!t) {
+      if (inUl) { html += '</ul>'; inUl = false; }
+      if (inOl) { html += '</ol>'; inOl = false; }
+      continue;
+    }
+    if (t.startsWith('# ')) {
+      if (inUl) { html += '</ul>'; inUl = false; }
+      if (inOl) { html += '</ol>'; inOl = false; }
+      html += `<h1>${inline(t.slice(2))}</h1>`;
+    } else if (t.startsWith('## ')) {
+      if (inUl) { html += '</ul>'; inUl = false; }
+      if (inOl) { html += '</ol>'; inOl = false; }
+      html += `<h2>${inline(t.slice(3))}</h2>`;
+    } else if (t.startsWith('### ')) {
+      if (inUl) { html += '</ul>'; inUl = false; }
+      if (inOl) { html += '</ol>'; inOl = false; }
+      html += `<h3>${inline(t.slice(4))}</h3>`;
+    } else if (t.startsWith('> ')) {
+      if (inUl) { html += '</ul>'; inUl = false; }
+      if (inOl) { html += '</ol>'; inOl = false; }
+      html += `<blockquote>${inline(t.slice(2))}</blockquote>`;
+    } else if (t.startsWith('• ') || t.startsWith('- ') || t.startsWith('* ')) {
+      if (inOl) { html += '</ol>'; inOl = false; }
+      if (!inUl) { html += '<ul>'; inUl = true; }
+      html += `<li>${inline(t.replace(/^[•\-*]\s+/, ''))}</li>`;
+    } else if (/^\d+\.\s+/.test(t)) {
+      if (inUl) { html += '</ul>'; inUl = false; }
+      if (!inOl) { html += '<ol>'; inOl = true; }
+      html += `<li>${inline(t.replace(/^\d+\.\s+/, ''))}</li>`;
+    } else {
+      if (inUl) { html += '</ul>'; inUl = false; }
+      if (inOl) { html += '</ol>'; inOl = false; }
+      html += `<p>${inline(t)}</p>`;
+    }
+  }
+  if (inUl) html += '</ul>';
+  if (inOl) html += '</ol>';
+  return html || '<p></p>';
+}
+
+export function getCleanText(htmlOrText) {
+  if (!htmlOrText) return '';
+  return htmlOrText
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function getWordCount(htmlOrText) {
+  const clean = getCleanText(htmlOrText);
+  if (!clean) return 0;
+  return clean.split(/\s+/).filter(Boolean).length;
+}
+
 // Render Rich Text Markdown/HTML content into styled React elements
 export function renderRichText(content) {
   if (!content || typeof content !== 'string') return null;
 
+  // If content contains HTML tags, render it with rich wysiwyg styles
+  if (/<[a-z][\s\S]*>/i.test(content)) {
+    return (
+      <div
+        className="wysiwyg-editor prose dark:prose-invert max-w-none text-foreground text-sm space-y-1"
+        dangerouslySetInnerHTML={{ __html: content }}
+      />
+    );
+  }
+
+  // Fallback markdown parsing for legacy markdown strings
   const lines = content.split('\n');
   const elements = [];
-
   let inList = false;
   let listItems = [];
   let isNumbered = false;
@@ -273,11 +440,7 @@ export function renderRichText(content) {
 
   lines.forEach((line, idx) => {
     const trimmed = line.trim();
-
-    // Skip stray empty hashtags
-    if (/^#{1,6}$/.test(trimmed)) {
-      return;
-    }
+    if (/^#{1,6}$/.test(trimmed)) return;
 
     if (trimmed.startsWith('# ')) {
       flushList(idx);
@@ -319,238 +482,503 @@ export function renderRichText(content) {
   return elements;
 }
 
-// Interactive Rich Text Editor Component
+// In-Place Visual WYSIWYG Rich Text Editor Component (No separate preview section)
 export function RichTextEditor({
+  name = '',
   value = '',
   onChange,
   onAiAssist,
   isAiGenerating = false,
-  placeholder = 'Describe the main highlights, key themes, delegate profile, and exhibitor benefits...',
-  rows = 6,
-  minHeight = '180px'
+  placeholder = 'Describe your event highlights, target visitor profiles, exhibitor benefits, and key conference themes...',
+  minHeight = '240px'
 }) {
-  const [activeTab, setActiveTab] = React.useState('write'); // 'write' or 'preview'
-  const textareaRef = React.useRef(null);
+  const [mode, setMode] = useState('visual'); // 'visual' | 'html'
+  const [internalHtml, setInternalHtml] = useState(() => markdownToHtml(value || ''));
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showHighlightPicker, setShowHighlightPicker] = useState(false);
+  const [selectedFont, setSelectedFont] = useState('inherit');
+  const [selectedSize, setSelectedSize] = useState('3');
+  const [selectedBlock, setSelectedBlock] = useState('p');
+  const [activeFormats, setActiveFormats] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    strike: false
+  });
 
-  const applyFormat = (type) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
+  const editorRef = React.useRef(null);
+  const isTypingRef = React.useRef(false);
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = value || '';
-    const selected = text.substring(start, end);
-
-    let prefix = '';
-    let suffix = '';
-    let replacement = '';
-
-    switch (type) {
-      case 'h1':
-        prefix = '# ';
-        replacement = prefix + (selected || 'Main Heading');
-        break;
-      case 'h2':
-        prefix = '## ';
-        replacement = prefix + (selected || 'Subheading');
-        break;
-      case 'h3':
-        prefix = '### ';
-        replacement = prefix + (selected || 'Section Title');
-        break;
-      case 'bold':
-        prefix = '**';
-        suffix = '**';
-        replacement = prefix + (selected || 'bold text') + suffix;
-        break;
-      case 'italic':
-        prefix = '*';
-        suffix = '*';
-        replacement = prefix + (selected || 'italic text') + suffix;
-        break;
-      case 'underline':
-        prefix = '<u>';
-        suffix = '</u>';
-        replacement = prefix + (selected || 'underlined text') + suffix;
-        break;
-      case 'bullet':
-        prefix = '• ';
-        replacement = selected ? selected.split('\n').map(l => `• ${l}`).join('\n') : '• Bullet list item';
-        break;
-      case 'number':
-        prefix = '1. ';
-        replacement = selected ? selected.split('\n').map((l, i) => `${i + 1}. ${l}`).join('\n') : '1. Numbered list item';
-        break;
-      case 'quote':
-        prefix = '> ';
-        replacement = prefix + (selected || 'Blockquote text');
-        break;
-      case 'code':
-        prefix = '`';
-        suffix = '`';
-        replacement = prefix + (selected || 'code') + suffix;
-        break;
-      case 'link':
-        const url = window.prompt('Enter URL link (e.g. https://visitexpo.in):', 'https://');
-        if (!url) return;
-        replacement = `[${selected || 'Link Title'}](${url})`;
-        break;
-      case 'clear':
-        replacement = selected.replace(/[\*#>`•]/g, '').replace(/<\/?u>/g, '');
-        break;
-      default:
-        return;
-    }
-
-    const newValue = text.substring(0, start) + replacement + text.substring(end);
-    onChange(newValue);
-
-    setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.focus();
-        textareaRef.current.setSelectionRange(start + prefix.length, start + replacement.length - suffix.length);
+  // Sync external value updates (e.g. from AI assistant or reset)
+  useEffect(() => {
+    const formatted = markdownToHtml(value || '');
+    if (!isTypingRef.current) {
+      setInternalHtml(formatted);
+      if (editorRef.current && editorRef.current.innerHTML !== formatted) {
+        editorRef.current.innerHTML = formatted;
       }
-    }, 10);
+    }
+  }, [value]);
+
+  // Initial load into contentEditable
+  useEffect(() => {
+    if (editorRef.current && !editorRef.current.innerHTML) {
+      editorRef.current.innerHTML = markdownToHtml(value || '');
+    }
+  }, []);
+
+  const checkActiveFormats = () => {
+    try {
+      setActiveFormats({
+        bold: document.queryCommandState('bold'),
+        italic: document.queryCommandState('italic'),
+        underline: document.queryCommandState('underline'),
+        strike: document.queryCommandState('strikeThrough')
+      });
+    } catch (e) {}
   };
 
+  const executeCommand = (cmd, val = null) => {
+    if (mode !== 'visual') return;
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
+    try {
+      document.execCommand('styleWithCSS', false, true);
+    } catch (e) {}
+    document.execCommand(cmd, false, val);
+    if (editorRef.current) {
+      const html = editorRef.current.innerHTML;
+      setInternalHtml(html);
+      onChange?.(html);
+      checkActiveFormats();
+    }
+  };
+
+  const handleInput = () => {
+    if (!editorRef.current) return;
+    isTypingRef.current = true;
+    const currentHtml = editorRef.current.innerHTML;
+    setInternalHtml(currentHtml);
+    onChange?.(currentHtml);
+    checkActiveFormats();
+    setTimeout(() => {
+      isTypingRef.current = false;
+    }, 150);
+  };
+
+  const handleModeSwitch = (newMode) => {
+    if (newMode === mode) return;
+    if (newMode === 'html') {
+      if (editorRef.current) {
+        const currentHtml = editorRef.current.innerHTML;
+        setInternalHtml(currentHtml);
+        onChange?.(currentHtml);
+      }
+      setMode('html');
+    } else {
+      setMode('visual');
+      setTimeout(() => {
+        if (editorRef.current) {
+          editorRef.current.innerHTML = internalHtml;
+          editorRef.current.focus();
+        }
+      }, 0);
+    }
+  };
+
+  const handleInsertLink = () => {
+    const url = window.prompt('Enter link URL (e.g. https://visitexpo.in):', 'https://');
+    if (url && url.trim()) {
+      executeCommand('createLink', url.trim());
+    }
+  };
+
+  const handleInsertDivider = () => {
+    executeCommand('insertHorizontalRule');
+  };
+
+  const handleClearFormat = () => {
+    executeCommand('removeFormat');
+    executeCommand('formatBlock', '<p>');
+    setSelectedBlock('p');
+    setSelectedFont('inherit');
+    setSelectedSize('3');
+  };
+
+  const TEXT_COLORS = [
+    { label: 'Default', color: 'inherit' },
+    { label: 'Charcoal', color: '#0f172a' },
+    { label: 'Muted Gray', color: '#64748b' },
+    { label: 'Indigo Brand', color: '#4f46e5' },
+    { label: 'Blue Accent', color: '#2563eb' },
+    { label: 'Emerald', color: '#059669' },
+    { label: 'Rose Pink', color: '#e11d48' },
+    { label: 'Amber Gold', color: '#d97706' },
+    { label: 'Purple', color: '#9333ea' }
+  ];
+
+  const HIGHLIGHT_COLORS = [
+    { label: 'None', color: 'transparent' },
+    { label: 'Yellow', color: '#fef08a' },
+    { label: 'Mint', color: '#bbf7d0' },
+    { label: 'Sky Blue', color: '#bfdbfe' },
+    { label: 'Pink', color: '#fbcfe8' },
+    { label: 'Orange', color: '#fed7aa' }
+  ];
+
+  const cleanText = getCleanText(internalHtml);
+  const wordCount = getWordCount(internalHtml);
+
   return (
-    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden space-y-0">
-      {/* Editor Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-border bg-muted/30">
-        {/* Mode Switcher */}
-        <div className="flex items-center gap-1 bg-background border border-border rounded-lg p-0.5 text-xs font-semibold">
+    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden flex flex-col transition-all">
+      {/* Top Header Bar matching Screenshot */}
+      <div className="bg-[#0f172a] text-white px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 select-none">
+        {/* Editor Mode Tabs */}
+        <div className="inline-flex items-center gap-1 bg-slate-800/90 p-1 rounded-lg border border-slate-700/60 shadow-inner">
           <button
             type="button"
-            onClick={() => setActiveTab('write')}
-            className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 ${
-              activeTab === 'write' ? 'bg-primary text-primary-foreground font-bold shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            onClick={() => handleModeSwitch('visual')}
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              mode === 'visual'
+                ? 'bg-[#e62e5c] text-white shadow'
+                : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
             }`}
           >
-            <Edit3 className="h-3.5 w-3.5" /> Editor
+            <FileEdit className="h-3.5 w-3.5" />
+            <span>Visual Editor</span>
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('preview')}
-            className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 ${
-              activeTab === 'preview' ? 'bg-primary text-primary-foreground font-bold shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            onClick={() => handleModeSwitch('html')}
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              mode === 'html'
+                ? 'bg-[#e62e5c] text-white shadow'
+                : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
             }`}
           >
-            <Eye className="h-3.5 w-3.5" /> Rich Preview
+            <Code className="h-3.5 w-3.5" />
+            <span>&lt;/&gt; HTML</span>
           </button>
         </div>
 
+        {/* Word Counter & AI Assist on the Right */}
+        <div className="flex items-center gap-3">
+          {onAiAssist && (
+            <button
+              type="button"
+              onClick={onAiAssist}
+              disabled={isAiGenerating}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white shadow-sm transition-all disabled:opacity-50"
+              title="Auto-generate or polish event description with AI"
+            >
+              {isAiGenerating ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Sparkles className="h-3 w-3 text-amber-300" />
+              )}
+              <span>AI Assist</span>
+            </button>
+          )}
+
+          <div className="text-xs text-slate-300 font-medium tracking-wide">
+            <span className="font-bold text-white">{wordCount}</span> / 2500 words
+          </div>
+        </div>
       </div>
 
-      {/* Formatting Toolbar (Only shown in 'write' mode) */}
-      {activeTab === 'write' && (
-        <div className="flex flex-wrap items-center gap-1 px-3 py-1.5 border-b border-border/70 bg-card text-xs overflow-x-auto">
-          {/* Headings */}
-          <div className="flex items-center border-r border-border pr-1 mr-1 gap-0.5">
+      {/* Formatting Toolbar (Only in Visual Mode) */}
+      {mode === 'visual' && (
+        <div className="bg-muted/40 border-b border-border px-3 py-2 flex flex-wrap items-center gap-1.5 text-xs text-foreground">
+          {/* Font Family Selector */}
+          <div className="relative">
+            <select
+              value={selectedFont}
+              onChange={(e) => {
+                setSelectedFont(e.target.value);
+                executeCommand('fontName', e.target.value);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="h-8 px-2.5 py-1 text-xs rounded-lg border border-border bg-background text-foreground hover:bg-muted/50 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-medium"
+              title="Font Family"
+            >
+              <option value="inherit">A Font (Default)</option>
+              <option value="Outfit, sans-serif">Outfit</option>
+              <option value="Inter, sans-serif">Inter</option>
+              <option value="Roboto, sans-serif">Roboto</option>
+              <option value="Arial, sans-serif">Arial</option>
+              <option value="Georgia, serif">Georgia (Serif)</option>
+              <option value="monospace">Monospace</option>
+            </select>
+          </div>
+
+          {/* Font Size Selector */}
+          <div className="relative">
+            <select
+              value={selectedSize}
+              onChange={(e) => {
+                setSelectedSize(e.target.value);
+                executeCommand('fontSize', e.target.value);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="h-8 px-2.5 py-1 text-xs rounded-lg border border-border bg-background text-foreground hover:bg-muted/50 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-medium"
+              title="Font Size"
+            >
+              <option value="1">↕ 12px - Small</option>
+              <option value="2">↕ 14px - Compact</option>
+              <option value="3">↕ 16px - Regular</option>
+              <option value="4">↕ 18px - Medium</option>
+              <option value="5">↕ 24px - Large</option>
+              <option value="6">↕ 30px - Title</option>
+            </select>
+          </div>
+
+          {/* Block Format Selector */}
+          <div className="relative">
+            <select
+              value={selectedBlock}
+              onChange={(e) => {
+                const tag = e.target.value;
+                setSelectedBlock(tag);
+                if (tag === 'p') {
+                  executeCommand('formatBlock', '<p>');
+                } else if (['h1', 'h2', 'h3'].includes(tag)) {
+                  executeCommand('formatBlock', `<${tag}>`);
+                } else if (tag === 'blockquote') {
+                  executeCommand('formatBlock', '<blockquote>');
+                }
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="h-8 px-2.5 py-1 text-xs rounded-lg border border-border bg-background text-foreground hover:bg-muted/50 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-medium"
+              title="Block Format"
+            >
+              <option value="p">Paragraph</option>
+              <option value="h1">Heading 1</option>
+              <option value="h2">Heading 2</option>
+              <option value="h3">Heading 3</option>
+              <option value="blockquote">Quote Block</option>
+            </select>
+          </div>
+
+          <div className="h-5 w-px bg-border mx-1" />
+
+          {/* Inline Styles: B, I, U, S */}
+          <div className="flex items-center gap-0.5">
             <button
               type="button"
-              onClick={() => applyFormat('h1')}
-              title="Heading 1 (#)"
-              className="px-2 py-1 rounded hover:bg-secondary text-foreground font-extrabold text-xs"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                executeCommand('bold');
+              }}
+              className={`h-8 w-8 inline-flex items-center justify-center rounded-lg font-bold text-sm transition-colors ${
+                activeFormats.bold
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'hover:bg-muted text-foreground'
+              }`}
+              title="Bold (Ctrl+B)"
             >
-              H1
+              B
             </button>
             <button
               type="button"
-              onClick={() => applyFormat('h2')}
-              title="Heading 2 (##)"
-              className="px-2 py-1 rounded hover:bg-secondary text-foreground font-bold text-xs"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                executeCommand('italic');
+              }}
+              className={`h-8 w-8 inline-flex items-center justify-center rounded-lg italic font-serif text-sm transition-colors ${
+                activeFormats.italic
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'hover:bg-muted text-foreground'
+              }`}
+              title="Italic (Ctrl+I)"
             >
-              H2
+              I
             </button>
             <button
               type="button"
-              onClick={() => applyFormat('h3')}
-              title="Heading 3 (###)"
-              className="px-2 py-1 rounded hover:bg-secondary text-foreground font-semibold text-xs"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                executeCommand('underline');
+              }}
+              className={`h-8 w-8 inline-flex items-center justify-center rounded-lg underline text-sm transition-colors ${
+                activeFormats.underline
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'hover:bg-muted text-foreground'
+              }`}
+              title="Underline (Ctrl+U)"
             >
-              H3
+              U
+            </button>
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                executeCommand('strikeThrough');
+              }}
+              className={`h-8 w-8 inline-flex items-center justify-center rounded-lg line-through text-sm transition-colors ${
+                activeFormats.strike
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'hover:bg-muted text-foreground'
+              }`}
+              title="Strikethrough"
+            >
+              S
             </button>
           </div>
 
-          {/* Inline Styles */}
-          <div className="flex items-center border-r border-border pr-1 mr-1 gap-0.5">
+          {/* Text Color Picker */}
+          <div className="relative">
             <button
               type="button"
-              onClick={() => applyFormat('bold')}
-              title="Bold (**text**)"
-              className="p-1.5 rounded hover:bg-secondary text-foreground font-bold"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setShowColorPicker((prev) => !prev);
+                setShowHighlightPicker(false);
+              }}
+              className="h-8 px-2 inline-flex items-center justify-center rounded-lg hover:bg-muted text-foreground font-bold text-xs gap-1 border border-transparent hover:border-border transition-colors"
+              title="Text Color"
             >
-              <Bold className="h-3.5 w-3.5" />
+              <span className="flex flex-col items-center leading-none">
+                <span className="font-bold text-xs">A</span>
+                <span className="h-0.5 w-3 bg-primary rounded-full mt-0.5" />
+              </span>
+              <ChevronDown className="h-2.5 w-2.5 opacity-60" />
             </button>
-            <button
-              type="button"
-              onClick={() => applyFormat('italic')}
-              title="Italic (*text*)"
-              className="p-1.5 rounded hover:bg-secondary text-foreground italic"
-            >
-              <Italic className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => applyFormat('underline')}
-              title="Underline (<u>text</u>)"
-              className="p-1.5 rounded hover:bg-secondary text-foreground underline"
-            >
-              <Underline className="h-3.5 w-3.5" />
-            </button>
+            {showColorPicker && (
+              <div
+                className="absolute top-full left-0 mt-1 z-30 p-2.5 rounded-xl bg-popover border border-border shadow-xl grid grid-cols-3 gap-1.5 w-44"
+                onMouseDown={(e) => e.preventDefault()}
+              >
+                {TEXT_COLORS.map((c) => (
+                  <button
+                    key={c.label}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      executeCommand('foreColor', c.color);
+                      setShowColorPicker(false);
+                    }}
+                    className="h-6 w-full rounded-md border border-border flex items-center justify-center text-[10px] font-medium transition-transform hover:scale-105"
+                    style={{
+                      backgroundColor: c.color === 'inherit' ? 'transparent' : c.color,
+                      color: c.color === 'inherit' || c.color === '#fef08a' ? '#000' : '#fff'
+                    }}
+                    title={c.label}
+                  >
+                    {c.color === 'inherit' ? 'Default' : ''}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Lists */}
-          <div className="flex items-center border-r border-border pr-1 mr-1 gap-0.5">
+          {/* Highlight Color Picker */}
+          <div className="relative">
             <button
               type="button"
-              onClick={() => applyFormat('bullet')}
-              title="Bulleted List (• item)"
-              className="p-1.5 rounded hover:bg-secondary text-foreground"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setShowHighlightPicker((prev) => !prev);
+                setShowColorPicker(false);
+              }}
+              className="h-8 px-2 inline-flex items-center justify-center rounded-lg hover:bg-muted text-foreground text-xs gap-1 border border-transparent hover:border-border transition-colors"
+              title="Highlight Background"
+            >
+              <Highlighter className="h-3.5 w-3.5" />
+              <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+            </button>
+            {showHighlightPicker && (
+              <div
+                className="absolute top-full left-0 mt-1 z-30 p-2.5 rounded-xl bg-popover border border-border shadow-xl grid grid-cols-3 gap-1.5 w-40"
+                onMouseDown={(e) => e.preventDefault()}
+              >
+                {HIGHLIGHT_COLORS.map((c) => (
+                  <button
+                    key={c.label}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      executeCommand('hiliteColor', c.color);
+                      setShowHighlightPicker(false);
+                    }}
+                    className="h-6 rounded-md border border-border text-[10px] font-bold text-foreground flex items-center justify-center transition-transform hover:scale-105"
+                    style={{ backgroundColor: c.color }}
+                    title={c.label}
+                  >
+                    {c.color === 'transparent' ? '✕' : ''}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="h-5 w-px bg-border mx-1" />
+
+          {/* List and Tools */}
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                executeCommand('insertUnorderedList');
+              }}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-lg hover:bg-muted text-foreground transition-colors"
+              title="Bulleted List"
             >
               <List className="h-3.5 w-3.5" />
             </button>
             <button
               type="button"
-              onClick={() => applyFormat('number')}
-              title="Numbered List (1. item)"
-              className="p-1.5 rounded hover:bg-secondary text-foreground"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                executeCommand('insertOrderedList');
+              }}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-lg hover:bg-muted text-foreground transition-colors"
+              title="Numbered List"
             >
               <ListOrdered className="h-3.5 w-3.5" />
             </button>
-          </div>
-
-          {/* Special Elements */}
-          <div className="flex items-center gap-0.5">
             <button
               type="button"
-              onClick={() => applyFormat('quote')}
-              title="Blockquote (> text)"
-              className="p-1.5 rounded hover:bg-secondary text-foreground"
-            >
-              <Quote className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => applyFormat('code')}
-              title="Inline Code (`code`)"
-              className="p-1.5 rounded hover:bg-secondary text-foreground"
-            >
-              <Code className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => applyFormat('link')}
-              title="Hyperlink [title](url)"
-              className="p-1.5 rounded hover:bg-secondary text-foreground"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleInsertLink();
+              }}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-lg hover:bg-muted text-foreground transition-colors"
+              title="Insert Link"
             >
               <LinkIcon className="h-3.5 w-3.5" />
             </button>
             <button
               type="button"
-              onClick={() => applyFormat('clear')}
-              title="Remove formatting"
-              className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-destructive ml-1"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                executeCommand('formatBlock', '<blockquote>');
+              }}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-lg hover:bg-muted text-foreground transition-colors"
+              title="Quote Callout"
+            >
+              <Quote className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleInsertDivider();
+              }}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-lg hover:bg-muted text-foreground transition-colors"
+              title="Horizontal Divider"
+            >
+              <Minus className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleClearFormat();
+              }}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors ml-1"
+              title="Clear Formatting"
             >
               <Eraser className="h-3.5 w-3.5" />
             </button>
@@ -558,34 +986,54 @@ export function RichTextEditor({
         </div>
       )}
 
-      {/* Active Editor Pane */}
-      {activeTab === 'write' ? (
-        <div className="relative">
-          <textarea
-            ref={textareaRef}
-            rows={rows}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder}
-            className="w-full bg-background p-3.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary leading-relaxed border-none resize-y"
+      {/* Editor Surface: Single in-place visual canvas with NO separate preview section */}
+      <div className="relative flex-1 bg-background">
+        {mode === 'visual' ? (
+          <div
+            ref={editorRef}
+            contentEditable
+            suppressContentEditableWarning
+            onInput={handleInput}
+            onKeyUp={checkActiveFormats}
+            onMouseUp={checkActiveFormats}
+            data-placeholder={placeholder}
+            className="wysiwyg-editor min-h-[260px] p-5 text-sm text-foreground bg-background focus:outline-none leading-relaxed transition-all cursor-text overflow-y-auto"
             style={{ minHeight }}
           />
-          <div className="flex justify-between items-center px-3 py-1.5 bg-muted/20 border-t border-border/50 text-[10px] text-muted-foreground">
-            <span>Supports Rich Formatting (H1, H2, Bold, Lists, Links, Quotes)</span>
-            <span>{value.length} characters</span>
-          </div>
-        </div>
-      ) : (
-        <div className="p-4 bg-background min-h-[180px] overflow-y-auto space-y-2 border-t border-border">
-          {!value || !value.trim() ? (
-            <p className="text-xs text-muted-foreground italic">No description content entered yet. Switch to Editor mode to write.</p>
+        ) : (
+          <textarea
+            name={name}
+            value={internalHtml}
+            onChange={(e) => {
+              const val = e.target.value;
+              setInternalHtml(val);
+              onChange?.(val);
+            }}
+            placeholder="<p>Enter HTML here...</p>"
+            className="w-full min-h-[260px] p-5 font-mono text-xs text-foreground bg-background focus:outline-none resize-y leading-relaxed border-none"
+            style={{ minHeight }}
+          />
+        )}
+      </div>
+
+      {/* Footer Status Bar */}
+      <div className="flex flex-wrap justify-between items-center px-4 py-2.5 bg-muted/20 border-t border-border text-xs text-muted-foreground gap-2">
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
+          <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
+          In-Place Visual Editor • Formatting is applied live without separate preview
+        </span>
+        <div>
+          {cleanText.length >= 30 ? (
+            <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 text-xs">
+              <Check className="h-3.5 w-3.5" /> Ready ({cleanText.length} characters • {wordCount} words)
+            </span>
           ) : (
-            <div className="prose dark:prose-invert max-w-none text-foreground text-sm">
-              {renderRichText(value)}
-            </div>
+            <span className="text-amber-600 dark:text-amber-400 font-semibold text-xs flex items-center gap-1">
+              <AlertCircle className="h-3.5 w-3.5" /> {cleanText.length} / 30 minimum characters required
+            </span>
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -601,6 +1049,53 @@ const STEPS = [
   { id: 8, title: 'Submit & Moderation', icon: CheckCircle2 }
 ];
 
+export const getInitialFormData = (user = null) => ({
+  title: '',
+  slug: '',
+  category: 'Technology & AI',
+  industry: 'Information Technology',
+  description: '',
+  startDate: '',
+  endDate: '',
+  timings: '09:00 AM - 06:00 PM',
+  venueName: '',
+  city: '',
+  state: 'Delhi NCR',
+  country: 'India',
+  address: '',
+  // Organizer Profile
+  orgName: user?.organization?.name || 'Global Tech Events Ltd',
+  orgEmail: user?.email || 'organizer@visitexpo.in',
+  orgPhone: '+91 98765 43210',
+  orgWebsite: 'https://globaltechevents.com',
+  orgGst: '07AAAAA1111A1Z1',
+  orgLogo: '',
+  orgDesc: '',
+  socialFacebook: '',
+  socialLinkedIn: '',
+  socialInstagram: '',
+  socialX: '',
+  // Media
+  bannerUrl: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&q=80',
+  gallery: [],
+  brochurePdf: '',
+  promoVideoUrl: '',
+  sponsorsList: [],
+  // Schedule
+  schedules: [{ name: 'Event Day', date: '' }],
+  // FAQs
+  faqsList: [],
+  // Contact
+  contactShortcode: '',
+  // Ticketing & Form
+  isFreeEvent: true,
+  paidTicketPrice: '499',
+  formFields: ['name', 'email', 'phone', 'company', 'designation'],
+  // SEO
+  metaTitle: '',
+  metaDescription: ''
+});
+
 export default function EventWizardPage() {
   const router = useRouter();
   const { accessToken, user } = useAuth();
@@ -608,8 +1103,6 @@ export default function EventWizardPage() {
 
   const [currentStep, setCurrentStep] = useState(1);
   const [formMode, setFormMode] = useState('wizard'); // 'wizard' | 'scrollable'
-  const [lastAutosaved, setLastAutosaved] = useState('Just now');
-  const [isSaving, setIsSaving] = useState(false);
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -617,58 +1110,17 @@ export default function EventWizardPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isCustomIndustry, setIsCustomIndustry] = useState(false);
 
+  // Form Validation Errors State
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+
   // Image Dimension Validation State
   const [bannerValidation, setBannerValidation] = useState(null);
   const [orgLogoValidation, setOrgLogoValidation] = useState(null);
   const [sponsorLogoValidation, setSponsorLogoValidation] = useState(null);
 
-  // Form State
-  const [formData, setFormData] = useState({
-    title: '',
-    slug: '',
-    category: 'Technology & AI',
-    industry: 'Information Technology',
-    description: '',
-    startDate: '',
-    endDate: '',
-    timings: '09:00 AM - 06:00 PM',
-    venueName: '',
-    city: '',
-    state: 'Delhi NCR',
-    country: 'India',
-    address: '',
-    // Organizer Profile
-    orgName: user?.organization?.name || 'Global Tech Events Ltd',
-    orgEmail: user?.email || 'organizer@visitexpo.in',
-    orgPhone: '+91 98765 43210',
-    orgWebsite: 'https://globaltechevents.com',
-    orgGst: '07AAAAA1111A1Z1',
-    orgLogo: '',
-    orgDesc: '',
-    socialFacebook: '',
-    socialLinkedIn: '',
-    socialInstagram: '',
-    socialX: '',
-    // Media
-    bannerUrl: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&q=80',
-    gallery: [],
-    brochurePdf: '',
-    promoVideoUrl: '',
-    sponsorsList: [],
-    // Schedule
-    schedules: [{ name: 'Event Day', date: '' }],
-    // FAQs
-    faqsList: [],
-    // Contact
-    contactShortcode: '',
-    // Ticketing & Form
-    isFreeEvent: true,
-    paidTicketPrice: '499',
-    formFields: ['name', 'email', 'phone', 'company', 'designation'],
-    // SEO
-    metaTitle: '',
-    metaDescription: ''
-  });
+  // Form State initialized fresh every time
+  const [formData, setFormData] = useState(() => getInitialFormData(user));
 
   // Real-time Duplicate Event Detection state
   const [duplicateCheck, setDuplicateCheck] = useState({
@@ -743,49 +1195,11 @@ export default function EventWizardPage() {
     }
   }, [currentStep]);
 
-  const saveDraftToStorage = (dataToSave = formData, stepToSave = currentStep) => {
-    try {
-      if (typeof window !== 'undefined') {
-        const payload = {
-          formData: dataToSave,
-          currentStep: stepToSave > 1 ? stepToSave : 2,
-          savedAt: new Date().toISOString()
-        };
-        localStorage.setItem('visitexpo_wizard_draft', JSON.stringify(payload));
-      }
-    } catch (e) {
-      console.error('Save draft error', e);
-    }
-  };
-
-  const handleManualSaveDraft = () => {
-    setIsSaving(true);
-    saveDraftToStorage(formData, currentStep);
-    setTimeout(() => {
-      setIsSaving(false);
-      setLastAutosaved(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    }, 600);
-  };
-
-  // Restore saved draft on mount if available & verify duplicate immediately
+  // Ensure clean fresh form on mount and purge any legacy draft from storage
   useEffect(() => {
     try {
       if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('visitexpo_wizard_draft');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          const loadedData = parsed.formData || (parsed.title || parsed.description || parsed.venueName ? parsed : null);
-          const loadedStep = parsed.currentStep || (loadedData?.title || loadedData?.venueName ? 2 : 1);
-
-          if (loadedData && (loadedData.title || loadedData.description || loadedData.venueName)) {
-            setFormData(prev => ({ ...prev, ...loadedData }));
-            setCurrentStep(loadedStep > 1 ? loadedStep : 2);
-            setLastAutosaved(parsed.savedAt ? new Date(parsed.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Loaded Draft');
-            if (loadedData.title && loadedData.title.trim().length >= 3) {
-              performDuplicateCheck(loadedData.title);
-            }
-          }
-        }
+        localStorage.removeItem('visitexpo_wizard_draft');
 
         // Restore chosen form mode (wizard vs scrollable)
         const savedMode = localStorage.getItem('visitexpo_create_event_mode');
@@ -794,9 +1208,26 @@ export default function EventWizardPage() {
         }
       }
     } catch (e) {
-      console.error('Error restoring saved draft / mode', e);
+      console.error('Error initializing form mode', e);
     }
   }, []);
+
+  const handleResetForm = () => {
+    setFormData(getInitialFormData(user));
+    setCurrentStep(1);
+    setErrors({});
+    setTouched({});
+    setDuplicateCheck({
+      checking: false,
+      isDuplicate: false,
+      existingEvent: null,
+      similarEvents: []
+    });
+    setSubmitError('');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('visitexpo_wizard_draft');
+    }
+  };
 
   const handleModeChange = (newMode) => {
     setFormMode(newMode);
@@ -816,18 +1247,213 @@ export default function EventWizardPage() {
     }
   };
 
-  // Autosave interval every 25 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setIsSaving(true);
-      saveDraftToStorage(formData, currentStep);
-      setTimeout(() => {
-        setIsSaving(false);
-        setLastAutosaved(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      }, 800);
-    }, 25000);
-    return () => clearInterval(interval);
-  }, [formData, currentStep]);
+  // Field-level Validation Rule Engine
+  const validateField = (name, value, allData = formData) => {
+    switch (name) {
+      case 'title': {
+        const trimmed = (value || '').trim();
+        if (!trimmed) return 'Event Name / Title is required.';
+        if (trimmed.length < 3) return 'Event title must be at least 3 characters.';
+        if (trimmed.length > 150) return 'Event title cannot exceed 150 characters.';
+        return '';
+      }
+      case 'slug': {
+        const trimmed = (value || '').trim();
+        if (!trimmed) return 'Public URL slug is required.';
+        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(trimmed)) {
+          return 'Slug can only contain lowercase letters, numbers, and single hyphens (e.g. tech-expo-2026).';
+        }
+        return '';
+      }
+      case 'category': {
+        if (!(value || '').trim()) return 'Please select a primary category.';
+        return '';
+      }
+      case 'industry': {
+        if (isCustomIndustry && !(value || '').trim()) {
+          return 'Please enter your custom industry sub-sector.';
+        }
+        return '';
+      }
+      case 'description': {
+        const textOnly = getCleanText(value);
+        if (!textOnly) return 'Event description is required.';
+        if (textOnly.length < 30) {
+          return `Description must be at least 30 characters (currently ${textOnly.length}).`;
+        }
+        return '';
+      }
+      case 'startDate': {
+        if (!value) return 'Start date is required.';
+        return '';
+      }
+      case 'endDate': {
+        if (!value) return 'End date is required.';
+        if (allData.startDate && new Date(value) < new Date(allData.startDate)) {
+          return 'End date cannot be earlier than start date.';
+        }
+        return '';
+      }
+      case 'venueName': {
+        const trimmed = (value || '').trim();
+        if (!trimmed) return 'Venue Name / Hall Number is required.';
+        if (trimmed.length < 3) return 'Venue name must be at least 3 characters.';
+        return '';
+      }
+      case 'city': {
+        const trimmed = (value || '').trim();
+        if (!trimmed) return 'City is required.';
+        if (/\d/.test(trimmed)) {
+          return 'City name cannot contain numbers. Please enter a valid city name (e.g. New Delhi, Mumbai, Berlin).';
+        }
+        if (!/^[a-zA-Z\s.'\-\/,()]+$/.test(trimmed) || !/[a-zA-Z]/.test(trimmed)) {
+          return 'City must contain a valid alphabetic name.';
+        }
+        if (trimmed.length < 2) {
+          return 'City name must be at least 2 characters.';
+        }
+        return '';
+      }
+      case 'country': {
+        const trimmed = (value || '').trim();
+        if (!trimmed) return 'Country is required.';
+        if (/\d/.test(trimmed)) {
+          return 'Country name cannot contain numbers. Please enter a valid country name (e.g. India, United States, Germany).';
+        }
+        if (!/^[a-zA-Z\s.'\-\/,()]+$/.test(trimmed) || !/[a-zA-Z]/.test(trimmed)) {
+          return 'Country must contain a valid alphabetic name.';
+        }
+        if (trimmed.length < 2) {
+          return 'Country name must be at least 2 characters.';
+        }
+        return '';
+      }
+      case 'orgName': {
+        const trimmed = (value || '').trim();
+        if (!trimmed) return 'Organizer Name is required.';
+        if (trimmed.length < 2) return 'Organizer name must be at least 2 characters.';
+        return '';
+      }
+      case 'orgEmail': {
+        const trimmed = (value || '').trim();
+        if (!trimmed) return 'Contact Email is required.';
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(trimmed)) return 'Please enter a valid email address (e.g. contact@domain.com).';
+        return '';
+      }
+      case 'orgPhone': {
+        const trimmed = (value || '').trim();
+        if (!trimmed) return 'Hotline Phone is required.';
+        if (!/^\+\d{1,4}/.test(trimmed)) {
+          return 'Phone number must include a country code starting with + (e.g. +91, +1, +44).';
+        }
+        const digitsOnly = trimmed.replace(/\D/g, '');
+        if (digitsOnly.length < 7) {
+          return 'Please enter a valid phone number with at least 7 digits.';
+        }
+        if (digitsOnly.length > 15) {
+          return 'Phone number cannot exceed 15 digits.';
+        }
+        return '';
+      }
+      case 'orgWebsite': {
+        const trimmed = (value || '').trim();
+        if (trimmed && !/^https?:\/\/.+/i.test(trimmed)) {
+          return 'Website must be a valid URL starting with http:// or https://';
+        }
+        return '';
+      }
+      case 'bannerUrl': {
+        if (!(value || '').trim()) {
+          return 'Event Main Banner Cover is required. Please upload or choose a banner image.';
+        }
+        return '';
+      }
+      case 'paidTicketPrice': {
+        if (!allData.isFreeEvent) {
+          const num = parseFloat(value);
+          if (isNaN(num) || num <= 0) {
+            return 'Ticket price must be a valid amount greater than ₹0.';
+          }
+        }
+        return '';
+      }
+      default:
+        return '';
+    }
+  };
+
+  // Step-level Validation Helper
+  const validateStep = (step, data = formData) => {
+    const stepErrors = {};
+    if (step === 2) {
+      const titleErr = validateField('title', data.title, data);
+      if (titleErr) stepErrors.title = titleErr;
+      const slugErr = validateField('slug', data.slug, data);
+      if (slugErr) stepErrors.slug = slugErr;
+      const catErr = validateField('category', data.category, data);
+      if (catErr) stepErrors.category = catErr;
+      const indErr = validateField('industry', data.industry, data);
+      if (indErr) stepErrors.industry = indErr;
+      const descErr = validateField('description', data.description, data);
+      if (descErr) stepErrors.description = descErr;
+    } else if (step === 3) {
+      const sDateErr = validateField('startDate', data.startDate, data);
+      if (sDateErr) stepErrors.startDate = sDateErr;
+      const eDateErr = validateField('endDate', data.endDate, data);
+      if (eDateErr) stepErrors.endDate = eDateErr;
+      const venueErr = validateField('venueName', data.venueName, data);
+      if (venueErr) stepErrors.venueName = venueErr;
+      const cityErr = validateField('city', data.city, data);
+      if (cityErr) stepErrors.city = cityErr;
+      const countryErr = validateField('country', data.country, data);
+      if (countryErr) stepErrors.country = countryErr;
+    } else if (step === 4) {
+      const orgNameErr = validateField('orgName', data.orgName, data);
+      if (orgNameErr) stepErrors.orgName = orgNameErr;
+      const orgEmailErr = validateField('orgEmail', data.orgEmail, data);
+      if (orgEmailErr) stepErrors.orgEmail = orgEmailErr;
+      const orgPhoneErr = validateField('orgPhone', data.orgPhone, data);
+      if (orgPhoneErr) stepErrors.orgPhone = orgPhoneErr;
+      const orgWebErr = validateField('orgWebsite', data.orgWebsite, data);
+      if (orgWebErr) stepErrors.orgWebsite = orgWebErr;
+    } else if (step === 5) {
+      const bannerErr = validateField('bannerUrl', data.bannerUrl, data);
+      if (bannerErr) stepErrors.bannerUrl = bannerErr;
+      if (bannerValidation && !bannerValidation.isValid) {
+        stepErrors.bannerUrl = bannerValidation.error || 'Banner image dimensions are invalid.';
+      }
+    } else if (step === 6) {
+      const priceErr = validateField('paidTicketPrice', data.paidTicketPrice, data);
+      if (priceErr) stepErrors.paidTicketPrice = priceErr;
+    }
+    return stepErrors;
+  };
+
+  // Full-form Validation for Submission
+  const validateAll = (data = formData) => {
+    let allErrors = {};
+    let firstInvalidStep = null;
+    let firstInvalidField = null;
+
+    for (let s = 2; s <= 6; s++) {
+      const stepErrs = validateStep(s, data);
+      if (Object.keys(stepErrs).length > 0) {
+        if (!firstInvalidStep) {
+          firstInvalidStep = s;
+          firstInvalidField = Object.keys(stepErrs)[0];
+        }
+        allErrors = { ...allErrors, ...stepErrs };
+      }
+    }
+
+    return {
+      isValid: Object.keys(allErrors).length === 0,
+      errors: allErrors,
+      firstInvalidStep,
+      firstInvalidField
+    };
+  };
 
   // Handle Category & Sub-Sector Changes
   const handleCategoryChange = (e) => {
@@ -840,6 +1466,14 @@ export default function EventWizardPage() {
       industry: defaultSub
     }));
     setIsCustomIndustry(false);
+    if (errors.category || errors.industry) {
+      setErrors(prev => {
+        const next = { ...prev };
+        delete next.category;
+        delete next.industry;
+        return next;
+      });
+    }
   };
 
   const handleSubSectorChange = (e) => {
@@ -850,16 +1484,54 @@ export default function EventWizardPage() {
     } else {
       setIsCustomIndustry(false);
       setFormData(prev => ({ ...prev, industry: val }));
+      if (errors.industry) {
+        setErrors(prev => {
+          const next = { ...prev };
+          delete next.industry;
+          return next;
+        });
+      }
     }
   };
 
   // Handle input changes
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    const val = type === 'checkbox' ? checked : value;
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: val
     }));
+
+    if (errors[name]) {
+      const err = validateField(name, val, { ...formData, [name]: val });
+      if (!err) {
+        setErrors(prev => {
+          const next = { ...prev };
+          delete next[name];
+          return next;
+        });
+      } else {
+        setErrors(prev => ({ ...prev, [name]: err }));
+      }
+    }
+  };
+
+  // Handle blur validation to give instant field-level feedback
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+    if (!name) return;
+    setTouched(prev => ({ ...prev, [name]: true }));
+    const err = validateField(name, value, formData);
+    if (err) {
+      setErrors(prev => ({ ...prev, [name]: err }));
+    } else if (errors[name]) {
+      setErrors(prev => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
   };
 
   // Toggle Step 6 Registration Form Required Fields
@@ -877,6 +1549,17 @@ export default function EventWizardPage() {
 
   // Generate Slug & trigger instant duplicate check on blur
   const handleTitleBlur = async () => {
+    const titleErr = validateField('title', formData.title, formData);
+    if (titleErr) {
+      setErrors(prev => ({ ...prev, title: titleErr }));
+    } else {
+      setErrors(prev => {
+        const next = { ...prev };
+        delete next.title;
+        return next;
+      });
+    }
+
     if (formData.title && formData.title.trim().length >= 3) {
       await performDuplicateCheck(formData.title);
     }
@@ -887,6 +1570,13 @@ export default function EventWizardPage() {
         .replace(/\s+/g, '-')
         .replace(/[^\w\-]+/g, '');
       setFormData(prev => ({ ...prev, slug: generatedSlug }));
+      if (errors.slug) {
+        setErrors(prev => {
+          const next = { ...prev };
+          delete next.slug;
+          return next;
+        });
+      }
     }
     // Auto-fill Meta Title if empty
     if (!formData.metaTitle && formData.title) {
@@ -951,6 +1641,7 @@ export default function EventWizardPage() {
 
     if (!validation.isValid) {
       if (fileInputRef.current) fileInputRef.current.value = '';
+      setErrors(prev => ({ ...prev, bannerUrl: validation.error || 'Banner image dimensions are invalid.' }));
       return;
     }
 
@@ -967,6 +1658,11 @@ export default function EventWizardPage() {
 
       if (res.data && res.data.success) {
         setFormData(prev => ({ ...prev, bannerUrl: res.data.url }));
+        setErrors(prev => {
+          const next = { ...prev };
+          delete next.bannerUrl;
+          return next;
+        });
         // Enrich dimensions if returned from API
         if (res.data.width && res.data.height) {
           setBannerValidation(prev => ({
@@ -1196,7 +1892,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
   const calculateSeoScore = () => {
     let score = 30;
     if (formData.title) score += 15;
-    if (formData.description && formData.description.length > 50) score += 20;
+    if (formData.description && getCleanText(formData.description).length > 50) score += 20;
     if (formData.category) score += 10;
     if (formData.bannerUrl) score += 15;
     if (formData.metaDescription && formData.metaDescription.length >= 50) score += 10;
@@ -1207,11 +1903,31 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
 
   // Navigation handlers
   const nextStep = async () => {
-    if (currentStep === 2) {
-      const check = await performDuplicateCheck(formData.title);
-      if (check.isDuplicate) {
-        setSubmitError(`Cannot proceed: An event titled "${check.existingEvent?.title || formData.title}" already exists on VisitExpo. Duplicate events cannot be created. Please modify your title or claim the existing listing.`);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Validate current step before advancing
+    if (currentStep >= 2 && currentStep <= 6) {
+      const stepErrors = validateStep(currentStep, formData);
+
+      if (currentStep === 2) {
+        const check = await performDuplicateCheck(formData.title);
+        if (check.isDuplicate) {
+          setSubmitError(`Cannot proceed: An event titled "${check.existingEvent?.title || formData.title}" already exists on VisitExpo. Duplicate events cannot be created. Please modify your title or claim the existing listing.`);
+          setErrors(prev => ({ ...prev, title: 'An event with this title already exists on VisitExpo.' }));
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+      }
+
+      if (Object.keys(stepErrors).length > 0) {
+        setErrors(prev => ({ ...prev, ...stepErrors }));
+        setSubmitError('Please complete all required fields highlighted in red before proceeding.');
+        const firstField = Object.keys(stepErrors)[0];
+        const el = document.querySelector(`[name="${firstField}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.focus();
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
         return;
       }
     }
@@ -1236,6 +1952,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
 
   const prevStep = () => {
     if (currentStep > 1) {
+      setSubmitError('');
       setCurrentStep(prev => prev - 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -1245,12 +1962,38 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
   const handleSubmitEvent = async () => {
     setSubmitting(true);
     setSubmitError('');
+
     try {
-      // Safeguard duplicate check before final submission
+      // 1. Comprehensive Validation across all sections
+      const validation = validateAll(formData);
+      if (!validation.isValid) {
+        setErrors(validation.errors);
+        setSubmitting(false);
+        setSubmitError('Validation Failed: Please fill in all required fields marked in red before submitting.');
+
+        if (formMode === 'wizard' && validation.firstInvalidStep) {
+          setCurrentStep(validation.firstInvalidStep);
+        }
+
+        setTimeout(() => {
+          const firstEl = document.querySelector(`[name="${validation.firstInvalidField}"]`);
+          if (firstEl) {
+            firstEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            firstEl.focus();
+          } else {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }, 100);
+        return;
+      }
+
+      // 2. Safeguard duplicate check before final submission
       const check = await performDuplicateCheck(formData.title);
       if (check.isDuplicate) {
         setSubmitError(`Submission Blocked: An event titled "${check.existingEvent?.title || formData.title}" is already present on VisitExpo. Duplicate events cannot be submitted.`);
+        setErrors(prev => ({ ...prev, title: 'An event with this title already exists.' }));
         setSubmitting(false);
+        if (formMode === 'wizard') setCurrentStep(2);
         return;
       }
 
@@ -1263,34 +2006,34 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
 
       const categoriesArray = [formData.category, formData.industry].filter(Boolean);
       const payload = {
-        title: formData.title || 'Untitled Expo Event',
-        slug: formData.slug || `expo-event-${Date.now()}`,
-        description: formData.description || 'Description provided during onboarding.',
+        title: formData.title.trim(),
+        slug: formData.slug.trim(),
+        description: formData.description.trim(),
         banner: formData.bannerUrl,
-        venue: formData.venueName || 'Main Exhibition Hall',
-        city: formData.city || 'New Delhi',
-        country: formData.country,
-        startDate: formData.startDate || new Date().toISOString(),
-        endDate: formData.endDate || new Date(Date.now() + 86400000 * 2).toISOString(),
+        venue: formData.venueName.trim(),
+        city: formData.city.trim(),
+        country: formData.country || 'India',
+        startDate: formData.startDate,
+        endDate: formData.endDate,
         timings: formData.timings,
         categories: categoriesArray,
         status: 'draft',
-        orgName: formData.orgName,
-        orgEmail: formData.orgEmail,
-        orgPhone: formData.orgPhone,
-        orgWebsite: formData.orgWebsite,
-        orgDesc: formData.orgDesc,
-        orgLogo: formData.orgLogo,
+        orgName: formData.orgName.trim(),
+        orgEmail: formData.orgEmail.trim(),
+        orgPhone: formData.orgPhone.trim(),
+        orgWebsite: formData.orgWebsite?.trim() || '',
+        orgDesc: formData.orgDesc || '',
+        orgLogo: formData.orgLogo || '',
         schedules: formData.schedules,
         sponsorsList: finalSponsorsList,
         faqsList: formData.faqsList,
         contactShortcode: formData.contactShortcode,
         // Ticketing data — server auto-creates a Ticket tier from this
         isFreeEvent: formData.isFreeEvent,
-        paidTicketPrice: formData.isFreeEvent ? 0 : (formData.paidTicketPrice || 0),
+        paidTicketPrice: formData.isFreeEvent ? 0 : (parseFloat(formData.paidTicketPrice) || 0),
         seo: {
-          metaTitle: formData.metaTitle,
-          metaDescription: formData.metaDescription
+          metaTitle: formData.metaTitle || `${formData.title} | VisitExpo`,
+          metaDescription: formData.metaDescription || ''
         }
       };
 
@@ -1301,6 +2044,11 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
       await axios.post(`${API_URL}/events`, payload, {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
+
+      // Clear draft on successful submission
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('visitexpo_wizard_draft');
+      }
 
       setIsSubmitted(true);
       setCurrentStep(8);
@@ -1422,17 +2170,29 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                     onBlur={handleTitleBlur}
                     placeholder="E.g. India International Tech & AI Summit 2026"
                     className={`w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none transition-all ${
-                      duplicateCheck.isDuplicate
+                      errors.title || duplicateCheck.isDuplicate
                         ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500 pr-10'
                         : 'border-border focus:ring-2 focus:ring-primary'
                     }`}
                   />
-                  {duplicateCheck.isDuplicate && (
+                  {duplicateCheck.isDuplicate ? (
                     <div className="absolute right-3 top-2.5 text-rose-500" title="Duplicate event title detected">
                       <AlertTriangle className="h-5 w-5" />
                     </div>
-                  )}
+                  ) : errors.title ? (
+                    <div className="absolute right-3 top-2.5 text-rose-500" title={errors.title}>
+                      <AlertCircle className="h-5 w-5" />
+                    </div>
+                  ) : null}
                 </div>
+
+                {/* Inline Validation Error */}
+                {errors.title && !duplicateCheck.isDuplicate && (
+                  <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{errors.title}</span>
+                  </p>
+                )}
 
                 {/* Instant Inline Error Banner Under Input */}
                 {duplicateCheck.isDuplicate && (
@@ -1556,10 +2316,21 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                     name="slug"
                     value={formData.slug}
                     onChange={handleChange}
+                    onBlur={handleBlur}
                     placeholder="india-tech-ai-summit-2026"
-                    className="w-full rounded-r-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary"
+                    className={`w-full rounded-r-lg border bg-background px-3.5 py-2.5 text-sm text-foreground font-mono focus:outline-none transition-all ${
+                      errors.slug
+                        ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500'
+                        : 'border-border focus:ring-2 focus:ring-primary'
+                    }`}
                   />
                 </div>
+                {errors.slug && (
+                  <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{errors.slug}</span>
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1572,7 +2343,11 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                   name="category"
                   value={formData.category}
                   onChange={handleCategoryChange}
-                  className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={`w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none transition-all ${
+                    errors.category
+                      ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500'
+                      : 'border-border focus:ring-2 focus:ring-primary'
+                  }`}
                 >
                   {Object.keys(CATEGORY_SUBSECTORS).map(catKey => (
                     <option key={catKey} value={catKey}>
@@ -1580,6 +2355,12 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                     </option>
                   ))}
                 </select>
+                {errors.category && (
+                  <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{errors.category}</span>
+                  </p>
+                )}
               </div>
 
               <div>
@@ -1617,11 +2398,31 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                           type="text"
                           name="industry"
                           value={formData.industry}
-                          onChange={e => setFormData(prev => ({ ...prev, industry: e.target.value }))}
+                          onChange={e => {
+                            setFormData(prev => ({ ...prev, industry: e.target.value }));
+                            if (errors.industry && e.target.value.trim()) {
+                              setErrors(prev => {
+                                const next = { ...prev };
+                                delete next.industry;
+                                return next;
+                              });
+                            }
+                          }}
                           placeholder="Enter custom industry sub-sector..."
-                          className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                          className={`w-full rounded-lg border bg-background px-3.5 py-2 text-xs text-foreground focus:outline-none transition-all ${
+                            errors.industry
+                              ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500'
+                              : 'border-border focus:ring-2 focus:ring-primary'
+                          }`}
                           autoFocus
                         />
+                      )}
+
+                      {errors.industry && (
+                        <p className="mt-1 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
+                          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                          <span>{errors.industry}</span>
+                        </p>
                       )}
                     </div>
                   );
@@ -1632,15 +2433,36 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
             <div>
               <div className="flex justify-between items-center mb-1.5">
                 <label className="block text-xs font-bold text-muted-foreground uppercase">
-                  Event Description *
+                  Describe Event Highlights & Overview * (50 characters - 2500 words)
                 </label>
               </div>
-              <RichTextEditor
-                value={formData.description}
-                onChange={(val) => setFormData(prev => ({ ...prev, description: val }))}
-                placeholder="Describe the main highlights, target visitor profiles, exhibitor benefits, and key conference themes..."
-                rows={6}
-              />
+              <div className={errors.description ? 'ring-2 ring-rose-500/40 rounded-xl overflow-hidden' : ''}>
+                <RichTextEditor
+                  name="description"
+                  value={formData.description}
+                  onChange={(val) => {
+                    setFormData(prev => ({ ...prev, description: val }));
+                    const cleanLen = getCleanText(val).length;
+                    if (errors.description && cleanLen >= 30) {
+                      setErrors(prev => {
+                        const next = { ...prev };
+                        delete next.description;
+                        return next;
+                      });
+                    }
+                  }}
+                  onAiAssist={generateAiDescription}
+                  isAiGenerating={isAiGenerating}
+                  placeholder="Describe your event highlights, target visitor profiles, exhibitor benefits, and key conference themes..."
+                  minHeight="260px"
+                />
+              </div>
+              {errors.description && (
+                <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>{errors.description}</span>
+                </p>
+              )}
             </div>
           </div>
   );
@@ -1663,9 +2485,29 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                   type="date"
                   name="startDate"
                   value={formData.startDate}
-                  onChange={handleChange}
-                  className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  onChange={(e) => {
+                    handleChange(e);
+                    if (formData.endDate && e.target.value && new Date(formData.endDate) >= new Date(e.target.value)) {
+                      setErrors(prev => {
+                        const next = { ...prev };
+                        delete next.endDate;
+                        return next;
+                      });
+                    }
+                  }}
+                  onBlur={handleBlur}
+                  className={`w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none transition-all dark:[color-scheme:dark] ${
+                    errors.startDate
+                      ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500'
+                      : 'border-border focus:ring-2 focus:ring-primary'
+                  }`}
                 />
+                {errors.startDate && (
+                  <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{errors.startDate}</span>
+                  </p>
+                )}
               </div>
 
               <div>
@@ -1677,8 +2519,19 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                   name="endDate"
                   value={formData.endDate}
                   onChange={handleChange}
-                  className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  onBlur={handleBlur}
+                  className={`w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none transition-all dark:[color-scheme:dark] ${
+                    errors.endDate
+                      ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500'
+                      : 'border-border focus:ring-2 focus:ring-primary'
+                  }`}
                 />
+                {errors.endDate && (
+                  <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{errors.endDate}</span>
+                  </p>
+                )}
               </div>
 
               <div>
@@ -1693,7 +2546,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                       const { end } = getTimingParts(formData.timings);
                       handleTimingChange(e.target.value, end);
                     }}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary dark:[color-scheme:dark]"
                   />
                   <span className="text-xs font-semibold text-muted-foreground">to</span>
                   <input
@@ -1703,7 +2556,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                       const { start } = getTimingParts(formData.timings);
                       handleTimingChange(start, e.target.value);
                     }}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary dark:[color-scheme:dark]"
                   />
                 </div>
               </div>
@@ -1719,23 +2572,52 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                   name="venueName"
                   value={formData.venueName}
                   onChange={handleChange}
+                  onBlur={handleBlur}
                   placeholder="E.g. Pragati Maidan Exhibition Complex (Hall 7-10)"
-                  className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={`w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none transition-all ${
+                    errors.venueName
+                      ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500'
+                      : 'border-border focus:ring-2 focus:ring-primary'
+                  }`}
                 />
+                {errors.venueName && (
+                  <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{errors.venueName}</span>
+                  </p>
+                )}
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
                   City *
                 </label>
-                <input
-                  type="text"
-                  name="city"
-                  value={formData.city}
-                  onChange={handleChange}
-                  placeholder="New Delhi"
-                  className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="city"
+                    value={formData.city}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    placeholder="E.g. New Delhi, Mumbai, Berlin"
+                    className={`w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none transition-all ${
+                      errors.city
+                        ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500 pr-10'
+                        : 'border-border focus:ring-2 focus:ring-primary'
+                    }`}
+                  />
+                  {errors.city && (
+                    <div className="absolute right-3 top-2.5 text-rose-500" title={errors.city}>
+                      <AlertCircle className="h-5 w-5" />
+                    </div>
+                  )}
+                </div>
+                {errors.city && (
+                  <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{errors.city}</span>
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1756,15 +2638,40 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
 
               <div>
                 <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
-                  Country
+                  Country *
                 </label>
-                <input
-                  type="text"
-                  name="country"
-                  value={formData.country}
-                  onChange={handleChange}
-                  className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="country"
+                    list="country-suggestions"
+                    value={formData.country}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    placeholder="E.g. India or United States"
+                    className={`w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none transition-all ${
+                      errors.country
+                        ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500 pr-10'
+                        : 'border-border focus:ring-2 focus:ring-primary'
+                    }`}
+                  />
+                  <datalist id="country-suggestions">
+                    {COMMON_COUNTRIES.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                  {errors.country && (
+                    <div className="absolute right-3 top-2.5 text-rose-500" title={errors.country}>
+                      <AlertCircle className="h-5 w-5" />
+                    </div>
+                  )}
+                </div>
+                {errors.country && (
+                  <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{errors.country}</span>
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1814,8 +2721,10 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
           </div>
   );
 
-  const renderStep4Content = ({ isScrollable = false } = {}) => (
-    <div className="space-y-6">
+  const renderStep4Content = ({ isScrollable = false } = {}) => {
+    const phoneParts = parsePhoneWithCountryCode(formData.orgPhone);
+    return (
+      <div className="space-y-6">
             <div className="border-b border-border pb-4">
               <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
                 <Building className="h-5 w-5 text-primary" /> {isScrollable ? "3. Organizer Profile Setup" : "Step 4: Organizer Profile Setup"}
@@ -1828,13 +2737,32 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
                   Organization / Business Name *
                 </label>
-                <input
-                  type="text"
-                  name="orgName"
-                  value={formData.orgName}
-                  onChange={handleChange}
-                  className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="orgName"
+                    value={formData.orgName}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    placeholder="E.g. Global Tech Conferences Pvt Ltd"
+                    className={`w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none transition-all ${
+                      errors.orgName
+                        ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500 pr-10'
+                        : 'border-border focus:ring-2 focus:ring-primary'
+                    }`}
+                  />
+                  {errors.orgName && (
+                    <div className="absolute right-3 top-2.5 text-rose-500" title={errors.orgName}>
+                      <AlertCircle className="h-5 w-5" />
+                    </div>
+                  )}
+                </div>
+                {errors.orgName && (
+                  <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{errors.orgName}</span>
+                  </p>
+                )}
               </div>
 
               <div>
@@ -1857,40 +2785,162 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
                   Official Website
                 </label>
-                <input
-                  type="url"
-                  name="orgWebsite"
-                  value={formData.orgWebsite}
-                  onChange={handleChange}
-                  placeholder="https://globaltechevents.com"
-                  className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+                <div className="relative">
+                  <input
+                    type="url"
+                    name="orgWebsite"
+                    value={formData.orgWebsite}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    placeholder="https://globaltechevents.com"
+                    className={`w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none transition-all ${
+                      errors.orgWebsite
+                        ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500 pr-10'
+                        : 'border-border focus:ring-2 focus:ring-primary'
+                    }`}
+                  />
+                  {errors.orgWebsite && (
+                    <div className="absolute right-3 top-2.5 text-rose-500" title={errors.orgWebsite}>
+                      <AlertCircle className="h-5 w-5" />
+                    </div>
+                  )}
+                </div>
+                {errors.orgWebsite && (
+                  <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{errors.orgWebsite}</span>
+                  </p>
+                )}
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
                   Contact Email *
                 </label>
-                <input
-                  type="email"
-                  name="orgEmail"
-                  value={formData.orgEmail}
-                  onChange={handleChange}
-                  className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+                <div className="relative">
+                  <input
+                    type="email"
+                    name="orgEmail"
+                    value={formData.orgEmail}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    placeholder="organizer@visitexpo.in"
+                    className={`w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none transition-all ${
+                      errors.orgEmail
+                        ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500 pr-10'
+                        : 'border-border focus:ring-2 focus:ring-primary'
+                    }`}
+                  />
+                  {errors.orgEmail && (
+                    <div className="absolute right-3 top-2.5 text-rose-500" title={errors.orgEmail}>
+                      <AlertCircle className="h-5 w-5" />
+                    </div>
+                  )}
+                </div>
+                {errors.orgEmail && (
+                  <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{errors.orgEmail}</span>
+                  </p>
+                )}
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
-                  Hotline Phone *
+                  Hotline Phone (with Country Code) *
                 </label>
-                <input
-                  type="text"
-                  name="orgPhone"
-                  value={formData.orgPhone}
-                  onChange={handleChange}
-                  className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+                <div className="relative">
+                  <div className={`flex rounded-lg border bg-background overflow-hidden transition-all ${
+                    errors.orgPhone
+                      ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5'
+                      : 'border-border focus-within:ring-2 focus-within:ring-primary focus-within:border-primary'
+                  }`}>
+                    {/* Country Dial Code Dropdown */}
+                    <div className="relative border-r border-border bg-muted/40 shrink-0">
+                      <select
+                        aria-label="Country Dial Code"
+                        value={phoneParts.code}
+                        onChange={(e) => {
+                          const newCode = e.target.value;
+                          const newFull = `${newCode} ${phoneParts.number}`.trim();
+                          setFormData(prev => ({ ...prev, orgPhone: newFull }));
+                          if (errors.orgPhone) {
+                            const err = validateField('orgPhone', newFull, { ...formData, orgPhone: newFull });
+                            if (!err) {
+                              setErrors(prev => {
+                                const next = { ...prev };
+                                delete next.orgPhone;
+                                return next;
+                              });
+                            } else {
+                              setErrors(prev => ({ ...prev, orgPhone: err }));
+                            }
+                          }
+                        }}
+                        className="h-full bg-transparent pl-2.5 pr-6 py-2.5 text-xs font-bold text-foreground focus:outline-none cursor-pointer appearance-none"
+                      >
+                        {COUNTRY_DIAL_CODES.map((item) => (
+                          <option key={item.code + item.country} value={item.code} className="bg-card text-foreground">
+                            {item.flag} {item.code} ({item.country})
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </div>
+                    </div>
+
+                    {/* Phone Number Input */}
+                    <input
+                      type="tel"
+                      name="orgPhone"
+                      value={phoneParts.number}
+                      onChange={(e) => {
+                        const newNum = e.target.value;
+                        const newFull = `${phoneParts.code} ${newNum}`.trim();
+                        setFormData(prev => ({ ...prev, orgPhone: newFull }));
+                        if (errors.orgPhone) {
+                          const err = validateField('orgPhone', newFull, { ...formData, orgPhone: newFull });
+                          if (!err) {
+                            setErrors(prev => {
+                              const next = { ...prev };
+                              delete next.orgPhone;
+                              return next;
+                            });
+                          } else {
+                            setErrors(prev => ({ ...prev, orgPhone: err }));
+                          }
+                        }
+                      }}
+                      onBlur={() => {
+                        const err = validateField('orgPhone', formData.orgPhone, formData);
+                        if (err) {
+                          setErrors(prev => ({ ...prev, orgPhone: err }));
+                        } else if (errors.orgPhone) {
+                          setErrors(prev => {
+                            const next = { ...prev };
+                            delete next.orgPhone;
+                            return next;
+                          });
+                        }
+                      }}
+                      placeholder="98765 43210"
+                      className="w-full bg-transparent px-3 py-2.5 text-sm text-foreground focus:outline-none"
+                    />
+
+                    {errors.orgPhone && (
+                      <div className="flex items-center pr-3 text-rose-500 shrink-0" title={errors.orgPhone}>
+                        <AlertCircle className="h-5 w-5" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {errors.orgPhone && (
+                  <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{errors.orgPhone}</span>
+                  </p>
+                )}
               </div>
             </div>
 
@@ -2008,7 +3058,8 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               </div>
             </div>
           </div>
-  );
+    );
+  };
 
   const renderStep5Content = ({ isScrollable = false } = {}) => (
     <div className="space-y-6">
@@ -2037,6 +3088,16 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 )}
               </div>
 
+              {errors.bannerUrl && !bannerValidation?.error && (
+                <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-600 dark:text-rose-400 text-xs flex items-start gap-2 animate-in fade-in-50">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="font-bold">Cover Banner Required: </strong>
+                    {errors.bannerUrl}
+                  </div>
+                </div>
+              )}
+
               {bannerValidation?.error && (
                 <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-600 text-xs flex items-start gap-2">
                   <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -2059,10 +3120,15 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
 
               <div 
                 onClick={triggerFileInput}
-                className="relative rounded-2xl border-2 border-dashed border-border p-6 bg-muted/10 text-center hover:border-primary transition-colors cursor-pointer"
+                className={`relative rounded-2xl border-2 border-dashed p-6 text-center transition-colors cursor-pointer ${
+                  errors.bannerUrl
+                    ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-500/5 hover:border-rose-600'
+                    : 'border-border bg-muted/10 hover:border-primary'
+                }`}
               >
                 <input
                   type="file"
+                  name="bannerUrl"
                   ref={fileInputRef}
                   onChange={handleBannerUpload}
                   accept="image/*"
@@ -2089,6 +3155,12 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                   </div>
                 )}
               </div>
+              {errors.bannerUrl && (
+                <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>{errors.bannerUrl}</span>
+                </p>
+              )}
             </div>
 
             <div className="grid gap-6 sm:grid-cols-2">
@@ -2272,7 +3344,16 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
             {/* Free vs Paid Toggle */}
             <div className="grid gap-6 sm:grid-cols-2">
               <div
-                onClick={() => setFormData(prev => ({ ...prev, isFreeEvent: true }))}
+                onClick={() => {
+                  setFormData(prev => ({ ...prev, isFreeEvent: true }));
+                  if (errors.paidTicketPrice) {
+                    setErrors(prev => {
+                      const next = { ...prev };
+                      delete next.paidTicketPrice;
+                      return next;
+                    });
+                  }
+                }}
                 className={`rounded-2xl border-2 p-5 cursor-pointer transition-all ${
                   formData.isFreeEvent
                     ? 'border-primary bg-primary/5 shadow-sm'
@@ -2313,15 +3394,34 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
             {!formData.isFreeEvent && (
               <div className="w-full sm:w-1/2">
                 <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
-                  Ticket Price per Attendee (INR ₹)
+                  Ticket Price per Attendee (INR ₹) *
                 </label>
-                <input
-                  type="number"
-                  name="paidTicketPrice"
-                  value={formData.paidTicketPrice}
-                  onChange={handleChange}
-                  className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+                <div className="relative">
+                  <input
+                    type="number"
+                    name="paidTicketPrice"
+                    value={formData.paidTicketPrice}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    placeholder="499"
+                    className={`w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm font-bold text-foreground focus:outline-none transition-all ${
+                      errors.paidTicketPrice
+                        ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500 pr-10'
+                        : 'border-border focus:ring-2 focus:ring-primary'
+                    }`}
+                  />
+                  {errors.paidTicketPrice && (
+                    <div className="absolute right-3 top-2.5 text-rose-500" title={errors.paidTicketPrice}>
+                      <AlertCircle className="h-5 w-5" />
+                    </div>
+                  )}
+                </div>
+                {errors.paidTicketPrice && (
+                  <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{errors.paidTicketPrice}</span>
+                  </p>
+                )}
               </div>
             )}
 
@@ -2396,7 +3496,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                     type="date"
                     value={newSchedule.date}
                     onChange={e => setNewSchedule(prev => ({ ...prev, date: e.target.value }))}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary dark:[color-scheme:dark]"
                   />
                 </div>
                 <button
@@ -2690,8 +3790,8 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                     { label: 'Event Title Unique (Not Duplicate)', pass: !duplicateCheck.isDuplicate, isCritical: true },
                     { label: 'Event Banner Uploaded', pass: !!formData.bannerUrl },
                     { label: 'Start & End Dates Set', pass: !!formData.startDate && !!formData.endDate },
-                    { label: 'Venue Location Confirmed', pass: !!formData.venueName && !!formData.city },
-                    { label: 'Organizer Profile Complete', pass: !!formData.orgName && !!formData.orgEmail },
+                    { label: 'Venue Location Confirmed', pass: !!formData.venueName && !!formData.city && !/\d/.test(formData.city) && !!formData.country && !/\d/.test(formData.country) },
+                    { label: 'Organizer Profile Complete', pass: !!formData.orgName && !!formData.orgEmail && /^\+\d{1,4}/.test(formData.orgPhone || '') },
                     { label: 'Visitor Form Configured', pass: true },
                     { label: 'SEO Title & Description', pass: !!formData.metaTitle }
                   ].map((item, idx) => (
@@ -2756,13 +3856,17 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
               <Link
                 href="/events"
+                onClick={handleResetForm}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-all"
               >
                 Go to Organizer Dashboard
               </Link>
               <button
-                onClick={() => setCurrentStep(1)}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-6 py-3 text-sm font-bold text-foreground hover:bg-secondary/80 transition-all"
+                onClick={() => {
+                  handleResetForm();
+                  setIsSubmitted(false);
+                }}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-6 py-3 text-sm font-bold text-foreground hover:bg-secondary/80 transition-all cursor-pointer"
               >
                 Onboard Another Event
               </button>
@@ -2776,35 +3880,64 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
       anchor: 'section-basic',
       label: '1. Basic Info',
       icon: FileText,
-      isComplete: Boolean(formData.title?.trim() && formData.description?.trim())
+      isComplete: Boolean(
+        formData.title?.trim().length >= 3 &&
+        getCleanText(formData.description).length >= 30 &&
+        !errors.title &&
+        !errors.description &&
+        !duplicateCheck.isDuplicate
+      )
     },
     {
       id: 'venue',
       anchor: 'section-venue',
       label: '2. Dates & Venue',
       icon: Calendar,
-      isComplete: Boolean(formData.startDate && formData.endDate && formData.venueName?.trim() && formData.city?.trim())
+      isComplete: Boolean(
+        formData.startDate &&
+        formData.endDate &&
+        new Date(formData.endDate) >= new Date(formData.startDate) &&
+        formData.venueName?.trim().length >= 3 &&
+        formData.city?.trim() &&
+        !/\d/.test(formData.city?.trim()) &&
+        formData.country?.trim() &&
+        !/\d/.test(formData.country?.trim()) &&
+        !errors.startDate &&
+        !errors.endDate &&
+        !errors.venueName &&
+        !errors.city &&
+        !errors.country
+      )
     },
     {
       id: 'organizer',
       anchor: 'section-organizer',
       label: '3. Organizer Profile',
       icon: Building,
-      isComplete: Boolean(formData.orgName?.trim() && formData.orgEmail?.trim())
+      isComplete: Boolean(
+        formData.orgName?.trim().length >= 2 &&
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.orgEmail?.trim() || '') &&
+        /^\+\d{1,4}/.test(formData.orgPhone?.trim() || '') &&
+        formData.orgPhone?.trim().replace(/\D/g, '').length >= 7 &&
+        formData.orgPhone?.trim().replace(/\D/g, '').length <= 15 &&
+        !errors.orgName &&
+        !errors.orgEmail &&
+        !errors.orgPhone
+      )
     },
     {
       id: 'media',
       anchor: 'section-media',
       label: '4. Media & Assets',
       icon: ImageIcon,
-      isComplete: Boolean(formData.bannerUrl?.trim())
+      isComplete: Boolean(formData.bannerUrl?.trim() && (!bannerValidation || bannerValidation.isValid))
     },
     {
       id: 'tickets',
       anchor: 'section-tickets',
       label: '5. Tickets & Form',
       icon: Ticket,
-      isComplete: Boolean(formData.isFreeEvent || (formData.paidTicketPrice && formData.paidTicketPrice !== ''))
+      isComplete: Boolean(formData.isFreeEvent || (parseFloat(formData.paidTicketPrice) > 0 && !errors.paidTicketPrice))
     },
     {
       id: 'seo',
@@ -2870,31 +4003,16 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               <button
                 type="button"
                 onClick={() => {
-                  if (window.confirm('Are you sure you want to discard this draft and start fresh?')) {
-                    if (typeof window !== 'undefined') {
-                      localStorage.removeItem('visitexpo_wizard_draft');
-                    }
-                    window.location.href = '/events/wizard';
+                  if (window.confirm('Are you sure you want to clear all fields and start fresh?')) {
+                    handleResetForm();
                   }
                 }}
-                className="text-xs font-semibold text-muted-foreground hover:text-red-500 px-2.5 py-1.5 rounded-lg border border-border hover:border-red-500/30 bg-muted/20 hover:bg-red-500/10 transition-all cursor-pointer"
-                title="Discard draft and start fresh"
+                className="text-xs font-semibold text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 px-3 py-1.5 rounded-lg border border-border hover:border-rose-500/30 bg-muted/20 hover:bg-rose-500/10 transition-all cursor-pointer"
+                title="Clear all fields and start fresh"
               >
-                Discard Draft
+                Clear Form
               </button>
             )}
-
-            {/* Autosave / Save Draft Button */}
-            <button
-              type="button"
-              onClick={handleManualSaveDraft}
-              disabled={isSaving}
-              title="Click to save draft now"
-              className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted active:scale-95 px-3 py-1.5 rounded-lg border border-border transition-all cursor-pointer hover:border-primary/50 shadow-2xs"
-            >
-              <Save className={`h-3.5 w-3.5 ${isSaving ? 'animate-spin text-primary' : 'text-emerald-500'}`} />
-              <span>{isSaving ? 'Saving Draft...' : `Autosaved at ${lastAutosaved}`}</span>
-            </button>
           </div>
         </div>
 
@@ -3099,8 +4217,8 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                   <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
                     <Zap className="h-4 w-4 text-primary" /> Publish & Status
                   </h4>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                    Draft Listing
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                    New Event
                   </span>
                 </div>
 
@@ -3149,21 +4267,6 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                     )}
                   </button>
                 )}
-
-                <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/70 text-xs">
-                  <button
-                    type="button"
-                    onClick={handleManualSaveDraft}
-                    disabled={isSaving}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline transition-colors cursor-pointer"
-                  >
-                    <Save className={'h-3.5 w-3.5 ' + (isSaving ? 'animate-spin text-primary' : 'text-emerald-500')} />
-                    <span>{isSaving ? 'Saving...' : 'Save Draft'}</span>
-                  </button>
-                  <span className="text-[11px] text-muted-foreground">
-                    {lastAutosaved}
-                  </span>
-                </div>
               </div>
 
               {/* Form Checklist Card */}

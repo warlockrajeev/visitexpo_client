@@ -26,7 +26,9 @@ import {
   Moon,
   Building,
   Wand2,
-  ShieldCheck
+  ShieldCheck,
+  Compass,
+  Globe
 } from 'lucide-react';
 
 import axios from 'axios';
@@ -191,7 +193,8 @@ export default function DashboardLayout({ children }) {
         { name: 'Exhibitors', href: '/exhibitors', icon: Building },
         { name: 'Visitor CRM', href: '/visitors', icon: Users },
         { name: 'Lead CRM', href: '/leads', icon: Target },
-        { name: 'Campaigns', href: '/campaigns', icon: Mail },
+        { name: 'Marketing & Campaigns', href: '/campaigns', icon: Mail },
+        { name: 'Exhibitor Discovery', href: '/campaigns/exhibitor-discovery', icon: Compass },
         { name: 'Ticketing', href: '/tickets', icon: Ticket },
         { name: 'Settings', href: '/settings', icon: Settings },
       ];
@@ -206,6 +209,8 @@ export default function DashboardLayout({ children }) {
     if (path === '/events/wizard') return 'Event Onboarding Wizard';
     if (path === '/events/claim') return 'Claim Existing Event';
     if (path === '/manage-events') return 'Event Management';
+    if (path === '/campaigns/exhibitor-discovery') return 'Exhibitor Discovery';
+    if (path === '/campaigns') return 'Marketing & Campaigns';
     const clean = (path || '').replace('/', '').replace(/-/g, ' ');
     return clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : 'Dashboard';
   };

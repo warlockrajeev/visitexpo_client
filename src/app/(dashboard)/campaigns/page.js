@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
 import {
@@ -20,7 +21,11 @@ import {
   X,
   Loader2,
   MessageSquare,
-  Smartphone
+  Smartphone,
+  Compass,
+  Globe,
+  ArrowRight,
+  Sparkles
 } from 'lucide-react';
 
 const API_URL =
@@ -187,6 +192,41 @@ export default function CampaignsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Sub-Navigation Tabs: Marketing Campaigns & Exhibitor Discovery */}
+      <div className="flex items-center gap-2 border-b border-border pb-1">
+        <div className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-primary border-b-2 border-primary -mb-1.5">
+          <Mail className="h-4 w-4" />
+          <span>Marketing &amp; Broadcast Campaigns</span>
+        </div>
+        <Link
+          href="/campaigns/exhibitor-discovery"
+          className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground rounded-lg transition-colors group"
+        >
+          <Compass className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" />
+          <span>Exhibitor Discovery</span>
+        </Link>
+      </div>
+
+      {/* Exhibitor Discovery Spotlight Banner */}
+      <div className="rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+            <Compass className="h-4 w-4 text-primary" /> Exhibitor Discovery Directory
+          </h3>
+          <p className="text-xs text-muted-foreground max-w-2xl">
+            Explore verified Indian and Global exhibitors across major industries. Filter by Preferred Industry, Search Products, and Preferred Country, then connect directly with booth contacts via credit-based inquiries.
+          </p>
+        </div>
+        <Link
+          href="/campaigns/exhibitor-discovery"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 text-xs font-bold shadow-md hover:shadow-lg transition-all shrink-0 cursor-pointer"
+        >
+          <Compass className="h-4 w-4" />
+          <span>Go to Exhibitor Discovery</span>
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
+
       {/* Header Dropdown & Actions */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-6 rounded-2xl border border-border shadow-sm">
         <div>

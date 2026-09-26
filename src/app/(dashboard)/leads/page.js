@@ -860,7 +860,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                 type="date"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary dark:[color-scheme:dark]"
                 title="Filter by Registration Date"
               />
             </div>
@@ -1395,7 +1395,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                       required
                       value={followUpDate}
                       onChange={(e) => setFollowUpDate(e.target.value)}
-                      className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary dark:[color-scheme:dark]"
                     />
                     <input
                       type="text"

@@ -297,9 +297,6 @@ export default function EventsPage() {
     }));
   };
 
-  // Fetch events owned/claimed by logged in organizer
-  const [localDraft, setLocalDraft] = useState(null);
-
   // Fetch events owned/claimed by logged in organizer (including drafts)
   const fetchEvents = async () => {
     setLoading(true);
@@ -348,16 +345,10 @@ export default function EventsPage() {
 
     try {
       if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('visitexpo_wizard_draft');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && (parsed.title || parsed.description)) {
-            setLocalDraft(parsed);
-          }
-        }
+        localStorage.removeItem('visitexpo_wizard_draft');
       }
     } catch (e) {
-      console.error('Error loading local draft', e);
+      console.error('Error clearing draft in manage-events', e);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, accessToken]);
@@ -725,27 +716,6 @@ export default function EventsPage() {
           />
         </div>
       </div>
-
-      {/* Unsaved local wizard draft banner */}
-      {localDraft && (statusFilter === 'all' || statusFilter === 'draft') && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400">
-              <Clock className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400">Unsaved Wizard Draft Detected</p>
-              <p className="text-sm font-bold text-foreground">{localDraft.title || 'Untitled Expo Event'}</p>
-            </div>
-          </div>
-          <Link
-            href="/events/wizard"
-            className="inline-flex items-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-xs transition-colors whitespace-nowrap"
-          >
-            Resume In Wizard <ExternalLink className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-      )}
 
       {/* Render Loader, Errors, or Event Cards */}
       {loading ? (
@@ -1115,7 +1085,7 @@ export default function EventsPage() {
                     required
                     value={eventForm.startDate}
                     onChange={handleInputChange}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary dark:[color-scheme:dark]"
                   />
                 </div>
                 <div>
@@ -1126,7 +1096,7 @@ export default function EventsPage() {
                     required
                     value={eventForm.endDate}
                     onChange={handleInputChange}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary dark:[color-scheme:dark]"
                   />
                 </div>
                 <div>
@@ -1139,7 +1109,7 @@ export default function EventsPage() {
                         const { end } = getTimingParts(eventForm.timings);
                         handleTimingChange(e.target.value, end);
                       }}
-                      className="w-full rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary dark:[color-scheme:dark]"
                     />
                     <span className="text-xs font-semibold text-muted-foreground">to</span>
                     <input
@@ -1149,7 +1119,7 @@ export default function EventsPage() {
                         const { start } = getTimingParts(eventForm.timings);
                         handleTimingChange(start, e.target.value);
                       }}
-                      className="w-full rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary dark:[color-scheme:dark]"
                     />
                   </div>
                 </div>
@@ -1389,7 +1359,7 @@ export default function EventsPage() {
                     type="date"
                     value={newSchedule.date}
                     onChange={e => setNewSchedule(prev => ({ ...prev, date: e.target.value }))}
-                    className="rounded-lg border border-border bg-background px-3 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="rounded-lg border border-border bg-background px-3 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary dark:[color-scheme:dark]"
                   />
                   <button
                     type="button"
