@@ -12,6 +12,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { renderCardDescription } from '../../utils/textFormatters.js';
 import Navbar from '../../components/Navbar.js';
 import { useAuth } from '../../context/AuthContext.js';
 import wpEventImages from '@/data/wordpress-event-images.json';
@@ -866,9 +867,12 @@ export default function EventsDirectoryPage() {
                       </div>
 
                       {/* Concise 2-line Description */}
-                      <p className="text-xs text-zinc-600 line-clamp-2 leading-relaxed min-h-[34px]">
-                        {evt.description || `Explore ${evt.title}, featuring international exhibitors, product showcases, and B2B business networking.`}
-                      </p>
+                      <div
+                        className="text-xs text-zinc-600 line-clamp-2 leading-relaxed min-h-[34px] [&_strong]:font-semibold [&_strong]:text-zinc-900 [&_b]:font-semibold [&_b]:text-zinc-900 [&_em]:italic"
+                        dangerouslySetInnerHTML={{
+                          __html: renderCardDescription(evt.description || `Explore ${evt.title}, featuring international exhibitors, product showcases, and B2B business networking.`)
+                        }}
+                      />
                     </div>
 
                     {/* Footer Row: [Country] on Left, [Exhibit • Get Pass →] on Right */}

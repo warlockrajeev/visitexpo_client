@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 
 import { renderRichText, RichTextEditor, SPONSOR_TIER_GROUPS, PRESET_SPONSOR_TIERS, CATEGORY_SUBSECTORS, CURRENCY_OPTIONS, getCurrencySymbol } from '../events/wizard/page.js';
+import { renderCardDescription, stripMarkdownAndHtml } from '../../../utils/textFormatters.js';
 import { showSweetAlert, showSweetConfirm, showSweetWarning, showSweetError } from '../../../utils/sweetalert.js';
 
 const API_URL =
@@ -46,19 +47,9 @@ const API_URL =
     ? 'https://api.visitexpo.in/api'
     : 'http://localhost:5000/api');
 
-// Clean HTML tags and decode entities for previewing descriptions cleanly on cards
+// Clean HTML tags, markdown symbols and decode entities for previewing descriptions cleanly
 export function stripHtmlAndEntities(text) {
-  if (!text || typeof text !== 'string') return '';
-  return text
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/\s+/g, ' ')
-    .trim();
+  return stripMarkdownAndHtml(text);
 }
 
 export default function EventsPage() {
@@ -1066,9 +1057,12 @@ export default function EventsPage() {
                 <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                   <div className="space-y-2">
                     <h3 className="font-bold text-lg leading-tight text-foreground line-clamp-1">{evt.title}</h3>
-                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                      {stripHtmlAndEntities(evt.description) || 'No description provided.'}
-                    </p>
+                    <div
+                      className="text-xs text-muted-foreground line-clamp-2 leading-relaxed [&_strong]:font-semibold [&_strong]:text-foreground [&_b]:font-semibold [&_b]:text-foreground [&_em]:italic"
+                      dangerouslySetInnerHTML={{
+                        __html: renderCardDescription(evt.description)
+                      }}
+                    />
                   </div>
 
                   <div className="space-y-1.5 border-t border-border/60 pt-3">

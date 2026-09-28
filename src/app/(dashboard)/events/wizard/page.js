@@ -338,18 +338,32 @@ export const CATEGORY_SUBSECTORS = {
 export function markdownToHtml(content) {
   if (!content) return '';
   if (/<(p|h[1-6]|div|ul|ol|li|blockquote|table|hr|b|i|u|s|strong|em)[^>]*>/i.test(content)) {
-    return content;
+    return content
+      .replace(/\*\*\s*#{1,6}\s*([^*]+?)\s*\*\*/g, '<strong>$1</strong>')
+      .replace(/\*\*\s*([^*]+?)\s*\*\*/g, '<strong>$1</strong>')
+      .replace(/#{1,6}\s*/g, '');
   }
-  const lines = content.split('\n');
+
+  // Pre-clean nested or chained hashtags like "### ## " or "**### "
+  let normalized = content
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/\*\*\s*#{1,6}\s*([\s\S]*?)\*\*/g, '**$1**')
+    .replace(/^(\s*#{1,6}\s*)(?:#{1,6}\s*)+/gm, '$1');
+
+  const lines = normalized.split('\n');
   let html = '';
   let inUl = false;
   let inOl = false;
 
   const inline = (s) => s
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/(?<!\*)\*(.*?)\*(?!\*)/g, '<em>$1</em>')
+    .replace(/\*\*\s*#{1,6}\s*([^*]+?)\s*\*\*/g, '<strong>$1</strong>')
+    .replace(/\*\*\s*([^*]+?)\s*\*\*/g, '<strong>$1</strong>')
+    .replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em>$1</em>')
     .replace(/<u>(.*?)<\/u>/gi, '<u>$1</u>')
-    .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/\*{2,}/g, '');
 
   for (let line of lines) {
     const t = line.trim();
@@ -398,6 +412,10 @@ export function getCleanText(htmlOrText) {
   return htmlOrText
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/\*\*\s*#{1,6}\s*([^*]+?)\s*\*\*/g, '$1')
+    .replace(/\*\*\s*([^*]+?)\s*\*\*/g, '$1')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/\*{2,}/g, '')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
     .replace(/\s+/g, ' ')
@@ -416,10 +434,15 @@ export function renderRichText(content) {
 
   // If content contains HTML tags, render it with rich wysiwyg styles
   if (/<[a-z][\s\S]*>/i.test(content)) {
+    const cleanedHtml = content
+      .replace(/\*\*\s*#{1,6}\s*([^*]+?)\s*\*\*/g, '<strong>$1</strong>')
+      .replace(/\*\*\s*([^*]+?)\s*\*\*/g, '<strong>$1</strong>')
+      .replace(/#{1,6}\s*/g, '');
+
     return (
       <div
         className="wysiwyg-editor prose dark:prose-invert max-w-none text-foreground text-sm space-y-1"
-        dangerouslySetInnerHTML={{ __html: content }}
+        dangerouslySetInnerHTML={{ __html: cleanedHtml }}
       />
     );
   }

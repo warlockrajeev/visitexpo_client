@@ -748,9 +748,12 @@ export default function CategoryEventsPage() {
                     </div>
 
                     {/* Description Snippet */}
-                    <p className="text-xs text-zinc-600 leading-relaxed line-clamp-2">
-                      {evt.description}
-                    </p>
+                    <div
+                      className="text-xs text-zinc-600 leading-relaxed line-clamp-2 [&_strong]:font-semibold [&_strong]:text-zinc-900 [&_b]:font-semibold [&_b]:text-zinc-900 [&_em]:italic"
+                      dangerouslySetInnerHTML={{
+                        __html: renderCardDescription(evt.description)
+                      }}
+                    />
 
                     {/* Tags */}
                     <div className="flex flex-wrap gap-1.5 pt-0.5">

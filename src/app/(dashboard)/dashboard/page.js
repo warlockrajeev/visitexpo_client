@@ -60,6 +60,7 @@ import {
   Cell
 } from 'recharts';
 import { useAuth } from '../../../context/AuthContext.js';
+import { renderCardDescription } from '../../../utils/textFormatters.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -1425,7 +1426,12 @@ function ExhibitorDashboard() {
             </div>
             <div>
               <span className="text-muted-foreground uppercase text-[10px] font-bold block">Event Description</span>
-              <p className="text-muted-foreground leading-relaxed mt-1 text-[11px]">{profile.event.description || 'No description available for this event.'}</p>
+              <div
+                className="text-muted-foreground leading-relaxed mt-1 text-[11px] [&_strong]:font-semibold [&_strong]:text-foreground [&_b]:font-semibold [&_b]:text-foreground [&_em]:italic"
+                dangerouslySetInnerHTML={{
+                  __html: renderCardDescription(profile.event.description)
+                }}
+              />
             </div>
           </div>
         </div>
@@ -2011,9 +2017,12 @@ function VisitorDashboard() {
                   <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
                     <div className="space-y-1.5">
                       <h4 className="text-sm font-bold text-foreground line-clamp-1">{expo.title}</h4>
-                      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                        {expo.shortDescription || expo.description || 'Join industry leaders and explore prime exhibits.'}
-                      </p>
+                      <div
+                        className="text-xs text-muted-foreground line-clamp-2 leading-relaxed [&_strong]:font-semibold [&_strong]:text-foreground [&_b]:font-semibold [&_b]:text-foreground [&_em]:italic"
+                        dangerouslySetInnerHTML={{
+                          __html: renderCardDescription(expo.shortDescription || expo.description || 'Join industry leaders and explore prime exhibits.')
+                        }}
+                      />
                       <div className="pt-1 space-y-1 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1.5">
                           <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />

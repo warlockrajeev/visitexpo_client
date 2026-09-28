@@ -13,6 +13,7 @@
  */
 
 import React, { useState } from 'react';
+import { renderCardDescription } from '../utils/textFormatters.js';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -322,9 +323,12 @@ export default function EventDetailModal({
 
           {/* Description */}
           <div className="bg-white p-5 rounded-2xl border border-zinc-200/80 space-y-2">
-            <p className="text-zinc-600 leading-relaxed text-xs">
-              {isReadMore ? event.description : (event.description?.slice(0, 240) || '') + '...'}
-            </p>
+            <div
+              className="text-zinc-600 leading-relaxed text-xs [&_strong]:font-semibold [&_strong]:text-zinc-900 [&_b]:font-semibold [&_b]:text-zinc-900 [&_em]:italic"
+              dangerouslySetInnerHTML={{
+                __html: renderCardDescription(isReadMore ? event.description : (event.description?.slice(0, 240) || '') + '...')
+              }}
+            />
             <button
               onClick={() => setIsReadMore(!isReadMore)}
               className="text-xs font-bold text-[#FF2E63] hover:underline cursor-pointer"

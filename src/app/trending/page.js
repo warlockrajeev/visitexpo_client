@@ -426,9 +426,12 @@ export default function TrendingEventsPage() {
                       </div>
 
                       {evt.description && (
-                        <p className="text-xs text-zinc-600 line-clamp-2 pt-1 leading-relaxed">
-                          {evt.description}
-                        </p>
+                        <div
+                          className="text-xs text-zinc-600 line-clamp-2 pt-1 leading-relaxed [&_strong]:font-semibold [&_strong]:text-zinc-900 [&_b]:font-semibold [&_b]:text-zinc-900 [&_em]:italic"
+                          dangerouslySetInnerHTML={{
+                            __html: renderCardDescription(evt.description)
+                          }}
+                        />
                       )}
                     </div>
 
