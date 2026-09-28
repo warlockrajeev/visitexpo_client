@@ -467,3 +467,23 @@ button:not(:disabled),
   }
 }
 
+/* Print Media Styles: Ensures clean prints and suppresses modal overlay frames when printed directly */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide interactive fixed backdrop overlays & buttons on direct browser print */
+  .fixed.inset-0:not(.print-include),
+  aside,
+  header,
+  nav,
+  button:not(.print-include) {
+    display: none !important;
+  }
+}
+
+

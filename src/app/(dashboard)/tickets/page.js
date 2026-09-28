@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { CURRENCY_OPTIONS, getCurrencySymbol } from '../events/wizard/page.js';
 import { showSweetAlert, showSweetConfirm, showSweetSuccess, showSweetError, showSweetWarning } from '../../../utils/sweetalert.js';
+import { printOrderReceipt } from '../../../utils/printReceipt.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -705,17 +706,31 @@ export default function TicketingPage() {
                               </span>
                               <p className="text-[10px] text-muted-foreground mt-0.5 capitalize">{ord.paymentMethod?.replace('_', ' ')}</p>
                             </td>
-                            <td className="px-5 py-3.5 text-right">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedOrder(ord);
-                                }}
-                                className="inline-flex items-center gap-1 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
-                              >
-                                <Eye className="h-3.5 w-3.5" /> Details
-                              </button>
+                            <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const targetEvent = events.find(ev => ev._id === (ord.event?._id || ord.event));
+                                    printOrderReceipt(ord, targetEvent);
+                                  }}
+                                  className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted p-1.5 rounded-lg border border-border/60 transition-colors cursor-pointer"
+                                  title="Print Official Receipt (PDF)"
+                                >
+                                  <Printer className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedOrder(ord);
+                                  }}
+                                  className="inline-flex items-center gap-1 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                                >
+                                  <Eye className="h-3.5 w-3.5" /> Details
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -1573,10 +1588,14 @@ export default function TicketingPage() {
             <div className="flex items-center justify-between px-6 py-4 border-t border-border bg-muted/20">
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={() => {
+                  const targetEvent = events.find(e => e._id === (selectedOrder.event?._id || selectedOrder.event));
+                  printOrderReceipt(selectedOrder, targetEvent);
+                }}
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground bg-background hover:bg-muted px-3.5 py-2 rounded-xl border border-border transition-colors cursor-pointer shadow-2xs"
+                title="Generate official A4 print receipt / Save as PDF"
               >
-                <Printer className="h-4 w-4" /> Print / Download Receipt
+                <Printer className="h-4 w-4 text-primary" /> Print / Download Receipt
               </button>
               <button
                 type="button"
