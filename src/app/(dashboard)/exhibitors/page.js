@@ -60,6 +60,31 @@ export default function ExhibitorsPage() {
   });
   const [newStaffMember, setNewStaffMember] = useState({ name: '', email: '', phone: '' });
 
+  const resetExhibitorForm = () => {
+    setNewExhibitor({
+      name: '',
+      description: '',
+      logo: '',
+      website: '',
+      contactEmail: '',
+      contactPhone: '',
+      attendanceType: 'in_person',
+      boothNumber: '',
+      staff: []
+    });
+    setNewStaffMember({ name: '', email: '', phone: '' });
+  };
+
+  const handleOpenModal = () => {
+    resetExhibitorForm();
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    resetExhibitorForm();
+  };
+
   // 1. Fetch Events on Load
   useEffect(() => {
     if (!user) return;
@@ -215,19 +240,8 @@ export default function ExhibitorsPage() {
 
         showSweetSuccess(`Exhibitor "${created.name}" onboarded successfully! Application has been forwarded to the Super Admin for review & approval.`);
 
-        // Reset form
-        setNewExhibitor({
-          name: '',
-          description: '',
-          logo: '',
-          website: '',
-          contactEmail: '',
-          contactPhone: '',
-          attendanceType: 'in_person',
-          boothNumber: '',
-          staff: []
-        });
-        setIsModalOpen(false);
+        // Reset form and close modal
+        handleCloseModal();
       }
     } catch (err) {
       console.error('Failed to onboard exhibitor', err);
@@ -276,7 +290,7 @@ export default function ExhibitorsPage() {
             />
           </div>
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={handleOpenModal}
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-md mt-4 md:mt-0"
           >
             <Plus className="h-4 w-4" /> Onboard Exhibitor
@@ -497,11 +511,18 @@ export default function ExhibitorsPage() {
 
       {/* Sleek Glassmorphism Onboarding Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-2xl rounded-2xl border border-border bg-card p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={handleCloseModal}
+        >
+          <div 
+            className="relative w-full max-w-2xl rounded-2xl border border-border bg-card p-6 shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
-              onClick={() => setIsModalOpen(false)}
-              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
+              type="button"
+              onClick={handleCloseModal}
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground cursor-pointer"
             >
               <X className="h-6 w-6" />
             </button>
@@ -673,7 +694,7 @@ export default function ExhibitorsPage() {
               <div className="flex justify-end gap-3 pt-4 border-t border-border">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={handleCloseModal}
                   className="rounded-lg border border-border hover:bg-secondary px-4 py-2 text-sm font-semibold text-foreground transition-colors"
                 >
                   Cancel

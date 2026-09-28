@@ -55,6 +55,25 @@ export default function CampaignsPage() {
     body: ''
   });
 
+  const resetCampaignForm = () => {
+    setNewCampaign({
+      title: '',
+      channel: 'email',
+      subject: '',
+      body: ''
+    });
+  };
+
+  const handleOpenCreateModal = () => {
+    resetCampaignForm();
+    setIsCreateModalOpen(true);
+  };
+
+  const handleCloseCreateModal = () => {
+    setIsCreateModalOpen(false);
+    resetCampaignForm();
+  };
+
   // 1. Fetch Events
   useEffect(() => {
     const fetchEvents = async () => {
@@ -132,13 +151,7 @@ export default function CampaignsPage() {
       );
       if (res.data && res.data.success) {
         setCampaigns(prev => [res.data.campaign, ...prev]);
-        setIsCreateModalOpen(false);
-        setNewCampaign({
-          title: '',
-          channel: 'email',
-          subject: '',
-          body: ''
-        });
+        handleCloseCreateModal();
       }
     } catch (err) {
       console.error('Create campaign failed', err);
@@ -251,7 +264,7 @@ export default function CampaignsPage() {
             />
           </div>
           <button
-            onClick={() => setIsCreateModalOpen(true)}
+            onClick={handleOpenCreateModal}
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-md mt-4 sm:mt-0"
           >
             <Plus className="h-4 w-4" /> Create Campaign
@@ -401,11 +414,18 @@ export default function CampaignsPage() {
 
       {/* Create Campaign Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={handleCloseCreateModal}
+        >
+          <div 
+            className="relative w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
-              onClick={() => setIsCreateModalOpen(false)}
-              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
+              type="button"
+              onClick={handleCloseCreateModal}
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground cursor-pointer"
             >
               <X className="h-6 w-6" />
             </button>
@@ -470,7 +490,7 @@ export default function CampaignsPage() {
               <div className="flex justify-end gap-3 pt-4 border-t border-border">
                 <button
                   type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
+                  onClick={handleCloseCreateModal}
                   className="rounded-lg border border-border hover:bg-secondary px-4 py-2 text-sm font-semibold text-foreground transition-colors"
                 >
                   Cancel

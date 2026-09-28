@@ -119,6 +119,78 @@ export default function TicketingPage() {
   const [replyMessage, setReplyMessage] = useState('');
   const [postingReply, setPostingReply] = useState(false);
 
+  // Helper reset & modal handlers to ensure form fields are always fresh/clean on open/close
+  const resetSimulateForm = () => {
+    setSimulateForm({
+      ticketId: tickets.length > 0 ? tickets[0]._id : '',
+      quantity: 1,
+      buyer: {
+        name: '',
+        email: '',
+        phone: '',
+        company: '',
+        designation: '',
+        country: 'India'
+      }
+    });
+  };
+
+  const handleOpenSimulateModal = () => {
+    resetSimulateForm();
+    setIsSimulateModalOpen(true);
+  };
+
+  const handleCloseSimulateModal = () => {
+    setIsSimulateModalOpen(false);
+    resetSimulateForm();
+  };
+
+  const resetTierForm = () => {
+    setNewTier({
+      title: '',
+      description: '',
+      type: 'free',
+      price: 0,
+      currency: 'INR',
+      capacity: 500
+    });
+  };
+
+  const handleOpenTierModal = () => {
+    resetTierForm();
+    setIsTierModalOpen(true);
+  };
+
+  const handleCloseTierModal = () => {
+    setIsTierModalOpen(false);
+    resetTierForm();
+  };
+
+  const resetSupportTicketForm = () => {
+    setNewSupportTicket({
+      title: '',
+      description: '',
+      category: 'technical',
+      priority: 'medium',
+      eventId: ''
+    });
+  };
+
+  const handleOpenRaiseTicketModal = () => {
+    resetSupportTicketForm();
+    setIsRaiseTicketModalOpen(true);
+  };
+
+  const handleCloseRaiseTicketModal = () => {
+    setIsRaiseTicketModalOpen(false);
+    resetSupportTicketForm();
+  };
+
+  const handleCloseTicketDetailModal = () => {
+    setSelectedTicketDetail(null);
+    setReplyMessage('');
+  };
+
   // 1. Fetch Events
   useEffect(() => {
     const fetchEvents = async () => {
@@ -233,15 +305,7 @@ export default function TicketingPage() {
       );
       if (res.data && res.data.success) {
         setTickets(prev => [...prev, res.data.ticket]);
-        setIsTierModalOpen(false);
-        setNewTier({
-          title: '',
-          description: '',
-          type: 'free',
-          price: 0,
-          currency: 'INR',
-          capacity: 500
-        });
+        handleCloseTierModal();
         showSweetSuccess(`Ticket tier "${res.data.ticket?.title}" created successfully!`);
       }
     } catch (err) {
@@ -269,13 +333,7 @@ export default function TicketingPage() {
 
       if (res.data && res.data.success) {
         showSweetSuccess(`Order: ${res.data.orderNumber}\nStatus: ${res.data.status}`, 'Purchase Successful!');
-        setIsSimulateModalOpen(false);
-        setSimulateForm({
-          ticketId: tickets[0]?._id || '',
-          quantity: 1,
-          buyer: { name: '', email: '', phone: '', company: '', designation: '', country: 'India' }
-        });
-        
+        handleCloseSimulateModal();
         fetchData();
       }
     } catch (err) {
@@ -331,14 +389,7 @@ export default function TicketingPage() {
 
       if (res.data && res.data.success) {
         showSweetSuccess(`Support Ticket ${res.data.ticket.ticketId} submitted successfully!`);
-        setIsRaiseTicketModalOpen(false);
-        setNewSupportTicket({
-          title: '',
-          description: '',
-          category: 'technical',
-          priority: 'medium',
-          eventId: ''
-        });
+        handleCloseRaiseTicketModal();
         fetchSupportTickets();
       }
     } catch (err) {
@@ -490,13 +541,13 @@ export default function TicketingPage() {
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => setIsSimulateModalOpen(true)}
+                onClick={handleOpenSimulateModal}
                 className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary hover:bg-secondary/80 px-4 py-2 text-sm font-semibold text-foreground transition-all"
               >
                 <RefreshCw className="h-4 w-4" /> Simulate Purchase
               </button>
               <button
-                onClick={() => setIsTierModalOpen(true)}
+                onClick={handleOpenTierModal}
                 className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-md"
               >
                 <Plus className="h-4 w-4" /> Add Ticket Tier
@@ -695,7 +746,7 @@ export default function TicketingPage() {
             </div>
 
             <button
-              onClick={() => setIsRaiseTicketModalOpen(true)}
+              onClick={handleOpenRaiseTicketModal}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-all shrink-0"
             >
               <Plus className="h-4.5 w-4.5" /> Raise New Support Ticket
@@ -851,11 +902,18 @@ export default function TicketingPage() {
 
       {/* ================= MODAL: RAISE SUPPORT TICKET ================= */}
       {isRaiseTicketModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-4">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={handleCloseRaiseTicketModal}
+        >
+          <div 
+            className="relative w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
-              onClick={() => setIsRaiseTicketModalOpen(false)}
-              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
+              type="button"
+              onClick={handleCloseRaiseTicketModal}
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground cursor-pointer"
             >
               <X className="h-6 w-6" />
             </button>
@@ -940,7 +998,7 @@ export default function TicketingPage() {
               <div className="flex justify-end gap-3 pt-4 border-t border-border">
                 <button
                   type="button"
-                  onClick={() => setIsRaiseTicketModalOpen(false)}
+                  onClick={handleCloseRaiseTicketModal}
                   className="rounded-lg border border-border hover:bg-secondary px-4 py-2 text-sm font-semibold text-foreground transition-colors"
                 >
                   Cancel
@@ -968,8 +1026,14 @@ export default function TicketingPage() {
 
       {/* ================= MODAL: TICKET DISCUSSION THREAD & REPLIES ================= */}
       {selectedTicketDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl border border-border bg-card shadow-2xl overflow-hidden">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={handleCloseTicketDetailModal}
+        >
+          <div 
+            className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl border border-border bg-card shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal Header */}
             <div className="p-5 border-b border-border flex items-center justify-between bg-muted/20">
               <div className="flex items-center gap-3">
@@ -984,8 +1048,9 @@ export default function TicketingPage() {
                 </div>
               </div>
               <button
-                onClick={() => setSelectedTicketDetail(null)}
-                className="text-muted-foreground hover:text-foreground p-1"
+                type="button"
+                onClick={handleCloseTicketDetailModal}
+                className="text-muted-foreground hover:text-foreground p-1 cursor-pointer"
               >
                 <X className="h-6 w-6" />
               </button>
@@ -1086,11 +1151,18 @@ export default function TicketingPage() {
 
       {/* Pricing Tier Modal */}
       {isTierModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={handleCloseTierModal}
+        >
+          <div 
+            className="relative w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
-              onClick={() => setIsTierModalOpen(false)}
-              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
+              type="button"
+              onClick={handleCloseTierModal}
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground cursor-pointer"
             >
               <X className="h-6 w-6" />
             </button>
@@ -1187,7 +1259,7 @@ export default function TicketingPage() {
               <div className="flex justify-end gap-3 pt-4 border-t border-border">
                 <button
                   type="button"
-                  onClick={() => setIsTierModalOpen(false)}
+                  onClick={handleCloseTierModal}
                   className="rounded-lg border border-border hover:bg-secondary px-4 py-2 text-sm font-semibold text-foreground transition-colors"
                 >
                   Cancel
@@ -1206,11 +1278,18 @@ export default function TicketingPage() {
 
       {/* Simulate Purchase Modal */}
       {isSimulateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={handleCloseSimulateModal}
+        >
+          <div 
+            className="relative w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
-              onClick={() => setIsSimulateModalOpen(false)}
-              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
+              type="button"
+              onClick={handleCloseSimulateModal}
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground cursor-pointer"
             >
               <X className="h-6 w-6" />
             </button>
@@ -1305,7 +1384,7 @@ export default function TicketingPage() {
               <div className="flex justify-end gap-3 pt-4 border-t border-border">
                 <button
                   type="button"
-                  onClick={() => setIsSimulateModalOpen(false)}
+                  onClick={handleCloseSimulateModal}
                   className="rounded-lg border border-border hover:bg-secondary px-4 py-2 text-sm font-semibold text-foreground transition-colors"
                 >
                   Cancel
