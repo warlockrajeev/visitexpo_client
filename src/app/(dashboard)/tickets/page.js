@@ -324,12 +324,13 @@ export default function TicketingPage() {
 
     setSimulating(true);
     try {
+      const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
       const res = await axios.post(`${API_URL}/orders/checkout`, {
         eventId: selectedEventId,
         ticketId: simulateForm.ticketId,
         quantity: parseInt(simulateForm.quantity, 10) || 1,
         buyer: simulateForm.buyer
-      });
+      }, { headers });
 
       if (res.data && res.data.success) {
         showSweetSuccess(`Order: ${res.data.orderNumber}\nStatus: ${res.data.status}`, 'Purchase Successful!');
