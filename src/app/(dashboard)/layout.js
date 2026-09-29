@@ -28,7 +28,10 @@ import {
   Wand2,
   ShieldCheck,
   Compass,
-  Globe
+  Globe,
+  Home,
+  ArrowLeft,
+  ArrowRight
 } from 'lucide-react';
 
 import axios from 'axios';
@@ -313,6 +316,18 @@ export default function DashboardLayout({ children }) {
 
         {/* Footer Area with Theme Toggle & User Info */}
         <div className="p-4 border-t border-border bg-muted/20">
+          <Link
+            href="/"
+            className="flex w-full items-center justify-between rounded-lg px-4 py-2.5 text-xs font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground mb-2 transition-colors"
+            title="Go back to VisitExpo landing page"
+          >
+            <span className="flex items-center gap-3">
+              <Home className="h-4.5 w-4.5 text-primary" />
+              Landing Page
+            </span>
+            <ArrowRight className="h-3.5 w-3.5 opacity-60" />
+          </Link>
+
           <button
             onClick={toggleTheme}
             className="flex w-full items-center justify-between rounded-lg px-4 py-2.5 text-xs font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground mb-3 transition-colors"
@@ -373,6 +388,16 @@ export default function DashboardLayout({ children }) {
             </h1>
           </div>
           <div className="flex items-center gap-3">
+            {/* Back to Landing Page Button */}
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card hover:bg-secondary px-3 py-1.5 text-xs font-bold text-foreground transition-all shadow-2xs cursor-pointer btn-press active:scale-95"
+              title="Return to VisitExpo Landing Page"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 text-primary" />
+              <span>Landing Page</span>
+            </Link>
+
             {user?.role === 'visitor' ? (
               <Link
                 href="/expos"
