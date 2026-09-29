@@ -67,8 +67,7 @@ import {
   Award,
   Mic,
   Megaphone,
-  Navigation,
-  Sparkles
+  Navigation
 } from 'lucide-react';
 
 const API_URL =
@@ -2458,7 +2457,6 @@ export default function ExpoDetailsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 mb-1">
-                  <Sparkles className="h-3 w-3 text-amber-500 fill-amber-500" />
                   <span>Recommendation Engine</span>
                 </div>
                 <h3 className="text-lg sm:text-xl font-extrabold text-zinc-900 tracking-tight">
@@ -2495,9 +2493,8 @@ export default function ExpoDetailsPage() {
                         <span className="text-[10px] font-extrabold text-zinc-700 bg-zinc-100 px-2.5 py-0.5 rounded-md truncate max-w-[60%]">
                           {rec.categories?.[0] || rec.category || 'Exhibition'}
                         </span>
-                        <span className="inline-flex items-center gap-1 text-[10px] font-black bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-2 py-0.5 rounded-full shadow-2xs">
-                          <Sparkles className="h-2.5 w-2.5" />
-                          {rec.matchScore || 88}% Match
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-2.5 py-0.5 rounded-full shadow-2xs">
+                          <span>{rec.matchScore || 88}% Match</span>
                         </span>
                       </div>
 

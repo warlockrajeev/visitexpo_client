@@ -25,7 +25,6 @@ import {
   ChevronDown,
   Building,
   ShieldCheck,
-  Sparkles,
   Compass
 } from 'lucide-react';
 
@@ -120,10 +119,9 @@ export default function Navbar({ solid = false }) {
           </Link>
           <Link
             href="/recommendations"
-            className="hover:text-white transition-colors flex items-center gap-1.5"
+            className="hover:text-white transition-colors"
           >
-            <Sparkles className="h-3.5 w-3.5 text-[#FFCC00]" />
-            <span>For You</span>
+            For You
           </Link>
           <Link
             href={user ? '/dashboard' : '/login?role=organizer&signup=true'}
@@ -254,7 +252,7 @@ export default function Navbar({ solid = false }) {
                           onClick={() => setProfileDropdownOpen(false)}
                           className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
                         >
-                          <Sparkles className="h-4 w-4 text-[#FFCC00]" />
+                          <Compass className="h-4 w-4 text-primary" />
                           <span>Recommended For You</span>
                         </Link>
                         <Link
@@ -408,10 +406,9 @@ export default function Navbar({ solid = false }) {
             <Link
               href="/recommendations"
               onClick={() => setMobileMenuOpen(false)}
-              className="hover:text-white py-1 transition-colors flex items-center gap-1.5"
+              className="hover:text-white py-1 transition-colors"
             >
-              <Sparkles className="h-4 w-4 text-[#FFCC00]" />
-              <span>Recommended For You</span>
+              Recommended For You
             </Link>
             <Link
               href={user ? '/dashboard' : '/login?role=organizer&signup=true'}
