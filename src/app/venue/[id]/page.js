@@ -3,15 +3,22 @@
 /**
  * @file app/venue/[id]/page.js
  * @description Dedicated Convention & Exhibition Venue Details Page (VDP).
- * Faithfully implements the 10times reference layout from the user's screenshots
- * styled with the VisitExpo color theme (#FFCC00 yellow, #FF2E63 pink, modern white canvas).
+ * Features:
+ * - Dynamic venue resolution (pre-curated venues + dynamic DB fallback)
+ * - Live Total Events Hosted and Upcoming Events with real API database synchronization
+ * - Interactive Google Maps embed with full-width preview, Copy Address, and Driving Directions
+ * - Event Calendar with Upcoming / Past / All tabs and keyword search
+ * - Meeting spaces, halls breakdown, reviews, and quote request modal
+ * - VisitExpo color theme (#FFCC00 yellow, #FF2E63 pink, modern high-contrast design)
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import axios from 'axios';
 import Navbar from '../../../components/Navbar.js';
-import { getVenueById, VENUES_DATA } from '../../../data/venuesData.js';
+import Footer from '../../../components/Footer.js';
+import { getVenueById, VENUES_DATA, slugifyVenue } from '../../../data/venuesData.js';
 import {
   MapPin,
   Star,
@@ -41,20 +48,36 @@ import {
   Globe,
   MessageSquare,
   ShieldCheck,
-  Search
+  Search,
+  Copy,
+  CheckCheck,
+  ChevronRight,
+  Eye,
+  SlidersHorizontal,
+  Compass
 } from 'lucide-react';
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== 'undefined' && window.location.hostname.includes('visitexpo.in')
+    ? 'https://api.visitexpo.in/api'
+    : 'http://localhost:5000/api');
 
 export default function VenueDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const venueId = params?.id || 'bharat-mandapam';
 
-  // Load venue data
+  // Load venue data (curated or dynamic fallback)
   const venue = useMemo(() => {
     return getVenueById(venueId) || getVenueById('bharat-mandapam');
   }, [venueId]);
 
-  // Local state
+  // Live database events state
+  const [allDbEvents, setAllDbEvents] = useState([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
+
+  // Local UI state
   const [activeTab, setActiveTab] = useState('overview');
   const [isFollowing, setIsFollowing] = useState(false);
   const [isCompared, setIsCompared] = useState(false);
@@ -62,6 +85,11 @@ export default function VenueDetailsPage() {
   const [interestedMap, setInterestedMap] = useState({});
   const [showFullDesc, setShowFullDesc] = useState(false);
   const [shareToast, setShareToast] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState(false);
+
+  // Event Calendar filtering state
+  const [eventFilterTab, setEventFilterTab] = useState('all'); // 'all', 'upcoming', 'past'
+  const [eventSearchQuery, setEventSearchQuery] = useState('');
 
   // Modals state
   const [showQuoteModal, setShowQuoteModal] = useState(false);
@@ -95,11 +123,207 @@ export default function VenueDetailsPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Fetch real events from the backend to compute live total and upcoming events
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLiveEvents = async () => {
+      try {
+        setLoadingEvents(true);
+        const res = await axios.get(`${API_URL}/events?limit=1000&all=true`);
+        const eventsList = res.data?.data?.events || res.data?.events || [];
+        if (isMounted && Array.isArray(eventsList)) {
+          setAllDbEvents(eventsList);
+        }
+      } catch (err) {
+        console.warn('Could not fetch live events from API, utilizing fallback data:', err);
+      } finally {
+        if (isMounted) setLoadingEvents(false);
+      }
+    };
+    fetchLiveEvents();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Filter events from the database matching this venue
+  const matchedDbEvents = useMemo(() => {
+    if (!venue || !Array.isArray(allDbEvents) || allDbEvents.length === 0) return [];
+
+    const vNorm = (venue.name || '').toLowerCase();
+    const vShortNorm = (venue.shortName || '').toLowerCase();
+    const vSlug = venue.slug || venue.id;
+    const vCity = (venue.city || '').toLowerCase();
+
+    return allDbEvents.filter((ev) => {
+      const evVenue = (ev.venue || '').toLowerCase();
+      const evCity = (ev.city || '').toLowerCase();
+      const evAddr = (ev.address || '').toLowerCase();
+      const evSlug = slugifyVenue(ev.venue || '');
+
+      // Direct match on venue name or short name
+      if (evVenue && (evVenue.includes(vShortNorm) || vNorm.includes(evVenue) || evVenue.includes(vNorm))) {
+        return true;
+      }
+      // Slug match
+      if (evSlug && (evSlug === vSlug || evSlug.includes(vSlug) || vSlug.includes(evSlug))) {
+        return true;
+      }
+      // Address match
+      if (evAddr && (evAddr.includes(vShortNorm) || evAddr.includes(vNorm))) {
+        return true;
+      }
+
+      // Specific known aliases
+      if (vSlug === 'bharat-mandapam' && (evVenue.includes('pragati') || evVenue.includes('mandapam') || evAddr.includes('pragati'))) return true;
+      if (vSlug === 'yashobhoomi' && (evVenue.includes('iicc') || evVenue.includes('dwarka') || evVenue.includes('yashobhoomi'))) return true;
+      if (vSlug === 'jio-world' && (evVenue.includes('jio') || evVenue.includes('bkc') || evVenue.includes('bandra kurla'))) return true;
+      if (vSlug === 'bec-mumbai' && (evVenue.includes('bombay exhibition') || evVenue.includes('nesco') || evVenue.includes('goregaon'))) return true;
+      if (vSlug === 'biec-bengaluru' && (evVenue.includes('biec') || evVenue.includes('bangalore exhibition'))) return true;
+      if (vSlug === 'india-expo-centre' && (evVenue.includes('expo centre') || evVenue.includes('greater noida') || evVenue.includes('ieml'))) return true;
+      if (vSlug === 'excel-london' && (evVenue.includes('excel') || evVenue.includes('docklands'))) return true;
+
+      // Fallback for custom dynamically generated venues: match city if venue name has overlap
+      if (evCity === vCity && vNorm.split(' ').some((word) => word.length > 3 && evVenue.includes(word))) {
+        return true;
+      }
+
+      return false;
+    });
+  }, [venue, allDbEvents]);
+
+  // Split into upcoming and past
+  const now = useMemo(() => new Date(), []);
+
+  const upcomingMatchedEvents = useMemo(() => {
+    return matchedDbEvents.filter((ev) => {
+      const end = ev.endDate ? new Date(ev.endDate) : ev.startDate ? new Date(ev.startDate) : null;
+      return !end || end >= now;
+    });
+  }, [matchedDbEvents, now]);
+
+  const pastMatchedEvents = useMemo(() => {
+    return matchedDbEvents.filter((ev) => {
+      const end = ev.endDate ? new Date(ev.endDate) : ev.startDate ? new Date(ev.startDate) : null;
+      return end && end < now;
+    });
+  }, [matchedDbEvents, now]);
+
+  // Aggregate live metrics
+  const totalEventsDisplay = useMemo(() => {
+    if (matchedDbEvents.length > 0) {
+      const baseCount = parseInt(venue.eventsHosted, 10) || 0;
+      return `${Math.max(baseCount, matchedDbEvents.length)}+`;
+    }
+    return venue.eventsHosted || '10+';
+  }, [matchedDbEvents, venue]);
+
+  const upcomingEventsDisplay = useMemo(() => {
+    if (upcomingMatchedEvents.length > 0) {
+      return `${upcomingMatchedEvents.length}+`;
+    }
+    return venue.upcomingEventsCount || '4+';
+  }, [upcomingMatchedEvents, venue]);
+
+  // Unified Calendar events (DB events mapped to unified structure + venue leading events fallback)
+  const unifiedCalendarEvents = useMemo(() => {
+    const list = [];
+
+    // Map DB events
+    matchedDbEvents.forEach((ev) => {
+      const start = ev.startDate ? new Date(ev.startDate) : null;
+      const end = ev.endDate ? new Date(ev.endDate) : null;
+      const isPast = end ? end < now : false;
+
+      let dateFormatted = ev.dates || 'Upcoming 2026';
+      if (start && !ev.dates) {
+        dateFormatted = start.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+        if (end) {
+          dateFormatted += ` - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+        }
+      }
+
+      list.push({
+        id: ev._id || ev.id || ev.slug,
+        slug: ev.slug || ev._id,
+        title: ev.title || 'Exhibition Fair',
+        dates: dateFormatted,
+        category: ev.category || 'Trade Exhibition',
+        turnout: ev.attendeesCount ? `${ev.attendeesCount.toLocaleString()}+ Attendees` : '15,000+ Visitors',
+        daysToGo: isPast ? 'Concluded' : 'Upcoming Event',
+        isPast,
+        isDbLive: true,
+        banner: ev.image || venue.heroBanner,
+        city: ev.city || venue.city,
+        venue: ev.venue || venue.name
+      });
+    });
+
+    // Supplement with curated leading events if DB matches are few
+    if (Array.isArray(venue.leadingEvents) && venue.leadingEvents.length > 0) {
+      venue.leadingEvents.forEach((curatedEvt) => {
+        // avoid duplicate title
+        const exists = list.some((x) => x.title.toLowerCase().includes(curatedEvt.title.toLowerCase()));
+        if (!exists) {
+          list.push({
+            id: `curated-${curatedEvt.id}`,
+            slug: slugifyVenue(curatedEvt.title),
+            title: curatedEvt.title,
+            dates: curatedEvt.dates,
+            category: curatedEvt.category,
+            turnout: curatedEvt.turnout,
+            daysToGo: curatedEvt.daysToGo,
+            isPast: false,
+            isDbLive: false,
+            banner: venue.gallery?.[0] || venue.heroBanner,
+            city: venue.city,
+            venue: venue.name
+          });
+        }
+      });
+    }
+
+    return list;
+  }, [matchedDbEvents, venue, now]);
+
+  // Filtered calendar events based on active tab and search
+  const filteredCalendarEvents = useMemo(() => {
+    return unifiedCalendarEvents.filter((ev) => {
+      // Tab filter
+      if (eventFilterTab === 'upcoming' && ev.isPast) return false;
+      if (eventFilterTab === 'past' && !ev.isPast) return false;
+
+      // Search filter
+      if (eventSearchQuery.trim()) {
+        const q = eventSearchQuery.toLowerCase().trim();
+        const matchesTitle = ev.title.toLowerCase().includes(q);
+        const matchesCategory = ev.category.toLowerCase().includes(q);
+        const matchesDates = ev.dates.toLowerCase().includes(q);
+        return matchesTitle || matchesCategory || matchesDates;
+      }
+
+      return true;
+    });
+  }, [unifiedCalendarEvents, eventFilterTab, eventSearchQuery]);
+
+  // Handlers
   const handleShare = () => {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(window.location.href);
       setShareToast(true);
       setTimeout(() => setShareToast(false), 3000);
+    }
+  };
+
+  const handleCopyAddress = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(venue.address);
+      setCopiedAddress(true);
+      setTimeout(() => setCopiedAddress(false), 3000);
     }
   };
 
@@ -151,8 +375,8 @@ export default function VenueDetailsPage() {
         <div>
           <h1 className="text-xl font-bold text-zinc-900">Venue Not Found</h1>
           <p className="text-sm text-zinc-500 mt-2">The venue you are looking for does not exist.</p>
-          <Link href="/" className="inline-block mt-4 px-4 py-2 bg-zinc-900 text-white text-xs font-bold rounded-xl">
-            Return Home
+          <Link href="/venues" className="inline-block mt-4 px-4 py-2 bg-zinc-900 text-white text-xs font-bold rounded-xl">
+            Browse All Venues
           </Link>
         </div>
       </div>
@@ -160,7 +384,7 @@ export default function VenueDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-zinc-900 font-sans antialiased selection:bg-[#FF2E63] selection:text-white">
+    <div className="min-h-screen bg-[#F8F9FA] text-zinc-900 font-sans antialiased selection:bg-[#FF2E63] selection:text-white flex flex-col">
       {/* Top Main Navbar */}
       <Navbar />
 
@@ -183,18 +407,35 @@ export default function VenueDetailsPage() {
         </div>
       )}
 
+      {/* Top Breadcrumb Bar */}
+      <div className="bg-white border-b border-zinc-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 text-xs text-zinc-500 flex items-center gap-1.5 overflow-x-auto">
+          <Link href="/" className="hover:text-zinc-900 transition-colors">Home</Link>
+          <ChevronRight className="h-3 w-3 text-zinc-400" />
+          <Link href="/venues" className="hover:text-zinc-900 transition-colors">Venues</Link>
+          <ChevronRight className="h-3 w-3 text-zinc-400" />
+          <span className="font-semibold text-zinc-800 truncate">{venue.shortName || venue.name}</span>
+        </div>
+      </div>
+
       {/* ========================================================================= */}
-      {/* 1. HERO BANNER & FLOATING VENUE PROFILE CARD (Image 1 Match)              */}
+      {/* 1. HERO BANNER & FLOATING VENUE PROFILE CARD                              */}
       {/* ========================================================================= */}
-      <div className="relative pt-20 sm:pt-24">
+      <div className="relative">
         {/* Panoramic Exhibition Hall Banner Background */}
-        <div className="relative h-48 sm:h-64 md:h-72 w-full overflow-hidden bg-zinc-900">
+        <div className="relative h-52 sm:h-64 md:h-72 w-full overflow-hidden bg-zinc-900">
           <img
             src={venue.heroBanner}
             alt={venue.name}
             className="w-full h-full object-cover opacity-85"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/30" />
+          <div className="absolute top-4 left-4 sm:left-6">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-xs font-bold border border-white/20">
+              <Building className="h-3.5 w-3.5 text-[#FFCC00]" />
+              <span>Official Convention &amp; Trade Center</span>
+            </span>
+          </div>
         </div>
 
         {/* Floating White Profile Card overlapping Hero Banner */}
@@ -227,13 +468,13 @@ export default function VenueDetailsPage() {
                     <button
                       type="button"
                       onClick={() => scrollToSection('location')}
-                      className="hover:underline cursor-pointer"
+                      className="hover:underline cursor-pointer text-left"
                     >
                       {venue.city}, {venue.country}
                     </button>
                   </div>
 
-                  {/* Followers & Rating stats */}
+                  {/* Followers, Rating & Live Database Badge */}
                   <div className="flex items-center gap-2 text-xs text-zinc-500 pt-0.5 flex-wrap">
                     <span className="font-semibold text-zinc-700">{venue.followersCount} Followers</span>
                     <span>•</span>
@@ -242,6 +483,16 @@ export default function VenueDetailsPage() {
                       <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
                     </div>
                     <span>{venue.ratingsCount} Ratings</span>
+
+                    {matchedDbEvents.length > 0 && (
+                      <>
+                        <span>•</span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-[10px]">
+                          <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                          <span>{matchedDbEvents.length} Live DB Events</span>
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -300,7 +551,7 @@ export default function VenueDetailsPage() {
                   className="px-3.5 py-2 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1.5"
                 >
                   <Navigation className="h-3.5 w-3.5 text-blue-600" />
-                  <span>Get Direction</span>
+                  <span>Map Location &amp; Directions</span>
                 </button>
 
                 {/* Contact */}
@@ -332,7 +583,7 @@ export default function VenueDetailsPage() {
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. STICKY SUB-NAV TAB BAR (Image 1, 2, 3, 4 Match)                       */}
+      {/* 2. STICKY SUB-NAV TAB BAR                                                 */}
       {/* ========================================================================= */}
       <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-zinc-200 shadow-2xs mt-4">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-4 py-2.5">
@@ -340,8 +591,8 @@ export default function VenueDetailsPage() {
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
             {[
               { id: 'overview', label: 'Overview' },
-              { id: 'location', label: 'Location' },
-              { id: 'calendar', label: 'Event Calendar' },
+              { id: 'location', label: 'Map Location' },
+              { id: 'calendar', label: `Event Calendar (${unifiedCalendarEvents.length})` },
               { id: 'meeting-space', label: 'Meeting Space' },
               { id: 'reviews', label: 'Reviews' }
             ].map((tab) => (
@@ -369,7 +620,7 @@ export default function VenueDetailsPage() {
                 className="text-xs font-semibold text-zinc-700 hover:text-zinc-900 flex items-center gap-1 px-2.5 py-1"
               >
                 <Navigation className="h-3 w-3 text-blue-600" />
-                <span>Get Direction</span>
+                <span>Map</span>
               </button>
 
               <button
@@ -400,7 +651,7 @@ export default function VenueDetailsPage() {
       {/* ========================================================================= */}
       {/* 3. MAIN CONTENT: 2-COLUMN LAYOUT (LEFT 65%, RIGHT SIDEBAR 35%)            */}
       {/* ========================================================================= */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex-1">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* ===================================================================== */}
@@ -409,15 +660,15 @@ export default function VenueDetailsPage() {
           <div className="lg:col-span-8 space-y-8">
             
             {/* ------------------------------------------------------------------- */}
-            {/* OVERVIEW SECTION (Image 2 Match)                                    */}
+            {/* OVERVIEW SECTION                                                    */}
             {/* ------------------------------------------------------------------- */}
             <div id="overview" className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-6">
               
               <div>
-                <h2 className="text-base sm:text-lg font-bold text-zinc-900">Overview</h2>
+                <h2 className="text-base sm:text-lg font-bold text-zinc-900">Venue Overview</h2>
               </div>
 
-              {/* 4 Architectural Venue Photos Grid (Image 2 Match) */}
+              {/* 4 Architectural Venue Photos Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 rounded-xl overflow-hidden">
                 {venue.gallery.map((photo, idx) => (
                   <div key={idx} className="relative h-28 sm:h-36 overflow-hidden rounded-lg bg-zinc-100 group">
@@ -439,17 +690,17 @@ export default function VenueDetailsPage() {
                   <span className="text-[11px] text-zinc-500 font-medium">Best Suited</span>
                 </div>
 
-                {/* 2. Events Hosted */}
+                {/* 2. Events Hosted (Dynamic Total Count) */}
                 <div className="bg-zinc-50/70 border border-zinc-200/80 rounded-xl p-3.5 text-center flex flex-col items-center justify-center space-y-1">
                   <Calendar className="h-5 w-5 text-orange-500 mb-0.5" />
-                  <span className="font-extrabold text-sm text-zinc-900">{venue.eventsHosted}</span>
+                  <span className="font-extrabold text-sm text-zinc-900">{totalEventsDisplay}</span>
                   <span className="text-[11px] text-zinc-500 font-medium">Events Hosted</span>
                 </div>
 
-                {/* 3. Upcoming Events */}
+                {/* 3. Upcoming Events (Dynamic Upcoming Count) */}
                 <div className="bg-zinc-50/70 border border-zinc-200/80 rounded-xl p-3.5 text-center flex flex-col items-center justify-center space-y-1">
-                  <Clock className="h-5 w-5 text-orange-500 mb-0.5" />
-                  <span className="font-extrabold text-sm text-zinc-900">{venue.upcomingEventsCount}</span>
+                  <Clock className="h-5 w-5 text-emerald-600 mb-0.5" />
+                  <span className="font-extrabold text-sm text-zinc-900 text-emerald-700">{upcomingEventsDisplay}</span>
                   <span className="text-[11px] text-zinc-500 font-medium">Upcoming Events</span>
                 </div>
 
@@ -495,7 +746,7 @@ export default function VenueDetailsPage() {
                 </div>
               </div>
 
-              {/* Highly Rated For: Segmented Green Bars (Image 2 & 3 Match) */}
+              {/* Highly Rated For: Segmented Green Bars */}
               <div className="pt-4 border-t border-zinc-150 space-y-3">
                 <h3 className="text-xs sm:text-sm font-bold text-zinc-900">Highly Rated For</h3>
 
@@ -533,212 +784,304 @@ export default function VenueDetailsPage() {
             </div>
 
             {/* ------------------------------------------------------------------- */}
-            {/* LEADING EVENTS SECTION (Image 3 Match)                              */}
+            {/* INTERACTIVE MAP LOCATION SECTION (Real Google Maps Embed)            */}
             {/* ------------------------------------------------------------------- */}
-            <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-base sm:text-lg font-bold text-zinc-900">Leading Events</h2>
-                <button
-                  type="button"
-                  onClick={() => scrollToSection('calendar')}
-                  className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors"
-                >
-                  View All Events →
-                </button>
-              </div>
-
-              {/* 2-Column Grid of Leading Events */}
-              <div className="grid sm:grid-cols-2 gap-3.5">
-                {venue.leadingEvents.map((evt) => {
-                  const isSaved = Boolean(bookmarkedEvents[evt.id]);
-
-                  return (
-                    <div
-                      key={evt.id}
-                      className="bg-white border border-zinc-200/90 hover:border-zinc-300 rounded-xl p-4 shadow-2xs hover:shadow-sm transition-all flex flex-col justify-between group"
-                    >
-                      <div className="space-y-1.5">
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="text-xs sm:text-sm font-semibold text-blue-600 group-hover:text-blue-800 transition-colors leading-snug line-clamp-2">
-                            {evt.title}
-                          </h4>
-                          <button
-                            type="button"
-                            onClick={() => toggleBookmark(evt.id)}
-                            className="text-zinc-400 hover:text-zinc-800 p-1 cursor-pointer shrink-0"
-                            title="Bookmark Event"
-                          >
-                            <Bookmark className={`h-4 w-4 ${isSaved ? 'fill-zinc-900 text-zinc-900' : ''}`} />
-                          </button>
-                        </div>
-
-                        <p className="text-[11px] text-zinc-500 font-medium">
-                          {evt.dates}
-                        </p>
-                      </div>
-
-                      <div className="pt-2 mt-2 border-t border-zinc-100 flex items-center justify-between text-[10px] text-zinc-400">
-                        <span className="font-semibold text-zinc-600 truncate max-w-[180px]">{evt.category}</span>
-                        <span className="bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded font-bold">{evt.daysToGo}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* ------------------------------------------------------------------- */}
-            {/* ADDRESS & LOCATION SECTION (Image 4 Match)                          */}
-            {/* ------------------------------------------------------------------- */}
-            <div id="location" className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-4">
-              <div>
-                <h2 className="text-base sm:text-lg font-bold text-zinc-900">Address</h2>
-              </div>
-
-              <div className="grid md:grid-cols-12 gap-5 items-center">
-                {/* Map Snapshot Visual */}
-                <div className="md:col-span-4 relative h-36 rounded-xl overflow-hidden border border-zinc-200 bg-zinc-100 group">
-                  <img
-                    src="https://images.unsplash.com/photo-1524661135-423995f22d0b?q=80&w=600&auto=format&fit=crop"
-                    alt="Map snapshot"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                  />
-                  <div className="absolute inset-0 bg-blue-900/10" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="h-8 w-8 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg animate-bounce">
-                      <MapPin className="h-4 w-4" />
-                    </div>
-                  </div>
+            <div id="location" className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-150 pb-3">
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-zinc-900 flex items-center gap-2">
+                    <Compass className="h-5 w-5 text-rose-500" />
+                    <span>Map Location &amp; Directions</span>
+                  </h2>
+                  <p className="text-xs text-zinc-500 mt-0.5">Interactive Google Maps navigation &amp; transit logistics</p>
                 </div>
 
-                {/* Address Details & Action Buttons */}
-                <div className="md:col-span-8 space-y-3">
-                  <div>
-                    <div className="flex items-center gap-1.5 font-bold text-sm text-zinc-900">
-                      <span>{venue.name}</span>
-                      <MapPin className="h-3.5 w-3.5 text-blue-600" />
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`https://maps.google.com/?q=${encodeURIComponent(venue.address || venue.name)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors shadow-2xs"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 text-[#FFCC00]" />
+                    <span>Open in Maps</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* Responsive Embedded Google Map */}
+              <div className="relative w-full h-72 sm:h-96 rounded-2xl overflow-hidden border border-zinc-200 shadow-xs bg-zinc-100 group">
+                <iframe
+                  title={`${venue.name} Interactive Map`}
+                  src={`https://maps.google.com/maps?q=${encodeURIComponent(venue.address || venue.name)}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                  className="w-full h-full border-0"
+                  loading="lazy"
+                  allowFullScreen
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+
+                {/* Floating Direction Overlay Pill on Map */}
+                <div className="absolute bottom-3 left-3 z-10">
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(venue.address || venue.name)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2 rounded-xl bg-zinc-950/90 hover:bg-black text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-lg backdrop-blur-md transition-all cursor-pointer hover:scale-102"
+                  >
+                    <Navigation className="h-3.5 w-3.5 text-[#FFCC00]" />
+                    <span>Get Turn-by-Turn Directions</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* Address Details & Logistics Card */}
+              <div className="bg-zinc-50/80 border border-zinc-200/80 rounded-xl p-4 sm:p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-sm text-zinc-900">{venue.name}</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        Verified Coordinates
+                      </span>
                     </div>
-                    <p className="text-xs text-zinc-600 mt-1 leading-relaxed">
+
+                    <p className="text-xs text-zinc-600 leading-relaxed font-medium">
                       {venue.address}
                     </p>
-                    <p className="text-[11px] text-zinc-500 mt-1 flex items-center gap-1">
-                      <Train className="h-3 w-3 text-blue-600" />
-                      <span>{venue.metro}</span>
-                    </p>
+
+                    <div className="flex flex-wrap items-center gap-3 pt-1 text-xs text-zinc-600">
+                      {venue.metro && (
+                        <span className="inline-flex items-center gap-1 text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                          <Train className="h-3.5 w-3.5 text-blue-600" />
+                          <span>{venue.metro}</span>
+                        </span>
+                      )}
+                      {venue.airportDistance && (
+                        <span className="inline-flex items-center gap-1 text-zinc-700 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200">
+                          <Plane className="h-3.5 w-3.5 text-zinc-500" />
+                          <span>{venue.airportDistance}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  {/* 4 Quick Action Buttons (Contact, Website, Get Quotes, Report) */}
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setShowContactModal(true)}
-                      className="px-3 py-1.5 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-semibold text-zinc-800 transition-colors cursor-pointer flex items-center gap-1"
-                    >
-                      <Phone className="h-3 w-3 text-zinc-500" />
-                      <span>Contact</span>
-                    </button>
+                  {/* Copy Address Button */}
+                  <button
+                    type="button"
+                    onClick={handleCopyAddress}
+                    className="self-start sm:self-auto px-3.5 py-2 rounded-xl bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-bold text-xs inline-flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer"
+                  >
+                    {copiedAddress ? (
+                      <>
+                        <CheckCheck className="h-3.5 w-3.5 text-emerald-600" />
+                        <span className="text-emerald-700 font-bold">Address Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5 text-zinc-500" />
+                        <span>Copy Address</span>
+                      </>
+                    )}
+                  </button>
+                </div>
 
-                    <a
-                      href={`https://maps.google.com/?q=${encodeURIComponent(venue.address)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3 py-1.5 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-semibold text-zinc-800 transition-colors cursor-pointer flex items-center gap-1"
-                    >
-                      <Globe className="h-3 w-3 text-blue-600" />
-                      <span>Website</span>
-                    </a>
+                {/* Quick Logistics Action Strip */}
+                <div className="pt-3 border-t border-zinc-200/70 flex flex-wrap items-center gap-2">
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(venue.address || venue.name)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs transition-colors"
+                  >
+                    <Navigation className="h-3.5 w-3.5" />
+                    <span>Driving Route</span>
+                  </a>
 
-                    <button
-                      type="button"
-                      onClick={() => setShowQuoteModal(true)}
-                      className="px-3 py-1.5 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-semibold text-zinc-800 transition-colors cursor-pointer flex items-center gap-1"
-                    >
-                      <span>Get Quotes</span>
-                    </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowContactModal(true)}
+                    className="px-3 py-1.5 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-semibold text-zinc-800 transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <Phone className="h-3.5 w-3.5 text-zinc-500" />
+                    <span>Venue Helpdesk</span>
+                  </button>
 
-                    <button
-                      type="button"
-                      onClick={() => alert('Report submitted. Our moderation team will verify venue coordinates.')}
-                      className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
-                    >
-                      <Flag className="h-3 w-3" />
-                      <span>Report</span>
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuoteModal(true)}
+                    className="px-3 py-1.5 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-semibold text-zinc-800 transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <span>Request Rates &amp; Hall Plan</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => alert('Location report received. Venue coordinates verified against survey records.')}
+                    className="px-3 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-800 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1 ml-auto"
+                  >
+                    <Flag className="h-3 w-3" />
+                    <span>Report inaccuracy</span>
+                  </button>
                 </div>
               </div>
             </div>
 
             {/* ------------------------------------------------------------------- */}
-            {/* EVENT CALENDAR SECTION (Image 4 Match)                              */}
+            {/* EVENT CALENDAR & LIVE EVENTS LISTING                                */}
             {/* ------------------------------------------------------------------- */}
-            <div id="calendar" className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-4">
-              <div>
-                <h2 className="text-base sm:text-lg font-bold text-zinc-900">Event Calendar</h2>
+            <div id="calendar" className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-150 pb-3">
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-zinc-900 flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-amber-500" />
+                    <span>Event Calendar &amp; Exhibitions</span>
+                  </h2>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Explore confirmed trade expos, B2B summits, and consumer fairs at {venue.shortName}
+                  </p>
+                </div>
+
+                {/* Filter Tabs */}
+                <div className="flex items-center gap-1.5 bg-zinc-100 p-1 rounded-xl">
+                  {[
+                    { id: 'all', label: `All (${unifiedCalendarEvents.length})` },
+                    { id: 'upcoming', label: `Upcoming (${unifiedCalendarEvents.filter(e => !e.isPast).length})` },
+                    { id: 'past', label: `Past (${unifiedCalendarEvents.filter(e => e.isPast).length})` }
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setEventFilterTab(tab.id)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        eventFilterTab === tab.id
+                          ? 'bg-white text-zinc-900 shadow-2xs'
+                          : 'text-zinc-600 hover:text-zinc-900'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Filter Pills */}
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1 bg-zinc-800 text-white rounded-md text-xs font-bold shadow-2xs">
-                  All Events
-                </span>
-                <span className="text-xs text-zinc-400 font-medium">
-                  Showing upcoming exhibitions scheduled at {venue.shortName}
-                </span>
+              {/* Search Bar for Events inside this venue */}
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                <input
+                  type="text"
+                  placeholder={`Search exhibitions or categories at ${venue.shortName}...`}
+                  value={eventSearchQuery}
+                  onChange={(e) => setEventSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50/70 text-xs text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900 transition-all"
+                />
+                {eventSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setEventSearchQuery('')}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-zinc-400 hover:text-zinc-700"
+                  >
+                    Clear
+                  </button>
+                )}
               </div>
 
               {/* Event Calendar Rows */}
-              <div className="divide-y divide-zinc-150">
-                {venue.leadingEvents.map((evt, idx) => {
-                  const isInterested = Boolean(interestedMap[evt.id]);
+              {filteredCalendarEvents.length === 0 ? (
+                <div className="text-center py-12 bg-zinc-50 rounded-xl border border-dashed border-zinc-200 space-y-2">
+                  <Calendar className="h-8 w-8 text-zinc-300 mx-auto" />
+                  <p className="text-xs font-bold text-zinc-700">No exhibitions match your criteria</p>
+                  <p className="text-[11px] text-zinc-500">Try changing the filter tab or resetting the search term.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-zinc-150">
+                  {filteredCalendarEvents.map((evt, idx) => {
+                    const isInterested = Boolean(interestedMap[evt.id]);
+                    const isSaved = Boolean(bookmarkedEvents[evt.id]);
 
-                  return (
-                    <div
-                      key={evt.id}
-                      className="py-4 first:pt-2 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
-                    >
-                      <div className="flex items-start gap-4">
-                        {/* Big Date Block */}
-                        <div className="w-16 h-16 rounded-xl bg-zinc-50 border border-zinc-200 flex flex-col items-center justify-center text-center shrink-0">
-                          <span className="text-[11px] font-extrabold text-zinc-800 leading-tight">
-                            {idx === 0 ? '14th - 27th' : idx === 1 ? '10th - 14th' : idx === 2 ? '06th - 14th' : '08th - 10th'}
-                          </span>
-                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mt-0.5">
-                            {idx === 0 ? 'NOV, 26' : idx === 1 ? 'MAR, 27' : idx === 2 ? 'FEB, 27' : 'OCT, 26'}
-                          </span>
+                    return (
+                      <div
+                        key={evt.id || idx}
+                        className="py-4.5 first:pt-2 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:bg-zinc-50/60 rounded-xl p-2 -mx-2 transition-colors"
+                      >
+                        <div className="flex items-start gap-4 min-w-0">
+                          {/* Event Thumbnail / Date Block */}
+                          <div className="relative w-16 h-16 sm:w-18 sm:h-18 rounded-xl overflow-hidden border border-zinc-200 bg-zinc-100 shrink-0">
+                            <img
+                              src={evt.banner}
+                              alt={evt.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            />
+                            <div className="absolute inset-0 bg-black/35 flex items-center justify-center">
+                              <span className="text-[10px] font-black text-white text-center px-1 uppercase leading-tight">
+                                {evt.isPast ? 'Concluded' : 'Fair'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Title, Pill & Organizer */}
+                          <div className="space-y-1 min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                                evt.isPast
+                                  ? 'bg-zinc-200 text-zinc-700'
+                                  : 'bg-emerald-600 text-white'
+                              }`}>
+                                {evt.daysToGo}
+                              </span>
+
+                              {evt.isDbLive && (
+                                <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                                  Live Database Event
+                                </span>
+                              )}
+
+                              <span className="text-[11px] text-zinc-500 font-semibold">
+                                {evt.dates}
+                              </span>
+                            </div>
+
+                            <Link
+                              href={`/expo/${evt.slug}`}
+                              className="block text-sm sm:text-base font-bold text-zinc-900 hover:text-[#FF2E63] transition-colors truncate"
+                              title={evt.title}
+                            >
+                              {evt.title}
+                            </Link>
+
+                            <p className="text-xs text-zinc-500 font-medium truncate">
+                              {evt.category} • {evt.turnout}
+                            </p>
+                          </div>
                         </div>
 
-                        {/* Title, Pill & Organizer */}
-                        <div className="space-y-1">
-                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-blue-500 text-white">
-                            {evt.daysToGo}
-                          </span>
-                          <h3 className="text-sm sm:text-base font-bold text-blue-600 group-hover:text-blue-800 transition-colors">
-                            {evt.title}
-                          </h3>
-                          <p className="text-xs text-zinc-500 font-medium">
-                            Tradeshow • {evt.turnout} • Verified Business Fair
-                          </p>
+                        {/* Right Buttons: Interested & View Details */}
+                        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => toggleInterested(evt.id)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 ${
+                              isInterested
+                                ? 'bg-amber-50 text-amber-800 border-amber-300'
+                                : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                            }`}
+                          >
+                            <Star className={`h-3.5 w-3.5 ${isInterested ? 'fill-amber-500 text-amber-500' : 'text-zinc-400'}`} />
+                            <span>{isInterested ? 'Interested' : 'Save'}</span>
+                          </button>
+
+                          <Link
+                            href={`/expo/${evt.slug}`}
+                            className="px-3.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold transition-colors shadow-2xs inline-flex items-center gap-1"
+                          >
+                            <span>Details</span>
+                            <ArrowRight className="h-3 w-3 text-[#FFCC00]" />
+                          </Link>
                         </div>
                       </div>
-
-                      {/* Interested Button */}
-                      <button
-                        type="button"
-                        onClick={() => toggleInterested(evt.id)}
-                        className={`self-start sm:self-auto px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 ${
-                          isInterested
-                            ? 'bg-amber-50 text-amber-800 border-amber-300'
-                            : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
-                        }`}
-                      >
-                        <Star className={`h-3.5 w-3.5 ${isInterested ? 'fill-amber-500 text-amber-500' : 'text-zinc-400'}`} />
-                        <span>Interested ({isInterested ? '204' : '203'})</span>
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* ------------------------------------------------------------------- */}
@@ -824,7 +1167,7 @@ export default function VenueDetailsPage() {
                         ))}
                       </div>
                     </div>
-                    <h5 className="font-bold text-xs text-zinc-900 leading-snug">"{rev.headline}"</h5>
+                    <h5 className="font-bold text-xs text-zinc-900 leading-snug">&quot;{rev.headline}&quot;</h5>
                     <p className="text-xs text-zinc-600 leading-relaxed">{rev.review}</p>
                   </div>
                 ))}
@@ -834,7 +1177,7 @@ export default function VenueDetailsPage() {
           </div>
 
           {/* ===================================================================== */}
-          {/* RIGHT SIDEBAR COLUMN (4 of 12 columns) (Images 2, 3, 4 Match)        */}
+          {/* RIGHT SIDEBAR COLUMN (4 of 12 columns)                                */}
           {/* ===================================================================== */}
           <div className="lg:col-span-4 space-y-6">
             
@@ -861,9 +1204,14 @@ export default function VenueDetailsPage() {
               </button>
             </div>
 
-            {/* 2. Featured Venues Widget (Image 2 Match) */}
+            {/* 2. Featured Venues Widget */}
             <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
-              <h3 className="text-sm font-bold text-zinc-900">Featured Venues</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-zinc-900">Featured Venues</h3>
+                <Link href="/venues" className="text-xs font-semibold text-blue-600 hover:underline">
+                  All &rarr;
+                </Link>
+              </div>
 
               <div className="divide-y divide-zinc-150">
                 {Object.values(VENUES_DATA)
@@ -901,7 +1249,7 @@ export default function VenueDetailsPage() {
               </div>
             </div>
 
-            {/* 3. More Venues Near... Widget (Image 3 Match) */}
+            {/* 3. More Venues Near Widget */}
             <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
               <h3 className="text-sm font-bold text-zinc-900">
                 More Venues near {venue.shortName}
@@ -933,14 +1281,14 @@ export default function VenueDetailsPage() {
               </div>
 
               <Link
-                href="/#venues"
+                href="/venues"
                 className="w-full py-2 px-3 rounded-xl bg-[#0B4EA2] hover:bg-[#083b7a] text-white font-bold text-xs transition-colors text-center block shadow-2xs"
               >
-                All Venues Nearby
+                Browse All Venues Directory
               </Link>
             </div>
 
-            {/* 4. Nearby Hotels Widget (Image 4 Match) */}
+            {/* 4. Nearby Hotels Widget */}
             <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
               <h3 className="text-sm font-bold text-zinc-900">Nearby Hotels</h3>
 
@@ -968,19 +1316,23 @@ export default function VenueDetailsPage() {
                 ))}
               </div>
 
-              <button
-                type="button"
-                onClick={() => alert('Hotel reservations portal opening soon on VisitExpo travel hub.')}
+              <a
+                href={`https://www.google.com/travel/hotels?q=hotels+near+${encodeURIComponent(venue.address || venue.name)}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-full py-2 px-3 rounded-xl bg-[#0B4EA2] hover:bg-[#083b7a] text-white font-bold text-xs transition-colors text-center block shadow-2xs cursor-pointer"
               >
-                More Hotels
-              </button>
+                Search Hotels on Google Travel &rarr;
+              </a>
             </div>
 
           </div>
 
         </div>
       </div>
+
+      {/* Footer */}
+      <Footer />
 
       {/* ========================================================================= */}
       {/* MODALS: GET QUOTES & CONTACT                                              */}

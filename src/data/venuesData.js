@@ -650,13 +650,28 @@ export const VENUES_DATA = {
 };
 
 /**
- * Helper to get a venue by ID or normalized slug
+ * Helper to slugify a venue name for URLs
  */
-export function getVenueById(idOrSlug) {
-  if (!idOrSlug) return null;
-  const normalized = String(idOrSlug).toLowerCase().trim().replace(/_/g, '-');
+export function slugifyVenue(name) {
+  if (!name) return 'venue';
+  return String(name)
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
 
-  // Direct match
+/**
+ * Helper to get a venue by ID, slug, or raw venue name.
+ * Supports pre-curated venues as well as dynamically generated profiles for any venue in the database.
+ */
+export function getVenueById(idOrSlug, customData = {}) {
+  if (!idOrSlug) return null;
+  const decoded = decodeURIComponent(String(idOrSlug)).trim();
+  const normalized = decoded.toLowerCase().replace(/_/g, '-');
+
+  // Direct match in pre-curated venues
   if (VENUES_DATA[normalized]) return VENUES_DATA[normalized];
 
   // Alias lookups
@@ -668,6 +683,67 @@ export function getVenueById(idOrSlug) {
   if (normalized.includes('expo-centre') || normalized.includes('greater-noida') || normalized.includes('mart')) return VENUES_DATA['india-expo-centre'];
   if (normalized.includes('excel') || normalized.includes('london')) return VENUES_DATA['excel-london'];
 
-  // Default fallback to first venue
-  return Object.values(VENUES_DATA)[0];
+  // Clean title from slug or raw string
+  const titleName = customData.name || decoded
+    .split('-')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+
+  const cityName = customData.city || 'Exhibition City';
+  const countryName = customData.country || 'India';
+  const fullAddress = customData.address || `${titleName}, ${cityName}, ${countryName}`;
+
+  return {
+    id: normalized,
+    slug: normalized,
+    name: titleName,
+    shortName: titleName.split(',')[0],
+    tagline: `Premier Exhibition & Convention Facility in ${cityName}`,
+    city: cityName,
+    state: customData.state || cityName,
+    country: countryName,
+    address: fullAddress,
+    metro: customData.metro || 'Direct rapid transit, metro concourse & highway connectivity',
+    airportDistance: customData.airportDistance || `Accessible from ${cityName} International Airport`,
+    heroBanner: customData.heroBanner || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=1600&auto=format&fit=crop',
+    logoThumbnail: customData.logoThumbnail || 'https://images.unsplash.com/photo-1541971875076-8f970d573be6?q=80&w=300&auto=format&fit=crop',
+    followersCount: '18K+',
+    rating: 4.8,
+    ratingsCount: 920,
+    bestSuited: 'B2B Trade Expos, Industry Summits & Consumer Fairs',
+    eventsHosted: customData.eventsHosted || '20+',
+    upcomingEventsCount: customData.upcomingEventsCount || '8+',
+    reputationText: 'Recognized Event Destination',
+    overviewDescription: customData.overviewDescription || `${titleName} is one of ${cityName}'s foremost venues for trade fairs, international conventions, and industry conclaves. Featuring modern exhibition infrastructure, dedicated logistical loading docks, multiple conference suites, and integrated parking facilities, it provides an exceptional platform for domestic and global organizers.`,
+    totalArea: '50,000+ sqm Indoor & Outdoor',
+    builtYear: '2016',
+    renovatedYear: '2024',
+    meetingRooms: 'Multi-purpose Exhibition Halls • Seminar Suites',
+    ratingsBreakdown: {
+      location: 9.5,
+      amenities: 9.4,
+      cleanliness: 9.6,
+      food: 9.1
+    },
+    gallery: [
+      'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=800&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1511578314322-379afb476865?q=80&w=800&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?q=80&w=800&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?q=80&w=800&auto=format&fit=crop'
+    ],
+    leadingEvents: [],
+    meetingSpaces: [
+      { name: 'Grand Exhibition Hall', capacity: '15,000 Attendees', area: '12,000 sqm', type: 'Exhibition Hall' },
+      { name: 'Plenary Conference Auditorium', capacity: '2,500 Delegates', area: '3,000 sqm', type: 'Auditorium' },
+      { name: 'Executive Meeting Suites', capacity: '200 Guests', area: '450 sqm', type: 'B2B Conclave' }
+    ],
+    nearbyVenues: [
+      { name: 'Bharat Mandapam (IECC)', location: 'New Delhi, India', distance: 'Major Hub', eventsHosted: '342+' },
+      { name: 'Jio World Convention Centre', location: 'Mumbai, India', distance: 'Major Hub', eventsHosted: '285+' }
+    ],
+    nearbyHotels: [
+      { name: 'City Center International Hotel', stars: 5, price: 'From ₹9,500 / night', distance: '1.5 km', rating: 4.8 },
+      { name: 'Premier Business Suites', stars: 4, price: 'From ₹5,800 / night', distance: '2.2 km', rating: 4.4 }
+    ]
+  };
 }

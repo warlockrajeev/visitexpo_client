@@ -25,6 +25,7 @@ import Navbar from '../../../components/Navbar.js';
 import Footer from '../../../components/Footer.js';
 import GatedAuthModal from '../../../components/GatedAuthModal.js';
 import InterestedAttendeesModal from '../../../components/InterestedAttendeesModal.js';
+import { slugifyVenue } from '../../../data/venuesData.js';
 import {
   Calendar,
   MapPin,
@@ -823,14 +824,19 @@ export default function ExpoDetailsPage() {
 
                 {/* Authentic WordPress Location & Venue Display */}
                 <div className="flex items-center gap-2 text-xs text-zinc-600 flex-wrap pt-0.5">
-                  <div className="inline-flex items-center gap-1.5 font-extrabold text-zinc-900 bg-zinc-100 px-2.5 py-1 rounded-lg border border-zinc-200 shadow-2xs">
+                  <Link
+                    href={`/venue/${slugifyVenue(event?.venue || event?.city || 'venue')}`}
+                    className="inline-flex items-center gap-1.5 font-extrabold text-zinc-900 bg-zinc-100 hover:bg-zinc-200 hover:text-[#FF2E63] px-2.5 py-1 rounded-lg border border-zinc-200 shadow-2xs transition-colors cursor-pointer group/vlink"
+                    title="View venue profile and exhibition calendar"
+                  >
                     <MapPin className="h-3.5 w-3.5 text-[#FF2E63] shrink-0" />
                     <span>
                       {event?.venue && event?.venue.toLowerCase() !== event?.city?.toLowerCase() && event?.venue.toLowerCase() !== 'exhibition center'
                         ? event.venue
                         : (event?.city ? `${event.city}${event.state && event.state !== event.city ? `, ${event.state}` : ''}` : 'Exhibition Location')}
                     </span>
-                  </div>
+                    <ArrowRight className="h-2.5 w-2.5 opacity-0 -ml-1 group-hover/vlink:opacity-100 group-hover/vlink:ml-0 transition-all text-[#FF2E63]" />
+                  </Link>
                   <span className="font-semibold text-zinc-700">
                     {event?.venue && event?.venue.toLowerCase() !== event?.city?.toLowerCase() && event?.venue.toLowerCase() !== 'exhibition center'
                       ? `${event.city}${event.country && event.country !== event.city ? `, ${event.country}` : ''}`
@@ -1489,10 +1495,19 @@ export default function ExpoDetailsPage() {
                 <div className="space-y-3">
                   {/* Venue Name & City Badge */}
                   <div className="space-y-1">
-                    <div className="text-base sm:text-lg font-black text-zinc-900 leading-snug">
-                      {event?.venue && event?.venue.toLowerCase() !== event?.city?.toLowerCase() && event?.venue.toLowerCase() !== 'exhibition center'
-                        ? event.venue
-                        : `${event?.city || 'Exhibition Facility'}${event?.state && event?.state !== event?.city ? `, ${event.state}` : ''}`}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="text-base sm:text-lg font-black text-zinc-900 leading-snug">
+                        {event?.venue && event?.venue.toLowerCase() !== event?.city?.toLowerCase() && event?.venue.toLowerCase() !== 'exhibition center'
+                          ? event.venue
+                          : `${event?.city || 'Exhibition Facility'}${event?.state && event?.state !== event?.city ? `, ${event.state}` : ''}`}
+                      </div>
+                      <Link
+                        href={`/venue/${slugifyVenue(event?.venue || event?.city || 'venue')}`}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline shrink-0"
+                      >
+                        <span>View Venue Profile</span>
+                        <ArrowRight className="h-3 w-3" />
+                      </Link>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 pt-0.5">
                       <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-zinc-100 text-zinc-800 border border-zinc-200">
