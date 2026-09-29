@@ -13,7 +13,7 @@
  * score breakdown tooltips, and one-click visitor pass registration.
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
@@ -102,9 +102,39 @@ export default function RecommendationEngineSection({
   const router = useRouter();
   const { user } = useAuth();
 
-  // State
-  const [selectedLocations, setSelectedLocations] = useState([]);
-  const [selectedInterests, setSelectedInterests] = useState([]);
+  // State with lazy initializers (run once on mount, no re-render loops)
+  const [selectedLocations, setSelectedLocations] = useState(() => {
+    if (defaultLocation) return [defaultLocation];
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('visitexpo_user_preferences');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed.locations) && parsed.locations.length > 0) {
+            return parsed.locations;
+          }
+        }
+      } catch (err) {}
+    }
+    return ['New Delhi'];
+  });
+
+  const [selectedInterests, setSelectedInterests] = useState(() => {
+    if (Array.isArray(defaultInterests) && defaultInterests.length > 0) return defaultInterests;
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('visitexpo_user_preferences');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed.interests) && parsed.interests.length > 0) {
+            return parsed.interests;
+          }
+        }
+      } catch (err) {}
+    }
+    return ['Technology'];
+  });
+
   const [userCoords, setUserCoords] = useState(null);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [detectedCityName, setDetectedCityName] = useState('');
@@ -116,55 +146,28 @@ export default function RecommendationEngineSection({
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [activeScoreTooltip, setActiveScoreTooltip] = useState(null);
 
-  // Initialize preferences from user profile or localStorage on mount
+  // Sync user preferences once when user logs in
+  const userSyncedRef = useRef(false);
   useEffect(() => {
-    let initialLocs = [];
-    let initialInts = [];
-
-    if (defaultLocation) {
-      initialLocs.push(defaultLocation);
-    }
-    if (defaultInterests && defaultInterests.length > 0) {
-      initialInts.push(...defaultInterests);
-    }
-
-    // Check user profile
-    if (user) {
+    if (user && !userSyncedRef.current) {
+      userSyncedRef.current = true;
       if (Array.isArray(user.preferredLocations) && user.preferredLocations.length > 0) {
-        initialLocs = [...user.preferredLocations];
-      } else if (user.city && initialLocs.length === 0) {
-        initialLocs = [user.city];
+        setSelectedLocations(user.preferredLocations);
+      } else if (user.city) {
+        setSelectedLocations([user.city]);
       }
-
       if (Array.isArray(user.interests) && user.interests.length > 0) {
-        initialInts = [...user.interests];
-      }
-    } else if (typeof window !== 'undefined') {
-      try {
-        const cached = localStorage.getItem('visitexpo_user_preferences');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (parsed.locations && initialLocs.length === 0) initialLocs = parsed.locations;
-          if (parsed.interests && initialInts.length === 0) initialInts = parsed.interests;
-        }
-      } catch (err) {
-        // Ignore JSON error
+        setSelectedInterests(user.interests);
       }
     }
+  }, [user]);
 
-    // Default to Technology & Healthcare and Delhi NCR if empty
-    if (initialInts.length === 0) {
-      initialInts = ['Technology'];
-    }
-    if (initialLocs.length === 0) {
-      initialLocs = ['New Delhi'];
-    }
+  // Primitive cache keys to prevent infinite re-render cycles
+  const locationsKey = selectedLocations.join(',');
+  const interestsKey = selectedInterests.join(',');
+  const coordsKey = userCoords ? `${userCoords.lat},${userCoords.lng}` : '';
 
-    setSelectedLocations(initialLocs);
-    setSelectedInterests(initialInts);
-  }, [user, defaultLocation, defaultInterests]);
-
-  // Fetch recommendations from backend
+  // Core fetch function
   const fetchRecommendations = useCallback(async () => {
     setLoading(true);
     try {
@@ -197,15 +200,54 @@ export default function RecommendationEngineSection({
     } finally {
       setLoading(false);
     }
-  }, [selectedLocations, selectedInterests, userCoords, timeframe, limit]);
+  }, [locationsKey, interestsKey, coordsKey, timeframe, limit]);
 
-  // Auto-fetch when filters change
+  // Auto-fetch when primitive filter keys change (debounced, cancelable)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchRecommendations();
+    let isCancelled = false;
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (selectedLocations.length > 0 && !selectedLocations.includes('all')) {
+          params.append('location', selectedLocations.join(','));
+        }
+        if (selectedInterests.length > 0) {
+          params.append('interests', selectedInterests.join(','));
+        }
+        if (userCoords?.lat && userCoords?.lng) {
+          params.append('lat', userCoords.lat);
+          params.append('lng', userCoords.lng);
+        }
+        if (timeframe) {
+          params.append('timeframe', timeframe);
+        }
+        params.append('limit', limit.toString());
+
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+        const res = await axios.get(`${API_URL}/events/recommendations?${params.toString()}`, { headers });
+        if (!isCancelled && res.data && res.data.success) {
+          setEvents(res.data.data || []);
+          setCriteria(res.data.criteria || null);
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          console.warn('[RecommendationEngine] Failed to fetch recommendations:', err.message);
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      }
     }, 150);
-    return () => clearTimeout(timer);
-  }, [fetchRecommendations]);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [locationsKey, interestsKey, coordsKey, timeframe, limit]);
 
   // Handle GPS location detection
   const handleDetectLocation = async () => {

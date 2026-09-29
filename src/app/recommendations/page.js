@@ -12,7 +12,7 @@
  * Theme: VisitExpo Yellow (#FFCC00), Pink (#FF2E63), and Clean Modern Slate.
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar.js';
 import Footer from '@/components/Footer.js';
@@ -85,9 +85,33 @@ const DEFAULT_BANNER = 'https://visitexpo.in/wp-content/uploads/2026/08/ET-TECH-
 export default function RecommendationsPage() {
   const { user } = useAuth();
 
-  // Filters & State
-  const [selectedLocations, setSelectedLocations] = useState([]);
-  const [selectedInterests, setSelectedInterests] = useState([]);
+  // Filters & State with lazy initializers
+  const [selectedLocations, setSelectedLocations] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('visitexpo_user_preferences');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed.locations) && parsed.locations.length > 0) return parsed.locations;
+        }
+      } catch (err) {}
+    }
+    return ['New Delhi'];
+  });
+
+  const [selectedInterests, setSelectedInterests] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('visitexpo_user_preferences');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed.interests) && parsed.interests.length > 0) return parsed.interests;
+        }
+      } catch (err) {}
+    }
+    return ['Technology'];
+  });
+
   const [userCoords, setUserCoords] = useState(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectedCity, setDetectedCity] = useState('');
@@ -103,37 +127,26 @@ export default function RecommendationsPage() {
   const [activeTooltipId, setActiveTooltipId] = useState(null);
   const [shareToast, setShareToast] = useState(false);
 
-  // Initialize from user or local cache
+  // Sync user profile once when user logs in
+  const userSyncedRef = useRef(false);
   useEffect(() => {
-    let locs = [];
-    let ints = [];
-
-    if (user) {
+    if (user && !userSyncedRef.current) {
+      userSyncedRef.current = true;
       if (Array.isArray(user.preferredLocations) && user.preferredLocations.length > 0) {
-        locs = [...user.preferredLocations];
+        setSelectedLocations(user.preferredLocations);
       } else if (user.city) {
-        locs = [user.city];
+        setSelectedLocations([user.city]);
       }
       if (Array.isArray(user.interests) && user.interests.length > 0) {
-        ints = [...user.interests];
+        setSelectedInterests(user.interests);
       }
-    } else if (typeof window !== 'undefined') {
-      try {
-        const cached = localStorage.getItem('visitexpo_user_preferences');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (parsed.locations) locs = parsed.locations;
-          if (parsed.interests) ints = parsed.interests;
-        }
-      } catch (err) {}
     }
-
-    if (ints.length === 0) ints = ['Technology'];
-    if (locs.length === 0) locs = ['New Delhi'];
-
-    setSelectedLocations(locs);
-    setSelectedInterests(ints);
   }, [user]);
+
+  // Primitive cache keys to prevent infinite re-render cycles
+  const locationsKey = selectedLocations.join(',');
+  const interestsKey = selectedInterests.join(',');
+  const coordsKey = userCoords ? `${userCoords.lat},${userCoords.lng}` : '';
 
   // Fetch recommendations
   const fetchRecommendations = useCallback(async () => {
@@ -168,14 +181,53 @@ export default function RecommendationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedLocations, selectedInterests, userCoords, timeframe]);
+  }, [locationsKey, interestsKey, coordsKey, timeframe]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchRecommendations();
+    let isCancelled = false;
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (selectedLocations.length > 0 && !selectedLocations.includes('all')) {
+          params.append('location', selectedLocations.join(','));
+        }
+        if (selectedInterests.length > 0) {
+          params.append('interests', selectedInterests.join(','));
+        }
+        if (userCoords?.lat && userCoords?.lng) {
+          params.append('lat', userCoords.lat);
+          params.append('lng', userCoords.lng);
+        }
+        if (timeframe) {
+          params.append('timeframe', timeframe);
+        }
+        params.append('limit', '24');
+
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+        const res = await axios.get(`${API_URL}/events/recommendations?${params.toString()}`, { headers });
+        if (!isCancelled && res.data?.success) {
+          setEvents(res.data.data || []);
+          setCriteria(res.data.criteria || null);
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          console.warn('[RecommendationsPage] Error:', err.message);
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      }
     }, 150);
-    return () => clearTimeout(timer);
-  }, [fetchRecommendations]);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [locationsKey, interestsKey, coordsKey, timeframe]);
 
   // Geolocation
   const handleDetectGPS = async () => {
