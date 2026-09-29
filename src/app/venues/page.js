@@ -40,14 +40,14 @@ export default function VenuesDirectoryPage() {
   const [apiVenues, setApiVenues] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch backend aggregated venues
+  // Fetch backend venues with custom images & media
   useEffect(() => {
     let isMounted = true;
     const fetchVenues = async () => {
       try {
-        const res = await axios.get(`${API_URL}/events/venues`);
-        if (isMounted && res.data?.success && Array.isArray(res.data.venues)) {
-          setApiVenues(res.data.venues);
+        const res = await axios.get(`${API_URL}/venues`);
+        if (isMounted && res.data?.success && Array.isArray(res.data.data)) {
+          setApiVenues(res.data.data);
         }
       } catch (err) {
         console.warn('Using curated venue data pool:', err);
@@ -59,37 +59,51 @@ export default function VenuesDirectoryPage() {
     return () => { isMounted = false; };
   }, []);
 
-  // Merge pre-curated venues with any dynamic venues from backend
+  // Merge pre-curated venues with database-saved custom images and new venues
   const allVenues = useMemo(() => {
-    const list = Object.values(VENUES_DATA);
+    const list = Object.values(VENUES_DATA).map((v) => ({ ...v }));
     
-    // Add additional venues from database if not already present
     if (Array.isArray(apiVenues)) {
       apiVenues.forEach((v) => {
-        const norm = (v.venueName || '').toLowerCase();
-        const exists = list.some(
-          curated =>
-            curated.name.toLowerCase().includes(norm) ||
-            norm.includes(curated.shortName.toLowerCase()) ||
-            curated.slug === slugifyVenue(v.venueName)
+        const norm = (v.name || v.venueName || '').toLowerCase();
+        const vSlug = v.slug || slugifyVenue(v.name || v.venueName || '');
+        
+        const existingIdx = list.findIndex(
+          (curated) =>
+            curated.slug === vSlug ||
+            curated.name.toLowerCase() === norm ||
+            (v.shortName && curated.shortName.toLowerCase() === v.shortName.toLowerCase())
         );
-        if (!exists && v.venueName && v.venueName.length > 3) {
+
+        if (existingIdx !== -1) {
+          // Merge custom database images and specs over curated defaults
+          list[existingIdx] = {
+            ...list[existingIdx],
+            ...v,
+            heroBanner: v.heroBanner || list[existingIdx].heroBanner,
+            logoThumbnail: v.logoThumbnail || list[existingIdx].logoThumbnail,
+            gallery: Array.isArray(v.gallery) && v.gallery.length > 0 ? v.gallery : list[existingIdx].gallery,
+            eventsHosted: v.liveTotalEvents ? `${v.liveTotalEvents}+` : (v.eventsHosted || list[existingIdx].eventsHosted),
+            upcomingEventsCount: v.liveUpcomingEvents !== undefined ? `${v.liveUpcomingEvents}+` : (v.upcomingEventsCount || list[existingIdx].upcomingEventsCount)
+          };
+        } else if ((v.name || v.venueName) && (v.name || v.venueName).length > 3) {
           list.push({
-            id: slugifyVenue(v.venueName),
-            slug: slugifyVenue(v.venueName),
-            name: v.venueName,
-            shortName: v.venueName.split(',')[0],
-            tagline: `Convention & Exhibition Center in ${v.city || 'India'}`,
+            id: vSlug,
+            slug: vSlug,
+            name: v.name || v.venueName,
+            shortName: v.shortName || (v.name || v.venueName).split(',')[0],
+            tagline: v.tagline || `Convention & Exhibition Center in ${v.city || 'India'}`,
             city: v.city || 'India',
             country: v.country || 'India',
-            address: `${v.venueName}, ${v.city || ''}, ${v.country || 'India'}`,
-            metro: 'Rapid transit & arterial highway access',
-            heroBanner: v.sampleEventImage || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=1600&auto=format&fit=crop',
-            rating: 4.8,
-            eventsHosted: `${v.totalEvents || 1}+`,
-            upcomingEventsCount: `${v.upcomingEvents || 0}+`,
-            totalArea: '40,000+ sqm Indoor Space',
-            reputationText: 'Recognized Venue'
+            address: v.address || `${v.name || v.venueName}, ${v.city || ''}, ${v.country || 'India'}`,
+            metro: v.metro || 'Rapid transit & highway connectivity',
+            heroBanner: v.heroBanner || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=1600&auto=format&fit=crop',
+            logoThumbnail: v.logoThumbnail || 'https://images.unsplash.com/photo-1541971875076-8f970d573be6?q=80&w=300&auto=format&fit=crop',
+            rating: v.rating || 4.8,
+            eventsHosted: v.liveTotalEvents ? `${v.liveTotalEvents}+` : (v.eventsHosted || '10+'),
+            upcomingEventsCount: v.liveUpcomingEvents !== undefined ? `${v.liveUpcomingEvents}+` : (v.upcomingEventsCount || '4+'),
+            totalArea: v.totalArea || '40,000+ sqm Indoor Space',
+            reputationText: v.reputationText || 'Recognized Venue'
           });
         }
       });

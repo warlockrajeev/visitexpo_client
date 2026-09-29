@@ -68,10 +68,40 @@ export default function VenueDetailsPage() {
   const router = useRouter();
   const venueId = params?.id || 'bharat-mandapam';
 
-  // Load venue data (curated or dynamic fallback)
-  const venue = useMemo(() => {
-    return getVenueById(venueId) || getVenueById('bharat-mandapam');
+  const [dbVenue, setDbVenue] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchVenueProfile = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/venues/${venueId}`);
+        if (isMounted && res.data?.success && res.data?.data) {
+          setDbVenue(res.data.data);
+        }
+      } catch (err) {
+        // use curated fallback data
+      }
+    };
+    fetchVenueProfile();
+    return () => {
+      isMounted = false;
+    };
   }, [venueId]);
+
+  // Load venue data (curated or dynamic fallback merged with database-saved custom images and specs)
+  const venue = useMemo(() => {
+    const base = getVenueById(venueId) || getVenueById('bharat-mandapam');
+    if (!dbVenue) return base;
+    return {
+      ...base,
+      ...dbVenue,
+      heroBanner: dbVenue.heroBanner || base.heroBanner,
+      logoThumbnail: dbVenue.logoThumbnail || base.logoThumbnail,
+      gallery: Array.isArray(dbVenue.gallery) && dbVenue.gallery.length > 0 ? dbVenue.gallery : base.gallery,
+      address: dbVenue.address || base.address,
+      metro: dbVenue.metro || base.metro
+    };
+  }, [venueId, dbVenue]);
 
   // Live database events state
   const [allDbEvents, setAllDbEvents] = useState([]);
