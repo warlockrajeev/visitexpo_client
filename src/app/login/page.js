@@ -342,6 +342,7 @@ export default function LoginPage() {
     setFormError('');
     setGoogleSubmitting(true);
     try {
+      googleProvider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, googleProvider);
       const fbUser = result.user;
       const idToken = await fbUser.getIdToken();

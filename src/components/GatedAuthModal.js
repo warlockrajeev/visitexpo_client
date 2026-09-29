@@ -132,6 +132,7 @@ export default function GatedAuthModal({ isOpen, onClose, context, onSuccess }) 
     setError('');
     setGoogleLoading(true);
     try {
+      googleProvider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, googleProvider);
       const fbUser = result.user;
       const idToken = await fbUser.getIdToken();

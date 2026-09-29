@@ -19,6 +19,11 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
+// Always display Google Account Chooser (profile selection) on every login attempt
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
+
 // Initialize analytics only on client-side
 let analytics = null;
 if (typeof window !== 'undefined') {
