@@ -67,7 +67,8 @@ import {
   Award,
   Mic,
   Megaphone,
-  Navigation
+  Navigation,
+  Sparkles
 } from 'lucide-react';
 
 const API_URL =
@@ -275,6 +276,37 @@ export default function ExpoDetailsPage() {
     };
     fetchEventReviews();
   }, [slug]);
+
+  // Recommended & Similar Events via Recommendation Engine
+  const [recommendedEvents, setRecommendedEvents] = useState([]);
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+
+  useEffect(() => {
+    if (!event) return;
+    const fetchRelatedRecommendations = async () => {
+      setLoadingRecommendations(true);
+      try {
+        const cat = event.categories?.[0] || event.category || '';
+        const city = event.city || '';
+        const res = await axios.get(
+          `${API_URL}/events/recommendations?location=${encodeURIComponent(city)}&interests=${encodeURIComponent(cat)}&limit=6`
+        );
+        if (res.data?.success && Array.isArray(res.data?.data)) {
+          const currentIdentifier = String(event.slug || event.id || event._id || slug).toLowerCase();
+          const filtered = res.data.data.filter((e) => {
+            const eSlug = String(e.slug || e.id || e._id || '').toLowerCase();
+            return eSlug !== currentIdentifier;
+          });
+          setRecommendedEvents(filtered.slice(0, 4));
+        }
+      } catch (err) {
+        console.warn('Could not load recommended events:', err);
+      } finally {
+        setLoadingRecommendations(false);
+      }
+    };
+    fetchRelatedRecommendations();
+  }, [event, slug]);
 
   // FAQ Accordion State
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
@@ -2418,6 +2450,102 @@ export default function ExpoDetailsPage() {
               </div>
             </div>
           )}
+
+          {/* ------------------------------------------------------------------- */}
+          {/* RECOMMENDED & SIMILAR TRADE SHOWS (POWERED BY RECOMMENDATION ENGINE) */}
+          {/* ------------------------------------------------------------------- */}
+          <div className="pt-8 border-t border-zinc-200/80 space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 mb-1">
+                  <Sparkles className="h-3 w-3 text-amber-500 fill-amber-500" />
+                  <span>Recommendation Engine</span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-extrabold text-zinc-900 tracking-tight">
+                  Similar &amp; Recommended Exhibitions
+                </h3>
+                <p className="text-xs text-zinc-500">
+                  Curated expos in {event?.city || 'India'} matching {event?.categories?.[0] || event?.category || 'this sector'}.
+                </p>
+              </div>
+              <Link
+                href="/recommendations"
+                className="text-xs font-bold text-[#FF2E63] hover:underline flex items-center gap-1"
+              >
+                <span>Explore More</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+
+            {loadingRecommendations ? (
+              <div className="grid sm:grid-cols-2 gap-4">
+                {[1, 2].map((sk) => (
+                  <div key={sk} className="h-44 bg-zinc-100 rounded-2xl animate-pulse" />
+                ))}
+              </div>
+            ) : recommendedEvents.length > 0 ? (
+              <div className="grid sm:grid-cols-2 gap-4">
+                {recommendedEvents.map((rec) => (
+                  <div
+                    key={rec._id || rec.id || rec.slug}
+                    className="group bg-white border border-zinc-200 rounded-2xl p-4 flex flex-col justify-between hover:border-zinc-300 hover:shadow-md transition-all space-y-3"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-[10px] font-extrabold text-zinc-700 bg-zinc-100 px-2.5 py-0.5 rounded-md truncate max-w-[60%]">
+                          {rec.categories?.[0] || rec.category || 'Exhibition'}
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-2 py-0.5 rounded-full shadow-2xs">
+                          <Sparkles className="h-2.5 w-2.5" />
+                          {rec.matchScore || 88}% Match
+                        </span>
+                      </div>
+
+                      <Link
+                        href={`/expo/${rec.slug || rec.id || rec._id}`}
+                        className="font-bold text-xs sm:text-sm text-zinc-900 group-hover:text-[#FF2E63] transition-colors line-clamp-2 block leading-snug"
+                      >
+                        {rec.title}
+                      </Link>
+
+                      <div className="space-y-1 text-xs text-zinc-500">
+                        <div className="flex items-center gap-1.5 text-zinc-700 font-semibold">
+                          <Calendar className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                          <span>{rec.startDate ? new Date(rec.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Upcoming'}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 truncate">
+                          <MapPin className="h-3.5 w-3.5 text-[#FF2E63] shrink-0" />
+                          <span className="truncate">{rec.venue || rec.city}</span>
+                        </div>
+                      </div>
+
+                      {rec.matchReasons && rec.matchReasons.length > 0 && (
+                        <div className="text-[10px] text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 font-medium">
+                          ✓ {rec.matchReasons[0]}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-3 border-t border-zinc-100 flex items-center justify-between text-xs">
+                      <Link
+                        href={`/expo/${rec.slug || rec.id || rec._id}`}
+                        className="font-bold text-zinc-700 hover:text-zinc-950"
+                      >
+                        View Details
+                      </Link>
+                      <Link
+                        href={`/expo/${rec.slug || rec.id || rec._id}`}
+                        className="font-extrabold text-[#FF2E63] hover:underline flex items-center gap-1"
+                      >
+                        <span>Get Pass</span>
+                        <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
 
           </div>
 

@@ -185,6 +185,7 @@ export default function DashboardLayout({ children }) {
   const navigation = user.role === 'visitor'
     ? [
         { name: 'My Passes & Badges', href: '/dashboard', icon: Ticket },
+        { name: 'Recommended For You', href: '/recommendations', icon: Compass, badge: 'AI Match' },
         { name: 'Browse Live Expos', href: '/expos', icon: Calendar },
         { name: 'My Profile & Settings', href: '/settings', icon: Settings },
       ]

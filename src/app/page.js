@@ -58,6 +58,7 @@ import {
 import axios from 'axios';
 import Navbar, { Logo } from '../components/Navbar.js';
 import ActionDiscoveryBanner from '../components/ActionDiscoveryBanner.js';
+import RecommendationEngineSection from '../components/RecommendationEngineSection.js';
 import AdvertiseModal from '../components/AdvertiseModal.js';
 import BrowseByCategory from '../components/BrowseByCategory.js';
 import BrowseByCity from '../components/BrowseByCity.js';
@@ -779,6 +780,11 @@ export default function LandingPage() {
 
         </div>
       </section>
+
+      {/* ========================================================================= */}
+      {/* 3.2 AI RECOMMENDATION ENGINE (LOCATION & INTEREST MATCHMAKING)            */}
+      {/* ========================================================================= */}
+      <RecommendationEngineSection />
 
       {/* ========================================================================= */}
       {/* 3.5 10TIMES BROWSE BY CATEGORY & BROWSE EVENTS BY CITY (DISCOVERY HUB)    */}

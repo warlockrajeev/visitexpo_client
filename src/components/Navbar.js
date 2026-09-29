@@ -24,7 +24,9 @@ import {
   LogOut,
   ChevronDown,
   Building,
-  ShieldCheck
+  ShieldCheck,
+  Sparkles,
+  Compass
 } from 'lucide-react';
 
 export const Logo = ({ className = "w-9 h-9" }) => (
@@ -115,6 +117,13 @@ export default function Navbar({ solid = false }) {
             className="hover:text-white transition-colors"
           >
             Explore Events
+          </Link>
+          <Link
+            href="/recommendations"
+            className="hover:text-white transition-colors flex items-center gap-1.5"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-[#FFCC00]" />
+            <span>For You</span>
           </Link>
           <Link
             href={user ? '/dashboard' : '/login?role=organizer&signup=true'}
@@ -239,6 +248,14 @@ export default function Navbar({ solid = false }) {
                         >
                           <Ticket className="h-4 w-4 text-primary" />
                           <span>My Passes &amp; Badges</span>
+                        </Link>
+                        <Link
+                          href="/recommendations"
+                          onClick={() => setProfileDropdownOpen(false)}
+                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                        >
+                          <Sparkles className="h-4 w-4 text-[#FFCC00]" />
+                          <span>Recommended For You</span>
                         </Link>
                         <Link
                           href="/expos"
@@ -387,6 +404,14 @@ export default function Navbar({ solid = false }) {
               className="hover:text-white py-1 transition-colors"
             >
               Explore Events
+            </Link>
+            <Link
+              href="/recommendations"
+              onClick={() => setMobileMenuOpen(false)}
+              className="hover:text-white py-1 transition-colors flex items-center gap-1.5"
+            >
+              <Sparkles className="h-4 w-4 text-[#FFCC00]" />
+              <span>Recommended For You</span>
             </Link>
             <Link
               href={user ? '/dashboard' : '/login?role=organizer&signup=true'}
