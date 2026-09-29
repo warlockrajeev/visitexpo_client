@@ -18,7 +18,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import {
-  Sparkles,
   MapPin,
   Calendar,
   Ticket,
@@ -379,7 +378,6 @@ export default function RecommendationEngineSection({
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 border-b border-zinc-200/80 pb-6">
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-extrabold bg-gradient-to-r from-amber-500/15 via-[#FF2E63]/15 to-purple-500/15 text-zinc-900 border border-amber-300/40 shadow-xs">
-              <Sparkles className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
               <span>AI Recommendation Engine</span>
               <span className="text-[10px] bg-zinc-900 text-white font-bold px-1.5 py-0.2 rounded-full">
                 Multi-Factor
@@ -654,7 +652,6 @@ export default function RecommendationEngineSection({
                       <div
                         className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black bg-gradient-to-r ${scoreGradient} shadow-md backdrop-blur-xs`}
                       >
-                        <Sparkles className="h-3 w-3" />
                         <span>{score}% Match</span>
                       </div>
                     </div>

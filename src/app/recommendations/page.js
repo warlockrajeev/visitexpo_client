@@ -19,7 +19,6 @@ import Footer from '@/components/Footer.js';
 import { useAuth } from '@/context/AuthContext.js';
 import axios from 'axios';
 import {
-  Sparkles,
   MapPin,
   Calendar,
   Ticket,
@@ -357,7 +356,6 @@ export default function RecommendationsPage() {
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="space-y-3 max-w-2xl">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black bg-primary/20 text-primary border border-primary/30">
-                <Sparkles className="h-3.5 w-3.5" />
                 <span>Personalized Matchmaking Engine</span>
               </div>
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white">
@@ -650,7 +648,6 @@ export default function RecommendationsPage() {
                       <div
                         className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black bg-gradient-to-r ${scoreGradient} shadow-md backdrop-blur-xs`}
                       >
-                        <Sparkles className="h-3 w-3" />
                         <span>{score}% Match</span>
                       </div>
                     </div>
