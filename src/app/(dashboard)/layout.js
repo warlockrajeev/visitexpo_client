@@ -323,7 +323,7 @@ export default function DashboardLayout({ children }) {
           >
             <span className="flex items-center gap-3">
               <Home className="h-4.5 w-4.5 text-primary" />
-              Landing Page
+              Explore Events
             </span>
             <ArrowRight className="h-3.5 w-3.5 opacity-60" />
           </Link>
@@ -395,7 +395,7 @@ export default function DashboardLayout({ children }) {
               title="Return to VisitExpo Landing Page"
             >
               <ArrowLeft className="h-3.5 w-3.5 text-primary" />
-              <span>Landing Page</span>
+              <span>Explore Events</span>
             </Link>
 
             {user?.role === 'visitor' ? (
