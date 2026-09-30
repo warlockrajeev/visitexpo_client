@@ -29,7 +29,6 @@ import {
   Mail,
   Phone,
   MapPin,
-  Sparkles,
   TrendingUp,
   Check,
   X,
@@ -1091,6 +1090,15 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
     return colors[sum % colors.length];
   };
 
+  // Filter active state for dynamic Reset button styling and contextual feedback
+  const hasActiveFilters = Boolean(
+    searchTerm.trim() ||
+    searchField !== 'all' ||
+    statusFilter !== 'all' ||
+    dateFilter ||
+    activeTab !== 'all'
+  );
+
   return (
     <div className="space-y-6 pb-16 relative">
       {/* 1. TOP HEADER SECTION */}
@@ -1124,7 +1132,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                 window.open('/expos', '_blank');
               }
             }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-medium transition-all shadow-sm cursor-pointer btn-press active:scale-95 select-none"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border transition-all shadow-2xs cursor-pointer btn-press active:scale-95 select-none"
           >
             <ExternalLink className="h-3.5 w-3.5" />
             Live Preview
@@ -1133,7 +1141,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
           {/* Add Manual Lead Button */}
           <button
             onClick={openAddLeadModal}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border transition-all shadow-2xs cursor-pointer btn-press active:scale-95 select-none"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 transition-all shadow-sm cursor-pointer btn-press active:scale-95 select-none"
           >
             <Plus className="h-3.5 w-3.5" />
             Add Lead
@@ -1142,116 +1150,127 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
       </div>
 
       {/* 2. SUB-HEADER: INTENT TABS & BATCH ACTION TOOLS ROW */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-border/80 pb-3">
+      <div className="flex flex-col 2xl:flex-row 2xl:items-center 2xl:justify-between gap-3 border-b border-border/80 pb-3">
         {/* Left: Categorized Intent Navigation Tabs */}
-        <div className="flex items-center gap-6 overflow-x-auto no-scrollbar text-sm">
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5 max-w-full">
           {/* Tab 1: All Inquiries */}
           <button
             onClick={() => setActiveTab('all')}
-            className={`relative pb-3 font-medium transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
               activeTab === 'all'
-                ? 'text-foreground font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent'
             }`}
           >
-            <Users className="h-3.5 w-3.5 text-primary" />
-            All Inquiries
-            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-secondary text-foreground font-bold">
+            <Users className="h-3.5 w-3.5" />
+            <span>All Inquiries</span>
+            <span
+              className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
+                activeTab === 'all'
+                  ? 'bg-amber-500/25 text-amber-600 dark:text-amber-400'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
               {tabCounts.all}
             </span>
-            {activeTab === 'all' && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
-            )}
           </button>
 
           {/* Tab 2: High-Intent Buyers */}
           <button
             onClick={() => setActiveTab('high_intent')}
-            className={`relative pb-3 font-medium transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
               activeTab === 'high_intent'
-                ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent'
             }`}
           >
-            <Flame className="h-3.5 w-3.5 text-emerald-500" />
-            High-Intent Buyers
-            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">
+            <Flame className="h-3.5 w-3.5" />
+            <span>High-Intent Buyers</span>
+            <span
+              className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
+                activeTab === 'high_intent'
+                  ? 'bg-emerald-500/25 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
               {tabCounts.high}
             </span>
-            {activeTab === 'high_intent' && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-full" />
-            )}
           </button>
 
           {/* Tab 3: Verified Delegates */}
           <button
             onClick={() => setActiveTab('verified_delegates')}
-            className={`relative pb-3 font-medium transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
               activeTab === 'verified_delegates'
-                ? 'text-amber-600 dark:text-amber-400 font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30 shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent'
             }`}
           >
-            <Users className="h-3.5 w-3.5 text-amber-500" />
-            Verified Delegates
-            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold">
+            <Users className="h-3.5 w-3.5" />
+            <span>Verified Delegates</span>
+            <span
+              className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
+                activeTab === 'verified_delegates'
+                  ? 'bg-sky-500/25 text-sky-600 dark:text-sky-400'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
               {tabCounts.delegates}
             </span>
-            {activeTab === 'verified_delegates' && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500 rounded-full" />
-            )}
           </button>
 
           {/* Tab 4: Stall Inquiries with "New" Tag */}
           <button
             onClick={() => setActiveTab('stall_inquiries')}
-            className={`relative pb-3 font-medium transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
               activeTab === 'stall_inquiries'
-                ? 'text-rose-600 dark:text-rose-400 font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent'
             }`}
           >
-            <Building2 className="h-3.5 w-3.5 text-rose-500" />
-            Stall Inquiries
+            <Building2 className="h-3.5 w-3.5" />
+            <span>Stall Inquiries</span>
             <span className="text-[9px] font-extrabold uppercase px-1 py-0.2 rounded bg-rose-500 text-white leading-tight">
               New
             </span>
-            {activeTab === 'stall_inquiries' && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-rose-500 rounded-full" />
-            )}
+            <span
+              className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
+                activeTab === 'stall_inquiries'
+                  ? 'bg-rose-500/25 text-rose-600 dark:text-rose-400'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {tabCounts.stall}
+            </span>
           </button>
         </div>
 
         {/* Right: Batch Action Toolbar Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Generate Digital Badges */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
             onClick={() => setShowBadgeModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-700 text-white transition-all shadow-xs cursor-pointer btn-press active:scale-95 select-none"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/30 hover:bg-sky-500/20 transition-all shadow-2xs cursor-pointer btn-press active:scale-95 select-none shrink-0"
           >
             <QrCode className="h-3.5 w-3.5" />
-            Digital Badges
+            <span>Digital Badges</span>
           </button>
 
-          {/* Broadcast Message */}
           <button
             onClick={() => setShowBroadcastModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-xs cursor-pointer btn-press active:scale-95 select-none"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 transition-all shadow-2xs cursor-pointer btn-press active:scale-95 select-none shrink-0"
           >
             <Send className="h-3.5 w-3.5" />
-            Broadcast Update
+            <span>Broadcast Update</span>
           </button>
 
-          {/* Bulk Import */}
           <button
             onClick={() => setShowBulkImportModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-600 hover:bg-teal-700 text-white transition-all shadow-xs cursor-pointer btn-press active:scale-95 select-none"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/30 hover:bg-teal-500/20 transition-all shadow-2xs cursor-pointer btn-press active:scale-95 select-none shrink-0"
           >
             <Upload className="h-3.5 w-3.5" />
-            Bulk Import
+            <span>Bulk Import</span>
           </button>
 
-          {/* Export CSV List */}
           <button
             type="button"
             id="btn-export-csv"
@@ -1259,25 +1278,25 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
               e.preventDefault();
               handleExportCsv();
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 dark:bg-zinc-700 dark:hover:bg-zinc-600 transition-all shadow-xs cursor-pointer btn-press active:scale-95 select-none"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border transition-all shadow-2xs cursor-pointer btn-press active:scale-95 select-none shrink-0"
             title="Export leads to CSV spreadsheet"
           >
             <Download className="h-3.5 w-3.5" />
-            Export CSV
+            <span>Export CSV</span>
           </button>
         </div>
       </div>
 
       {/* 3. FILTER & SEARCH TOOLBAR */}
-      <div className="rounded-xl border border-border bg-card p-3 shadow-xs space-y-3">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-2.5">
+      <div className="rounded-xl border border-border bg-card p-3 shadow-xs space-y-2.5">
+        <div className="flex flex-col 2xl:flex-row items-stretch 2xl:items-center justify-between gap-2.5">
           {/* Search by dropdown + Search input combo */}
-          <div className="flex items-center flex-1 min-w-[280px]">
-            <div className="relative">
+          <div className="flex items-center flex-1 min-w-0 w-full 2xl:max-w-md">
+            <div className="relative shrink-0">
               <select
                 value={searchField}
                 onChange={(e) => setSearchField(e.target.value)}
-                className="appearance-none bg-muted/60 hover:bg-muted/80 text-foreground text-xs font-semibold pl-3 pr-7 py-2 rounded-l-lg border border-r-0 border-border focus:outline-none cursor-pointer"
+                className="appearance-none bg-muted/60 hover:bg-muted/80 text-foreground text-xs font-semibold pl-3 pr-7 py-2 rounded-l-lg border border-r-0 border-border focus:outline-none cursor-pointer h-9 transition-colors"
               >
                 <option value="all">Search All</option>
                 <option value="name">Buyer Name</option>
@@ -1288,31 +1307,45 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
               <ChevronDown className="h-3 w-3 text-muted-foreground absolute right-2.5 top-3 pointer-events-none" />
             </div>
 
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-0">
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search term..."
-                className="w-full bg-background text-foreground text-xs py-2 pl-3 pr-9 rounded-r-lg border border-border focus:outline-none focus:ring-1 focus:ring-primary focus:border-transparent placeholder:text-muted-foreground"
+                placeholder={
+                  searchField === 'name'
+                    ? 'Search by buyer name...'
+                    : searchField === 'email'
+                    ? 'Search by email address...'
+                    : searchField === 'company'
+                    ? 'Search by organization name...'
+                    : searchField === 'phone'
+                    ? 'Search by phone number...'
+                    : 'Search by name, email, company, phone...'
+                }
+                className="w-full bg-background text-foreground text-xs h-9 py-2 pl-3 pr-8 rounded-r-lg border border-border focus:outline-none focus:ring-1 focus:ring-primary focus:border-transparent placeholder:text-muted-foreground"
               />
-              <button
-                type="button"
-                className="absolute right-2 top-2 p-0.5 text-muted-foreground hover:text-foreground cursor-pointer active:scale-90 transition-transform"
-              >
-                <Search className="h-3.5 w-3.5" />
-              </button>
+              {searchTerm ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2.5 top-2.5 p-0.5 text-muted-foreground hover:text-foreground cursor-pointer rounded transition-colors"
+                  title="Clear search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : (
+                <div className="absolute right-2.5 top-2.5 text-muted-foreground pointer-events-none">
+                  <Search className="h-3.5 w-3.5" />
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Filters label and dropdowns */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-muted-foreground px-1 hidden xl:inline-block">
-              Filters:
-            </span>
-
+          {/* Filters dropdowns and reset */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full 2xl:w-auto shrink-0">
             {/* Event Edition Selector */}
-            <div className="min-w-[200px] sm:min-w-[240px]">
+            <div className="w-full sm:w-[220px] md:w-[260px] shrink-0">
               <SearchableSelect
                 options={[
                   ...(events.length > 1 ? [{ value: 'all', label: 'All My Expo Editions' }] : []),
@@ -1325,46 +1358,57 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                 onChange={(val) => setSelectedEventId(val)}
                 placeholder={events.length === 0 ? 'No Active Editions' : 'Select Edition...'}
                 searchPlaceholder="Search editions..."
-                className="py-1.5 text-xs font-medium"
+                className="h-9 py-1 text-xs font-medium"
               />
             </div>
 
-            {/* Status Dropdown */}
-            <div className="relative min-w-[130px]">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full appearance-none rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground pr-8 focus:outline-none focus:ring-1 focus:ring-primary font-medium cursor-pointer"
-              >
-                <option value="all">All Status</option>
-                <option value="new">New Inflow</option>
-                <option value="contacted">Contacted</option>
-                <option value="qualified">Qualified</option>
-                <option value="proposal">Proposal Sent</option>
-                <option value="won">Deal Won</option>
-                <option value="lost">Closed Lost</option>
-              </select>
-              <ChevronDown className="h-3 w-3 text-muted-foreground absolute right-2.5 top-3 pointer-events-none" />
-            </div>
+            {/* Status & Date Filter Group (2 cols on mobile, inline on sm+) */}
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center shrink-0">
+              {/* Status Dropdown */}
+              <div className="relative w-full sm:w-[130px] shrink-0">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full h-9 appearance-none rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground pr-8 focus:outline-none focus:ring-1 focus:ring-primary font-medium cursor-pointer"
+                >
+                  <option value="all">All Status</option>
+                  <option value="new">New Inflow</option>
+                  <option value="contacted">Contacted</option>
+                  <option value="qualified">Qualified</option>
+                  <option value="proposal">Proposal Sent</option>
+                  <option value="won">Deal Won</option>
+                  <option value="lost">Closed Lost</option>
+                </select>
+                <ChevronDown className="h-3 w-3 text-muted-foreground absolute right-2.5 top-3 pointer-events-none" />
+              </div>
 
-            {/* Date Filter */}
-            <div className="relative min-w-[135px]">
-              <input
-                type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary dark:[color-scheme:dark] cursor-pointer"
-                title="Filter by Registration Date"
-              />
+              {/* Date Filter */}
+              <div className="relative w-full sm:w-[135px] shrink-0">
+                <input
+                  type="date"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="w-full h-9 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary dark:[color-scheme:dark] cursor-pointer"
+                  title="Filter by Registration Date"
+                />
+              </div>
             </div>
 
             {/* Reset Button */}
             <button
               onClick={handleResetFilters}
-              className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:text-amber-700 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg transition-all cursor-pointer btn-press active:scale-95 select-none"
+              className={`inline-flex items-center justify-center gap-1.5 h-9 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
+                hasActiveFilters
+                  ? 'text-amber-600 dark:text-amber-400 hover:text-amber-700 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30'
+                  : 'text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/70 border border-border/60'
+              }`}
+              title="Reset all filters and search"
             >
               <RotateCcw className="h-3.5 w-3.5" />
-              Reset
+              <span>Reset</span>
+              {hasActiveFilters && (
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+              )}
             </button>
           </div>
         </div>
@@ -1373,10 +1417,12 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
       {/* 4. CONTEXT / SUMMARY BAR */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs text-muted-foreground px-1 gap-2">
         <p className="flex items-center gap-1.5">
-          <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-          Verified buyers, business attendees, and delegates registered for your expo editions:
+          <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+          <span className="truncate">
+            Verified buyers, business attendees, and delegates registered for your expo editions:
+          </span>
         </p>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           {selectedLeadIds.size > 0 && (
             <span className="font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
               {selectedLeadIds.size} of {filteredLeads.length} selected
@@ -1396,73 +1442,83 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
             <p className="text-xs font-medium">Loading attendee registrations...</p>
           </div>
         ) : filteredLeads.length === 0 ? (
-          /* High-Fidelity Custom Empty State (Inspired by 10times design) */
-          <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
-            {/* Custom SVG Illustration */}
-            <div className="relative mb-5">
-              <svg
-                width="140"
-                height="110"
-                viewBox="0 0 140 110"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="drop-shadow-sm"
-              >
-                {/* Folder Backing */}
-                <path
-                  d="M10 24C10 18.4772 14.4772 14 20 14H50L62 26H120C125.523 26 130 30.4772 130 36V90C130 95.5228 125.523 100 120 100H20C14.4772 100 10 95.5228 10 90V24Z"
-                  fill="currentColor"
-                  className="text-amber-500/20 dark:text-amber-400/10"
-                />
-                {/* Folder Front Flap */}
-                <path
-                  d="M10 40H130V90C130 95.5228 125.523 100 120 100H20C14.4772 100 10 95.5228 10 90V40Z"
-                  fill="currentColor"
-                  className="text-amber-500/30 dark:text-amber-400/20"
-                />
-                {/* Cute Sad Face on Folder */}
-                <circle cx="55" cy="65" r="3.5" fill="#0284C7" />
-                <circle cx="85" cy="65" r="3.5" fill="#0284C7" />
-                <path
-                  d="M62 82C66 77 74 77 78 82"
-                  stroke="#0284C7"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                />
-                {/* Speech Bubble with Cross/Empty Motif */}
-                <g transform="translate(85, 2)">
-                  <rect width="40" height="28" rx="8" fill="#0284C7" />
-                  <path d="M12 28L8 35L20 28H12Z" fill="#0284C7" />
-                  {/* Cross icon inside bubble */}
-                  <path
-                    d="M16 10L24 18M24 10L16 18"
-                    stroke="white"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  />
-                </g>
-              </svg>
+          /* Premium Enterprise Empty State */
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+            {/* Visual Icon Container */}
+            <div className="relative mb-4 flex items-center justify-center">
+              <div className="h-14 w-14 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center shadow-lg shadow-amber-500/5">
+                {hasActiveFilters ? (
+                  <Filter className="h-7 w-7 text-amber-500" />
+                ) : (
+                  <Users className="h-7 w-7 text-amber-500" />
+                )}
+              </div>
+              <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-card border border-border flex items-center justify-center shadow-xs">
+                {hasActiveFilters ? (
+                  <Search className="h-2.5 w-2.5 text-muted-foreground" />
+                ) : (
+                  <Plus className="h-2.5 w-2.5 text-amber-500" />
+                )}
+              </div>
             </div>
 
-            <h3 className="text-base font-extrabold tracking-wide uppercase text-foreground mb-1">
-              {events.length === 0 ? 'NO EXPO EDITIONS FOUND' : 'NO DATA FOUND!'}
+            <h3 className="text-base font-bold text-foreground mb-1">
+              {events.length === 0
+                ? 'No Expo Editions Found'
+                : hasActiveFilters
+                ? 'No Leads Matching Criteria'
+                : 'No Buyer Leads Captured Yet'}
             </h3>
-            <p className="text-xs text-muted-foreground max-w-md mb-6">
+            <p className="text-xs text-muted-foreground max-w-md mb-6 leading-relaxed">
               {events.length === 0
                 ? 'You have not created any expo editions yet. Create your first expo event to start capturing buyer leads.'
-                : 'Your event is not receiving leads yet. Publish or promote your expo event page to start capturing verified buyer registrations.'}
+                : hasActiveFilters
+                ? 'No attendee records match your active search keyword or filter settings. Try adjusting your search query or reset filters.'
+                : 'Your expo edition has not received any leads yet. Share your event preview page or embed the registration widget to start capturing verified attendee leads.'}
             </p>
 
-            <div className="flex flex-wrap items-center justify-center gap-3">
+            <div className="flex flex-wrap items-center justify-center gap-2.5">
               {events.length === 0 ? (
                 <a
                   href="/events/wizard"
-                  className="px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all shadow-sm cursor-pointer btn-press active:scale-95 select-none"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition-all shadow-xs cursor-pointer btn-press active:scale-95 select-none"
                 >
-                  CREATE EXPO EDITION
+                  <Plus className="h-3.5 w-3.5" />
+                  Create Expo Edition
                 </a>
+              ) : hasActiveFilters ? (
+                <>
+                  <button
+                    onClick={handleResetFilters}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition-all shadow-xs cursor-pointer btn-press active:scale-95 select-none"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Reset All Filters
+                  </button>
+                  <button
+                    onClick={openAddLeadModal}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border font-semibold text-xs transition-all cursor-pointer btn-press active:scale-95 select-none"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Lead Manually
+                  </button>
+                </>
               ) : (
                 <>
+                  <button
+                    onClick={openAddLeadModal}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition-all shadow-xs cursor-pointer btn-press active:scale-95 select-none"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Lead Manually
+                  </button>
+                  <button
+                    onClick={() => setShowBulkImportModal(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground font-semibold text-xs transition-all cursor-pointer btn-press active:scale-95 select-none"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    Import Leads
+                  </button>
                   <button
                     onClick={() => {
                       if (currentEvent) {
@@ -1471,23 +1527,10 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                         window.open('/expos', '_blank');
                       }
                     }}
-                    className="px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all shadow-sm cursor-pointer btn-press active:scale-95 select-none"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-border bg-card hover:bg-secondary text-muted-foreground hover:text-foreground font-semibold text-xs transition-all cursor-pointer btn-press active:scale-95 select-none"
                   >
-                    PREVIEW EXPO PAGE
-                  </button>
-
-                  <button
-                    onClick={openAddLeadModal}
-                    className="px-5 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs uppercase tracking-wider transition-all shadow-sm cursor-pointer btn-press active:scale-95 select-none"
-                  >
-                    ADD LEAD MANUALLY
-                  </button>
-
-                  <button
-                    onClick={() => setShowBulkImportModal(true)}
-                    className="px-4 py-2.5 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground font-semibold text-xs transition-all cursor-pointer btn-press active:scale-95 select-none"
-                  >
-                    Import Demo Leads
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Preview Expo Page
                   </button>
                 </>
               )}
@@ -2493,7 +2536,7 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
                     Full Name *
@@ -2544,7 +2587,7 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
                     Phone Number
@@ -2585,7 +2628,7 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
                     Designation / Role
