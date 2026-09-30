@@ -1153,12 +1153,17 @@ export default function EventsPage() {
                         <Edit className="h-4.5 w-4.5" />
                       </button>
                       <button
-                        onClick={() => handleDeleteEvent(evt)}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          handleDeleteEvent(evt);
+                        }}
                         disabled={isDeleting || Boolean(deletingEventId)}
-                        className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-secondary rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-                        title={isDeleting ? 'Deleting Event' : 'Delete Event'}
+                        className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-secondary rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer btn-press active:scale-90"
+                        title={isDeleting ? 'Deleting Event...' : 'Delete Event'}
                       >
-                        {isDeleting ? <Loader2 className="h-4.5 w-4.5 animate-spin" /> : <Trash2 className="h-4.5 w-4.5" />}
+                        {isDeleting ? <Loader2 className="h-4.5 w-4.5 animate-spin text-destructive" /> : <Trash2 className="h-4.5 w-4.5" />}
                       </button>
                       <a
                         href={`https://visitexpo.in/event/${evt.slug}`}
@@ -2043,8 +2048,7 @@ export default function EventsPage() {
                         <SearchableSelect
                           options={CURRENCY_OPTIONS.map(c => ({
                             value: c.code,
-                            label: `${c.flag} ${c.code} (${c.symbol}) - ${c.name}`,
-                            subtext: `${c.name} ${c.symbol}`,
+                            label: `${c.code} (${c.symbol}) - ${c.name}`,
                             flag: c.flag
                           }))}
                           value={eventForm.currency || 'INR'}

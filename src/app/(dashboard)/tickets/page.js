@@ -1240,8 +1240,7 @@ export default function TicketingPage() {
                     <SearchableSelect
                       options={CURRENCY_OPTIONS.map(c => ({
                         value: c.code,
-                        label: `${c.flag} ${c.code} (${c.symbol}) - ${c.name}`,
-                        subtext: `${c.name} ${c.symbol}`,
+                        label: `${c.code} (${c.symbol}) - ${c.name}`,
                         flag: c.flag
                       }))}
                       value={newTier.currency || 'INR'}

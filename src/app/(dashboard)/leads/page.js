@@ -405,6 +405,7 @@ export default function LeadsCRMPage() {
         if (drawerLead && drawerLead._id === leadId) {
           setDrawerLead(null);
         }
+        showSweetSuccess('Lead deleted successfully');
       }
     } catch (err) {
       console.error('Error deleting lead', err);
@@ -1744,7 +1745,12 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                           </button>
                           {/* Delete Lead */}
                           <button
-                            onClick={(e) => handleDeleteLead(item._id, e)}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              handleDeleteLead(item._id, e);
+                            }}
                             className="p-1.5 rounded-md text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-all cursor-pointer btn-press active:scale-90"
                             title="Delete Lead"
                           >
