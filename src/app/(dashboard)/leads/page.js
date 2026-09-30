@@ -73,8 +73,8 @@ export default function LeadsCRMPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Tab State: 'high_intent' | 'verified_delegates' | 'stall_inquiries' | 'all'
-  const [activeTab, setActiveTab] = useState('high_intent');
+  // Tab State: 'all' | 'high_intent' | 'verified_delegates' | 'stall_inquiries'
+  const [activeTab, setActiveTab] = useState('all');
 
   // Search & Filter State
   const [searchField, setSearchField] = useState('all'); // 'all' | 'name' | 'email' | 'company' | 'phone'
@@ -131,40 +131,64 @@ export default function LeadsCRMPage() {
     source: 'website',
     status: 'new',
     leadScore: 65,
-    notes: ''
+    notes: '',
+    eventId: ''
   });
   const [leadFormErrors, setLeadFormErrors] = useState({});
   const [isSubmittingLead, setIsSubmittingLead] = useState(false);
 
-  // 1. Fetch Events
+  // 1. Fetch Events (Organizers see only their own and claimed expo editions)
   useEffect(() => {
     const fetchEvents = async () => {
       try {
         const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
-        const res = await axios.get(`${API_URL}/events?limit=1000&all=true`, { headers });
-        if (res.data && res.data.success && res.data.data.docs) {
-          const rawEvents = res.data.data.docs;
-          const userOrgId = user?.organization?._id || user?.organization;
-          const userId = user?._id || user?.id;
+        const orgId = user?.organization?._id || user?.organization;
+        const userId = user?._id || user?.id;
+        const isSuperAdmin = user?.role === 'super_admin';
 
-          const sorted = [...rawEvents].sort((a, b) => {
-            const aOrg = a.organizer?._id || a.organizer;
-            const bOrg = b.organizer?._id || b.organizer;
-            const aIsMine = (userOrgId && aOrg?.toString() === userOrgId?.toString()) || (userId && a.claimedBy?.toString() === userId?.toString());
-            const bIsMine = (userOrgId && bOrg?.toString() === userOrgId?.toString()) || (userId && b.claimedBy?.toString() === userId?.toString());
+        const ids = [orgId, userId].filter(Boolean).map(String);
+        const eventsUrl = isSuperAdmin
+          ? `${API_URL}/events?limit=200&all=true`
+          : `${API_URL}/events?limit=200&all=true&organizerId=${ids.join(',')}`;
 
-            if (aIsMine && !bIsMine) return -1;
-            if (!aIsMine && bIsMine) return 1;
-            return 0;
-          });
+        const res = await axios.get(eventsUrl, { headers });
+        if (res.data && res.data.success && res.data.data?.docs) {
+          let eventList = res.data.data.docs;
 
-          setEvents(sorted);
-          if (sorted.length > 0) {
-            setSelectedEventId(sorted[0]._id);
+          if (!isSuperAdmin) {
+            const userEmail = (user?.email || '').toLowerCase().trim();
+            eventList = eventList.filter(evt => {
+              const evtOrgId = String(evt.organizer?._id || evt.organizer || '');
+              const evtClaimedBy = String(evt.claimedBy?._id || evt.claimedBy || '');
+              const evtOrgEmail = (evt.organizerEmail || evt.orgEmail || '').toLowerCase().trim();
+
+              const isOrgMatch = orgId && evtOrgId && evtOrgId === String(orgId);
+              const isUserMatch = userId && evtOrgId && evtOrgId === String(userId);
+              const isClaimedMatch = userId && evtClaimedBy && (evtClaimedBy === String(userId) || evtClaimedBy === String(orgId));
+              const isEmailMatch = userEmail && evtOrgEmail && evtOrgEmail === userEmail;
+
+              return isOrgMatch || isUserMatch || isClaimedMatch || isEmailMatch;
+            });
+          }
+
+          // Sort newest created first
+          eventList.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+          setEvents(eventList);
+          if (eventList.length > 0) {
+            setSelectedEventId(prev => {
+              if (prev && (prev === 'all' || eventList.some(e => e._id === prev))) return prev;
+              return eventList[0]._id;
+            });
           } else {
+            setSelectedEventId('');
+            setLeads([]);
             setLoading(false);
           }
         } else {
+          setEvents([]);
+          setSelectedEventId('');
+          setLeads([]);
           setLoading(false);
         }
       } catch (err) {
@@ -173,7 +197,9 @@ export default function LeadsCRMPage() {
         setLoading(false);
       }
     };
-    fetchEvents();
+    if (user) {
+      fetchEvents();
+    }
   }, [user, accessToken]);
 
   // 2. Fetch Leads for Active Event
@@ -186,8 +212,12 @@ export default function LeadsCRMPage() {
     setError('');
     try {
       const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+      const params = { limit: 300 };
+      if (selectedEventId !== 'all') {
+        params.eventId = selectedEventId;
+      }
       const res = await axios.get(`${API_URL}/leads`, {
-        params: { eventId: selectedEventId, limit: 300 },
+        params,
         headers
       });
       if (res.data && res.data.success) {
@@ -196,7 +226,8 @@ export default function LeadsCRMPage() {
       }
     } catch (err) {
       console.error('Failed to load leads', err);
-      setError('Error fetching CRM leads. Ensure database is running.');
+      const serverMsg = err.response?.data?.error || err.response?.data?.message || 'Error fetching CRM leads.';
+      setError(serverMsg);
     } finally {
       setLoading(false);
     }
@@ -208,6 +239,7 @@ export default function LeadsCRMPage() {
 
   // Active selected event object
   const currentEvent = useMemo(() => {
+    if (!selectedEventId || selectedEventId === 'all') return events[0] || null;
     return events.find((e) => e._id === selectedEventId) || null;
   }, [events, selectedEventId]);
 
@@ -326,7 +358,7 @@ export default function LeadsCRMPage() {
     setSearchTerm('');
     setStatusFilter('all');
     setDateFilter('');
-    setActiveTab('high_intent');
+    setActiveTab('all');
     setSelectedLeadIds(new Set());
   };
 
@@ -767,8 +799,9 @@ export default function LeadsCRMPage() {
   // Handle Bulk Import Submission
   const handleBulkImportSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedEventId) {
-      showSweetWarning('Please select an active expo edition first.');
+    const targetEventId = selectedEventId && selectedEventId !== 'all' ? selectedEventId : (events[0]?._id || '');
+    if (!targetEventId) {
+      showSweetWarning('Please select or create an active expo edition first.');
       return;
     }
 
@@ -824,7 +857,7 @@ export default function LeadsCRMPage() {
     try {
       const res = await axios.post(
         `${API_URL}/leads/bulk`,
-        { eventId: selectedEventId, leads: leadsToImport },
+        { eventId: targetEventId, leads: leadsToImport },
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
 
@@ -912,6 +945,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
   const openAddLeadModal = () => {
     setIsEditMode(false);
     setCurrentLeadId(null);
+    const defaultEvtId = selectedEventId && selectedEventId !== 'all' ? selectedEventId : (events[0]?._id || '');
     setLeadForm({
       name: '',
       email: '',
@@ -922,7 +956,8 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
       source: 'website',
       status: 'new',
       leadScore: 65,
-      notes: ''
+      notes: '',
+      eventId: defaultEvtId
     });
     setLeadFormErrors({});
     setShowLeadModal(true);
@@ -942,7 +977,8 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
       source: lead.source || 'website',
       status: lead.status || 'new',
       leadScore: lead.leadScore !== undefined ? lead.leadScore : 65,
-      notes: lead.notes || ''
+      notes: lead.notes || '',
+      eventId: lead.event?._id || lead.event || ''
     });
     setLeadFormErrors({});
     setShowLeadModal(true);
@@ -952,8 +988,10 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
   const handleSaveLead = async (e) => {
     e.preventDefault();
 
-    if (!selectedEventId && !isEditMode) {
-      showSweetWarning('Please select an expo edition before adding leads.');
+    const targetEventId = leadForm.eventId || (selectedEventId && selectedEventId !== 'all' ? selectedEventId : events[0]?._id);
+
+    if (!targetEventId && !isEditMode) {
+      showSweetWarning('Please create or select an expo edition before adding leads.');
       return;
     }
 
@@ -1004,12 +1042,18 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
             phone: leadForm.phone.trim(),
             company: leadForm.company.trim(),
             designation: leadForm.designation.trim(),
-            eventId: selectedEventId
+            eventId: targetEventId
           },
           { headers: { Authorization: `Bearer ${accessToken}` } }
         );
         if (res.data && res.data.success) {
-          setLeads(prev => [res.data.lead, ...prev]);
+          const newLead = res.data.lead;
+          setLeads(prev => [newLead, ...prev]);
+          // Automatically switch to 'all' tab and reset filters so the newly added lead is immediately visible!
+          setActiveTab('all');
+          setStatusFilter('all');
+          setSearchTerm('');
+          setDateFilter('');
           setShowLeadModal(false);
           showSweetSuccess('Buyer lead added successfully!');
         }
@@ -1101,7 +1145,26 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-border/80 pb-3">
         {/* Left: Categorized Intent Navigation Tabs */}
         <div className="flex items-center gap-6 overflow-x-auto no-scrollbar text-sm">
-          {/* Tab 1: High-Intent Buyers */}
+          {/* Tab 1: All Inquiries */}
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`relative pb-3 font-medium transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none ${
+              activeTab === 'all'
+                ? 'text-foreground font-semibold'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Users className="h-3.5 w-3.5 text-primary" />
+            All Inquiries
+            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-secondary text-foreground font-bold">
+              {tabCounts.all}
+            </span>
+            {activeTab === 'all' && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+            )}
+          </button>
+
+          {/* Tab 2: High-Intent Buyers */}
           <button
             onClick={() => setActiveTab('high_intent')}
             className={`relative pb-3 font-medium transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none ${
@@ -1120,7 +1183,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
             )}
           </button>
 
-          {/* Tab 2: Verified Delegates */}
+          {/* Tab 3: Verified Delegates */}
           <button
             onClick={() => setActiveTab('verified_delegates')}
             className={`relative pb-3 font-medium transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none ${
@@ -1139,7 +1202,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
             )}
           </button>
 
-          {/* Tab 3: Stall Inquiries with "New" Tag */}
+          {/* Tab 4: Stall Inquiries with "New" Tag */}
           <button
             onClick={() => setActiveTab('stall_inquiries')}
             className={`relative pb-3 font-medium transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none ${
@@ -1155,24 +1218,6 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
             </span>
             {activeTab === 'stall_inquiries' && (
               <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-rose-500 rounded-full" />
-            )}
-          </button>
-
-          {/* Tab 4: All Inquiries */}
-          <button
-            onClick={() => setActiveTab('all')}
-            className={`relative pb-3 font-medium transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none ${
-              activeTab === 'all'
-                ? 'text-foreground font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            All Inquiries
-            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-secondary text-muted-foreground font-bold">
-              {tabCounts.all}
-            </span>
-            {activeTab === 'all' && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground rounded-full" />
             )}
           </button>
         </div>
@@ -1269,10 +1314,13 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
             {/* Event Edition Selector */}
             <div className="min-w-[200px] sm:min-w-[240px]">
               <SearchableSelect
-                options={events.map((evt) => ({
-                  value: evt._id,
-                  label: evt.title
-                }))}
+                options={[
+                  ...(events.length > 1 ? [{ value: 'all', label: 'All My Expo Editions' }] : []),
+                  ...events.map((evt) => ({
+                    value: evt._id,
+                    label: evt.title
+                  }))
+                ]}
                 value={selectedEventId}
                 onChange={(val) => setSelectedEventId(val)}
                 placeholder={events.length === 0 ? 'No Active Editions' : 'Select Edition...'}
@@ -1397,32 +1445,52 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
             </div>
 
             <h3 className="text-base font-extrabold tracking-wide uppercase text-foreground mb-1">
-              NO DATA FOUND!
+              {events.length === 0 ? 'NO EXPO EDITIONS FOUND' : 'NO DATA FOUND!'}
             </h3>
             <p className="text-xs text-muted-foreground max-w-md mb-6">
-              Your event is not receiving leads yet. Publish or promote your expo event page to start capturing verified buyer registrations.
+              {events.length === 0
+                ? 'You have not created any expo editions yet. Create your first expo event to start capturing buyer leads.'
+                : 'Your event is not receiving leads yet. Publish or promote your expo event page to start capturing verified buyer registrations.'}
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-3">
-              <button
-                onClick={() => {
-                  if (currentEvent) {
-                    window.open(`/expo/${currentEvent.slug || currentEvent._id}`, '_blank');
-                  } else {
-                    window.open('/expos', '_blank');
-                  }
-                }}
-                className="px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all shadow-sm cursor-pointer btn-press active:scale-95 select-none"
-              >
-                PREVIEW EXPO PAGE
-              </button>
+              {events.length === 0 ? (
+                <a
+                  href="/events/wizard"
+                  className="px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all shadow-sm cursor-pointer btn-press active:scale-95 select-none"
+                >
+                  CREATE EXPO EDITION
+                </a>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      if (currentEvent) {
+                        window.open(`/expo/${currentEvent.slug || currentEvent._id}`, '_blank');
+                      } else {
+                        window.open('/expos', '_blank');
+                      }
+                    }}
+                    className="px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs uppercase tracking-wider transition-all shadow-sm cursor-pointer btn-press active:scale-95 select-none"
+                  >
+                    PREVIEW EXPO PAGE
+                  </button>
 
-              <button
-                onClick={() => setShowBulkImportModal(true)}
-                className="px-4 py-2.5 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground font-semibold text-xs transition-all cursor-pointer btn-press active:scale-95 select-none"
-              >
-                Import Demo Leads
-              </button>
+                  <button
+                    onClick={openAddLeadModal}
+                    className="px-5 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs uppercase tracking-wider transition-all shadow-sm cursor-pointer btn-press active:scale-95 select-none"
+                  >
+                    ADD LEAD MANUALLY
+                  </button>
+
+                  <button
+                    onClick={() => setShowBulkImportModal(true)}
+                    className="px-4 py-2.5 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground font-semibold text-xs transition-all cursor-pointer btn-press active:scale-95 select-none"
+                  >
+                    Import Demo Leads
+                  </button>
+                </>
+              )}
             </div>
           </div>
         ) : (
@@ -2406,6 +2474,25 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
             </div>
 
             <form onSubmit={handleSaveLead} className="space-y-3">
+              {events.length > 1 && !isEditMode && (
+                <div>
+                  <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
+                    Expo Edition *
+                  </label>
+                  <select
+                    value={leadForm.eventId || (selectedEventId !== 'all' ? selectedEventId : events[0]?._id)}
+                    onChange={(e) => setLeadForm({ ...leadForm, eventId: e.target.value })}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-medium"
+                  >
+                    {events.map((evt) => (
+                      <option key={evt._id} value={evt._id}>
+                        {evt.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
