@@ -12,6 +12,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar.js';
 import { useAuth } from '@/context/AuthContext.js';
+import { renderCardDescription } from '@/utils/textFormatters.js';
 import {
   TrendingUp,
   Search,

@@ -12,6 +12,7 @@ import Link from 'next/link';
 import Navbar from '../../../components/Navbar.js';
 import { useAuth } from '../../../context/AuthContext.js';
 import { getCategoryBySlug, CATEGORIES_CONFIG } from '../../../data/categoryEventsData.js';
+import { renderCardDescription } from '../../../utils/textFormatters.js';
 import {
   Search,
   Calendar as CalendarIcon,
