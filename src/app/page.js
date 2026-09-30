@@ -680,16 +680,10 @@ export default function LandingPage() {
           <div className="pt-2 flex flex-wrap items-center justify-center gap-3.5">
             <Link
               href={user ? '/events' : '/login?role=visitor&redirect=/events'}
-              className="inline-flex items-center gap-2 rounded-full bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold px-7 py-3 text-xs sm:text-sm transition-all shadow-md hover:scale-102 cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-full bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold px-8 py-3.5 text-xs sm:text-sm transition-all shadow-lg hover:scale-105 cursor-pointer"
             >
               <span>Explore Exhibitions</span>
               <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              href={user ? '/dashboard' : '/login?role=organizer&signup=true'}
-              className="inline-flex items-center gap-2 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/30 text-white font-bold px-7 py-3 text-xs sm:text-sm transition-all shadow-sm hover:scale-102 cursor-pointer"
-            >
-              {user ? (user.role === 'organizer' ? 'Organizer Dashboard' : 'My Dashboard') : 'For Organizers'}
             </Link>
           </div>
 

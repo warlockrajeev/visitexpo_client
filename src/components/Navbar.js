@@ -98,18 +98,6 @@ export default function Navbar({ solid = false }) {
       isAnchor: false
     },
     {
-      id: 'organizers',
-      label: 'For Organizers',
-      href: user ? '/dashboard' : '/login?role=organizer&signup=true',
-      isAnchor: false
-    },
-    {
-      id: 'exhibitors',
-      label: 'For Exhibitors',
-      href: user ? '/dashboard' : '/login?role=exhibitor&signup=true',
-      isAnchor: false
-    },
-    {
       id: 'claim',
       label: 'Claim Listing',
       href: pathname === '/' ? '#claim' : '/#claim',
