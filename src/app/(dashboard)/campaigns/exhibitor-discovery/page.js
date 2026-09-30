@@ -24,6 +24,7 @@ import {
   Coins,
   Sparkles,
   ExternalLink,
+  ChevronLeft,
   ChevronRight,
   X,
   Loader2,
@@ -46,6 +47,8 @@ const API_URL =
   (typeof window !== 'undefined' && window.location.hostname.includes('visitexpo.in')
     ? 'https://api.visitexpo.in/api'
     : 'http://localhost:5000/api');
+
+const EXHIBITORS_PER_PAGE = 9;
 
 // Curated Fallback Exhibitors (Indian & Global)
 const FALLBACK_EXHIBITORS = [
@@ -587,6 +590,7 @@ export default function ExhibitorDiscoveryPage() {
   const [searchProducts, setSearchProducts] = useState('');
   const [selectedCountry, setSelectedCountry] = useState('All Countries');
   const [originFilter, setOriginFilter] = useState('all'); // 'all' | 'india' | 'global'
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Applied Filter States (Controlled by Apply Button)
   const [appliedFilters, setAppliedFilters] = useState({
@@ -646,6 +650,7 @@ export default function ExhibitorDiscoveryPage() {
       const res = await axios.get(`${API_URL}/exhibitors/discovery`, { headers });
       if (res.data && res.data.success && res.data.data?.exhibitors) {
         setExhibitors(res.data.data.exhibitors);
+        setCurrentPage(1);
         if (res.data.data.userCredits !== undefined) {
           setUserCredits(res.data.data.userCredits);
           if (typeof window !== 'undefined') {
@@ -673,6 +678,7 @@ export default function ExhibitorDiscoveryPage() {
       country: selectedCountry,
       origin: originFilter
     });
+    setCurrentPage(1);
     showToast(`Filters applied! Exploring verified exhibitors.`);
   };
 
@@ -688,6 +694,7 @@ export default function ExhibitorDiscoveryPage() {
       country: 'All Countries',
       origin: 'all'
     });
+    setCurrentPage(1);
     showToast(`Filters reset to default view.`);
   };
 
@@ -725,6 +732,24 @@ export default function ExhibitorDiscoveryPage() {
       return true;
     });
   }, [exhibitors, appliedFilters]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredExhibitors.length / EXHIBITORS_PER_PAGE));
+  const activePage = Math.min(currentPage, totalPages);
+  const firstExhibitorIndex = (activePage - 1) * EXHIBITORS_PER_PAGE;
+  const paginatedExhibitors = filteredExhibitors.slice(
+    firstExhibitorIndex,
+    firstExhibitorIndex + EXHIBITORS_PER_PAGE
+  );
+  const paginationStart = Math.max(1, Math.min(activePage - 2, totalPages - 4));
+  const paginationEnd = Math.min(totalPages, paginationStart + 4);
+  const visiblePages = Array.from(
+    { length: paginationEnd - paginationStart + 1 },
+    (_, index) => paginationStart + index
+  );
+
+  const handlePageChange = (page) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
 
   // Open Connect Modal
   const handleOpenConnect = (exhibitor) => {
@@ -975,7 +1000,7 @@ export default function ExhibitorDiscoveryPage() {
           </div>
 
           <div className="text-xs text-muted-foreground font-semibold">
-            Showing <strong className="text-foreground">{filteredExhibitors.length}</strong> of {exhibitors.length} exhibitors
+            <strong className="text-foreground">{filteredExhibitors.length}</strong> matching exhibitors
           </div>
         </div>
 
@@ -1123,7 +1148,7 @@ export default function ExhibitorDiscoveryPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredExhibitors.map((exhibitor) => {
+          {paginatedExhibitors.map((exhibitor) => {
             const isIndian = exhibitor.origin === 'india';
             return (
               <div
@@ -1235,6 +1260,56 @@ export default function ExhibitorDiscoveryPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {!loading && filteredExhibitors.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs font-semibold text-muted-foreground">
+            Showing <strong className="text-foreground">{firstExhibitorIndex + 1}-{Math.min(firstExhibitorIndex + EXHIBITORS_PER_PAGE, filteredExhibitors.length)}</strong> of {filteredExhibitors.length} exhibitors
+          </p>
+
+          <nav className="flex items-center justify-between gap-1.5 sm:justify-end" aria-label="Exhibitor directory pagination">
+            <button
+              type="button"
+              onClick={() => handlePageChange(activePage - 1)}
+              disabled={activePage === 1}
+              className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Previous</span>
+            </button>
+
+            <div className="flex items-center gap-1" aria-label={`Page ${activePage} of ${totalPages}`}>
+              {visiblePages.map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  onClick={() => handlePageChange(page)}
+                  aria-current={page === activePage ? 'page' : undefined}
+                  className={`h-8 min-w-8 rounded-lg px-2 text-xs font-bold transition-colors ${
+                    page === activePage
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'border border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handlePageChange(activePage + 1)}
+              disabled={activePage === totalPages}
+              className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Next page"
+            >
+              <span className="hidden sm:inline">Next</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </nav>
         </div>
       )}
 

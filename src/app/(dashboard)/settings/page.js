@@ -18,6 +18,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
 import { validateEventImage } from '../../../utils/imageValidation.js';
+import { showSweetError } from '../../../utils/sweetalert.js';
 import {
   Settings,
   Building,
@@ -124,6 +125,8 @@ export default function SettingsPage() {
   const [orgOtpTimer, setOrgOtpTimer] = useState(0);
   const [orgPhoneVerified, setOrgPhoneVerified] = useState(true);
   const [orgPhoneVerificationToken, setOrgPhoneVerificationToken] = useState('');
+  const [orgPhoneError, setOrgPhoneError] = useState('');
+  const [visitorPhoneError, setVisitorPhoneError] = useState('');
 
   // Password / Security Form
   const [securityForm, setSecurityForm] = useState({
@@ -234,11 +237,19 @@ export default function SettingsPage() {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (errorMessage) {
+      showSweetError(errorMessage, 'Please review your details');
+    }
+  }, [errorMessage]);
+
   // Phone Change Handlers
   const handleOrgPhoneChange = (val) => {
     setOrgForm((prev) => ({ ...prev, phone: val }));
     const digits = cleanDigits(val);
     const initialDigits = cleanDigits(initialOrgPhone);
+    const isInvalidPhone = val.trim() && (digits.length !== 10 || !/^[6-9]\d{9}$/.test(digits));
+    setOrgPhoneError(isInvalidPhone ? 'Enter a valid 10-digit Indian mobile number.' : '');
     if (digits === initialDigits) {
       setOrgPhoneVerified(true);
       setOrgOtpSent(false);
@@ -252,6 +263,8 @@ export default function SettingsPage() {
     setVisitorForm((prev) => ({ ...prev, phone: val }));
     const digits = cleanDigits(val);
     const initialDigits = cleanDigits(initialVisitorPhone);
+    const isInvalidPhone = val.trim() && (digits.length !== 10 || !/^[6-9]\d{9}$/.test(digits));
+    setVisitorPhoneError(isInvalidPhone ? 'Enter a valid 10-digit Indian mobile number.' : '');
     if (digits === initialDigits) {
       setVisitorPhoneVerified(true);
       setVisitorOtpSent(false);
@@ -411,11 +424,13 @@ export default function SettingsPage() {
 
     const cleanVisitorDigits = cleanDigits(visitorForm.phone);
     if (visitorForm.phone && (cleanVisitorDigits.length !== 10 || !/^[6-9]\d{9}$/.test(cleanVisitorDigits))) {
+      setVisitorPhoneError('Enter a valid 10-digit Indian mobile number.');
       setErrorMessage('Please enter a valid 10-digit Indian mobile number.');
       setTimeout(() => setErrorMessage(''), 4000);
       setSavingProfile(false);
       return;
     }
+    setVisitorPhoneError('');
 
     const initialVisDigits = cleanDigits(initialVisitorPhone);
     const isVisitorPhoneChanged = cleanVisitorDigits && cleanVisitorDigits !== initialVisDigits;
@@ -530,11 +545,13 @@ export default function SettingsPage() {
 
     const cleanPhoneDigits = cleanDigits(orgForm.phone);
     if (orgForm.phone && (cleanPhoneDigits.length !== 10 || !/^[6-9]\d{9}$/.test(cleanPhoneDigits))) {
+      setOrgPhoneError('Enter a valid 10-digit Indian mobile number.');
       setErrorMessage('Please enter a valid 10-digit Indian mobile number (e.g. 9876543210).');
       setTimeout(() => setErrorMessage(''), 4000);
       setSavingOrg(false);
       return;
     }
+    setOrgPhoneError('');
 
     const initialDigits = cleanDigits(initialOrgPhone);
     const isPhoneChanged = cleanPhoneDigits && cleanPhoneDigits !== initialDigits;
@@ -797,13 +814,6 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {errorMessage && (
-        <div className="flex items-center gap-2 rounded-xl bg-destructive/10 border border-destructive/20 p-4 text-xs font-bold text-destructive">
-          <AlertCircle className="h-5 w-5 flex-shrink-0" />
-          <span>{errorMessage}</span>
-        </div>
-      )}
-
       {/* Tabs Layout */}
       <div className="flex flex-col md:flex-row gap-6 items-start">
         {/* Left Side: Tabs buttons */}
@@ -908,9 +918,13 @@ export default function SettingsPage() {
                       value={visitorForm.phone}
                       onChange={(e) => handleVisitorPhoneChange(e.target.value)}
                       placeholder="+91 98765 43210"
-                      className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      aria-invalid={Boolean(visitorPhoneError)}
+                      className={`w-full rounded-xl border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 ${
+                        visitorPhoneError ? 'border-destructive focus:ring-destructive/30' : 'border-border focus:ring-primary'
+                      }`}
                     />
                   </div>
+                  {visitorPhoneError && <p className="mt-1 text-[11px] font-semibold text-destructive">{visitorPhoneError}</p>}
 
                   {/* Visitor Phone Change OTP Verification Box */}
                   {cleanDigits(visitorForm.phone) !== cleanDigits(initialVisitorPhone) && (

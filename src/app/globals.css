@@ -298,15 +298,9 @@ button:not(:disabled),
    VisitExpo Custom SweetAlert2 Theming & Micro-Interactions
    ============================================================ */
 
-/* Ensure SweetAlert2 container is above ALL modals (z-50 = 50) */
-.swal2-container.swal2-shown {
+/* Ensure SweetAlert2 containers are above ALL app modals (z-50 = 50). */
+.swal2-container {
   z-index: 10000 !important;
-}
-
-.swal2-container:not(.swal2-shown) {
-  display: none !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
 }
 
 .visitexpo-swal-popup {
@@ -485,5 +479,4 @@ button:not(:disabled),
     display: none !important;
   }
 }
-
 

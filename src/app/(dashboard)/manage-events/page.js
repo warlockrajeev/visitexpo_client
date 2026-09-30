@@ -61,6 +61,9 @@ export default function EventsPage() {
   // Search & Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // all, draft, published, completed, cancelled
+  const [isSavingEvent, setIsSavingEvent] = useState(false);
+  const [deletingEventId, setDeletingEventId] = useState(null);
+  const [updatingEventId, setUpdatingEventId] = useState(null);
 
   // Modal State for creation/edit
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -834,6 +837,7 @@ export default function EventsPage() {
       currency: eventForm.currency || 'INR'
     };
 
+    setIsSavingEvent(true);
     try {
       if (editMode) {
         // Edit Endpoint
@@ -868,11 +872,19 @@ export default function EventsPage() {
         return;
       }
       showSweetError(err.response?.data?.error || 'Failed to save event details');
+    } finally {
+      setIsSavingEvent(false);
     }
   };
 
   // Handle Delete Event
-  const handleDeleteEvent = async (id) => {
+  const handleDeleteEvent = async (event) => {
+    const id = event?._id || event?.id || event?.wpPostId || event?.slug;
+    if (!id) {
+      showSweetError('This event is missing an identifier and cannot be deleted.');
+      return;
+    }
+
     const confirmed = await showSweetConfirm({
       title: 'Delete Event?',
       text: 'Are you sure you want to delete this event? This will permanently remove its tickets and registrations.',
@@ -882,21 +894,34 @@ export default function EventsPage() {
       isDanger: true
     });
     if (!confirmed) return;
+
+    setDeletingEventId(id);
     try {
       const res = await axios.delete(`${API_URL}/events/${id}`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
+        headers: { Authorization: `Bearer ${accessToken}` },
+        data: {
+          slug: event.slug,
+          title: event.title,
+          wpPostId: event.wpPostId
+        }
       });
       if (res.data && res.data.success) {
-        setEvents(prev => prev.filter(evt => evt._id !== id));
+        setEvents(prev => prev.filter(evt => (evt._id || evt.id || evt.wpPostId || evt.slug) !== id));
+        showSweetAlert('The event and its related data were deleted.', 'success');
+      } else {
+        showSweetError(res.data?.error || 'Failed to delete event.');
       }
     } catch (err) {
       console.error('Error deleting event', err);
-      showSweetError('Error deleting event.');
+      showSweetError(err.response?.data?.error || 'Error deleting event.');
+    } finally {
+      setDeletingEventId(null);
     }
   };
 
   // Change Event Status Directly
   const updateEventStatus = async (id, status) => {
+    setUpdatingEventId(id);
     try {
       const res = await axios.put(
         `${API_URL}/events/${id}`,
@@ -909,6 +934,8 @@ export default function EventsPage() {
     } catch (err) {
       console.error('Error updating status', err);
       showSweetError(err.response?.data?.error || 'Could not update status.', 'Status Update Failed');
+    } finally {
+      setUpdatingEventId(null);
     }
   };
 
@@ -1027,6 +1054,8 @@ export default function EventsPage() {
           {filteredEvents.map((evt) => {
             const startStr = new Date(evt.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
             const endStr = new Date(evt.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const isDeleting = deletingEventId === evt._id;
+            const isUpdating = updatingEventId === evt._id;
             
             return (
               <div key={evt._id} className="flex flex-col justify-between rounded-2xl border border-border bg-card overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
@@ -1098,16 +1127,18 @@ export default function EventsPage() {
                       {evt.status === 'draft' ? (
                         <button
                           onClick={() => updateEventStatus(evt._id, 'published')}
-                          className="text-xs text-emerald-500 hover:bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20 font-semibold"
+                          disabled={isUpdating || isDeleting}
+                          className="inline-flex items-center gap-1 text-xs text-emerald-500 hover:bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20 font-semibold disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          Publish
+                          {isUpdating ? <><Loader2 className="h-3 w-3 animate-spin" /> Publishing...</> : 'Publish'}
                         </button>
                       ) : evt.status === 'published' ? (
                         <button
                           onClick={() => updateEventStatus(evt._id, 'completed')}
-                          className="text-xs text-blue-500 hover:bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20 font-semibold"
+                          disabled={isUpdating || isDeleting}
+                          className="inline-flex items-center gap-1 text-xs text-blue-500 hover:bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20 font-semibold disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          Mark Completed
+                          {isUpdating ? <><Loader2 className="h-3 w-3 animate-spin" /> Updating...</> : 'Mark Completed'}
                         </button>
                       ) : null}
                     </div>
@@ -1115,17 +1146,19 @@ export default function EventsPage() {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => openEditModal(evt)}
-                        className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors"
+                        disabled={isDeleting}
+                        className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                         title="Edit Event"
                       >
                         <Edit className="h-4.5 w-4.5" />
                       </button>
                       <button
-                        onClick={() => handleDeleteEvent(evt._id)}
-                        className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-secondary rounded-md transition-colors"
-                        title="Delete Event"
+                        onClick={() => handleDeleteEvent(evt)}
+                        disabled={isDeleting || Boolean(deletingEventId)}
+                        className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-secondary rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                        title={isDeleting ? 'Deleting Event' : 'Delete Event'}
                       >
-                        <Trash2 className="h-4.5 w-4.5" />
+                        {isDeleting ? <Loader2 className="h-4.5 w-4.5 animate-spin" /> : <Trash2 className="h-4.5 w-4.5" />}
                       </button>
                       <a
                         href={`https://visitexpo.in/event/${evt.slug}`}
@@ -2073,20 +2106,21 @@ export default function EventsPage() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-lg border border-border hover:bg-secondary px-4 py-2 text-sm font-semibold text-foreground transition-colors"
+                  disabled={isSavingEvent}
+                  className="rounded-lg border border-border hover:bg-secondary px-4 py-2 text-sm font-semibold text-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={duplicateCheck.isDuplicate}
-                  className={`rounded-lg px-4 py-2 text-sm font-semibold shadow-md transition-colors ${
-                    duplicateCheck.isDuplicate
+                  disabled={duplicateCheck.isDuplicate || isSavingEvent}
+                  className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold shadow-md transition-colors ${
+                    duplicateCheck.isDuplicate || isSavingEvent
                       ? 'bg-muted text-muted-foreground cursor-not-allowed'
                       : 'bg-primary hover:bg-primary/90 text-primary-foreground'
                   }`}
                 >
-                  {duplicateCheck.isDuplicate ? 'Duplicate Event Title' : 'Save Event'}
+                  {isSavingEvent ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : duplicateCheck.isDuplicate ? 'Duplicate Event Title' : 'Save Event'}
                 </button>
               </div>
             </form>
