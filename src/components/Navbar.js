@@ -25,7 +25,8 @@ import {
   ChevronDown,
   Building,
   ShieldCheck,
-  Compass
+  Compass,
+  Loader2
 } from 'lucide-react';
 
 export const Logo = ({ className = "w-9 h-9" }) => (
@@ -65,6 +66,82 @@ export default function Navbar({ solid = false }) {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const [loadingNavId, setLoadingNavId] = useState(null);
+
+  // Clear loading state when pathname changes
+  useEffect(() => {
+    setLoadingNavId(null);
+  }, [pathname]);
+
+  // Fallback safety timeout (4s) so loader doesn't get stuck if navigation stays on same page
+  useEffect(() => {
+    if (!loadingNavId) return;
+    const timer = setTimeout(() => {
+      setLoadingNavId(null);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [loadingNavId]);
+
+  const navItems = [
+    {
+      id: 'explore',
+      label: 'Explore Events',
+      href: user ? '/events' : '/login?role=visitor&redirect=/events',
+      isAnchor: false
+    },
+    {
+      id: 'foryou',
+      label: 'For You',
+      mobileLabel: 'Recommended For You',
+      href: '/recommendations',
+      isAnchor: false
+    },
+    {
+      id: 'organizers',
+      label: 'For Organizers',
+      href: user ? '/dashboard' : '/login?role=organizer&signup=true',
+      isAnchor: false
+    },
+    {
+      id: 'exhibitors',
+      label: 'For Exhibitors',
+      href: user ? '/dashboard' : '/login?role=exhibitor&signup=true',
+      isAnchor: false
+    },
+    {
+      id: 'claim',
+      label: 'Claim Listing',
+      href: pathname === '/' ? '#claim' : '/#claim',
+      isAnchor: true
+    },
+    {
+      id: 'contact',
+      label: 'Contact',
+      href: '/contact',
+      isAnchor: false
+    }
+  ];
+
+  const handleNavClick = (item, e) => {
+    if (item.isAnchor) {
+      if (pathname === '/') {
+        e?.preventDefault();
+        const el = document.getElementById('claim');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+        }
+        return;
+      }
+    }
+
+    const cleanHref = item.href.split('?')[0].split('#')[0];
+    if (cleanHref === pathname) {
+      return;
+    }
+
+    setLoadingNavId(item.id);
+  };
 
   const getRoleBadge = (role) => {
     if (role === 'visitor') {
@@ -111,36 +188,29 @@ export default function Navbar({ solid = false }) {
 
         {/* Desktop Navigation Links */}
         <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-zinc-200">
-          <Link
-            href={user ? '/events' : '/login?role=visitor&redirect=/events'}
-            className="hover:text-white transition-colors"
-          >
-            Explore Events
-          </Link>
-          <Link
-            href="/recommendations"
-            className="hover:text-white transition-colors"
-          >
-            For You
-          </Link>
-          <Link
-            href={user ? '/dashboard' : '/login?role=organizer&signup=true'}
-            className="hover:text-white transition-colors"
-          >
-            For Organizers
-          </Link>
-          <Link
-            href={user ? '/dashboard' : '/login?role=exhibitor&signup=true'}
-            className="hover:text-white transition-colors"
-          >
-            For Exhibitors
-          </Link>
-          <a href="#claim" className="hover:text-white transition-colors">
-            Claim Listing
-          </a>
-          <Link href="/contact" className="hover:text-white transition-colors">
-            Contact
-          </Link>
+          {navItems.map((item) => {
+            const isLoading = loadingNavId === item.id;
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                onClick={(e) => handleNavClick(item, e)}
+                className={`relative inline-flex items-center gap-1.5 py-1 transition-all select-none ${
+                  isLoading
+                    ? 'text-[#FFCC00] font-bold pointer-events-none'
+                    : 'text-zinc-200 hover:text-white'
+                }`}
+              >
+                {isLoading && (
+                  <Loader2 className="h-3 w-3 animate-spin text-[#FFCC00] shrink-0" />
+                )}
+                <span>{item.label}</span>
+                {isLoading && (
+                  <span className="absolute -bottom-1 left-0 right-0 h-[2px] bg-[#FFCC00] rounded-full animate-pulse shadow-[0_0_8px_#FFCC00]" />
+                )}
+              </Link>
+            );
+          })}
         </nav>
 
         {/* Desktop Actions */}
@@ -396,48 +466,31 @@ export default function Navbar({ solid = false }) {
 
           {/* Navigation Links */}
           <nav className="flex flex-col space-y-3 text-sm font-semibold text-zinc-200">
-            <Link
-              href={user ? '/events' : '/login?role=visitor&redirect=/events'}
-              onClick={() => setMobileMenuOpen(false)}
-              className="hover:text-white py-1 transition-colors"
-            >
-              Explore Events
-            </Link>
-            <Link
-              href="/recommendations"
-              onClick={() => setMobileMenuOpen(false)}
-              className="hover:text-white py-1 transition-colors"
-            >
-              Recommended For You
-            </Link>
-            <Link
-              href={user ? '/dashboard' : '/login?role=organizer&signup=true'}
-              onClick={() => setMobileMenuOpen(false)}
-              className="hover:text-white py-1 transition-colors"
-            >
-              For Organizers
-            </Link>
-            <Link
-              href={user ? '/dashboard' : '/login?role=exhibitor&signup=true'}
-              onClick={() => setMobileMenuOpen(false)}
-              className="hover:text-white py-1 transition-colors"
-            >
-              For Exhibitors
-            </Link>
-            <a
-              href="#claim"
-              onClick={() => setMobileMenuOpen(false)}
-              className="hover:text-white py-1 transition-colors"
-            >
-              Claim Listing
-            </a>
-            <Link
-              href="/contact"
-              onClick={() => setMobileMenuOpen(false)}
-              className="hover:text-white py-1 transition-colors"
-            >
-              Contact
-            </Link>
+            {navItems.map((item) => {
+              const isLoading = loadingNavId === item.id;
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  onClick={(e) => {
+                    handleNavClick(item, e);
+                    if (item.isAnchor && pathname === '/') {
+                      setMobileMenuOpen(false);
+                    }
+                  }}
+                  className={`flex items-center gap-2 py-1.5 transition-colors ${
+                    isLoading
+                      ? 'text-[#FFCC00] font-bold pointer-events-none'
+                      : 'hover:text-white text-zinc-200'
+                  }`}
+                >
+                  {isLoading && (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-[#FFCC00] shrink-0" />
+                  )}
+                  <span>{item.mobileLabel || item.label}</span>
+                </Link>
+              );
+            })}
           </nav>
 
           {/* Mobile Footer Actions */}
@@ -478,6 +531,29 @@ export default function Navbar({ solid = false }) {
           </div>
         </div>
       )}
+      {/* Top Nano Progress Bar on Header */}
+      {loadingNavId && (
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-zinc-900/60 overflow-hidden pointer-events-none z-50">
+          <div
+            className="h-full bg-gradient-to-r from-amber-500 via-[#FFCC00] to-[#FF2E63] shadow-[0_0_10px_#FFCC00]"
+            style={{
+              width: '45%',
+              animation: 'navbarProgress 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite'
+            }}
+          />
+        </div>
+      )}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            @keyframes navbarProgress {
+              0% { transform: translateX(-100%); }
+              50% { transform: translateX(120%); }
+              100% { transform: translateX(320%); }
+            }
+          `
+        }}
+      />
     </header>
   );
 }
