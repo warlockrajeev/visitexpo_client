@@ -11,6 +11,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar.js';
 import Footer from '@/components/Footer.js';
+import GoogleCalendarButton from '@/components/GoogleCalendarButton.js';
 import { useAuth } from '@/context/AuthContext.js';
 import axios from 'axios';
 import {
@@ -613,8 +614,14 @@ export default function InterestedEventsPage() {
                         Remove Interest
                       </button>
 
-                      {/* Right: Get Pass Button */}
-                      <div className="flex items-center gap-2">
+                      {/* Right: Actions */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <GoogleCalendarButton
+                          event={evt}
+                          variant="compact"
+                          className="py-1 px-2.5 text-[11px]"
+                        />
+
                         <Link
                           href={`/expo/${eventSlug}`}
                           className="text-xs font-bold text-zinc-700 hover:text-zinc-950 hover:underline"

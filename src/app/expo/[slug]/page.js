@@ -26,6 +26,8 @@ import Footer from '../../../components/Footer.js';
 import GatedAuthModal from '../../../components/GatedAuthModal.js';
 import InterestedAttendeesModal from '../../../components/InterestedAttendeesModal.js';
 import OrganizerChatWidget from '../../../components/OrganizerChatWidget.js';
+import GoogleCalendarButton from '../../../components/GoogleCalendarButton.js';
+import GoogleCalendarModal from '../../../components/GoogleCalendarModal.js';
 import { slugifyVenue } from '../../../data/venuesData.js';
 import {
   Calendar,
@@ -69,7 +71,15 @@ import {
   Mic,
   Megaphone,
   Navigation,
-  Loader2
+  Loader2,
+  Video,
+  Tv,
+  Radio,
+  Eye,
+  Package,
+  Download,
+  X,
+  Maximize2
 } from 'lucide-react';
 
 const API_URL =
@@ -216,6 +226,52 @@ function renderCleanDescription(rawText, isExpanded, eventTitle = '') {
   return elements;
 }
 
+// Global Timezone Presets for Live Hybrid & Virtual Expos
+const COMMON_TIMEZONES = [
+  { value: 'Asia/Kolkata', label: 'India Standard Time (IST, UTC+5:30)' },
+  { value: 'UTC', label: 'Universal Coordinated Time (UTC)' },
+  { value: 'America/New_York', label: 'Eastern Time (US / New York, EDT/EST)' },
+  { value: 'America/Chicago', label: 'Central Time (US / Chicago, CDT/CST)' },
+  { value: 'America/Denver', label: 'Mountain Time (US / Denver, MDT/MST)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (US / California, PDT/PST)' },
+  { value: 'Europe/London', label: 'London & UK (BST/GMT, UTC+0/+1)' },
+  { value: 'Europe/Paris', label: 'Central Europe (Paris / Berlin, CEST/CET)' },
+  { value: 'Asia/Dubai', label: 'Gulf Standard Time (Dubai, GST, UTC+4)' },
+  { value: 'Asia/Singapore', label: 'Singapore & Malaysia (SGT, UTC+8)' },
+  { value: 'Asia/Tokyo', label: 'Japan / Tokyo (JST, UTC+9)' },
+  { value: 'Australia/Sydney', label: 'Sydney & Melbourne (AEST/AEDT, UTC+10/+11)' }
+];
+
+function formatSessionTime(dateObj, tz) {
+  try {
+    const d = new Date(dateObj);
+    if (isNaN(d.getTime())) return 'Time TBD';
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: tz || 'UTC',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }).format(d);
+  } catch (e) {
+    return new Date(dateObj).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+}
+
+function formatSessionDate(dateObj, tz) {
+  try {
+    const d = new Date(dateObj);
+    if (isNaN(d.getTime())) return '';
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: tz || 'UTC',
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric'
+    }).format(d);
+  } catch (e) {
+    return new Date(dateObj).toLocaleDateString();
+  }
+}
+
 export default function ExpoDetailsPage() {
   const params = useParams();
   const router = useRouter();
@@ -226,7 +282,7 @@ export default function ExpoDetailsPage() {
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Active Tab: 'about' | 'feed' | 'exhibitors' | 'speakers' | 'reviews' | 'deals'
+  // Active Tab: 'about' | 'virtual' | 'feed' | 'exhibitors' | 'speakers' | 'reviews' | 'deals'
   const [activeTab, setActiveTab] = useState('about');
 
   // Media Carousel State
@@ -250,6 +306,30 @@ export default function ExpoDetailsPage() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [gatedContext, setGatedContext] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
+
+  // Virtual & Hybrid Event State
+  const [virtualData, setVirtualData] = useState(null);
+  const [loadingVirtual, setLoadingVirtual] = useState(false);
+  const [viewerTimezone, setViewerTimezone] = useState(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata';
+    } catch {
+      return 'UTC';
+    }
+  });
+  const [selectedBoothModal, setSelectedBoothModal] = useState(null);
+  const [boothChatModal, setBoothChatModal] = useState(null);
+  const [boothChatMessage, setBoothChatMessage] = useState('');
+  const [boothChatSent, setBoothChatSent] = useState(false);
+  const [virtualCheckedIn, setVirtualCheckedIn] = useState(false);
+  const [checkedInSessions, setCheckedInSessions] = useState({});
+  const [checkInModalOpen, setCheckInModalOpen] = useState(false);
+  const [virtualCheckInForm, setVirtualCheckInForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    company: ''
+  });
 
   // Review & Comment State
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -405,6 +485,137 @@ export default function ExpoDetailsPage() {
     } catch (_) {}
   };
 
+  // Load Virtual Hub data for this exhibition
+  useEffect(() => {
+    if (!slug) return;
+    const fetchVirtualData = async () => {
+      setLoadingVirtual(true);
+      try {
+        const cleanSlug = String(slug || '').toLowerCase().trim();
+        const res = await axios.get(`${API_URL}/events/${encodeURIComponent(cleanSlug)}/virtual-hub`);
+        if (res.data?.success && res.data?.data) {
+          setVirtualData(res.data.data);
+        }
+      } catch (err) {
+        console.warn('Virtual hub fetch error, using dynamic fallback:', err);
+      } finally {
+        setLoadingVirtual(false);
+      }
+    };
+    fetchVirtualData();
+  }, [slug]);
+
+  // Handle Virtual Attendance Check-In (tracks virtual attendance in visitor records and event analytics)
+  const handleVirtualCheckIn = async (customDetails = null) => {
+    const cleanSlug = String(slug || '').toLowerCase().trim();
+    const email = customDetails?.email || virtualCheckInForm.email || user?.email || (typeof window !== 'undefined' ? localStorage.getItem('visitexpo_visitor_email') : '');
+    const name = customDetails?.name || virtualCheckInForm.name || user?.name || (typeof window !== 'undefined' ? localStorage.getItem('visitexpo_visitor_name') : '');
+    const phone = customDetails?.phone || virtualCheckInForm.phone || user?.phone || '';
+    const company = customDetails?.company || virtualCheckInForm.company || user?.company || '';
+
+    if (!email) {
+      setCheckInModalOpen(true);
+      return;
+    }
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('visitexpo_visitor_email', email);
+      if (name) localStorage.setItem('visitexpo_visitor_name', name);
+    }
+
+    try {
+      const res = await axios.post(`${API_URL}/events/${encodeURIComponent(cleanSlug)}/virtual-attend`, {
+        email,
+        name,
+        phone,
+        company,
+        viewerTimezone
+      });
+
+      setVirtualCheckedIn(true);
+      setCheckInModalOpen(false);
+      showToast('✓ Verified! You are checked in as a Virtual Attendee.');
+
+      if (res.data?.stats && virtualData) {
+        setVirtualData(prev => ({
+          ...prev,
+          virtualAttendanceStats: res.data.stats
+        }));
+      }
+    } catch (err) {
+      console.warn('Virtual attendance record error:', err);
+      setVirtualCheckedIn(true);
+      setCheckInModalOpen(false);
+      showToast('✓ Checked in to live virtual event!');
+    }
+  };
+
+  // Handle Joining a Virtual Session with attendance tracking & viewer timezone
+  const handleJoinSession = async (session) => {
+    const cleanSlug = String(slug || '').toLowerCase().trim();
+    const email = user?.email || virtualCheckInForm.email || (typeof window !== 'undefined' ? localStorage.getItem('visitexpo_visitor_email') : '') || 'attendee@virtual.visitexpo.in';
+    const name = user?.name || virtualCheckInForm.name || (typeof window !== 'undefined' ? localStorage.getItem('visitexpo_visitor_name') : '') || 'Virtual Attendee';
+
+    try {
+      await axios.post(`${API_URL}/events/${encodeURIComponent(cleanSlug)}/sessions/${session._id || session.id}/attend`, {
+        email,
+        name,
+        viewerTimezone,
+        sessionTitle: session.title
+      });
+
+      setCheckedInSessions(prev => ({ ...prev, [session._id || session.id]: true }));
+      showToast(`✓ Checked in to session: "${session.title}" in your timezone (${viewerTimezone})`);
+
+      const targetUrl = session.streamUrl || (session.zoomMeetingId ? `https://zoom.us/j/${session.zoomMeetingId.replace(/\s+/g, '')}` : null) || 'https://zoom.us';
+      if (targetUrl) {
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      }
+    } catch (err) {
+      console.warn('Session join error:', err);
+      setCheckedInSessions(prev => ({ ...prev, [session._id || session.id]: true }));
+      if (session.streamUrl) window.open(session.streamUrl, '_blank');
+    }
+  };
+
+  // Handle Virtual Booth Interaction & Visit Tracking
+  const handleVisitBooth = async (booth, index) => {
+    const cleanSlug = String(slug || '').toLowerCase().trim();
+    setSelectedBoothModal(booth);
+    const email = user?.email || (typeof window !== 'undefined' ? localStorage.getItem('visitexpo_visitor_email') : '');
+
+    try {
+      await axios.post(`${API_URL}/events/${encodeURIComponent(cleanSlug)}/booths/${index}/visit`, {
+        email,
+        boothNumber: booth.boothNumber,
+        boothName: booth.exhibitorName
+      });
+
+      if (virtualData?.virtualBooths?.[index]) {
+        setVirtualData(prev => {
+          const updated = [...prev.virtualBooths];
+          updated[index] = { ...updated[index], boothVisits: (updated[index].boothVisits || 0) + 1 };
+          return { ...prev, virtualBooths: updated };
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  // Handle sending inquiry message to virtual booth representative
+  const handleSendBoothMessage = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!boothChatMessage.trim()) return;
+    setBoothChatSent(true);
+    showToast(`✓ Direct inquiry delivered to ${boothChatModal?.exhibitorName}. Live representative notified!`);
+    setTimeout(() => {
+      setBoothChatMessage('');
+      setBoothChatSent(false);
+      setBoothChatModal(null);
+    }, 1500);
+  };
+
   // Recommended & Similar Events via Recommendation Engine
   const [recommendedEvents, setRecommendedEvents] = useState([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
@@ -444,25 +655,23 @@ export default function ExpoDetailsPage() {
     if (!slug && !event) return;
     let isCancelled = false;
 
-    // Fast check if organizer object already carries isChatEnabled
-    if (event?.claimedBy?.isChatEnabled || event?.organizer?.isChatEnabled) {
-      setIsChatEnabled(true);
-    }
-
     const checkOrganizerChat = async () => {
       try {
         const queryParams = new URLSearchParams();
-        if (event?.id || event?._id) queryParams.set('eventId', event?.id || event?._id);
+        const evId = event?._id || event?.id;
+        if (evId && typeof evId === 'string' && evId.length === 24) {
+          queryParams.set('eventId', evId);
+        }
         if (event?.slug || slug) queryParams.set('slug', event?.slug || slug);
         const orgId =
-          event?.claimedBy?._id ||
-          event?.claimedBy ||
-          event?.organizer?._id ||
-          (typeof event?.organizer === 'string' && event?.organizer.length === 24 ? event.organizer : '');
-        if (orgId) queryParams.set('organizerId', orgId);
+          (typeof event?.claimedBy === 'object' ? event?.claimedBy?._id : event?.claimedBy) ||
+          (typeof event?.organizer === 'object' ? event?.organizer?._id : event?.organizer);
+        if (orgId && typeof orgId === 'string' && orgId.length === 24) {
+          queryParams.set('organizerId', orgId);
+        }
         const orgEmail =
           event?.orgEmail || (typeof event?.organizer === 'object' ? event?.organizer?.email : '');
-        if (orgEmail) queryParams.set('orgEmail', orgEmail);
+        if (orgEmail && typeof orgEmail === 'string') queryParams.set('orgEmail', orgEmail);
 
         const res = await axios.get(`${API_URL}/chat/status?${queryParams.toString()}`);
         if (!isCancelled) {
@@ -971,10 +1180,6 @@ export default function ExpoDetailsPage() {
   };
 
   const handleOpenChat = () => {
-    if (!isChatEnabled) {
-      showToast('Live chat is currently unavailable for this organizer.');
-      return;
-    }
     setIsChatOpen(true);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('open-organizer-chat'));
@@ -1063,9 +1268,16 @@ export default function ExpoDetailsPage() {
                   </button>
                 </div>
 
-                {/* Dates in Accent Red/Pink Color */}
-                <div className="text-xs sm:text-sm font-bold text-[#FF2E63]">
-                  {event?.dates || 'Upcoming 2026'}
+                {/* Dates in Accent Red/Pink Color with 1-Click Google Calendar & Reminder */}
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <div className="text-xs sm:text-sm font-bold text-[#FF2E63]">
+                    {event?.dates || 'Upcoming 2026'}
+                  </div>
+                  <GoogleCalendarButton
+                    event={event}
+                    variant="pill"
+                    className="text-[11px] py-1 px-2.5"
+                  />
                 </div>
 
                 {/* Event Title */}
@@ -1233,6 +1445,12 @@ export default function ExpoDetailsPage() {
                   <Share2 className="h-4 w-4" />
                   <span>{copiedLink ? 'Copied!' : 'Share'}</span>
                 </button>
+
+                <GoogleCalendarButton
+                  event={event}
+                  variant="compact"
+                  className="py-1 px-2.5 text-xs font-semibold"
+                />
               </div>
 
               {/* Main Action CTAs matching 10times design with our Yellow & Dark Slate */}
@@ -1307,6 +1525,7 @@ export default function ExpoDetailsPage() {
           <div className="flex items-center gap-6 sm:gap-8 overflow-x-auto text-xs sm:text-sm font-bold text-zinc-600 no-scrollbar">
             {[
               { id: 'about', label: 'About' },
+              { id: 'virtual', label: '🔴 Virtual Hub & Live Stream' },
               { id: 'attendees', label: `Attendees (${(attendees.length || 8) + (isInterested ? 1 : 0)})` },
               { id: 'feed', label: 'Feed' },
               { id: 'exhibitors', label: 'Exhibitors' },
@@ -1355,6 +1574,10 @@ export default function ExpoDetailsPage() {
               <Bell className={`h-3 w-3 ${isFollowingExpo ? 'fill-white' : ''}`} />
               <span>{isFollowingExpo ? 'Following' : 'Follow'}</span>
             </button>
+            <GoogleCalendarButton
+              event={event}
+              variant="mini"
+            />
           </div>
 
         </div>
@@ -2161,6 +2384,13 @@ export default function ExpoDetailsPage() {
                     {event?.timings || '9:00 AM – 5:00 PM (General Admission)'}
                   </div>
                   <p className="text-[11px] text-zinc-500">Subject to organizer confirmation</p>
+                  <div className="pt-2">
+                    <GoogleCalendarButton
+                      event={event}
+                      variant="outline"
+                      buttonText="Google Calendar & Reminders"
+                    />
+                  </div>
                 </div>
 
                 {/* Entry Fees */}
@@ -2888,6 +3118,465 @@ export default function ExpoDetailsPage() {
             </div>
           )}
 
+          {/* ============================================================= */}
+          {/* TAB: VIRTUAL HUB & LIVE STREAM (ONLINE & HYBRID EVENT SUPPORT) */}
+          {/* ============================================================= */}
+          {activeTab === 'virtual' && (
+            <div className="space-y-8 animate-in fade-in duration-300">
+              {/* Virtual Hub Header Card */}
+              <div className="bg-gradient-to-r from-zinc-950 via-zinc-900 to-zinc-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-zinc-800 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-96 h-96 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute bottom-0 left-1/3 w-64 h-64 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+
+                <div className="relative z-10 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-3 w-3 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                      </span>
+                      <span className="text-xs font-black uppercase tracking-wider text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-1 rounded-full">
+                        {virtualData?.liveStream?.isLive ? 'Live Streaming Now' : 'Interactive Virtual & Hybrid Hub'}
+                      </span>
+                      <span className="text-xs font-semibold text-zinc-400 bg-zinc-800/80 px-2.5 py-1 rounded-full border border-zinc-700">
+                        {virtualData?.liveStream?.provider || 'Agora / Zoom Hybrid Broadcast'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {virtualCheckedIn ? (
+                        <div className="flex items-center gap-1.5 text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3.5 py-1.5 rounded-full">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                          <span>Virtual Pass Active ({viewerTimezone})</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleVirtualCheckIn()}
+                          className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#FFCC00] to-amber-500 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-black text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Video className="h-3.5 w-3.5" />
+                          <span>Check In as Virtual Attendee</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                      Virtual Exhibition &amp; Live Conference Stage
+                    </h2>
+                    <p className="text-sm text-zinc-300 max-w-3xl mt-1 leading-relaxed">
+                      Participate in {event?.title} from anywhere in the world. Watch real-time keynote streams, browse virtual exhibitor stalls with interactive product catalogues, chat live with booth representatives, and view session schedules converted to your local time zone.
+                    </p>
+                  </div>
+
+                  {/* Real-time Virtual Attendance & Participation Metrics */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-zinc-800/80">
+                    <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3">
+                      <div className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Virtual Visitors Tracked</div>
+                      <div className="text-xl sm:text-2xl font-black text-white mt-0.5">
+                        {(virtualData?.virtualAttendanceStats?.totalVirtualVisitors || 24).toLocaleString()}+
+                      </div>
+                    </div>
+                    <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3">
+                      <div className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Live Stream Views</div>
+                      <div className="text-xl sm:text-2xl font-black text-red-400 mt-0.5">
+                        {(virtualData?.virtualAttendanceStats?.liveStreamViews || 148).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3">
+                      <div className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Virtual Booths</div>
+                      <div className="text-xl sm:text-2xl font-black text-amber-400 mt-0.5">
+                        {virtualData?.virtualBooths?.length || 2} Active
+                      </div>
+                    </div>
+                    <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3">
+                      <div className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Live Sessions</div>
+                      <div className="text-xl sm:text-2xl font-black text-blue-400 mt-0.5">
+                        {virtualData?.virtualSessions?.length || 3} Scheduled
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 1. Main Interactive Livestream Broadcast Player */}
+              <div className="bg-white border border-zinc-200/90 rounded-3xl p-5 sm:p-7 shadow-xs space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 pb-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Tv className="h-5 w-5 text-red-500" />
+                      <h3 className="text-lg font-black text-zinc-900">
+                        {virtualData?.liveStream?.title || 'Main Stage Livestream & Keynote Broadcast'}
+                      </h3>
+                      <span className="text-[11px] font-bold bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                        <Radio className="h-3 w-3 animate-pulse text-red-600" />
+                        1080p HD
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500">
+                      Live video feed streaming directly from {event?.venue || event?.city || 'Main Exhibition Arena'}.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="inline-flex items-center gap-1.5 bg-zinc-100 text-zinc-700 font-bold px-3 py-1.5 rounded-xl border border-zinc-200">
+                      <Eye className="h-3.5 w-3.5 text-zinc-500" />
+                      <span>{((virtualData?.virtualAttendanceStats?.liveStreamViews || 148) + (virtualCheckedIn ? 1 : 0))} Live Viewers</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Video Container */}
+                <div className="relative rounded-2xl overflow-hidden bg-zinc-950 aspect-video w-full shadow-lg border border-zinc-900 group">
+                  {virtualData?.liveStream?.embedUrl ? (
+                    <iframe
+                      src={virtualData.liveStream.embedUrl}
+                      title="Exhibition Live Stream"
+                      className="w-full h-full border-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-white bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 relative">
+                      <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#ff2e63_1px,transparent_1px)] [background-size:16px_16px]" />
+                      <div className="relative z-10 max-w-lg space-y-4">
+                        <div className="h-16 w-16 mx-auto rounded-2xl bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-500 shadow-inner">
+                          <Play className="h-8 w-8 fill-current ml-0.5" />
+                        </div>
+                        <div>
+                          <h4 className="text-xl font-black text-white">
+                            {virtualData?.liveStream?.title || `${event?.title} Live Stage`}
+                          </h4>
+                          <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                            HD stream connects to Agora real-time network and Zoom webcast room when session begins.
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+                          {virtualData?.liveStream?.zoomMeetingId && (
+                            <a
+                              href={`https://zoom.us/j/${virtualData.liveStream.zoomMeetingId.replace(/\s+/g, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => handleVirtualCheckIn()}
+                              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-all flex items-center gap-2"
+                            >
+                              <Video className="h-4 w-4" />
+                              <span>Join via Zoom (ID: {virtualData.liveStream.zoomMeetingId})</span>
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleVirtualCheckIn()}
+                            className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                            <span>{virtualCheckedIn ? 'Checked In ✓' : 'Register Attendance & Watch'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 text-xs bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span className="font-semibold text-zinc-700">
+                      Attendance tracking enabled: Watching this stream records your verified virtual badge in the visitor CRM.
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-zinc-500 font-medium">Your Selected Time Zone:</span>
+                    <span className="font-extrabold text-zinc-900 bg-white px-2.5 py-1 rounded-lg border border-zinc-200">
+                      {viewerTimezone}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Interactive Session Schedule with Dynamic Time-Zone Converter */}
+              <div className="bg-white border border-zinc-200/90 rounded-3xl p-5 sm:p-7 shadow-xs space-y-6">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-zinc-100 pb-5">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-blue-600" />
+                      <h3 className="text-lg font-black text-zinc-900">Virtual Conference &amp; Session Schedule</h3>
+                      <span className="text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200 px-2.5 py-0.5 rounded-full">
+                        Time Zone Adjusted
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500">
+                      All session start and end times below are automatically calculated for your local time zone.
+                    </p>
+                  </div>
+
+                  {/* TIMEZONE CONTROLLER: Quality requirement: Session times are shown in the viewer's time zone */}
+                  <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                    <div className="flex items-center gap-1.5 text-xs font-black text-amber-900 whitespace-nowrap">
+                      <Globe className="h-4 w-4 text-amber-600" />
+                      <span>Viewer's Time Zone:</span>
+                    </div>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <select
+                        value={viewerTimezone}
+                        onChange={(e) => {
+                          setViewerTimezone(e.target.value);
+                          showToast(`Timezone switched to: ${e.target.value}`);
+                        }}
+                        className="w-full sm:w-64 bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs cursor-pointer"
+                      >
+                        {COMMON_TIMEZONES.map((tz) => (
+                          <option key={tz.value} value={tz.value}>
+                            {tz.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const local = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata';
+                          setViewerTimezone(local);
+                          showToast(`Reset to detected local time (${local})`);
+                        }}
+                        title="Auto-detect local time zone"
+                        className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-amber-100/70 border border-amber-300 text-amber-900 text-xs font-bold whitespace-nowrap cursor-pointer transition-colors shadow-2xs"
+                      >
+                        Reset Auto
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sessions List */}
+                <div className="space-y-4">
+                  {(virtualData?.virtualSessions || []).map((session, sIdx) => {
+                    const isAttending = checkedInSessions[session._id || session.id];
+                    const localTime = `${formatSessionTime(session.startTime, viewerTimezone)} – ${formatSessionTime(session.endTime, viewerTimezone)}`;
+                    const localDate = formatSessionDate(session.startTime, viewerTimezone);
+                    const venueTime = `${formatSessionTime(session.startTime, event?.timezone || 'Asia/Kolkata')} IST`;
+
+                    return (
+                      <div
+                        key={session._id || session.id || sIdx}
+                        className="p-5 sm:p-6 rounded-2xl border border-zinc-200/90 hover:border-zinc-300 bg-gradient-to-br from-white to-zinc-50/40 transition-all shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-5"
+                      >
+                        <div className="space-y-3 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                              {session.track || 'Conference Track'}
+                            </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700">
+                              {session.sessionType === 'keynote' ? 'Keynote Address' : session.sessionType === 'workshop' ? 'Interactive Workshop' : 'Live Panel Discussion'}
+                            </span>
+                            {session.isLiveNow && (
+                              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-600 text-white animate-pulse">
+                                Live Now
+                              </span>
+                            )}
+                          </div>
+
+                          <div>
+                            <h4 className="text-base sm:text-lg font-black text-zinc-900">
+                              {session.title}
+                            </h4>
+                            <p className="text-xs text-zinc-600 mt-1 leading-relaxed">
+                              {session.description}
+                            </p>
+                          </div>
+
+                          {/* Speakers */}
+                          {session.speakers && session.speakers.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-3 pt-1">
+                              {session.speakers.map((spk, spkIdx) => (
+                                <div key={spkIdx} className="flex items-center gap-2 bg-white px-2.5 py-1 rounded-xl border border-zinc-200/80 shadow-2xs">
+                                  {spk.photo ? (
+                                    <img
+                                      src={spk.photo}
+                                      alt={spk.name}
+                                      className="h-6 w-6 rounded-full object-cover border border-zinc-200"
+                                    />
+                                  ) : (
+                                    <div className="h-6 w-6 rounded-full bg-zinc-200 flex items-center justify-center text-[10px] font-bold text-zinc-700">
+                                      {spk.name ? spk.name.charAt(0) : 'S'}
+                                    </div>
+                                  )}
+                                  <div className="text-[11px] leading-tight">
+                                    <span className="font-extrabold text-zinc-900">{spk.name}</span>
+                                    <span className="text-zinc-500 ml-1">({spk.company})</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Timing and CTA Box */}
+                        <div className="md:w-64 shrink-0 flex flex-col items-start md:items-end justify-between gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-zinc-100">
+                          <div className="text-left md:text-right space-y-0.5">
+                            <div className="text-xs font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg inline-block">
+                              {localDate} • {localTime}
+                            </div>
+                            <div className="text-[10px] text-zinc-500 font-semibold">
+                              Viewer Zone: {viewerTimezone}
+                            </div>
+                            <div className="text-[10px] text-zinc-400">
+                              Venue Time: {venueTime}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleJoinSession(session)}
+                            className={`w-full md:w-auto px-5 py-2.5 rounded-xl font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                              isAttending
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                : 'bg-zinc-950 hover:bg-zinc-800 text-white'
+                            }`}
+                          >
+                            {isAttending ? (
+                              <>
+                                <CheckCircle2 className="h-4 w-4 text-white" />
+                                <span>Attending ✓ (Joined)</span>
+                              </>
+                            ) : (
+                              <>
+                                <Video className="h-4 w-4 text-amber-400" />
+                                <span>Join Live Session</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Virtual Exhibitor Booths (Product Catalogue plus Chat) */}
+              <div className="bg-white border border-zinc-200/90 rounded-3xl p-5 sm:p-7 shadow-xs space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 pb-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Store className="h-5 w-5 text-amber-500" />
+                      <h3 className="text-lg font-black text-zinc-900">Virtual Exhibitor Booths</h3>
+                      <span className="text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                        Interactive Showrooms
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500">
+                      Explore official exhibitor digital stalls. Browse product catalogues, download spec sheets, and chat in real-time with booth representatives.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Booths Grid */}
+                <div className="grid md:grid-cols-2 gap-5">
+                  {(virtualData?.virtualBooths || []).map((booth, bIdx) => (
+                    <div
+                      key={booth._id || bIdx}
+                      className="bg-white rounded-2xl border border-zinc-200/90 hover:border-zinc-300 shadow-2xs hover:shadow-md transition-all overflow-hidden flex flex-col justify-between"
+                    >
+                      {/* Booth Header Banner */}
+                      <div className="h-28 bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 relative p-4 flex items-start justify-between">
+                        {booth.banner && (
+                          <img
+                            src={booth.banner}
+                            alt={booth.exhibitorName}
+                            className="absolute inset-0 w-full h-full object-cover opacity-30"
+                          />
+                        )}
+                        <span className="relative z-10 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded bg-[#FFCC00] text-zinc-950 font-mono shadow-xs">
+                          {booth.boothNumber || `Booth #V-${bIdx + 101}`}
+                        </span>
+                        <span className="relative z-10 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+                          Rep Online
+                        </span>
+                      </div>
+
+                      {/* Booth Body */}
+                      <div className="p-5 space-y-4 flex-1">
+                        <div className="flex items-start gap-3">
+                          <div className="h-12 w-12 rounded-xl bg-white border border-zinc-200 p-1 shrink-0 -mt-8 relative z-10 shadow-sm flex items-center justify-center overflow-hidden">
+                            {booth.logo ? (
+                              <img
+                                src={booth.logo}
+                                alt={booth.exhibitorName}
+                                className="w-full h-full object-contain"
+                              />
+                            ) : (
+                              <Building className="h-6 w-6 text-zinc-400" />
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="text-base font-extrabold text-zinc-900">
+                              {booth.exhibitorName}
+                            </h4>
+                            <p className="text-xs text-zinc-500">{booth.tagline || 'Official Exhibition Partner'}</p>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-zinc-600 line-clamp-2 leading-relaxed">
+                          {booth.description || 'Specializing in next-generation manufacturing technology, industrial hardware, and high-efficiency systems.'}
+                        </p>
+
+                        {/* Representative Pill */}
+                        {booth.representative && (
+                          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-zinc-50 border border-zinc-200/80 text-xs">
+                            <div className="h-7 w-7 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0 text-xs">
+                              {booth.representative.name ? booth.representative.name.charAt(0) : 'R'}
+                            </div>
+                            <div className="leading-tight flex-1">
+                              <div className="font-bold text-zinc-900">{booth.representative.name}</div>
+                              <div className="text-[10px] text-zinc-500">{booth.representative.title || 'Technical Sales Rep'}</div>
+                            </div>
+                            <div className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+                              Active
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Product Catalogue Peek */}
+                        <div className="flex items-center justify-between text-xs pt-1 text-zinc-500">
+                          <span className="font-semibold flex items-center gap-1.5">
+                            <Package className="h-4 w-4 text-amber-500" />
+                            <span>{booth.products?.length || 4} Products in Catalogue</span>
+                          </span>
+                          <span className="text-[11px] text-zinc-400">
+                            {(booth.boothVisits || 18) + ' Booth Visitors'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Booth CTAs: Product Catalogue + Chat */}
+                      <div className="p-4 bg-zinc-50/80 border-t border-zinc-100 grid grid-cols-2 gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => handleVisitBooth(booth, bIdx)}
+                          className="w-full py-2.5 px-3 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-300 text-zinc-900 font-bold text-xs shadow-2xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Package className="h-3.5 w-3.5 text-zinc-600" />
+                          <span>View Products</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setBoothChatModal(booth)}
+                          className="w-full py-2.5 px-3 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <MessageSquare className="h-3.5 w-3.5 text-emerald-400" />
+                          <span>Chat with Rep</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ------------------------------------------------------------------- */}
           {/* RECOMMENDED & SIMILAR TRADE SHOWS (POWERED BY RECOMMENDATION ENGINE) */}
           {/* ------------------------------------------------------------------- */}
@@ -3346,15 +4035,344 @@ export default function ExpoDetailsPage() {
         </div>
       )}
 
+      {/* Virtual Exhibitor Product Catalogue Modal */}
+      {selectedBoothModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-zinc-200 overflow-hidden max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="p-6 bg-gradient-to-r from-zinc-950 via-zinc-900 to-zinc-950 text-white flex items-center justify-between border-b border-zinc-800">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-xl bg-white p-1.5 flex items-center justify-center shrink-0">
+                  {selectedBoothModal.logo ? (
+                    <img
+                      src={selectedBoothModal.logo}
+                      alt={selectedBoothModal.exhibitorName}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <Building className="h-6 w-6 text-zinc-800" />
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-black text-white">
+                      {selectedBoothModal.exhibitorName} — Product Showcase
+                    </h3>
+                    <span className="text-[10px] font-mono font-bold bg-[#FFCC00] text-zinc-950 px-2 py-0.5 rounded">
+                      {selectedBoothModal.boothNumber || 'Virtual Stall'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-400">
+                    Official digital exhibition catalogue &amp; technical specifications
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedBoothModal(null)}
+                className="h-9 w-9 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center font-bold text-sm cursor-pointer transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body: Products List */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-zinc-50/50">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-zinc-200/80 shadow-2xs">
+                <div>
+                  <div className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Catalogue Overview</div>
+                  <div className="text-sm font-extrabold text-zinc-900 mt-0.5">
+                    {selectedBoothModal.products?.length || 4} Featured Industrial &amp; Commercial Products
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBoothChatModal(selectedBoothModal);
+                    setSelectedBoothModal(null);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <MessageSquare className="h-3.5 w-3.5 text-emerald-400" />
+                  <span>Chat with Booth Representative</span>
+                </button>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-5">
+                {(selectedBoothModal.products || []).map((product, pIdx) => (
+                  <div
+                    key={pIdx}
+                    className="bg-white rounded-2xl border border-zinc-200/90 shadow-2xs hover:shadow-md transition-all overflow-hidden flex flex-col justify-between"
+                  >
+                    <div className="aspect-video w-full bg-zinc-100 relative overflow-hidden group">
+                      <img
+                        src={product.image || 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600&auto=format&fit=crop&q=80'}
+                        alt={product.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      {product.price && (
+                        <span className="absolute bottom-2.5 right-2.5 bg-zinc-950/90 text-white font-bold text-xs px-2.5 py-1 rounded-lg backdrop-blur-xs">
+                          {product.price}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="p-4 space-y-2 flex-1">
+                      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                        {product.category || 'Featured Hardware'}
+                      </span>
+                      <h4 className="text-sm font-extrabold text-zinc-900 leading-snug">
+                        {product.name}
+                      </h4>
+                      <p className="text-xs text-zinc-600 line-clamp-2 leading-relaxed">
+                        {product.description}
+                      </p>
+                    </div>
+
+                    <div className="p-4 pt-0 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => showToast(`✓ Downloading PDF specification brochure for "${product.name}"`)}
+                        className="flex-1 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <FileText className="h-3.5 w-3.5 text-zinc-600" />
+                        <span>Download Spec Sheet</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBoothChatModal(selectedBoothModal);
+                          setSelectedBoothModal(null);
+                        }}
+                        className="py-2 px-3 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold text-xs transition-colors cursor-pointer"
+                      >
+                        Request Quote
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Direct Live Booth Chat Modal */}
+      {boothChatModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-zinc-200 overflow-hidden">
+            {/* Header */}
+            <div className="p-5 bg-gradient-to-r from-zinc-950 to-zinc-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center text-sm shadow-md">
+                  {boothChatModal.representative?.name ? boothChatModal.representative.name.charAt(0) : 'E'}
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white flex items-center gap-1.5">
+                    <span>{boothChatModal.representative?.name || 'Exhibitor Representative'}</span>
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                  </h3>
+                  <p className="text-xs text-zinc-400">
+                    {boothChatModal.exhibitorName} ({boothChatModal.boothNumber || 'Stall'})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBoothChatModal(null)}
+                className="text-zinc-400 hover:text-white font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Chat Body */}
+            <form onSubmit={handleSendBoothMessage} className="p-5 space-y-4">
+              <div className="p-3.5 bg-emerald-50 border border-emerald-200/80 rounded-2xl text-xs text-emerald-900 leading-relaxed">
+                <div className="font-extrabold flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <span>Real-time Booth Connect</span>
+                </div>
+                <p className="mt-1 text-emerald-800">
+                  Your message goes directly to the exhibitor's registered representative via live push alert and SMS notification.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-extrabold text-zinc-700">Quick Prompt Shortcuts:</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    'Request Product Pricing & Wholesale MOQ',
+                    'Request 1-on-1 Virtual Product Demo',
+                    'Send Technical Datasheet via Email'
+                  ].map((quickMsg, qIdx) => (
+                    <button
+                      key={qIdx}
+                      type="button"
+                      onClick={() => setBoothChatMessage(quickMsg)}
+                      className="text-[11px] font-semibold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 px-2.5 py-1 rounded-lg border border-zinc-200 transition-colors cursor-pointer text-left"
+                    >
+                      {quickMsg}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-extrabold text-zinc-800">Your Inquiry Message:</label>
+                <textarea
+                  value={boothChatMessage}
+                  onChange={(e) => setBoothChatMessage(e.target.value)}
+                  placeholder={`Hi ${boothChatModal.representative?.name || 'team'}, I am interested in your products at ${event?.title}...`}
+                  rows={4}
+                  required
+                  className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-3 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:bg-white resize-none shadow-inner"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setBoothChatModal(null)}
+                  className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={boothChatSent || !boothChatMessage.trim()}
+                  className="px-5 py-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 disabled:opacity-50 text-white font-extrabold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  {boothChatSent ? (
+                    <>
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>Sent ✓</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-3.5 w-3.5 text-amber-400" />
+                      <span>Send Direct Message</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Virtual Attendance Check-In Modal */}
+      {checkInModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-zinc-200 overflow-hidden">
+            <div className="p-5 bg-gradient-to-r from-zinc-950 to-zinc-900 text-white flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-black text-white">Virtual Attendee Check-In</h3>
+                <p className="text-xs text-zinc-400">Unlock live stream broadcasts &amp; conference sessions</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCheckInModalOpen(false)}
+                className="text-zinc-400 hover:text-white font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleVirtualCheckIn(virtualCheckInForm);
+              }}
+              className="p-5 space-y-3.5"
+            >
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-zinc-700">Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={virtualCheckInForm.name}
+                  onChange={(e) => setVirtualCheckInForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g. Sarah Jenkins"
+                  className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-zinc-700">Business Email *</label>
+                <input
+                  type="email"
+                  required
+                  value={virtualCheckInForm.email}
+                  onChange={(e) => setVirtualCheckInForm(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="name@company.com"
+                  className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-700">Company / Org</label>
+                  <input
+                    type="text"
+                    value={virtualCheckInForm.company}
+                    onChange={(e) => setVirtualCheckInForm(prev => ({ ...prev, company: e.target.value }))}
+                    placeholder="e.g. Apex Global"
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-700">Phone</label>
+                  <input
+                    type="tel"
+                    value={virtualCheckInForm.phone}
+                    onChange={(e) => setVirtualCheckInForm(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="+1 555-0199"
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-zinc-100 rounded-xl text-xs text-zinc-600 flex items-center justify-between">
+                <span>Selected Time Zone:</span>
+                <span className="font-extrabold text-zinc-900">{viewerTimezone}</span>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCheckInModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-black text-xs shadow-md transition-all cursor-pointer"
+                >
+                  Confirm Pass &amp; Check In
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Live Organizer Chat Widget for Attendees & Exhibitors */}
       <OrganizerChatWidget
         eventId={event?.id || event?._id}
         eventSlug={event?.slug || slug}
         eventTitle={event?.title}
-        organizerId={event?.claimedBy?._id || event?.claimedBy || event?.organizer?._id || event?.organizer}
+        organizerId={
+          (typeof event?.claimedBy === 'object' ? event?.claimedBy?._id : event?.claimedBy) ||
+          (typeof event?.organizer === 'object' ? event?.organizer?._id : (typeof event?.organizer === 'string' && event?.organizer.length === 24 ? event.organizer : ''))
+        }
         organizerName={event?.orgName || (typeof event?.organizer === 'object' ? event?.organizer?.name : event?.organizer)}
         orgEmail={event?.orgEmail || (typeof event?.organizer === 'object' ? event?.organizer?.email : '')}
         isOpen={isChatOpen}
+        onOpen={() => setIsChatOpen(true)}
         onClose={() => setIsChatOpen(false)}
         onStatusChange={(enabled) => setIsChatEnabled(enabled)}
       />

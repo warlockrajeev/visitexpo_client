@@ -16,6 +16,7 @@ import React, { useState } from 'react';
 import { renderCardDescription } from '../utils/textFormatters.js';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import GoogleCalendarButton from './GoogleCalendarButton.js';
 import {
   X,
   Calendar,
@@ -163,6 +164,12 @@ export default function EventDetailModal({
                 <span>{copiedLink ? 'Copied!' : 'Share'}</span>
               </button>
 
+              <GoogleCalendarButton
+                event={event}
+                variant="compact"
+                className="py-1 px-2 text-xs"
+              />
+
               <button
                 type="button"
                 onClick={handleOpenFullPage}
@@ -195,8 +202,15 @@ export default function EventDetailModal({
               </div>
 
               <div className="space-y-1">
-                <div className="text-xs font-bold text-[#FF2E63]">
-                  {event.dates}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="text-xs font-bold text-[#FF2E63]">
+                    {event.dates}
+                  </div>
+                  <GoogleCalendarButton
+                    event={event}
+                    variant="pill"
+                    className="text-[10px] py-0.5 px-2"
+                  />
                 </div>
                 <h2 className="text-lg sm:text-xl font-extrabold text-zinc-900 tracking-tight leading-snug">
                   {event.title} <span className="text-rose-500 text-sm">🛡️</span>

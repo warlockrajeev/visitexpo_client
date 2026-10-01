@@ -41,6 +41,7 @@ export default function OrganizerChatWidget({
   organizerName,
   orgEmail,
   isOpen: controlledIsOpen,
+  onOpen: controlledOnOpen,
   onClose: controlledOnClose,
   onStatusChange
 }) {
@@ -58,6 +59,9 @@ export default function OrganizerChatWidget({
   const handleOpen = () => {
     setInternalIsOpen(true);
     setUnreadCount(0);
+    if (controlledOnOpen) {
+      controlledOnOpen();
+    }
   };
 
   const handleClose = () => {
@@ -124,10 +128,18 @@ export default function OrganizerChatWidget({
     const checkChatStatus = async () => {
       try {
         const queryParams = new URLSearchParams();
-        if (organizerId) queryParams.set('organizerId', organizerId);
-        if (eventId) queryParams.set('eventId', eventId);
-        if (eventSlug) queryParams.set('slug', eventSlug);
-        if (orgEmail) queryParams.set('orgEmail', orgEmail);
+        if (organizerId && typeof organizerId === 'string' && organizerId.trim() && organizerId !== '[object Object]') {
+          queryParams.set('organizerId', organizerId.trim());
+        }
+        if (eventId && typeof eventId === 'string' && eventId.trim() && eventId !== '[object Object]') {
+          queryParams.set('eventId', eventId.trim());
+        }
+        if (eventSlug && typeof eventSlug === 'string' && eventSlug.trim()) {
+          queryParams.set('slug', eventSlug.trim());
+        }
+        if (orgEmail && typeof orgEmail === 'string' && orgEmail.trim()) {
+          queryParams.set('orgEmail', orgEmail.trim());
+        }
 
         const res = await axios.get(`${API_URL}/chat/status?${queryParams.toString()}`);
         if (!isMounted) return;
@@ -310,8 +322,8 @@ export default function OrganizerChatWidget({
     }
   };
 
-  // If organizer has not enabled chat, don't show the widget
-  if (!isChatEnabled) {
+  // If organizer has not enabled chat and modal is not opened, don't show the widget launcher
+  if (!isChatEnabled && !isOpen) {
     return null;
   }
 

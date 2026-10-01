@@ -665,22 +665,19 @@ export default function OrganizersDirectoryPage() {
                         </div>
                       </div>
 
-                      {/* Right: Direct Chat CTA */}
-                      <div className="shrink-0 flex items-center gap-2 self-start md:self-center">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenChat(org)}
-                          disabled={!isOnline}
-                          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all shadow-sm ${
-                            isOnline
-                              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-500/20 hover:scale-102 active:scale-98 cursor-pointer'
-                              : 'bg-secondary text-muted-foreground border border-border cursor-not-allowed opacity-60'
-                          }`}
-                        >
-                          <MessageSquare className="h-4 w-4" />
-                          <span>{isOnline ? 'Chat with Organizer' : 'Chat Offline'}</span>
-                        </button>
-                      </div>
+                      {/* Right: Direct Chat CTA - Only shown when organizer has Live Chat online/enabled */}
+                      {isOnline && (
+                        <div className="shrink-0 flex items-center gap-2 self-start md:self-center">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenChat(org)}
+                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all shadow-sm bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-500/20 hover:scale-102 active:scale-98 cursor-pointer"
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                            <span>Chat with Organizer</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Exhibitions Section */}

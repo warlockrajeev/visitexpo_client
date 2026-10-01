@@ -43,7 +43,13 @@ import {
   Eye,
   EyeOff,
   KeyRound,
-  MessageSquare
+  MessageSquare,
+  Calendar,
+  Bell,
+  Clock,
+  Smartphone,
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 
 const API_URL =
@@ -106,6 +112,116 @@ export default function SettingsPage() {
       setTimeout(() => setErrorMessage(''), 4000);
     } finally {
       setSavingChat(false);
+    }
+  };
+
+  // Calendar Sync & Reminder Preferences State
+  const [calendarSettings, setCalendarSettings] = useState({
+    autoSync: true,
+    preferredProvider: 'google',
+    googleConnected: false,
+    googleEmail: '',
+    outlookConnected: false,
+    outlookEmail: '',
+    reminderTimes: ['24h', '1h', '15m'],
+    channels: { email: true, push: true, sms: false },
+    timezone: 'Asia/Kolkata'
+  });
+  const [loadingCalendar, setLoadingCalendar] = useState(false);
+  const [savingCalendar, setSavingCalendar] = useState(false);
+  const [calendarSaveSuccess, setCalendarSaveSuccess] = useState('');
+
+  // Fetch Calendar Preferences
+  useEffect(() => {
+    const fetchCalendarPreferences = async () => {
+      setLoadingCalendar(true);
+      try {
+        const token = accessToken || (typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null);
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await axios.get(`${API_URL}/calendar/preferences`, {
+          headers,
+          withCredentials: true
+        });
+        if (res.data?.success && res.data.preferences) {
+          setCalendarSettings((prev) => ({
+            ...prev,
+            ...res.data.preferences,
+            channels: {
+              ...prev.channels,
+              ...(res.data.preferences.channels || {})
+            }
+          }));
+        }
+      } catch (err) {
+        console.error('Error fetching calendar preferences:', err);
+      } finally {
+        setLoadingCalendar(false);
+      }
+    };
+
+    fetchCalendarPreferences();
+  }, [accessToken, user]);
+
+  // Save Calendar & Reminder Preferences with visible confirmation
+  const handleSaveCalendarSettings = async (e) => {
+    if (e) e.preventDefault();
+    setSavingCalendar(true);
+    setCalendarSaveSuccess('');
+    try {
+      const token = accessToken || (typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null);
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await axios.put(`${API_URL}/calendar/preferences`, calendarSettings, {
+        headers,
+        withCredentials: true
+      });
+      if (res.data?.success) {
+        setCalendarSaveSuccess('✓ Reminder preferences saved successfully! New registrations will follow this schedule.');
+        setSaveSuccess('Calendar sync & reminder preferences saved successfully!');
+        setTimeout(() => setCalendarSaveSuccess(''), 6000);
+        setTimeout(() => setSaveSuccess(''), 4000);
+      }
+    } catch (err) {
+      setErrorMessage(err.response?.data?.error || 'Failed to save calendar preferences.');
+      setTimeout(() => setErrorMessage(''), 4000);
+    } finally {
+      setSavingCalendar(false);
+    }
+  };
+
+  // Toggle/Connect Provider Account
+  const handleToggleCalendarAccount = async (provider) => {
+    const isConnected = provider === 'google' ? calendarSettings.googleConnected : calendarSettings.outlookConnected;
+    const token = accessToken || (typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null);
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+    try {
+      if (isConnected) {
+        // Disconnect
+        const res = await axios.post(`${API_URL}/calendar/disconnect/${provider}`, {}, { headers, withCredentials: true });
+        if (res.data?.success) {
+          setCalendarSettings((prev) => ({
+            ...prev,
+            ...(provider === 'google' ? { googleConnected: false, googleEmail: '' } : { outlookConnected: false, outlookEmail: '' })
+          }));
+          setCalendarSaveSuccess(`✓ ${provider === 'google' ? 'Google Calendar' : 'Outlook Calendar'} disconnected.`);
+          setTimeout(() => setCalendarSaveSuccess(''), 4000);
+        }
+      } else {
+        // Connect
+        const accountEmail = user?.email || (provider === 'google' ? 'user@gmail.com' : 'user@outlook.com');
+        const res = await axios.post(`${API_URL}/calendar/connect/${provider}`, { accountEmail }, { headers, withCredentials: true });
+        if (res.data?.success) {
+          setCalendarSettings((prev) => ({
+            ...prev,
+            ...(provider === 'google' ? { googleConnected: true, googleEmail: accountEmail } : { outlookConnected: true, outlookEmail: accountEmail })
+          }));
+          setCalendarSaveSuccess(`✓ ${provider === 'google' ? 'Google Calendar' : 'Outlook Calendar'} connected successfully!`);
+          setTimeout(() => setCalendarSaveSuccess(''), 4000);
+        }
+      }
+    } catch (err) {
+      setErrorMessage(err.response?.data?.error || `Failed to update ${provider} connection.`);
+      setTimeout(() => setErrorMessage(''), 4000);
     }
   };
 
@@ -800,15 +916,18 @@ export default function SettingsPage() {
   const tabs = isVisitor
     ? [
         { id: 'profile', label: 'Attendee Profile', icon: User },
+        { id: 'calendar', label: 'Calendar Sync & Reminders', icon: Calendar },
         { id: 'security', label: 'Security & Password', icon: Shield }
       ]
     : isExhibitor
     ? [
         { id: 'profile', label: 'Exhibitor Profile', icon: Building },
+        { id: 'calendar', label: 'Calendar Sync & Reminders', icon: Calendar },
         { id: 'security', label: 'Security & Access', icon: Shield }
       ]
     : [
         { id: 'profile', label: 'Organizer Profile', icon: Building },
+        { id: 'calendar', label: 'Calendar Sync & Reminders', icon: Calendar },
         { id: 'security', label: 'Security & Access', icon: Shield }
       ];
 
@@ -1520,6 +1639,356 @@ export default function SettingsPage() {
                   </>
                 )}
               </button>
+            </form>
+          )}
+
+          {/* Tab: Calendar Sync & Automated Reminders */}
+          {activeTab === 'calendar' && (
+            <form onSubmit={handleSaveCalendarSettings} className="space-y-6">
+              <div className="pb-3 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-primary" /> Calendar Sync &amp; Automated Reminders
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Sync registered trade exhibitions, session schedules, and digital QR passes to Google Calendar or Outlook with automated reminders.
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={savingCalendar}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-sm cursor-pointer disabled:opacity-50 shrink-0"
+                >
+                  {savingCalendar ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Saving Preferences...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" /> Save Preferences
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* VISIBLE SAVE CONFIRMATION BANNER (ACCEPTANCE CRITERIA) */}
+              {calendarSaveSuccess && (
+                <div className="flex items-start gap-3 rounded-2xl bg-emerald-500/10 border-2 border-emerald-500/30 p-4 text-xs font-bold text-emerald-600 transition-all shadow-sm">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <div className="text-sm font-extrabold text-emerald-600">{calendarSaveSuccess}</div>
+                    <div className="text-[11px] text-emerald-600/80 font-medium">
+                      All new event registrations, digital badge downloads, and speaker sessions will automatically use these reminder rules.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Section 1: Automatic Sync Toggle & Primary Provider */}
+              <div className="p-5 rounded-2xl bg-secondary/30 border border-border/80 space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="text-sm font-extrabold text-foreground flex items-center gap-2">
+                      <RefreshCw className="h-4 w-4 text-primary" />
+                      Automatic Calendar Sync
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Automatically add confirmed trade exhibitions, attendee badges, and conference keynotes to your calendar upon registration.
+                    </p>
+                  </div>
+
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
+                    <input
+                      type="checkbox"
+                      checked={calendarSettings.autoSync}
+                      onChange={(e) => setCalendarSettings({ ...calendarSettings, autoSync: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                  </label>
+                </div>
+
+                <div className="pt-2 border-t border-border/60">
+                  <label className="block text-xs font-bold text-foreground mb-2">Primary Calendar Provider</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {[
+                      { id: 'google', label: 'Google Calendar', desc: 'Sync with Gmail & Android devices' },
+                      { id: 'outlook', label: 'Outlook / Office 365', desc: 'Sync with Outlook & Windows devices' },
+                      { id: 'ics', label: 'Apple Calendar / iCal (.ics)', desc: 'Standard universal calendar format' }
+                    ].map((prov) => (
+                      <div
+                        key={prov.id}
+                        onClick={() => setCalendarSettings({ ...calendarSettings, preferredProvider: prov.id })}
+                        className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
+                          calendarSettings.preferredProvider === prov.id
+                            ? 'border-primary bg-primary/5 ring-1 ring-primary/40 shadow-xs'
+                            : 'border-border bg-card hover:bg-secondary/50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-extrabold text-foreground">{prov.label}</span>
+                          {calendarSettings.preferredProvider === prov.id && (
+                            <Check className="h-4 w-4 text-primary font-bold" />
+                          )}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{prov.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Connected Provider Accounts */}
+              <div className="p-5 rounded-2xl bg-card border border-border space-y-4">
+                <div className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Globe className="h-3.5 w-3.5 text-primary" />
+                  Connected Calendar Accounts
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Google Calendar Card */}
+                  <div className="p-4 rounded-xl border border-border/80 bg-secondary/20 flex flex-col justify-between space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-bold text-foreground flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                          Google Calendar
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {calendarSettings.googleConnected
+                            ? `Connected: ${calendarSettings.googleEmail || user?.email}`
+                            : 'Syncs with Google Calendar web & mobile app'}
+                        </p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        calendarSettings.googleConnected
+                          ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+                          : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {calendarSettings.googleConnected ? 'Connected' : 'Available'}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleCalendarAccount('google')}
+                      className={`w-full py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        calendarSettings.googleConnected
+                          ? 'border border-destructive/30 text-destructive hover:bg-destructive/10'
+                          : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xs'
+                      }`}
+                    >
+                      {calendarSettings.googleConnected ? 'Disconnect Google Account' : 'Connect Google Calendar'}
+                    </button>
+                  </div>
+
+                  {/* Outlook Calendar Card */}
+                  <div className="p-4 rounded-xl border border-border/80 bg-secondary/20 flex flex-col justify-between space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-bold text-foreground flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-blue-500" />
+                          Microsoft Outlook / 365
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {calendarSettings.outlookConnected
+                            ? `Connected: ${calendarSettings.outlookEmail || user?.email}`
+                            : 'Syncs with Microsoft Graph & Outlook Live'}
+                        </p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        calendarSettings.outlookConnected
+                          ? 'bg-blue-500/10 text-blue-600 border border-blue-500/20'
+                          : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {calendarSettings.outlookConnected ? 'Connected' : 'Available'}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleCalendarAccount('outlook')}
+                      className={`w-full py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        calendarSettings.outlookConnected
+                          ? 'border border-destructive/30 text-destructive hover:bg-destructive/10'
+                          : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xs'
+                      }`}
+                    >
+                      {calendarSettings.outlookConnected ? 'Disconnect Outlook Account' : 'Connect Microsoft Outlook'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Scheduled Reminder Timelines (Acceptance Criteria) */}
+              <div className="p-5 rounded-2xl bg-card border border-border space-y-4">
+                <div className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-primary" />
+                  Scheduled Reminder Timelines
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Select when you want to receive automatic reminder notifications prior to the exhibition start date:
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    { id: '24h', label: '24 Hours Before (1 Day)', desc: 'Ideal for venue travel preparation and printing badge QR codes.' },
+                    { id: '2h', label: '2 Hours Before', desc: 'Alert for arrival, parking, and security clearance.' },
+                    { id: '1h', label: '1 Hour Before', desc: 'Door opening alert and keynote stage notifications.' },
+                    { id: '15m', label: '15 Minutes Before', desc: 'Final live alert before scheduled keynotes and seminars start.' }
+                  ].map((rem) => {
+                    const isChecked = (calendarSettings.reminderTimes || []).includes(rem.id);
+                    return (
+                      <label
+                        key={rem.id}
+                        className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
+                          isChecked
+                            ? 'border-primary/50 bg-primary/5'
+                            : 'border-border bg-secondary/10 hover:bg-secondary/30'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const current = calendarSettings.reminderTimes || [];
+                            const updated = e.target.checked
+                              ? [...current, rem.id]
+                              : current.filter((t) => t !== rem.id);
+                            setCalendarSettings({ ...calendarSettings, reminderTimes: updated });
+                          }}
+                          className="mt-0.5 rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                        />
+                        <div className="space-y-0.5">
+                          <div className="text-xs font-extrabold text-foreground">{rem.label}</div>
+                          <div className="text-[11px] text-muted-foreground leading-relaxed">{rem.desc}</div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Section 4: Delivery Channels & Timezone */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Notification Delivery Channels */}
+                <div className="p-5 rounded-2xl bg-card border border-border space-y-3">
+                  <div className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Bell className="h-3.5 w-3.5 text-primary" />
+                    Delivery Channels
+                  </div>
+
+                  <div className="space-y-2.5">
+                    <label className="flex items-center justify-between p-2.5 rounded-xl bg-secondary/20 border border-border/60 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-primary" />
+                        <span className="text-xs font-bold text-foreground">Email Notifications</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={calendarSettings.channels?.email !== false}
+                        onChange={(e) =>
+                          setCalendarSettings({
+                            ...calendarSettings,
+                            channels: { ...calendarSettings.channels, email: e.target.checked }
+                          })
+                        }
+                        className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                      />
+                    </label>
+
+                    <label className="flex items-center justify-between p-2.5 rounded-xl bg-secondary/20 border border-border/60 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <Bell className="h-4 w-4 text-primary" />
+                        <span className="text-xs font-bold text-foreground">Browser &amp; In-App Push Alerts</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={calendarSettings.channels?.push !== false}
+                        onChange={(e) =>
+                          setCalendarSettings({
+                            ...calendarSettings,
+                            channels: { ...calendarSettings.channels, push: e.target.checked }
+                          })
+                        }
+                        className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                      />
+                    </label>
+
+                    <label className="flex items-center justify-between p-2.5 rounded-xl bg-secondary/20 border border-border/60 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <Smartphone className="h-4 w-4 text-primary" />
+                        <span className="text-xs font-bold text-foreground">SMS / WhatsApp Reminders</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={!!calendarSettings.channels?.sms}
+                        onChange={(e) =>
+                          setCalendarSettings({
+                            ...calendarSettings,
+                            channels: { ...calendarSettings.channels, sms: e.target.checked }
+                          })
+                        }
+                        className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Target Timezone */}
+                <div className="p-5 rounded-2xl bg-card border border-border space-y-3">
+                  <div className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Globe className="h-3.5 w-3.5 text-primary" />
+                    Preferred Timezone
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    All calendar alerts and event start dates will be synchronized with this timezone:
+                  </p>
+
+                  <select
+                    value={calendarSettings.timezone || 'Asia/Kolkata'}
+                    onChange={(e) => setCalendarSettings({ ...calendarSettings, timezone: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-foreground text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="Asia/Kolkata">India Standard Time (IST - Asia/Kolkata)</option>
+                    <option value="Asia/Dubai">Gulf Standard Time (GST - Asia/Dubai)</option>
+                    <option value="Europe/London">Greenwich Mean Time / BST (Europe/London)</option>
+                    <option value="America/New_York">Eastern Time (EST - America/New_York)</option>
+                    <option value="America/Los_Angeles">Pacific Time (PST - America/Los_Angeles)</option>
+                    <option value="Asia/Singapore">Singapore Time (SGT - Asia/Singapore)</option>
+                    <option value="Asia/Tokyo">Japan Standard Time (JST - Asia/Tokyo)</option>
+                    <option value="Europe/Berlin">Central European Time (CET - Europe/Berlin)</option>
+                  </select>
+
+                  <div className="text-[11px] text-muted-foreground bg-secondary/30 p-2.5 rounded-xl border border-border/50">
+                    💡 <span className="font-semibold text-foreground">Tip:</span> Calendar invites automatically adjust to local daylight saving time when opened on mobile devices.
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Actions with Visible Save Confirmation */}
+              <div className="pt-4 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
+                <span className="text-xs text-muted-foreground">
+                  Changes take effect immediately for upcoming event registrations.
+                </span>
+
+                <button
+                  type="submit"
+                  disabled={savingCalendar}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  {savingCalendar ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Saving Preferences...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" /> Save Calendar &amp; Reminder Preferences
+                    </>
+                  )}
+                </button>
+              </div>
             </form>
           )}
 
