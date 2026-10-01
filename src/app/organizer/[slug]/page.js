@@ -11,6 +11,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '../../../components/Navbar.js';
+import OrganizerChatWidget from '../../../components/OrganizerChatWidget.js';
 import {
   Building,
   Calendar,
@@ -566,6 +567,12 @@ export default function OrganizerProfilePage() {
             ))}
           </div>
         </div>
+
+        {/* Live Organizer Chat Widget */}
+        <OrganizerChatWidget
+          organizerName={organizer?.name}
+          organizerId={organizer?.id}
+        />
 
       </main>
     </div>

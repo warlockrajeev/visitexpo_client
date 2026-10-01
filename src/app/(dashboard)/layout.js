@@ -31,7 +31,8 @@ import {
   Globe,
   Home,
   ArrowLeft,
-  ArrowRight
+  ArrowRight,
+  MessageSquare
 } from 'lucide-react';
 
 import axios from 'axios';
@@ -46,6 +47,7 @@ const API_URL =
 export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dynamicEvents, setDynamicEvents] = useState([]);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
   const pathname = usePathname();
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
@@ -54,6 +56,25 @@ export default function DashboardLayout({ children }) {
   useEffect(() => {
     initSweetAlertInterceptors();
   }, []);
+
+  // Poll chat settings & unread count for organizers
+  useEffect(() => {
+    let timer;
+    const fetchChatStats = async () => {
+      if (user && user.role !== 'visitor') {
+        try {
+          const res = await axios.get(`${API_URL}/chat/settings`, { withCredentials: true });
+          if (res.data?.success && res.data?.stats) {
+            setUnreadChatCount(res.data.stats.unreadConversations || 0);
+          }
+        } catch (_) {}
+      }
+    };
+
+    fetchChatStats();
+    timer = setInterval(fetchChatStats, 12000);
+    return () => clearInterval(timer);
+  }, [user]);
 
   const handleToggleView = () => {
     if (typeof toggleDashboardView === 'function') {
@@ -185,6 +206,7 @@ export default function DashboardLayout({ children }) {
   const navigation = user.role === 'visitor'
     ? [
         { name: 'My Passes & Badges', href: '/dashboard', icon: Ticket },
+        { name: 'Organizers & Expos', href: '/organizers', icon: Building, badge: 'Live Chat' },
         { name: 'Recommended For You', href: '/recommendations', icon: Compass, badge: 'AI Match' },
         { name: 'Browse Live Expos', href: '/expos', icon: Calendar },
         { name: 'My Profile & Settings', href: '/settings', icon: Settings },
@@ -192,10 +214,17 @@ export default function DashboardLayout({ children }) {
     : (user.role === 'exhibitor' || isExhibitorView)
     ? [
         { name: 'Exhibitor Hub', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'Organizers & Expos', href: '/organizers', icon: Building, badge: 'Live Chat' },
         { name: 'Settings', href: '/settings', icon: Settings },
       ]
     : [
         { name: 'Dashboard Hub', href: '/dashboard', icon: LayoutDashboard },
+        {
+          name: 'Live Chat',
+          href: '/chat',
+          icon: MessageSquare,
+          badge: unreadChatCount > 0 ? `${unreadChatCount} new` : (user.isChatEnabled ? 'Live' : null)
+        },
         { name: 'Event Wizard', href: '/events/wizard', icon: Wand2, badge: 'Onboarding' },
         { name: 'Claim Event', href: '/events/claim', icon: ShieldCheck },
         { name: 'Manage Events', href: '/manage-events', icon: Calendar },
@@ -214,6 +243,8 @@ export default function DashboardLayout({ children }) {
       if (user?.role === 'exhibitor' || isExhibitorView) return 'Exhibitor Hub';
       return 'Organizer Dashboard Hub';
     }
+    if (path === '/organizers') return 'Event Organizers & Exhibitions Directory';
+    if (path === '/chat') return 'Live Chat Desk & Attendee Hub';
     if (path === '/expos') return 'Live Exhibitions & Passes';
     if (path === '/events/wizard') return 'Event Onboarding Wizard';
     if (path === '/events/claim') return 'Claim Existing Event';

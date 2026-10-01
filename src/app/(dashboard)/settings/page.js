@@ -42,7 +42,8 @@ import {
   Lock,
   Eye,
   EyeOff,
-  KeyRound
+  KeyRound,
+  MessageSquare
 } from 'lucide-react';
 
 const API_URL =
@@ -66,6 +67,47 @@ export default function SettingsPage() {
   const [savingOrg, setSavingOrg] = useState(false);
   const [savingSecurity, setSavingSecurity] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
+  // Live Chat Settings State
+  const [chatSettings, setChatSettings] = useState({
+    isChatEnabled: false,
+    chatStatus: 'offline',
+    chatWelcomeMessage: 'Hello! Welcome to our exhibition desk. How can we assist you today?',
+    chatAutoReply: true
+  });
+  const [savingChat, setSavingChat] = useState(false);
+
+  useEffect(() => {
+    if (user && user.role !== 'visitor') {
+      axios
+        .get(`${API_URL}/chat/settings`, { withCredentials: true })
+        .then((res) => {
+          if (res.data?.success && res.data.settings) {
+            setChatSettings({
+              isChatEnabled: !!res.data.settings.isChatEnabled,
+              chatStatus: res.data.settings.chatStatus || 'offline',
+              chatWelcomeMessage: res.data.settings.chatWelcomeMessage || '',
+              chatAutoReply: res.data.settings.chatAutoReply !== false
+            });
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user]);
+
+  const handleSaveChatSettings = async () => {
+    setSavingChat(true);
+    try {
+      await axios.patch(`${API_URL}/chat/settings`, chatSettings, { withCredentials: true });
+      setSaveSuccess('Live Chat settings updated successfully!');
+      setTimeout(() => setSaveSuccess(''), 4000);
+    } catch (err) {
+      setErrorMessage(err.response?.data?.message || 'Failed to update live chat settings.');
+      setTimeout(() => setErrorMessage(''), 4000);
+    } finally {
+      setSavingChat(false);
+    }
+  };
 
   // Password Visibility States
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -1380,6 +1422,88 @@ export default function SettingsPage() {
                   />
                 </div>
               </div>
+
+              {/* LIVE CHAT DESK PREFERENCES */}
+              {!isExhibitor && (
+                <div className="space-y-4 p-5 border border-primary/20 bg-primary/5 rounded-2xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                        <MessageSquare className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-foreground">
+                          Attendee & Exhibitor Live Chat Desk
+                        </h4>
+                        <p className="text-xs text-muted-foreground">
+                          Allow visitors and prospective exhibitors to chat directly with your team on your expo pages.
+                        </p>
+                      </div>
+                    </div>
+
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={chatSettings.isChatEnabled}
+                        onChange={(e) =>
+                          setChatSettings((prev) => ({
+                            ...prev,
+                            isChatEnabled: e.target.checked,
+                            chatStatus: e.target.checked ? 'online' : 'offline'
+                          }))
+                        }
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-zinc-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
+                    </label>
+                  </div>
+
+                  {chatSettings.isChatEnabled && (
+                    <div className="space-y-3 pt-2 border-t border-border/50">
+                      <div>
+                        <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">
+                          Custom Welcome Greeting Message
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={chatSettings.chatWelcomeMessage}
+                          onChange={(e) =>
+                            setChatSettings((prev) => ({ ...prev, chatWelcomeMessage: e.target.value }))
+                          }
+                          placeholder="Type your greeting message..."
+                          className="w-full rounded-xl border border-border bg-background p-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground">
+                          Send greeting automatically on first message
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={chatSettings.chatAutoReply}
+                          onChange={(e) =>
+                            setChatSettings((prev) => ({ ...prev, chatAutoReply: e.target.checked }))
+                          }
+                          className="h-4 w-4 rounded border-border text-primary"
+                        />
+                      </div>
+
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={handleSaveChatSettings}
+                          disabled={savingChat}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all shadow-xs"
+                        >
+                          {savingChat ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                          Update Live Chat Settings
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <button
                 type="submit"

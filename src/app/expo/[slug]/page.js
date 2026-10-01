@@ -25,6 +25,7 @@ import Navbar from '../../../components/Navbar.js';
 import Footer from '../../../components/Footer.js';
 import GatedAuthModal from '../../../components/GatedAuthModal.js';
 import InterestedAttendeesModal from '../../../components/InterestedAttendeesModal.js';
+import OrganizerChatWidget from '../../../components/OrganizerChatWidget.js';
 import { slugifyVenue } from '../../../data/venuesData.js';
 import {
   Calendar,
@@ -1027,6 +1028,20 @@ export default function ExpoDetailsPage() {
                   className="flex-1 sm:flex-none px-5 py-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-extrabold text-xs sm:text-sm shadow-sm border border-zinc-300 transition-all hover:scale-102 active:scale-98 cursor-pointer text-center"
                 >
                   Request Booth
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.dispatchEvent(new CustomEvent('open-organizer-chat'));
+                    }
+                  }}
+                  className="flex-1 sm:flex-none px-5 py-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-extrabold text-xs sm:text-sm shadow-xs transition-all hover:scale-102 active:scale-98 cursor-pointer text-center inline-flex items-center justify-center gap-1.5"
+                  title="Chat directly with the organizer of this exhibition"
+                >
+                  <MessageSquare className="h-4 w-4 text-emerald-600" />
+                  <span>Chat with Organizer</span>
                 </button>
               </div>
 
@@ -2907,6 +2922,16 @@ export default function ExpoDetailsPage() {
           <span>{toastMessage}</span>
         </div>
       )}
+
+      {/* Live Organizer Chat Widget for Attendees & Exhibitors */}
+      <OrganizerChatWidget
+        eventId={event?.id || event?._id}
+        eventSlug={event?.slug || slug}
+        eventTitle={event?.title}
+        organizerId={event?.claimedBy?._id || event?.claimedBy || event?.organizer?._id || event?.organizer}
+        organizerName={event?.orgName || (typeof event?.organizer === 'object' ? event?.organizer?.name : event?.organizer)}
+        orgEmail={event?.orgEmail || (typeof event?.organizer === 'object' ? event?.organizer?.email : '')}
+      />
 
       {/* Footer */}
       <Footer />

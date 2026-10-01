@@ -46,7 +46,8 @@ import {
   UserCheck,
   Bell,
   Bookmark,
-  X
+  X,
+  MessageSquare
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -900,6 +901,21 @@ function ExhibitorDashboard() {
                 You are registered as an official trade exhibitor. Connect your company to an upcoming exhibition event below to activate your booth dashboard, manage your team delegate passes, and showcase products to trade buyers.
               </p>
             </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href="/organizers"
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-xs font-bold transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+              >
+                <MessageSquare className="h-4 w-4" /> Organizers &amp; Live Chat
+              </Link>
+              <Link
+                href="/expos"
+                className="inline-flex items-center gap-2 rounded-xl border border-border bg-secondary hover:bg-secondary/80 px-4 py-2.5 text-xs font-bold text-foreground transition-colors cursor-pointer"
+              >
+                <Calendar className="h-4 w-4" /> Browse Expos
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -1049,13 +1065,22 @@ function ExhibitorDashboard() {
           />
         </div>
 
-        <button
-          onClick={() => setShowAddBoothModal(true)}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-secondary hover:bg-secondary/80 text-foreground border border-border transition-colors cursor-pointer shrink-0"
-        >
-          <Plus className="h-3.5 w-3.5 text-primary" />
-          Add Another Expo Booth
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Link
+            href="/organizers"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer shadow-sm"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            Organizers &amp; Live Chat
+          </Link>
+          <button
+            onClick={() => setShowAddBoothModal(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-secondary hover:bg-secondary/80 text-foreground border border-border transition-colors cursor-pointer"
+          >
+            <Plus className="h-3.5 w-3.5 text-primary" />
+            Add Another Expo Booth
+          </button>
+        </div>
       </div>
 
       {/* Lock Warning Alert Banner if pending or rejected */}
@@ -1113,6 +1138,32 @@ function ExhibitorDashboard() {
             {profile.attendanceType?.replace('_', ' ') || 'in-person'} Booth
           </span>
         </div>
+      </div>
+
+      {/* Organizers & Live Chat Spotlight Banner for Exhibitors */}
+      <div className="bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-primary/10 border border-purple-500/20 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+            <span className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+              B2B Expo Organizers Directory
+            </span>
+          </div>
+          <h3 className="text-base sm:text-lg font-bold text-foreground">
+            Connect with 500+ Event Organizers for Booth &amp; Sponsorship Opportunities
+          </h3>
+          <p className="text-xs text-muted-foreground max-w-xl">
+            Discover upcoming trade exhibitions, search by sector or city, and chat live with organizers to secure prime stall locations.
+          </p>
+        </div>
+        <Link
+          href="/organizers"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs shadow-md shadow-primary/20 shrink-0 transition-all hover:scale-102"
+        >
+          <Building className="h-4 w-4" />
+          <span>Explore Organizers &amp; Chat</span>
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
       </div>
 
       {/* Modal: Add Another Booth */}
@@ -1597,6 +1648,12 @@ function VisitorDashboard() {
             <Ticket className="h-4 w-4" /> Claim Passes Here
           </a>
           <Link
+            href="/organizers"
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-xs font-bold transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+          >
+            <MessageSquare className="h-4 w-4" /> Organizers &amp; Live Chat
+          </Link>
+          <Link
             href="/expos"
             className="inline-flex items-center gap-2 rounded-xl border border-border bg-secondary hover:bg-secondary/80 px-4 py-2.5 text-xs font-bold text-foreground transition-colors cursor-pointer"
           >
@@ -1610,6 +1667,32 @@ function VisitorDashboard() {
             Refresh
           </button>
         </div>
+      </div>
+
+      {/* Organizers & Live Chat Spotlight Card */}
+      <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-primary/10 border border-emerald-500/20 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              Live Organizer Desk
+            </span>
+          </div>
+          <h3 className="text-base sm:text-lg font-bold text-foreground">
+            Explore 500+ Event Organizers &amp; Exhibitions
+          </h3>
+          <p className="text-xs text-muted-foreground max-w-xl">
+            Browse verified trade fair organizers, view their upcoming expos, and chat directly in real-time with organizers who have live chat enabled.
+          </p>
+        </div>
+        <Link
+          href="/organizers"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-500/20 shrink-0 transition-all hover:scale-102"
+        >
+          <Building className="h-4 w-4" />
+          <span>Explore Organizers &amp; Chat</span>
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
       </div>
 
       {/* Status Alerts */}
