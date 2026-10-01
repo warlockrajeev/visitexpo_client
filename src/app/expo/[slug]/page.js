@@ -68,7 +68,8 @@ import {
   Award,
   Mic,
   Megaphone,
-  Navigation
+  Navigation,
+  Loader2
 } from 'lucide-react';
 
 const API_URL =
@@ -265,6 +266,11 @@ export default function ExpoDetailsPage() {
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [helpfulLikedIds, setHelpfulLikedIds] = useState(new Set());
   const [eventReviews, setEventReviews] = useState([]);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+
+  // Live Organizer Chat State
+  const [isChatEnabled, setIsChatEnabled] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Auto-prefill author details from user auth context
   useEffect(() => {
@@ -432,6 +438,49 @@ export default function ExpoDetailsPage() {
 
   // FAQ Accordion State
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
+
+  // Check if Organizer has Live Chat enabled for this event
+  useEffect(() => {
+    if (!slug && !event) return;
+    let isCancelled = false;
+
+    // Fast check if organizer object already carries isChatEnabled
+    if (event?.claimedBy?.isChatEnabled || event?.organizer?.isChatEnabled) {
+      setIsChatEnabled(true);
+    }
+
+    const checkOrganizerChat = async () => {
+      try {
+        const queryParams = new URLSearchParams();
+        if (event?.id || event?._id) queryParams.set('eventId', event?.id || event?._id);
+        if (event?.slug || slug) queryParams.set('slug', event?.slug || slug);
+        const orgId =
+          event?.claimedBy?._id ||
+          event?.claimedBy ||
+          event?.organizer?._id ||
+          (typeof event?.organizer === 'string' && event?.organizer.length === 24 ? event.organizer : '');
+        if (orgId) queryParams.set('organizerId', orgId);
+        const orgEmail =
+          event?.orgEmail || (typeof event?.organizer === 'object' ? event?.organizer?.email : '');
+        if (orgEmail) queryParams.set('orgEmail', orgEmail);
+
+        const res = await axios.get(`${API_URL}/chat/status?${queryParams.toString()}`);
+        if (!isCancelled) {
+          setIsChatEnabled(Boolean(res.data?.success && res.data?.isChatEnabled));
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          setIsChatEnabled(false);
+        }
+      }
+    };
+
+    checkOrganizerChat();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [slug, event]);
 
   // Fetch Event by slug or ID from dedicated API route or fallback to WordPress API
   useEffect(() => {
@@ -921,6 +970,17 @@ export default function ExpoDetailsPage() {
     }
   };
 
+  const handleOpenChat = () => {
+    if (!isChatEnabled) {
+      showToast('Live chat is currently unavailable for this organizer.');
+      return;
+    }
+    setIsChatOpen(true);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('open-organizer-chat'));
+    }
+  };
+
   if (loading && !event) {
     return (
       <div className="min-h-screen bg-white">
@@ -942,13 +1002,13 @@ export default function ExpoDetailsPage() {
   const editionLabel = event?.edition || '11th Edition';
 
   return (
-    <div className="min-h-screen bg-[#F6F7F9] text-zinc-900 font-sans antialiased selection:bg-[#FF2E63] selection:text-white pb-20">
+    <div className="min-h-screen flex flex-col bg-[#F6F7F9] text-zinc-900 font-sans antialiased selection:bg-[#FF2E63] selection:text-white">
       
       {/* Universal Navbar */}
       <Navbar solid={true} />
 
       {/* Main Container */}
-      <main className="pt-20 sm:pt-24 max-w-7xl mx-auto px-4 sm:px-6 space-y-6">
+      <main className="flex-1 pt-20 sm:pt-24 max-w-7xl mx-auto px-4 sm:px-6 space-y-6 w-full pb-20">
 
         {/* Breadcrumb Navigation */}
         <div className="flex items-center gap-2 text-xs text-zinc-500 pt-2">
@@ -1218,19 +1278,18 @@ export default function ExpoDetailsPage() {
                   Request Booth
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (typeof window !== 'undefined') {
-                      window.dispatchEvent(new CustomEvent('open-organizer-chat'));
-                    }
-                  }}
-                  className="flex-1 sm:flex-none px-5 py-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-extrabold text-xs sm:text-sm shadow-xs transition-all hover:scale-102 active:scale-98 cursor-pointer text-center inline-flex items-center justify-center gap-1.5"
-                  title="Chat directly with the organizer of this exhibition"
-                >
-                  <MessageSquare className="h-4 w-4 text-emerald-600" />
-                  <span>Chat with Organizer</span>
-                </button>
+                {/* 4. Chat with Organizer - Only displayed when Live Chat is enabled by organizer */}
+                {isChatEnabled && (
+                  <button
+                    type="button"
+                    onClick={handleOpenChat}
+                    className="flex-1 sm:flex-none px-5 py-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-extrabold text-xs sm:text-sm shadow-xs transition-all hover:scale-102 active:scale-98 cursor-pointer text-center inline-flex items-center justify-center gap-1.5"
+                    title="Chat directly with the organizer of this exhibition"
+                  >
+                    <MessageSquare className="h-4 w-4 text-emerald-600" />
+                    <span>Chat with Organizer</span>
+                  </button>
+                )}
               </div>
 
             </div>
@@ -3295,6 +3354,9 @@ export default function ExpoDetailsPage() {
         organizerId={event?.claimedBy?._id || event?.claimedBy || event?.organizer?._id || event?.organizer}
         organizerName={event?.orgName || (typeof event?.organizer === 'object' ? event?.organizer?.name : event?.organizer)}
         orgEmail={event?.orgEmail || (typeof event?.organizer === 'object' ? event?.organizer?.email : '')}
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        onStatusChange={(enabled) => setIsChatEnabled(enabled)}
       />
 
       {/* Footer */}

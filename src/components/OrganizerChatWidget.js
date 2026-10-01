@@ -39,17 +39,33 @@ export default function OrganizerChatWidget({
   eventTitle,
   organizerId,
   organizerName,
-  orgEmail
+  orgEmail,
+  isOpen: controlledIsOpen,
+  onClose: controlledOnClose,
+  onStatusChange
 }) {
   const { user } = useAuth();
 
   // Chat Status & Availability
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
   const [isChatEnabled, setIsChatEnabled] = useState(false);
   const [organizerInfo, setOrganizerInfo] = useState(null);
   const [welcomeMessage, setWelcomeMessage] = useState(
     'Hello! Welcome to our exhibition desk. How can we assist you today?'
   );
+
+  const handleOpen = () => {
+    setInternalIsOpen(true);
+    setUnreadCount(0);
+  };
+
+  const handleClose = () => {
+    setInternalIsOpen(false);
+    if (controlledOnClose) {
+      controlledOnClose();
+    }
+  };
 
   // Form & Conversation state
   const [conversation, setConversation] = useState(null);
@@ -84,8 +100,7 @@ export default function OrganizerChatWidget({
       setSessionId(storedSession);
 
       const handleOpenTrigger = () => {
-        setIsOpen(true);
-        setUnreadCount(0);
+        handleOpen();
       };
       window.addEventListener('open-organizer-chat', handleOpenTrigger);
       return () => window.removeEventListener('open-organizer-chat', handleOpenTrigger);
@@ -105,6 +120,7 @@ export default function OrganizerChatWidget({
 
   // 2. Query Organizer Live Chat Status from Backend
   useEffect(() => {
+    let isMounted = true;
     const checkChatStatus = async () => {
       try {
         const queryParams = new URLSearchParams();
@@ -114,23 +130,39 @@ export default function OrganizerChatWidget({
         if (orgEmail) queryParams.set('orgEmail', orgEmail);
 
         const res = await axios.get(`${API_URL}/chat/status?${queryParams.toString()}`);
+        if (!isMounted) return;
         if (res.data?.success) {
-          setIsChatEnabled(!!res.data.isChatEnabled);
+          const enabled = !!res.data.isChatEnabled;
+          setIsChatEnabled(enabled);
+          if (onStatusChange) onStatusChange(enabled);
           if (res.data.organizer) {
             setOrganizerInfo(res.data.organizer);
           }
           if (res.data.chatWelcomeMessage) {
             setWelcomeMessage(res.data.chatWelcomeMessage);
           }
+        } else {
+          setIsChatEnabled(false);
+          if (onStatusChange) onStatusChange(false);
         }
       } catch (err) {
         console.warn('Could not verify organizer chat status:', err);
+        if (!isMounted) return;
+        setIsChatEnabled(false);
+        if (onStatusChange) onStatusChange(false);
       }
     };
 
     if (organizerId || eventId || eventSlug || orgEmail) {
       checkChatStatus();
+    } else {
+      setIsChatEnabled(false);
+      if (onStatusChange) onStatusChange(false);
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [organizerId, eventId, eventSlug, orgEmail]);
 
   // 3. Check for existing active conversation in localStorage or participant API
@@ -290,11 +322,9 @@ export default function OrganizerChatWidget({
       {/* Floating Launcher Button (Bottom Right) */}
       {!isOpen && (
         <button
-          onClick={() => {
-            setIsOpen(true);
-            setUnreadCount(0);
-          }}
-          className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 px-4 py-3 rounded-full bg-gradient-to-r from-primary to-primary/90 text-primary-foreground font-bold text-xs shadow-xl shadow-primary/30 hover:scale-105 transition-all duration-200 group"
+          type="button"
+          onClick={handleOpen}
+          className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 px-4 py-3 rounded-full bg-gradient-to-r from-primary to-primary/90 text-primary-foreground font-bold text-xs shadow-xl shadow-primary/30 hover:scale-105 transition-all duration-200 group cursor-pointer"
           aria-label="Chat with Organizer"
         >
           {/* Pulsing Online Dot */}
@@ -339,15 +369,17 @@ export default function OrganizerChatWidget({
 
             <div className="flex items-center gap-1">
               <button
-                onClick={() => setIsOpen(false)}
-                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+                type="button"
+                onClick={handleClose}
+                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Minimize chat"
               >
                 <Minimize2 className="h-4 w-4" />
               </button>
               <button
-                onClick={() => setIsOpen(false)}
-                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+                type="button"
+                onClick={handleClose}
+                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Close chat"
               >
                 <X className="h-4 w-4" />

@@ -43,7 +43,7 @@ const YouTubeIcon = ({ className = "h-4 w-4" }) => (
   </svg>
 );
 
-export default function Footer() {
+export default function Footer({ className = '' }) {
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
 
@@ -58,7 +58,7 @@ export default function Footer() {
   };
 
   return (
-    <footer className="bg-zinc-950 text-zinc-400 text-xs border-t border-zinc-800/80">
+    <footer className={`bg-zinc-950 text-zinc-400 text-xs border-t border-zinc-800/80 mt-auto w-full ${className}`}>
       {/* Main Grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10">
