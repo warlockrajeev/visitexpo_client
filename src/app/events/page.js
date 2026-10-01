@@ -44,7 +44,10 @@ import {
   LocateFixed,
   Navigation,
   Loader2,
-  Heart
+  Heart,
+  Crown,
+  Sparkles,
+  Ticket
 } from 'lucide-react';
 import {
   calculateDistanceKm,
@@ -95,6 +98,11 @@ export default function EventsDirectoryPage() {
   const [toDate, setToDate] = useState('');
   const [sortBy, setSortBy] = useState('upcoming'); // 'upcoming' | 'rating' | 'turnout' | 'title'
   const [featuredOnly, setFeaturedOnly] = useState(false);
+  const [top10Only, setTop10Only] = useState(false);
+  const [freePassOnly, setFreePassOnly] = useState(false);
+  const [minRating, setMinRating] = useState('all'); // 'all' | '4.8' | '4.5' | '4.0'
+  const [dateQuickFilter, setDateQuickFilter] = useState('all'); // 'all' | 'this_month' | 'next_30' | 'next_90' | 'this_year' | 'weekend'
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
 
   // Proximity / Nearby State
@@ -134,6 +142,22 @@ export default function EventsDirectoryPage() {
         setSortBy('turnout');
       } else if (sortParam === 'rating') {
         setSortBy('rating');
+      }
+      if (sp.get('top10') === 'true' || sortParam === 'top10') {
+        setTop10Only(true);
+        setSortBy('rating');
+      }
+      if (sp.get('state')) {
+        setSelectedState(sp.get('state'));
+      }
+      if (sp.get('venue')) {
+        setSelectedVenue(sp.get('venue'));
+      }
+      if (sp.get('minRating')) {
+        setMinRating(sp.get('minRating'));
+      }
+      if (sp.get('freePass') === 'true') {
+        setFreePassOnly(true);
       }
     }
   }, []);
@@ -313,65 +337,123 @@ export default function EventsDirectoryPage() {
       }
     }
 
+    // Free Pass Only Filter
+    if (freePassOnly) {
+      list = list.filter((e) => !e.entryType || e.entryType.toLowerCase().includes('free'));
+    }
+
+    // Minimum Rating Filter
+    if (minRating !== 'all') {
+      const min = parseFloat(minRating);
+      list = list.filter((e) => (parseFloat(e.rating) || 4.0) >= min);
+    }
+
+    // Date Quick Filter
+    if (dateQuickFilter !== 'all') {
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+
+      list = list.filter((e) => {
+        if (!e.startDate) return true;
+        const s = new Date(e.startDate);
+        if (isNaN(s.getTime())) return true;
+
+        if (dateQuickFilter === 'this_month') {
+          return s.getMonth() === currentMonth && s.getFullYear() === currentYear;
+        }
+        if (dateQuickFilter === 'next_30') {
+          const diffDays = (s.getTime() - now.getTime()) / (1000 * 3600 * 24);
+          return diffDays >= 0 && diffDays <= 30;
+        }
+        if (dateQuickFilter === 'next_90') {
+          const diffDays = (s.getTime() - now.getTime()) / (1000 * 3600 * 24);
+          return diffDays >= 0 && diffDays <= 90;
+        }
+        if (dateQuickFilter === 'this_year') {
+          return s.getFullYear() === currentYear;
+        }
+        if (dateQuickFilter === 'weekend') {
+          const day = s.getDay(); // 0 is Sun, 5 is Fri, 6 is Sat
+          return day === 0 || day === 5 || day === 6;
+        }
+        return true;
+      });
+    }
+
     // Featured Only Filter
     if (featuredOnly) {
       list = list.filter((e) => e.featured);
     }
 
-    // Proximity / Nearby Distance Calculation & Sorting
-    if (isNearbyActive && userLocation) {
-      list = list.map((e) => {
-        const coords = resolveEventCoordinates(e);
-        const distanceKm = coords ? calculateDistanceKm(userLocation.lat, userLocation.lng, coords.lat, coords.lng) : null;
-        return { ...e, distanceKm };
-      });
-
-      // Sort closest first
+    // Top 10 Rated Filter (specifically top 10 highest-rated expos across all events)
+    if (top10Only) {
       list.sort((a, b) => {
-        if (a.distanceKm == null && b.distanceKm == null) return 0;
-        if (a.distanceKm == null) return 1;
-        if (b.distanceKm == null) return -1;
-        return a.distanceKm - b.distanceKm;
+        const rA = parseFloat(a.rating) || 4.5;
+        const rB = parseFloat(b.rating) || 4.5;
+        if (rB !== rA) return rB - rA;
+        const cA = parseInt(String(a.reviewCount || 0), 10) || 0;
+        const cB = parseInt(String(b.reviewCount || 0), 10) || 0;
+        if (cB !== cA) return cB - cA;
+        return (a.title || '').localeCompare(b.title || '');
       });
+      list = list.slice(0, 10);
     } else {
-      // Standard Sorting
-      list.sort((a, b) => {
-        if (sortBy === 'rating') {
-          const rA = parseFloat(a.rating) || 4.0;
-          const rB = parseFloat(b.rating) || 4.0;
-          return rB - rA;
-        }
-        if (sortBy === 'title') {
-          return (a.title || '').localeCompare(b.title || '');
-        }
-        if (sortBy === 'turnout') {
-          const parseTurnout = (t = '') => {
-            const m = String(t).match(/(\d+[\d,]*)/);
-            return m ? parseInt(m[1].replace(/,/g, ''), 10) : 0;
-          };
-          return parseTurnout(b.attendees) - parseTurnout(a.attendees);
-        }
-        // Default: upcoming startDate (upcoming events chronologically first, then past events)
-        const now = Date.now();
-        const timeA = a.startDate ? new Date(a.startDate).getTime() : 0;
-        const timeB = b.startDate ? new Date(b.startDate).getTime() : 0;
-        const isFutureA = timeA >= now;
-        const isFutureB = timeB >= now;
+      // Proximity / Nearby Distance Calculation & Sorting
+      if (isNearbyActive && userLocation) {
+        list = list.map((e) => {
+          const coords = resolveEventCoordinates(e);
+          const distanceKm = coords ? calculateDistanceKm(userLocation.lat, userLocation.lng, coords.lat, coords.lng) : null;
+          return { ...e, distanceKm };
+        });
 
-        if (isFutureA && !isFutureB) return -1;
-        if (!isFutureA && isFutureB) return 1;
-        if (isFutureA && isFutureB) return timeA - timeB; // soonest upcoming first
-        return timeB - timeA; // past: most recent first
-      });
+        // Sort closest first
+        list.sort((a, b) => {
+          if (a.distanceKm == null && b.distanceKm == null) return 0;
+          if (a.distanceKm == null) return 1;
+          if (b.distanceKm == null) return -1;
+          return a.distanceKm - b.distanceKm;
+        });
+      } else {
+        // Standard Sorting
+        list.sort((a, b) => {
+          if (sortBy === 'rating') {
+            const rA = parseFloat(a.rating) || 4.0;
+            const rB = parseFloat(b.rating) || 4.0;
+            return rB - rA;
+          }
+          if (sortBy === 'title') {
+            return (a.title || '').localeCompare(b.title || '');
+          }
+          if (sortBy === 'turnout') {
+            const parseTurnout = (t = '') => {
+              const m = String(t).match(/(\d+[\d,]*)/);
+              return m ? parseInt(m[1].replace(/,/g, ''), 10) : 0;
+            };
+            return parseTurnout(b.attendees) - parseTurnout(a.attendees);
+          }
+          // Default: upcoming startDate (upcoming events chronologically first, then past events)
+          const now = Date.now();
+          const timeA = a.startDate ? new Date(a.startDate).getTime() : 0;
+          const timeB = b.startDate ? new Date(b.startDate).getTime() : 0;
+          const isFutureA = timeA >= now;
+          const isFutureB = timeB >= now;
+
+          if (isFutureA && !isFutureB) return -1;
+          if (!isFutureA && isFutureB) return 1;
+          if (isFutureA && isFutureB) return timeA - timeB; // soonest upcoming first
+          return timeB - timeA; // past: most recent first
+        });
+      }
     }
 
     return list;
-  }, [events, searchQuery, selectedCategory, selectedState, selectedCity, selectedVenue, fromDate, toDate, sortBy, featuredOnly, isNearbyActive, userLocation]);
+  }, [events, searchQuery, selectedCategory, selectedState, selectedCity, selectedVenue, fromDate, toDate, sortBy, featuredOnly, isNearbyActive, userLocation, top10Only, freePassOnly, minRating, dateQuickFilter]);
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedCategory, selectedState, selectedCity, selectedVenue, fromDate, toDate, sortBy, featuredOnly, isNearbyActive]);
+  }, [searchQuery, selectedCategory, selectedState, selectedCity, selectedVenue, fromDate, toDate, sortBy, featuredOnly, isNearbyActive, top10Only, freePassOnly, minRating, dateQuickFilter]);
 
   // Pagination calculation
   const totalPages = Math.ceil(filteredEvents.length / ITEMS_PER_PAGE) || 1;
@@ -591,6 +673,10 @@ export default function EventsDirectoryPage() {
     setSortBy('upcoming');
     setFeaturedOnly(false);
     setIsNearbyActive(false);
+    setTop10Only(false);
+    setFreePassOnly(false);
+    setMinRating('all');
+    setDateQuickFilter('all');
     setCurrentPage(1);
   };
 
@@ -604,7 +690,11 @@ export default function EventsDirectoryPage() {
     toDate !== '' ||
     sortBy !== 'upcoming' ||
     featuredOnly ||
-    isNearbyActive;
+    isNearbyActive ||
+    top10Only ||
+    freePassOnly ||
+    minRating !== 'all' ||
+    dateQuickFilter !== 'all';
 
   // Unauthenticated session guard screen
   if (authLoading || !user) {
@@ -756,8 +846,27 @@ export default function EventsDirectoryPage() {
               })}
             </div>
 
-            {/* Quick Tools on Right: Nearby, Featured & Reset */}
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Quick Tools on Right: Top 10 Rated, Nearby, Featured & Reset */}
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              {/* Top 10 Rated Quick Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !top10Only;
+                  setTop10Only(next);
+                  if (next) setSortBy('rating');
+                }}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+                  top10Only
+                    ? 'bg-amber-400 text-zinc-950 border-amber-400 font-black shadow-amber-200/50 shadow-md ring-2 ring-amber-300'
+                    : 'bg-white text-zinc-800 border-zinc-200 hover:bg-amber-50 hover:border-amber-300'
+                }`}
+                title="Filter to Top 10 Highest Rated Exhibitions"
+              >
+                <Crown className={`h-3.5 w-3.5 ${top10Only ? 'fill-zinc-950 text-zinc-950' : 'fill-amber-400 text-amber-500'}`} />
+                <span>Top 10 Rated</span>
+              </button>
+
               <button
                 type="button"
                 onClick={handleToggleNearby}
@@ -802,12 +911,321 @@ export default function EventsDirectoryPage() {
               )}
             </div>
           </div>
+
+          {/* ========================================================================= */}
+          {/* ADVANCED SEARCHING & FILTERING CONSOLE (Highlighted Red Box Area)          */}
+          {/* ========================================================================= */}
+          <div className="pt-3 border-t border-zinc-150 space-y-2.5">
+            {/* Row 1: Fast Filter Badges */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-[11px] font-extrabold text-zinc-400 uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
+                <SlidersHorizontal className="h-3 w-3 text-zinc-500" />
+                <span>Quick Filters:</span>
+              </span>
+
+              {/* Free Pass Only */}
+              <button
+                type="button"
+                onClick={() => setFreePassOnly((p) => !p)}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-2xs ${
+                  freePassOnly
+                    ? 'bg-emerald-600 text-white font-extrabold shadow-sm'
+                    : 'bg-white border border-zinc-200 text-zinc-700 hover:border-emerald-500'
+                }`}
+              >
+                <Ticket className="h-3.5 w-3.5 text-emerald-500" />
+                <span>Free Visitor Pass</span>
+              </button>
+
+              {/* This Month */}
+              <button
+                type="button"
+                onClick={() => setDateQuickFilter((d) => (d === 'this_month' ? 'all' : 'this_month'))}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-2xs ${
+                  dateQuickFilter === 'this_month'
+                    ? 'bg-blue-600 text-white font-extrabold shadow-sm'
+                    : 'bg-white border border-zinc-200 text-zinc-700 hover:border-blue-400'
+                }`}
+              >
+                <Calendar className="h-3.5 w-3.5 text-blue-500" />
+                <span>Happening This Month</span>
+              </button>
+
+              {/* Next 90 Days */}
+              <button
+                type="button"
+                onClick={() => setDateQuickFilter((d) => (d === 'next_90' ? 'all' : 'next_90'))}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-2xs ${
+                  dateQuickFilter === 'next_90'
+                    ? 'bg-purple-600 text-white font-extrabold shadow-sm'
+                    : 'bg-white border border-zinc-200 text-zinc-700 hover:border-purple-400'
+                }`}
+              >
+                <span>Next 90 Days</span>
+              </button>
+
+              {/* 4.5+ Rating */}
+              <button
+                type="button"
+                onClick={() => setMinRating((r) => (r === '4.5' ? 'all' : '4.5'))}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-2xs ${
+                  minRating === '4.5'
+                    ? 'bg-amber-500 text-white font-extrabold shadow-sm'
+                    : 'bg-white border border-zinc-200 text-zinc-700 hover:border-amber-400'
+                }`}
+              >
+                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
+                <span>⭐ 4.5+ Rating</span>
+              </button>
+
+              {/* Toggle Advanced Filters Button */}
+              <button
+                type="button"
+                onClick={() => setShowAdvancedFilters((p) => !p)}
+                className="ml-auto px-3 py-1 rounded-xl text-xs font-bold text-zinc-700 hover:text-zinc-950 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              >
+                <Filter className="h-3 w-3 text-zinc-500" />
+                <span>{showAdvancedFilters ? 'Hide Search Filters' : 'More Search Filters ▾'}</span>
+              </button>
+            </div>
+
+            {/* Row 2: Expanded Secondary Dropdowns (State, Venue, Rating, Dates) */}
+            {showAdvancedFilters && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3.5 rounded-2xl bg-zinc-50 border border-zinc-200 shadow-inner animate-in fade-in duration-200">
+                {/* State Dropdown */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-zinc-500 uppercase tracking-wider block">
+                    Filter by State / Region
+                  </label>
+                  <select
+                    value={selectedState}
+                    onChange={(e) => setSelectedState(e.target.value)}
+                    className="w-full px-3 py-2 text-xs font-semibold rounded-xl bg-white border border-zinc-200 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] cursor-pointer shadow-2xs"
+                  >
+                    <option value="all">All States &amp; Regions</option>
+                    {availableStates.map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Venue Dropdown */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-zinc-500 uppercase tracking-wider block">
+                    Filter by Venue / Center
+                  </label>
+                  <select
+                    value={selectedVenue}
+                    onChange={(e) => setSelectedVenue(e.target.value)}
+                    className="w-full px-3 py-2 text-xs font-semibold rounded-xl bg-white border border-zinc-200 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] cursor-pointer shadow-2xs"
+                  >
+                    <option value="all">All Venues &amp; Centers</option>
+                    {availableVenues.map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Minimum Rating Dropdown */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-zinc-500 uppercase tracking-wider block">
+                    Minimum Rating
+                  </label>
+                  <select
+                    value={minRating}
+                    onChange={(e) => setMinRating(e.target.value)}
+                    className="w-full px-3 py-2 text-xs font-semibold rounded-xl bg-white border border-zinc-200 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] cursor-pointer shadow-2xs"
+                  >
+                    <option value="all">All Ratings (Any Star)</option>
+                    <option value="4.8">⭐ 4.8 Stars &amp; Above</option>
+                    <option value="4.5">⭐ 4.5 Stars &amp; Above</option>
+                    <option value="4.0">⭐ 4.0 Stars &amp; Above</option>
+                  </select>
+                </div>
+
+                {/* Date Range Picker */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-zinc-500 uppercase tracking-wider block">
+                    Custom Date Range
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="date"
+                      value={fromDate}
+                      onChange={(e) => setFromDate(e.target.value)}
+                      className="w-1/2 px-2.5 py-1.5 text-[11px] font-semibold rounded-xl bg-white border border-zinc-200 text-zinc-900 focus:outline-none shadow-2xs"
+                      title="From date"
+                    />
+                    <span className="text-zinc-400 text-xs font-bold">–</span>
+                    <input
+                      type="date"
+                      value={toDate}
+                      onChange={(e) => setToDate(e.target.value)}
+                      className="w-1/2 px-2.5 py-1.5 text-[11px] font-semibold rounded-xl bg-white border border-zinc-200 text-zinc-900 focus:outline-none shadow-2xs"
+                      title="To date"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Row 3: Active Filters Summary Badges */}
+            {hasActiveFilters && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
+                <span className="text-[11px] text-zinc-400 font-extrabold uppercase tracking-wider">Active:</span>
+                {top10Only && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[11px] shadow-2xs">
+                    <Crown className="h-3 w-3 text-amber-600 fill-amber-500" />
+                    <span>Top 10 Rated</span>
+                    <button
+                      type="button"
+                      onClick={() => setTop10Only(false)}
+                      className="hover:text-amber-950 font-black cursor-pointer ml-0.5"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                )}
+                {freePassOnly && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold text-[11px] shadow-2xs">
+                    <span>Free Pass</span>
+                    <button
+                      type="button"
+                      onClick={() => setFreePassOnly(false)}
+                      className="hover:text-emerald-950 font-black cursor-pointer ml-0.5"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                )}
+                {selectedCity !== 'all' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-900 border border-zinc-300 font-bold text-[11px] shadow-2xs">
+                    <span>City: {selectedCity}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCity('all')}
+                      className="hover:text-zinc-950 font-black cursor-pointer ml-0.5"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                )}
+                {selectedState !== 'all' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-900 border border-zinc-300 font-bold text-[11px] shadow-2xs">
+                    <span>State: {selectedState}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedState('all')}
+                      className="hover:text-zinc-950 font-black cursor-pointer ml-0.5"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                )}
+                {selectedVenue !== 'all' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-900 border border-zinc-300 font-bold text-[11px] shadow-2xs">
+                    <span>Venue: {selectedVenue}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedVenue('all')}
+                      className="hover:text-zinc-950 font-black cursor-pointer ml-0.5"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                )}
+                {minRating !== 'all' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[11px] shadow-2xs">
+                    <span>⭐ {minRating}+ Stars</span>
+                    <button
+                      type="button"
+                      onClick={() => setMinRating('all')}
+                      className="hover:text-amber-950 font-black cursor-pointer ml-0.5"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                )}
+                {dateQuickFilter !== 'all' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-900 border border-blue-300 font-bold text-[11px] shadow-2xs">
+                    <span>Date: {dateQuickFilter.replace('_', ' ')}</span>
+                    <button
+                      type="button"
+                      onClick={() => setDateQuickFilter('all')}
+                      className="hover:text-blue-950 font-black cursor-pointer ml-0.5"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                )}
+                {selectedCategory !== 'All' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-900 border border-zinc-300 font-bold text-[11px] shadow-2xs">
+                    <span>{selectedCategory}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCategory('All')}
+                      className="hover:text-zinc-950 font-black cursor-pointer ml-0.5"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                )}
+                {searchQuery && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-900 border border-zinc-300 font-bold text-[11px] shadow-2xs">
+                    <span>Search: &ldquo;{searchQuery}&rdquo;</span>
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="hover:text-zinc-950 font-black cursor-pointer ml-0.5"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="text-[11px] font-extrabold text-rose-600 hover:text-rose-700 underline cursor-pointer ml-1"
+                >
+                  Clear all filters
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
       {/* Main Content Area - Event Cards Grid starts right here! */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-5">
         <div id="events-grid-anchor" className="scroll-mt-4" />
+
+        {/* Top 10 Rated Active Banner */}
+        {top10Only && (
+          <div className="bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50 border border-amber-300 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 text-xs text-amber-950 shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-zinc-950 shadow-sm">
+                <Crown className="h-4 w-4 fill-zinc-950" />
+              </div>
+              <div>
+                <span className="font-black text-sm text-zinc-950 block">Top 10 Highest-Rated Exhibitions Active</span>
+                <span className="text-zinc-700 text-xs">
+                  Displaying the 10 most prestigious trade shows ranked by verified buyer ratings and attendee reviews.
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setTop10Only(false)}
+              className="px-3.5 py-1.5 rounded-xl bg-white border border-amber-300 hover:bg-amber-100 text-zinc-950 font-black transition-all shadow-2xs cursor-pointer text-xs"
+            >
+              Show All Exhibitions
+            </button>
+          </div>
+        )}
 
         {/* Results Count Line */}
         <div className="flex items-center justify-between text-xs text-zinc-500 pb-1">
@@ -930,10 +1348,18 @@ export default function EventsDirectoryPage() {
 
                     {/* Top Badges Row */}
                     <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between z-10 pointer-events-none">
-                      {/* Category Badge on Left */}
-                      <span className="px-3.5 py-1 rounded-full text-[11px] font-black bg-zinc-950/80 text-white shadow-lg border border-white/20 backdrop-blur-md">
-                        {evt.category || 'Trade Show'}
-                      </span>
+                      {/* Category or Top Rank Badge on Left */}
+                      <div className="flex items-center gap-1.5 pointer-events-auto">
+                        {(top10Only || (sortBy === 'rating' && (currentPage - 1) * ITEMS_PER_PAGE + idx < 10)) && (
+                          <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-zinc-950 shadow-xl ring-2 ring-white inline-flex items-center gap-1">
+                            <Crown className="h-3 w-3 fill-zinc-950" />
+                            <span>#{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1} Ranked</span>
+                          </span>
+                        )}
+                        <span className="px-3.5 py-1 rounded-full text-[11px] font-black bg-zinc-950/80 text-white shadow-lg border border-white/20 backdrop-blur-md">
+                          {evt.category || 'Trade Show'}
+                        </span>
+                      </div>
 
                       {/* Free Visitor Pass Badge + Interest + Bookmark Buttons on Right */}
                       <div className="flex items-center gap-1.5 pointer-events-auto">

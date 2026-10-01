@@ -65,6 +65,7 @@ import BrowseByCity from '../components/BrowseByCity.js';
 import ExploreVenues from '../components/ExploreVenues.js';
 import FeaturedOrganizers from '../components/FeaturedOrganizers.js';
 import PeoplesReviews from '../components/PeoplesReviews.js';
+import TopRatedExhibitions from '../components/TopRatedExhibitions.js';
 import Footer from '../components/Footer.js';
 
 const API_URL =
@@ -694,6 +695,11 @@ export default function LandingPage() {
       {/* 2.5 ACTION DISCOVERY BANNER (Find What Matters & Time to Act)             */}
       {/* ========================================================================= */}
       <ActionDiscoveryBanner onKeywordClick={handleBannerKeywordClick} />
+
+      {/* ========================================================================= */}
+      {/* TOP 10 RATED EXHIBITIONS SHOWCASE                                         */}
+      {/* ========================================================================= */}
+      <TopRatedExhibitions events={events} />
 
       {/* ========================================================================= */}
       {/* 3. THREE PERSONA ONBOARDING CARDS                                         */}

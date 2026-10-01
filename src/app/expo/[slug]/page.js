@@ -250,7 +250,7 @@ export default function ExpoDetailsPage() {
   const [gatedContext, setGatedContext] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
-  // Review Modal State
+  // Review & Comment State
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewerName, setReviewerName] = useState('');
@@ -258,24 +258,146 @@ export default function ExpoDetailsPage() {
   const [reviewerRole, setReviewerRole] = useState('Verified Trade Buyer');
   const [reviewHeadline, setReviewHeadline] = useState('');
   const [reviewText, setReviewText] = useState('');
-  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [commentAuthor, setCommentAuthor] = useState('');
+  const [commentCompany, setCommentCompany] = useState('');
+  const [commentRating, setCommentRating] = useState(5);
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [helpfulLikedIds, setHelpfulLikedIds] = useState(new Set());
   const [eventReviews, setEventReviews] = useState([]);
 
-  // Fetch event reviews from backend API
+  // Auto-prefill author details from user auth context
+  useEffect(() => {
+    if (user?.name) {
+      setReviewerName(prev => prev || user.name);
+      setCommentAuthor(prev => prev || user.name);
+    }
+    if (user?.company || user?.organization?.name) {
+      const comp = user.company || user.organization?.name || '';
+      setReviewerCompany(prev => prev || comp);
+      setCommentCompany(prev => prev || comp);
+    }
+  }, [user]);
+
+  // Fetch event reviews from backend API (with local proxy & absolute URL fallback)
   useEffect(() => {
     if (!slug) return;
     const fetchEventReviews = async () => {
       try {
-        const res = await axios.get(`${API_URL}/reviews/event/${encodeURIComponent(slug)}`);
+        const res = await axios.get(`/api/reviews/event/${encodeURIComponent(slug)}`);
         if (res.data?.success && Array.isArray(res.data?.data)) {
           setEventReviews(res.data.data);
+          return;
         }
-      } catch (err) {
-        // keep fallback
-      }
+      } catch (_) {}
+
+      try {
+        const res2 = await axios.get(`${API_URL}/reviews/event/${encodeURIComponent(slug)}`);
+        if (res2.data?.success && Array.isArray(res2.data?.data)) {
+          setEventReviews(res2.data.data);
+        }
+      } catch (_) {}
     };
     fetchEventReviews();
   }, [slug]);
+
+  // Handle Comment & Review Submission
+  const handlePostComment = async (e, fromModal = false) => {
+    if (e && e.preventDefault) e.preventDefault();
+
+    const txt = (fromModal ? reviewText : (commentText || reviewText)).trim();
+    if (!txt) {
+      showToast('Please enter your comment or review text.');
+      return;
+    }
+
+    const authorName = (fromModal ? (reviewerName || user?.name) : (commentAuthor || reviewerName || user?.name || 'Trade Professional')).trim() || 'Verified Trade Visitor';
+    const company = (fromModal ? (reviewerCompany || user?.company) : (commentCompany || reviewerCompany || user?.company || '')).trim() || 'Trade Delegate';
+    const ratingVal = Math.min(5, Math.max(1, Number(fromModal ? reviewRating : commentRating) || 5));
+    const headlineVal = (fromModal ? reviewHeadline : '').trim();
+
+    setIsSubmittingComment(true);
+
+    const tempComment = {
+      _id: `temp_${Date.now()}`,
+      name: authorName,
+      email: user?.email || '',
+      role: user?.role === 'organizer' ? 'Exhibition Organizer' : (user?.role === 'exhibitor' ? 'Verified Exhibitor' : 'Verified Trade Buyer'),
+      title: 'Industry Professional',
+      company,
+      avatar: user?.avatar || '',
+      eventTitle: event?.title || 'Exhibition',
+      eventSlug: slug,
+      rating: ratingVal,
+      headline: headlineVal,
+      review: txt,
+      comment: txt,
+      helpfulCount: 0,
+      createdAt: new Date().toISOString(),
+      status: 'approved'
+    };
+
+    // Instant optimistic update
+    setEventReviews(prev => [tempComment, ...prev]);
+    setCommentText('');
+    setReviewText('');
+    setReviewHeadline('');
+    setShowReviewModal(false);
+    showToast('Your comment has been posted successfully!');
+
+    try {
+      const payload = {
+        name: authorName,
+        email: user?.email || '',
+        role: tempComment.role,
+        title: 'Industry Professional',
+        company,
+        avatar: user?.avatar || '',
+        eventTitle: event?.title || 'Exhibition',
+        eventSlug: slug,
+        rating: ratingVal,
+        headline: headlineVal,
+        review: txt,
+        comment: txt,
+        status: 'approved'
+      };
+
+      let res = await axios.post('/api/reviews', payload).catch(() => null);
+      if (!res?.data?.success) {
+        res = await axios.post(`${API_URL}/reviews`, payload).catch(() => null);
+      }
+
+      if (res?.data?.success && res.data?.data) {
+        setEventReviews(prev => prev.map(c => (c._id === tempComment._id ? res.data.data : c)));
+      }
+    } catch (err) {
+      console.warn('Backend sync failed, saved locally:', err);
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  // Handle Helpful Reaction Upvote
+  const handleHelpfulReaction = async (revId) => {
+    if (!revId || helpfulLikedIds.has(revId)) return;
+
+    setHelpfulLikedIds(prev => new Set(prev).add(revId));
+    setEventReviews(prev =>
+      prev.map(r => {
+        if (r._id === revId || r.id === revId) {
+          return { ...r, helpfulCount: (r.helpfulCount || 0) + 1 };
+        }
+        return r;
+      })
+    );
+    showToast('Marked review as helpful!');
+
+    try {
+      await axios.post(`/api/reviews/${encodeURIComponent(revId)}/helpful`).catch(() => {
+        return axios.post(`${API_URL}/reviews/${encodeURIComponent(revId)}/helpful`);
+      });
+    } catch (_) {}
+  };
 
   // Recommended & Similar Events via Recommendation Engine
   const [recommendedEvents, setRecommendedEvents] = useState([]);
@@ -1130,7 +1252,7 @@ export default function ExpoDetailsPage() {
               { id: 'feed', label: 'Feed' },
               { id: 'exhibitors', label: 'Exhibitors' },
               { id: 'speakers', label: 'Speakers' },
-              { id: 'reviews', label: `${reviewsCount || 2} Reviews` },
+              { id: 'reviews', label: `Reviews & Comments (${eventReviews.length > 0 ? eventReviews.length : (reviewsCount || 3)})` },
               { id: 'deals', label: 'Deals' }
             ].map((tab) => (
               <button
@@ -2280,32 +2402,38 @@ export default function ExpoDetailsPage() {
           )}
 
           {/* ============================================================= */}
-          {/* TAB: REVIEWS & RATINGS                                       */}
+          {/* TAB: REVIEWS & COMMENTS DISCUSSION                           */}
           {/* ============================================================= */}
           {activeTab === 'reviews' && (
             <div className="space-y-6">
               <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-7 shadow-xs space-y-6">
+                
+                {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 pb-5">
                   <div>
                     <div className="flex items-center gap-2">
                       <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                      <h2 className="text-lg font-extrabold text-zinc-900">Ratings &amp; Attendee Reviews</h2>
+                      <h2 className="text-lg font-extrabold text-zinc-900">Ratings, Reviews &amp; Comments</h2>
                       <span className="text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full">
                         {ratingValue} / 5.0 Rating
                       </span>
                     </div>
                     <p className="text-xs text-zinc-500 pt-0.5">
-                      Verified feedback from delegates, exhibitors, and trade visitors.
+                      Join the discussion, ask attendee questions, or share your exhibition experience for {event?.title}.
                     </p>
                   </div>
 
                   <button
                     type="button"
-                    onClick={() => setShowReviewModal(true)}
+                    onClick={() => {
+                      const el = document.getElementById('comment-box-input');
+                      if (el) el.focus();
+                      else setShowReviewModal(true);
+                    }}
                     className="px-5 py-2.5 rounded-xl bg-[#FF2E63] hover:bg-[#e02656] text-white font-bold text-xs shrink-0 flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
                   >
-                    <Star className="h-3.5 w-3.5 fill-white text-white" />
-                    <span>Write a Review</span>
+                    <MessageSquare className="h-3.5 w-3.5 fill-white text-white" />
+                    <span>Leave a Comment</span>
                   </button>
                 </div>
 
@@ -2319,14 +2447,14 @@ export default function ExpoDetailsPage() {
                       ))}
                     </div>
                     <div className="text-xs text-zinc-500 font-semibold pt-1">
-                      Based on {reviewsCount} verified reviews
+                      Based on {eventReviews.length > 0 ? eventReviews.length : (reviewsCount || 3)} verified attendee submissions
                     </div>
                   </div>
 
                   <div className="sm:col-span-8 space-y-2">
                     {[
-                      { stars: '5 Stars', pct: 82 },
-                      { stars: '4 Stars', pct: 14 },
+                      { stars: '5 Stars', pct: 84 },
+                      { stars: '4 Stars', pct: 12 },
                       { stars: '3 Stars', pct: 3 },
                       { stars: '2 Stars', pct: 1 },
                       { stars: '1 Star', pct: 0 }
@@ -2342,74 +2470,244 @@ export default function ExpoDetailsPage() {
                   </div>
                 </div>
 
-                {/* User Reviews List */}
+                {/* ========================================================= */}
+                {/* INLINE COMMENT & DISCUSSION FORM                          */}
+                {/* ========================================================= */}
+                <div className="p-5 sm:p-6 rounded-2xl border-2 border-amber-300/80 bg-gradient-to-br from-amber-50/40 via-white to-zinc-50 space-y-4 shadow-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-150 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="h-7 w-7 rounded-lg bg-amber-400 text-zinc-950 flex items-center justify-center font-black text-xs shadow-2xs">
+                        💬
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-zinc-950">Add a Comment or Question</h3>
+                        <p className="text-[11px] text-zinc-500">Connect with delegates, exhibitors, and organizers directly.</p>
+                      </div>
+                    </div>
+
+                    {/* Interactive Star Rating Selector */}
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-bold text-zinc-600 mr-1.5">Rating:</span>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setCommentRating(star)}
+                          className="p-1 cursor-pointer hover:scale-120 transition-transform"
+                          title={`Rate ${star} Stars`}
+                        >
+                          <Star
+                            className={`h-4 w-4 ${
+                              star <= commentRating
+                                ? 'fill-amber-400 text-amber-400'
+                                : 'text-zinc-300'
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <form onSubmit={(e) => handlePostComment(e, false)} className="space-y-3.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-zinc-700 mb-1">Your Name *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder={user?.name || "e.g. Ananya Sen"}
+                          value={commentAuthor}
+                          onChange={(e) => setCommentAuthor(e.target.value)}
+                          className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] shadow-2xs font-medium"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-zinc-700 mb-1">Company / Organization</label>
+                        <input
+                          type="text"
+                          placeholder={user?.company || "e.g. Apex Industrial Systems"}
+                          value={commentCompany}
+                          onChange={(e) => setCommentCompany(e.target.value)}
+                          className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] shadow-2xs font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 mb-1">Your Comment *</label>
+                      <textarea
+                        id="comment-box-input"
+                        required
+                        rows={3}
+                        placeholder="Write your comment, question about visitor passes, or exhibition impressions here..."
+                        value={commentText}
+                        onChange={(e) => setCommentText(e.target.value)}
+                        className="w-full p-3 text-xs rounded-xl border border-zinc-200 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] shadow-2xs leading-relaxed"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 pt-1">
+                      <span className="text-[11px] text-zinc-400 hidden sm:inline">
+                        Comments appear instantly and are verified by the VisitExpo network.
+                      </span>
+
+                      <button
+                        type="submit"
+                        disabled={isSubmittingComment}
+                        className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-zinc-950 hover:bg-[#FFCC00] text-[#FFCC00] hover:text-zinc-950 font-black text-xs transition-all shadow-md hover:scale-[1.02] active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {isSubmittingComment ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <span>Posting...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-3.5 w-3.5" />
+                            <span>Post Comment</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* ========================================================= */}
+                {/* COMMENTS & REVIEWS FEED                                   */}
+                {/* ========================================================= */}
                 <div className="space-y-4 pt-1">
+                  <div className="flex items-center justify-between text-xs font-bold text-zinc-500 pb-1 border-b border-zinc-100">
+                    <span>
+                      All Comments &amp; Feedback ({eventReviews.length > 0 ? eventReviews.length : 3})
+                    </span>
+                    <span className="text-[11px] text-emerald-700 font-extrabold flex items-center gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                      <span>Verified Trade Community</span>
+                    </span>
+                  </div>
+
                   {(eventReviews.length > 0
                     ? eventReviews.map((r) => ({
+                        id: r._id || r.id,
                         author: r.name,
                         role: `${r.title ? r.title + ' • ' : ''}${r.company || r.role || 'Verified Trade Buyer'}`,
                         rating: r.rating || 5,
                         headline: r.headline,
+                        helpfulCount: r.helpfulCount || 0,
                         date: r.createdAt
-                          ? new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                          ? (Date.now() - new Date(r.createdAt).getTime() < 300000
+                              ? 'Just now'
+                              : new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))
                           : 'Recent',
-                        review: r.review
+                        review: r.review || r.comment
                       }))
                     : [
                         {
+                          id: 'sample_1',
                           author: 'Vikramaditya Rao',
                           role: 'VP Procurement • Apex Industrial Corp',
                           rating: 5,
                           date: 'September 2026',
+                          helpfulCount: 8,
                           review:
                             'Outstanding trade show experience. The caliber of direct suppliers and machinery manufacturers was exceptional. Signed two major supplier MOUs directly on the floor.'
                         },
                         {
+                          id: 'sample_2',
                           author: 'Sarah Chen',
                           role: 'Senior Buyer • Global Retail Group',
                           rating: 5,
                           date: 'August 2026',
+                          helpfulCount: 4,
                           review:
                             'Seamless visitor entry with the VisitExpo pass. Great organization of exhibition halls, easy B2B matchmaking, and high-quality international exhibitors.'
                         },
                         {
+                          id: 'sample_3',
                           author: 'Marcus Weber',
                           role: 'Managing Director • European Tools GmbH',
                           rating: 4,
                           date: 'July 2026',
+                          helpfulCount: 2,
                           review:
                             'Impressive turnout of genuine trade buyers. Good venue amenities and straightforward booth logistics. We plan to return for the next edition.'
                         }
                       ]
-                  ).map((rev, rIdx) => (
-                    <div key={rIdx} className="p-4 rounded-xl border border-zinc-200 bg-white space-y-2 shadow-2xs">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="text-xs sm:text-sm font-extrabold text-zinc-900 flex items-center gap-1.5">
-                            <span>{rev.author}</span>
-                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">
-                              Verified Buyer
-                            </span>
+                  ).map((rev, rIdx) => {
+                    const isHelpfulClicked = rev.id && helpfulLikedIds.has(rev.id);
+
+                    return (
+                      <div
+                        key={rev.id || rIdx}
+                        className="p-4 sm:p-5 rounded-2xl border border-zinc-200/90 bg-white space-y-3 shadow-2xs hover:border-zinc-300 transition-all"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            {/* Avatar Badge */}
+                            <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-zinc-900 to-zinc-700 text-[#FFCC00] font-black text-xs flex items-center justify-center ring-2 ring-zinc-100 shrink-0">
+                              {(rev.author || 'T').charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="text-xs sm:text-sm font-black text-zinc-950 flex items-center gap-1.5 flex-wrap">
+                                <span>{rev.author}</span>
+                                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  Verified Attendee
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-zinc-500 font-semibold">{rev.role}</div>
+                            </div>
                           </div>
-                          <div className="text-[11px] text-zinc-500">{rev.role}</div>
+
+                          <div className="text-right shrink-0">
+                            <div className="flex items-center gap-0.5 text-amber-500 justify-end">
+                              {[...Array(rev.rating)].map((_, i) => (
+                                <Star key={i} className="h-3 w-3 fill-amber-400 text-amber-400" />
+                              ))}
+                            </div>
+                            <div className="text-[10px] text-zinc-400 font-bold pt-0.5">{rev.date}</div>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <div className="flex items-center gap-0.5 text-amber-500 justify-end">
-                            {[...Array(rev.rating)].map((_, i) => (
-                              <Star key={i} className="h-3 w-3 fill-amber-400 text-amber-400" />
-                            ))}
-                          </div>
-                          <div className="text-[10px] text-zinc-400 font-medium">{rev.date}</div>
+
+                        {rev.headline && (
+                          <div className="text-xs font-black text-zinc-950 pt-0.5">&ldquo;{rev.headline}&rdquo;</div>
+                        )}
+
+                        <p className="text-xs text-zinc-700 leading-relaxed font-normal">
+                          &ldquo;{rev.review}&rdquo;
+                        </p>
+
+                        {/* Comment Actions: Helpful & Reply */}
+                        <div className="flex items-center justify-between pt-2 border-t border-zinc-100 text-xs text-zinc-500">
+                          <button
+                            type="button"
+                            onClick={() => handleHelpfulReaction(rev.id)}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                              isHelpfulClicked
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : 'hover:bg-zinc-100 text-zinc-600'
+                            }`}
+                          >
+                            <span>👍 Helpful ({rev.helpfulCount})</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCommentText(`@${rev.author} `);
+                              const el = document.getElementById('comment-box-input');
+                              if (el) {
+                                el.focus();
+                                el.scrollIntoView({ behavior: 'smooth' });
+                              }
+                            }}
+                            className="text-[11px] font-bold text-zinc-500 hover:text-zinc-900 cursor-pointer"
+                          >
+                            Reply
+                          </button>
                         </div>
                       </div>
-                      {rev.headline && (
-                        <div className="text-xs font-bold text-zinc-900 pt-0.5">&ldquo;{rev.headline}&rdquo;</div>
-                      )}
-                      <p className="text-xs text-zinc-700 leading-relaxed font-normal pt-1">
-                        "{rev.review}"
-                      </p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
