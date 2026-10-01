@@ -1092,6 +1092,12 @@ export default function EventsPage() {
                         __html: renderCardDescription(evt.description)
                       }}
                     />
+                    {evt.status === 'cancelled' && evt.rejectionReason && (
+                      <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2">
+                        <p className="text-[10px] font-bold uppercase text-destructive">Rejection reason</p>
+                        <p className="mt-0.5 whitespace-pre-wrap text-xs text-foreground">{evt.rejectionReason}</p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-1.5 border-t border-border/60 pt-3">

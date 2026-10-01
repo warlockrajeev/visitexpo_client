@@ -29,8 +29,28 @@ import {
   Loader2,
   Bookmark,
   Star,
-  Bell
+  Bell,
+  Languages
 } from 'lucide-react';
+
+const LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'hi', label: 'Hindi' },
+  { code: 'bn', label: 'Bengali' },
+  { code: 'ta', label: 'Tamil' },
+  { code: 'te', label: 'Telugu' },
+  { code: 'mr', label: 'Marathi' },
+  { code: 'gu', label: 'Gujarati' },
+  { code: 'kn', label: 'Kannada' },
+  { code: 'ml', label: 'Malayalam' },
+  { code: 'pa', label: 'Punjabi' },
+  { code: 'es', label: 'Spanish' },
+  { code: 'fr', label: 'French' },
+  { code: 'de', label: 'German' },
+  { code: 'ar', label: 'Arabic' },
+  { code: 'zh-CN', label: 'Chinese (Simplified)' },
+  { code: 'ja', label: 'Japanese' }
+];
 
 export const Logo = ({ className = "w-9 h-9" }) => (
   <img
@@ -48,6 +68,97 @@ export default function Navbar({ solid = false }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const profileDropdownRef = useRef(null);
+  const [language, setLanguage] = useState(() => {
+    if (typeof window === 'undefined') return 'en';
+    const savedLanguage = window.localStorage.getItem('visitexpo-language');
+    return LANGUAGES.some((item) => item.code === savedLanguage) ? savedLanguage : 'en';
+  });
+  const [translateReady, setTranslateReady] = useState(false);
+  const translateInitialized = useRef(false);
+  const translateMounted = useRef(false);
+
+  useEffect(() => {
+    translateMounted.current = true;
+
+    const initializeGoogleTranslate = () => {
+      const TranslateElement = window.google?.translate?.TranslateElement;
+      if (!TranslateElement || !translateMounted.current || translateInitialized.current) return;
+
+      translateInitialized.current = true;
+      new TranslateElement(
+        {
+          pageLanguage: 'en',
+          includedLanguages: LANGUAGES.map((item) => item.code).join(','),
+          autoDisplay: false
+        },
+        'google_translate_element'
+      );
+      setTranslateReady(true);
+    };
+
+    window.googleTranslateElementInit = initializeGoogleTranslate;
+
+    if (window.google?.translate?.TranslateElement) {
+      initializeGoogleTranslate();
+    } else if (!document.getElementById('google-translate-script')) {
+      const script = document.createElement('script');
+      script.id = 'google-translate-script';
+      script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+
+    return () => {
+      translateMounted.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!translateReady) return undefined;
+
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      const languageSelect = document.querySelector('.goog-te-combo');
+      if (languageSelect) {
+        languageSelect.value = language;
+        languageSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        window.clearInterval(timer);
+      }
+
+      attempts += 1;
+      if (attempts >= 30) window.clearInterval(timer);
+    }, 100);
+
+    return () => window.clearInterval(timer);
+  }, [language, translateReady]);
+
+  const handleLanguageChange = (event) => {
+    const nextLanguage = event.target.value;
+    setLanguage(nextLanguage);
+    window.localStorage.setItem('visitexpo-language', nextLanguage);
+  };
+
+  const renderLanguageSelector = (id) => (
+    <label
+      htmlFor={id}
+      className="inline-flex items-center gap-2 rounded-lg border border-zinc-700/80 bg-zinc-900/90 px-2.5 py-2 text-zinc-300"
+    >
+      <Languages className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+      <select
+        id={id}
+        value={language}
+        onChange={handleLanguageChange}
+        aria-label="Translate website language"
+        className="max-w-32 cursor-pointer bg-transparent text-xs font-semibold text-zinc-100 outline-none"
+      >
+        {LANGUAGES.map((item) => (
+          <option key={item.code} value={item.code} className="bg-zinc-900 text-zinc-100">
+            {item.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -206,6 +317,7 @@ export default function Navbar({ solid = false }) {
 
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-3">
+          {/* {renderLanguageSelector('desktop-language-selector')} */}
           {loading && !user ? (
             <div className="h-8 w-20 rounded-full bg-zinc-850/80 border border-zinc-700/60 animate-pulse" />
           ) : user ? (
@@ -513,6 +625,9 @@ export default function Navbar({ solid = false }) {
 
           {/* Mobile Footer Actions */}
           <div className="pt-3 border-t border-zinc-800">
+            {/* <div className="mb-3">
+              {renderLanguageSelector('mobile-language-selector')}
+            </div> */}
             {loading && !user ? (
               <div className="h-9 w-full rounded-full bg-zinc-850/80 border border-zinc-700/60 animate-pulse" />
             ) : user ? (
@@ -549,6 +664,11 @@ export default function Navbar({ solid = false }) {
           </div>
         </div>
       )}
+      <div
+        id="google_translate_element"
+        className="fixed -left-[10000px] top-0 h-px w-px overflow-hidden"
+        aria-hidden="true"
+      />
       {/* Top Nano Progress Bar on Header */}
       {loadingNavId && (
         <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-zinc-900/60 overflow-hidden pointer-events-none z-50">
