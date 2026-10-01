@@ -86,6 +86,7 @@ export function OrganizerDashboardInner() {
   const [leads, setLeads] = useState([]);
   const [engagements, setEngagements] = useState([]);
   const [loadingEngagements, setLoadingEngagements] = useState(true);
+  const [engagementSearch, setEngagementSearch] = useState('');
 
   useEffect(() => {
     if (!user) return;
@@ -248,6 +249,28 @@ export function OrganizerDashboardInner() {
     { title: 'Exhibitors Onboarded', value: dashboardStats.totalExhibitors.toLocaleString(), change: 'Active across events', icon: Building, color: 'text-amber-500', bg: 'bg-amber-500/10' },
     { title: 'Event Leads', value: dashboardStats.totalLeads.toLocaleString(), change: '+14.2% qualified leads', icon: Target, color: 'text-pink-500', bg: 'bg-pink-500/10' }
   ];
+
+  const engagementQuery = engagementSearch.trim().toLowerCase();
+  const filteredEngagements = engagements.filter((eng) => {
+    if (!engagementQuery) return true;
+    const status = eng.type === 'both'
+      ? 'interested following'
+      : eng.type === 'follower'
+        ? 'following event'
+        : 'marked interested';
+    return [
+      eng.userName,
+      eng.userDesignation,
+      eng.userEmail,
+      eng.userPhone,
+      eng.userCompany,
+      eng.userRole,
+      eng.eventTitle,
+      eng.eventCity,
+      eng.eventDates,
+      status
+    ].some((value) => String(value || '').toLowerCase().includes(engagementQuery));
+  });
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
@@ -548,7 +571,28 @@ export function OrganizerDashboardInner() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-4">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="search"
+                value={engagementSearch}
+                onChange={(e) => setEngagementSearch(e.target.value)}
+                placeholder="Search delegates or events..."
+                aria-label="Search event engagements"
+                className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              {engagementSearch && (
+                <button
+                  type="button"
+                  onClick={() => setEngagementSearch('')}
+                  aria-label="Clear engagement search"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
             <span className="text-xs text-muted-foreground font-semibold">
               Total Engaged: <strong className="text-foreground">{engagements.length}</strong>
             </span>
@@ -575,8 +619,8 @@ export function OrganizerDashboardInner() {
                     <span className="text-xs font-semibold">Loading delegate insights...</span>
                   </td>
                 </tr>
-              ) : engagements.length > 0 ? (
-                engagements.map((eng) => (
+              ) : filteredEngagements.length > 0 ? (
+                filteredEngagements.map((eng) => (
                   <tr key={eng._id} className="hover:bg-muted/10 transition-colors">
                     <td className="p-3">
                       <div className="flex items-center gap-2.5">
@@ -631,8 +675,14 @@ export function OrganizerDashboardInner() {
                   <td colSpan={6} className="p-8 text-center text-muted-foreground">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <UserCheck className="h-8 w-8 text-muted-foreground/30 mx-auto" />
-                      <p className="font-semibold text-xs text-foreground">No Event Engagements Yet</p>
-                      <p className="text-[10px]">When trade buyers or visitors mark interest or follow your exhibitions, their profiles will appear here.</p>
+                      <p className="font-semibold text-xs text-foreground">
+                        {engagementQuery ? 'No Matching Delegates' : 'No Event Engagements Yet'}
+                      </p>
+                      <p className="text-[10px]">
+                        {engagementQuery
+                          ? 'Try a different name, company, event, or engagement status.'
+                          : 'When trade buyers or visitors mark interest or follow your exhibitions, their profiles will appear here.'}
+                      </p>
                     </div>
                   </td>
                 </tr>
