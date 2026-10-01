@@ -534,11 +534,18 @@ export default function ExpoDetailsPage() {
     const next = !isInterested;
     setIsInterested(next);
     if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('visitexpo_interested_events');
+        const set = new Set(raw ? JSON.parse(raw) : []);
+        if (next) set.add(slug);
+        else set.delete(slug);
+        localStorage.setItem('visitexpo_interested_events', JSON.stringify(Array.from(set)));
+      } catch (_) {}
       localStorage.setItem(`visitexpo_interested_${slug}`, String(next));
     }
     showToast(
       next
-        ? 'Marked as Interested! Pass added to dashboard & attendee directory.'
+        ? 'Marked as Interested! Added to your Interested Events.'
         : 'Removed from your interested list.'
     );
 
@@ -584,6 +591,13 @@ export default function ExpoDetailsPage() {
     const next = !isFollowingExpo;
     setIsFollowingExpo(next);
     if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('visitexpo_followed_events');
+        const set = new Set(raw ? JSON.parse(raw) : []);
+        if (next) set.add(slug);
+        else set.delete(slug);
+        localStorage.setItem('visitexpo_followed_events', JSON.stringify(Array.from(set)));
+      } catch (_) {}
       localStorage.setItem(`visitexpo_follow_expo_${slug}`, String(next));
     }
     showToast(
@@ -673,11 +687,63 @@ export default function ExpoDetailsPage() {
   };
 
   const handleSave = () => {
-    if (!user) {
-      setGatedContext({ action: 'save', event });
-    } else {
-      setIsSaved(prev => !prev);
-      showToast(isSaved ? 'Removed from saved events.' : 'Event saved to your Watchlist ♡');
+    const next = !isSaved;
+    setIsSaved(next);
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('visitexpo_saved_events');
+        const set = new Set(raw ? JSON.parse(raw) : []);
+        const idKey = String(event?.id || event?.wpPostId || slug).trim();
+        const slugKey = String(slug || event?.slug || '').toLowerCase().trim();
+        if (next) {
+          set.add(idKey);
+          if (slugKey) set.add(slugKey);
+        } else {
+          set.delete(idKey);
+          if (slugKey) set.delete(slugKey);
+        }
+        localStorage.setItem('visitexpo_saved_events', JSON.stringify(Array.from(set)));
+
+        // Persist full event details for instant bookmarks loading
+        try {
+          const rawMap = localStorage.getItem('visitexpo_saved_event_details');
+          const map = rawMap ? JSON.parse(rawMap) : {};
+          if (next && event) {
+            const detail = {
+              id: idKey,
+              slug: slugKey || idKey,
+              title: event.title,
+              image: event.image,
+              dates: event.dates,
+              city: event.city,
+              venue: event.venue,
+              category: event.category,
+              country: event.country || 'India',
+              organizer: event.organizer || ''
+            };
+            map[idKey] = detail;
+            if (slugKey) map[slugKey] = detail;
+          } else {
+            delete map[idKey];
+            if (slugKey) delete map[slugKey];
+          }
+          localStorage.setItem('visitexpo_saved_event_details', JSON.stringify(map));
+        } catch (_) {}
+      } catch (_) {}
+    }
+    showToast(next ? 'Event saved to your Bookmarks!' : 'Removed from bookmarks.');
+
+    if (user?.email) {
+      axios.post(`/api/events/${encodeURIComponent(slug)}/social`, {
+        actionType: 'bookmark',
+        eventTitle: event?.title,
+        eventCity: event?.city,
+        eventVenue: event?.venue,
+        eventDates: event?.dates,
+        eventCategory: event?.category,
+        eventImage: event?.image,
+        user: { id: user.id || user._id, email: user.email, name: user.name }
+      }).catch(() => {});
     }
   };
 

@@ -26,7 +26,10 @@ import {
   Building,
   ShieldCheck,
   Compass,
-  Loader2
+  Loader2,
+  Bookmark,
+  Star,
+  Bell
 } from 'lucide-react';
 
 export const Logo = ({ className = "w-9 h-9" }) => (
@@ -342,6 +345,33 @@ export default function Navbar({ solid = false }) {
                         </Link>
                       </>
                     )}
+
+                    <Link
+                      href="/bookmarks"
+                      onClick={() => setProfileDropdownOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                    >
+                      <Bookmark className="h-4 w-4 text-rose-400" />
+                      <span>Saved Bookmarks</span>
+                    </Link>
+
+                    <Link
+                      href="/interested"
+                      onClick={() => setProfileDropdownOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                    >
+                      <Star className="h-4 w-4 text-amber-400" />
+                      <span>Interested Events</span>
+                    </Link>
+
+                    <Link
+                      href="/following"
+                      onClick={() => setProfileDropdownOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                    >
+                      <Bell className="h-4 w-4 text-blue-400" />
+                      <span>Followed Expos &amp; Organizers</span>
+                    </Link>
 
                     <Link
                       href="/settings"

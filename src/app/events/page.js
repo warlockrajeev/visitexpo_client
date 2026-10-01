@@ -43,7 +43,8 @@ import {
   BellRing,
   LocateFixed,
   Navigation,
-  Loader2
+  Loader2,
+  Heart
 } from 'lucide-react';
 import {
   calculateDistanceKm,
@@ -102,9 +103,10 @@ export default function EventsDirectoryPage() {
   const [userLocation, setUserLocation] = useState(null);
   const [userCityName, setUserCityName] = useState('');
 
-  // Save, Follow & Pass State
+  // Save, Follow, Interest & Pass State
   const [savedEventIds, setSavedEventIds] = useState(new Set());
   const [followedSlugs, setFollowedSlugs] = useState(new Set());
+  const [interestedSlugs, setInterestedSlugs] = useState(new Set());
   const [claimedPassIds, setClaimedPassIds] = useState(new Set());
   const [toastMessage, setToastMessage] = useState(null);
 
@@ -154,7 +156,7 @@ export default function EventsDirectoryPage() {
     fetchEvents();
   }, []);
 
-  // Load saved bookmarks and followed events from localStorage & backend
+  // Load saved bookmarks, interested, and followed events from localStorage & backend
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -162,6 +164,8 @@ export default function EventsDirectoryPage() {
         if (saved) setSavedEventIds(new Set(JSON.parse(saved)));
         const followed = localStorage.getItem('visitexpo_followed_events');
         if (followed) setFollowedSlugs(new Set(JSON.parse(followed)));
+        const interested = localStorage.getItem('visitexpo_interested_events');
+        if (interested) setInterestedSlugs(new Set(JSON.parse(interested)));
       } catch (_) {}
     }
 
@@ -170,12 +174,37 @@ export default function EventsDirectoryPage() {
         .then(res => {
           if (res.data?.success && res.data?.data) {
             const followedList = res.data.data.followedEvents || [];
+            const interestedList = res.data.data.interestedEvents || [];
+            const bookmarkedList = res.data.data.bookmarkedEvents || [];
+
             if (followedList.length > 0) {
               setFollowedSlugs(prev => {
                 const merged = new Set(prev);
                 followedList.forEach(e => {
                   const s = (e.eventSlug || e.slug || e.id || '').toLowerCase().trim();
                   if (s) merged.add(s);
+                });
+                return merged;
+              });
+            }
+
+            if (interestedList.length > 0) {
+              setInterestedSlugs(prev => {
+                const merged = new Set(prev);
+                interestedList.forEach(e => {
+                  const s = (e.eventSlug || e.slug || e.id || '').toLowerCase().trim();
+                  if (s) merged.add(s);
+                });
+                return merged;
+              });
+            }
+
+            if (bookmarkedList.length > 0) {
+              setSavedEventIds(prev => {
+                const merged = new Set(prev);
+                bookmarkedList.forEach(e => {
+                  const id = e.eventId || e.eventSlug || e.id || '';
+                  if (id) merged.add(id);
                 });
                 return merged;
               });
@@ -351,18 +380,120 @@ export default function EventsDirectoryPage() {
     return filteredEvents.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredEvents, currentPage]);
 
-  const handleToggleSave = (eventId) => {
+  const handleToggleSave = async (eventId, evt) => {
+    const slug = (evt?.slug || evt?.id || eventId || '').toLowerCase().trim();
+    const idStr = String(eventId || evt?.id || slug).trim();
     const next = new Set(savedEventIds);
-    if (next.has(eventId)) {
-      next.delete(eventId);
-      showToast('Event removed from saved list.');
+    const isSaved = next.has(idStr) || (slug && next.has(slug)) || (eventId && next.has(eventId));
+    if (isSaved) {
+      next.delete(idStr);
+      if (eventId) next.delete(eventId);
+      if (slug) next.delete(slug);
+      showToast('Event removed from bookmarks.');
     } else {
-      next.add(eventId);
+      next.add(idStr);
+      if (slug) next.add(slug);
       showToast('Event saved to your bookmarks!');
     }
     setSavedEventIds(next);
     if (typeof window !== 'undefined') {
       localStorage.setItem('visitexpo_saved_events', JSON.stringify(Array.from(next)));
+      try {
+        const rawMap = localStorage.getItem('visitexpo_saved_event_details');
+        const map = rawMap ? JSON.parse(rawMap) : {};
+        if (isSaved) {
+          delete map[idStr];
+          if (slug) delete map[slug];
+        } else if (evt) {
+          const detail = {
+            id: evt.id || idStr,
+            slug: evt.slug || slug,
+            title: evt.title,
+            image: evt.image,
+            dates: evt.dates,
+            city: evt.city,
+            venue: evt.venue,
+            category: evt.category,
+            country: evt.country || 'India',
+            organizer: evt.organizer || evt.organizerName || ''
+          };
+          map[idStr] = detail;
+          if (slug) map[slug] = detail;
+        }
+        localStorage.setItem('visitexpo_saved_event_details', JSON.stringify(map));
+      } catch (_) {}
+    }
+
+    if (user?.email && evt) {
+      try {
+        await axios.post(`/api/events/${encodeURIComponent(slug)}/social`, {
+          actionType: 'bookmark',
+          eventTitle: evt.title,
+          eventCity: evt.city,
+          eventVenue: evt.venue,
+          eventDates: evt.dates,
+          eventCategory: evt.category,
+          eventImage: evt.image,
+          organizerId: evt.organizerId || evt.claimedBy || '',
+          organizerName: evt.organizerName || evt.organizer || '',
+          user: {
+            id: user.id || user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role
+          }
+        });
+      } catch (_) {}
+    }
+  };
+
+  const handleToggleInterest = async (evt) => {
+    const slug = (evt.slug || evt.id || '').toLowerCase().trim();
+    if (!slug) return;
+
+    const isInterested = interestedSlugs.has(slug);
+    const nextInterested = !isInterested;
+
+    setInterestedSlugs(prev => {
+      const next = new Set(prev);
+      if (nextInterested) next.add(slug);
+      else next.delete(slug);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('visitexpo_interested_events', JSON.stringify(Array.from(next)));
+      }
+      return next;
+    });
+
+    showToast(
+      nextInterested
+        ? `Marked interest in ${evt.title}!`
+        : `Removed interest from ${evt.title}.`
+    );
+
+    if (user?.email) {
+      try {
+        await axios.post(`/api/events/${encodeURIComponent(slug)}/social`, {
+          actionType: 'interested',
+          eventTitle: evt.title,
+          eventCity: evt.city,
+          eventVenue: evt.venue,
+          eventDates: evt.dates,
+          eventCategory: evt.category,
+          eventImage: evt.image,
+          organizerId: evt.organizerId || evt.claimedBy || '',
+          organizerName: evt.organizerName || evt.organizer || '',
+          user: {
+            id: user.id || user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            company: user.company || user.organization?.name || '',
+            phone: user.phone || ''
+          }
+        });
+      } catch (err) {
+        console.warn('Failed to sync interest state to server:', err);
+      }
     }
   };
 
@@ -766,7 +897,9 @@ export default function EventsDirectoryPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
             {paginatedEvents.map((evt, idx) => {
               const eventSlug = evt.slug || evt.id;
-              const isSaved = savedEventIds.has(evt.id);
+              const isSaved = savedEventIds.has(evt.id) || savedEventIds.has(eventSlug);
+              const isInterested = interestedSlugs.has(String(eventSlug).toLowerCase()) || interestedSlugs.has(String(evt.id).toLowerCase());
+              const isFollowing = followedSlugs.has(String(eventSlug).toLowerCase()) || followedSlugs.has(String(evt.id).toLowerCase());
               const isClaimed = claimedPassIds.has(evt.id);
               const wpImg =
                 wpEventImages[String(evt.slug || '').toLowerCase()] ||
@@ -802,18 +935,38 @@ export default function EventsDirectoryPage() {
                         {evt.category || 'Trade Show'}
                       </span>
 
-                      {/* Free Visitor Pass Badge + Bookmark Button on Right */}
+                      {/* Free Visitor Pass Badge + Interest + Bookmark Buttons on Right */}
                       <div className="flex items-center gap-1.5 pointer-events-auto">
                         <span className="px-3.5 py-1 rounded-full text-[11px] font-black bg-gradient-to-r from-[#FFCC00] to-amber-400 text-zinc-950 shadow-lg tracking-tight">
                           Free Visitor Pass
                         </span>
 
+                        {/* Quick Interest Star Button */}
                         <button
                           type="button"
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            handleToggleSave(evt.id);
+                            handleToggleInterest(evt);
+                          }}
+                          className={`p-2 rounded-full backdrop-blur-md transition-all shadow-md cursor-pointer hover:scale-110 active:scale-95 ${
+                            isInterested
+                              ? 'bg-amber-400 text-zinc-950 shadow-amber-400/40 scale-105'
+                              : 'bg-black/40 text-white hover:bg-black/70'
+                          }`}
+                          aria-label="Mark as interested"
+                          title={isInterested ? 'Interested (Click to remove)' : 'Show Interest'}
+                        >
+                          <Star className={`h-3 w-3 ${isInterested ? 'fill-zinc-950 text-zinc-950' : 'text-white'}`} />
+                        </button>
+
+                        {/* Bookmark Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleToggleSave(evt.id, evt);
                           }}
                           className={`p-2 rounded-full backdrop-blur-md transition-all shadow-md cursor-pointer hover:scale-110 active:scale-95 ${
                             isSaved
@@ -883,8 +1036,26 @@ export default function EventsDirectoryPage() {
                         <span className="truncate">{evt.country || evt.city || 'International'}</span>
                       </div>
 
-                      {/* Right: Exhibit • Get Pass → */}
+                      {/* Right: Interested • Exhibit • Get Pass → */}
                       <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleToggleInterest(evt);
+                          }}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            isInterested
+                              ? 'bg-amber-400 text-zinc-950 font-black shadow-xs'
+                              : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700'
+                          }`}
+                          title={isInterested ? 'Interested (Click to remove)' : 'Show Interest'}
+                        >
+                          <Star className={`h-3 w-3 ${isInterested ? 'fill-zinc-950 text-zinc-950' : 'text-amber-500'}`} />
+                          <span>{isInterested ? 'Interested' : 'Interest'}</span>
+                        </button>
+
                         <Link
                           href="/login?role=exhibitor&signup=true"
                           className="text-xs font-black text-[#FF2E63] hover:text-[#d91e52] hover:underline transition-colors px-1 py-0.5 cursor-pointer"

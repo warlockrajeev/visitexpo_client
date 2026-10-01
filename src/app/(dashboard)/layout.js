@@ -32,7 +32,10 @@ import {
   Home,
   ArrowLeft,
   ArrowRight,
-  MessageSquare
+  MessageSquare,
+  Bookmark,
+  Star,
+  Bell
 } from 'lucide-react';
 
 import axios from 'axios';
@@ -206,6 +209,9 @@ export default function DashboardLayout({ children }) {
   const navigation = user.role === 'visitor'
     ? [
         { name: 'My Passes & Badges', href: '/dashboard', icon: Ticket },
+        { name: 'Saved Bookmarks', href: '/bookmarks', icon: Bookmark },
+        { name: 'Interested Events', href: '/interested', icon: Star },
+        { name: 'Followed Expos', href: '/following', icon: Bell },
         { name: 'Organizers & Expos', href: '/organizers', icon: Building, badge: 'Live Chat' },
         { name: 'Recommended For You', href: '/recommendations', icon: Compass, badge: 'AI Match' },
         { name: 'Browse Live Expos', href: '/expos', icon: Calendar },
@@ -214,6 +220,9 @@ export default function DashboardLayout({ children }) {
     : (user.role === 'exhibitor' || isExhibitorView)
     ? [
         { name: 'Exhibitor Hub', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'Saved Bookmarks', href: '/bookmarks', icon: Bookmark },
+        { name: 'Interested Events', href: '/interested', icon: Star },
+        { name: 'Followed Expos', href: '/following', icon: Bell },
         { name: 'Organizers & Expos', href: '/organizers', icon: Building, badge: 'Live Chat' },
         { name: 'Settings', href: '/settings', icon: Settings },
       ]
@@ -225,6 +234,9 @@ export default function DashboardLayout({ children }) {
           icon: MessageSquare,
           badge: unreadChatCount > 0 ? `${unreadChatCount} new` : (user.isChatEnabled ? 'Live' : null)
         },
+        { name: 'Saved Bookmarks', href: '/bookmarks', icon: Bookmark },
+        { name: 'Interested Events', href: '/interested', icon: Star },
+        { name: 'Followed Expos', href: '/following', icon: Bell },
         { name: 'Event Wizard', href: '/events/wizard', icon: Wand2, badge: 'Onboarding' },
         { name: 'Claim Event', href: '/events/claim', icon: ShieldCheck },
         { name: 'Manage Events', href: '/manage-events', icon: Calendar },
@@ -243,6 +255,9 @@ export default function DashboardLayout({ children }) {
       if (user?.role === 'exhibitor' || isExhibitorView) return 'Exhibitor Hub';
       return 'Organizer Dashboard Hub';
     }
+    if (path === '/bookmarks') return 'My Saved Bookmarks';
+    if (path === '/interested') return 'My Interested Exhibitions';
+    if (path === '/following') return 'Followed Expos & Organizers';
     if (path === '/organizers') return 'Event Organizers & Exhibitions Directory';
     if (path === '/chat') return 'Live Chat Desk & Attendee Hub';
     if (path === '/expos') return 'Live Exhibitions & Passes';
