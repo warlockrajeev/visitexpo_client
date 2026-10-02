@@ -69,6 +69,7 @@ import {
   FileEdit,
   Strikethrough,
   Highlighter,
+  RotateCcw,
   Minus,
   Type,
   Palette,
@@ -1686,6 +1687,77 @@ export default function EventWizardPage() {
     }
   };
 
+  const resetSectionForm = async (step) => {
+    const fieldsByStep = {
+      2: ['title', 'slug', 'category', 'industry', 'description'],
+      3: ['startDate', 'endDate', 'timings', 'venueName', 'city', 'state', 'country', 'address'],
+      4: ['orgName', 'orgEmail', 'orgPhone', 'orgWebsite', 'orgGst', 'orgLogo', 'orgDesc', 'socialFacebook', 'socialLinkedIn', 'socialInstagram', 'socialX'],
+      5: ['bannerUrl', 'gallery', 'brochurePdf', 'promoVideoUrl', 'sponsorsList'],
+      6: ['isFreeEvent', 'paidTicketPrice', 'currency', 'formFields', 'schedules', 'faqsList', 'contactShortcode'],
+      7: ['metaTitle', 'metaDescription']
+    };
+    const sectionNames = {
+      2: 'Basic Details',
+      3: 'Date & Venue',
+      4: 'Organizer Profile',
+      5: 'Media Upload',
+      6: 'Ticketing & Form',
+      7: 'Preview & SEO'
+    };
+    const fields = fieldsByStep[step] || [];
+    if (!fields.length) return;
+
+    const confirmed = await showSweetConfirm({
+      title: `Reset ${sectionNames[step]}?`,
+      text: 'Only this section will be reset. Other sections will keep their current values.',
+      icon: 'warning',
+      confirmButtonText: 'Reset Section',
+      cancelButtonText: 'Cancel',
+      isDanger: true
+    });
+    if (!confirmed) return;
+
+    const initialData = getInitialFormData(user);
+    const fieldsToReset = new Set(fields);
+    setFormData((prev) => ({
+      ...prev,
+      ...Object.fromEntries(fields.map((field) => [field, initialData[field]]))
+    }));
+    setErrors((prev) => Object.fromEntries(Object.entries(prev).filter(([field]) => !fieldsToReset.has(field))));
+    setTouched((prev) => Object.fromEntries(Object.entries(prev).filter(([field]) => !fieldsToReset.has(field))));
+    setSubmitError('');
+
+    if (step === 2) {
+      setIsCustomCategory(false);
+      setIsCustomIndustry(false);
+      setDuplicateCheck({ checking: false, isDuplicate: false, existingEvent: null, similarEvents: [] });
+    } else if (step === 4) {
+      setOrgLogoValidation(null);
+    } else if (step === 5) {
+      setBannerValidation(null);
+      setSponsorLogoValidation(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setNewSponsor({ name: '', link: '', logo: '', tier: 'Platinum Sponsor' });
+      setIsCustomSponsorTier(false);
+    } else if (step === 6) {
+      setNewSchedule({ name: '', date: '' });
+      setNewFaq({ question: '', answer: '' });
+    }
+  };
+
+  const renderSectionResetButton = (step) => (
+    <button
+      type="button"
+      onClick={() => resetSectionForm(step)}
+      disabled={step === 5 && (isUploading || isSponsorUploading)}
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-muted/20 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
+      title="Reset only this section"
+    >
+      <RotateCcw className="h-3.5 w-3.5" />
+      <span>Reset</span>
+    </button>
+  );
+
   const handleModeChange = (newMode) => {
     setFormMode(newMode);
     try {
@@ -2751,6 +2823,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 </h3>
                 <p className="text-xs text-muted-foreground">Provide core identity and taxonomy for your expo.</p>
               </div>
+              {renderSectionResetButton(2)}
             </div>
 
             <div className="grid gap-6 sm:grid-cols-2">
@@ -3106,11 +3179,14 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
 
   const renderStep3Content = ({ isScrollable = false } = {}) => (
     <div className="space-y-6">
-            <div className="border-b border-border pb-4">
-              <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary" /> {isScrollable ? "2. Dates, Timings & Venue Location" : "Step 3: Dates, Timings & Venue Location"}
-              </h3>
-              <p className="text-xs text-muted-foreground">Specify event schedule and exact hall address.</p>
+            <div className="border-b border-border pb-4 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-primary" /> {isScrollable ? "2. Dates, Timings & Venue Location" : "Step 3: Dates, Timings & Venue Location"}
+                </h3>
+                <p className="text-xs text-muted-foreground">Specify event schedule and exact hall address.</p>
+              </div>
+              {renderSectionResetButton(3)}
             </div>
 
             <div className="grid gap-6 sm:grid-cols-3">
@@ -3363,11 +3439,14 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
     const selectedCountry = COUNTRY_DIAL_CODES.find(c => c.code === phoneParts.code) || COUNTRY_DIAL_CODES[0];
     return (
       <div className="space-y-6">
-            <div className="border-b border-border pb-4">
-              <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                <Building className="h-5 w-5 text-primary" /> {isScrollable ? "3. Organizer Profile Setup" : "Step 4: Organizer Profile Setup"}
-              </h3>
-              <p className="text-xs text-muted-foreground">Build trust with corporate attendees & exhibitors.</p>
+            <div className="border-b border-border pb-4 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <Building className="h-5 w-5 text-primary" /> {isScrollable ? "3. Organizer Profile Setup" : "Step 4: Organizer Profile Setup"}
+                </h3>
+                <p className="text-xs text-muted-foreground">Build trust with corporate attendees & exhibitors.</p>
+              </div>
+              {renderSectionResetButton(4)}
             </div>
 
             <div className="grid gap-6 sm:grid-cols-2">
@@ -3716,11 +3795,14 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
 
   const renderStep5Content = ({ isScrollable = false } = {}) => (
     <div className="space-y-6">
-            <div className="border-b border-border pb-4">
-              <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                <ImageIcon className="h-5 w-5 text-primary" /> {isScrollable ? "4. Media Upload & Promotional Assets" : "Step 5: Media Upload & Promotional Assets"}
-              </h3>
-              <p className="text-xs text-muted-foreground">Upload 1920x1080 banner, gallery photos, brochure PDF & promo video.</p>
+            <div className="border-b border-border pb-4 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <ImageIcon className="h-5 w-5 text-primary" /> {isScrollable ? "4. Media Upload & Promotional Assets" : "Step 5: Media Upload & Promotional Assets"}
+                </h3>
+                <p className="text-xs text-muted-foreground">Upload 1920x1080 banner, gallery photos, brochure PDF & promo video.</p>
+              </div>
+              {renderSectionResetButton(5)}
             </div>
 
             {/* Main Cover Banner Upload Zone */}
@@ -3967,11 +4049,14 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
 
   const renderStep6Content = ({ isScrollable = false } = {}) => (
     <div className="space-y-6">
-            <div className="border-b border-border pb-4">
-              <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                <Ticket className="h-5 w-5 text-primary" /> {isScrollable ? "5. Ticketing & Visitor Registration Setup" : "Step 6: Ticketing & Visitor Registration Setup"}
-              </h3>
-              <p className="text-xs text-muted-foreground">Configure registration rules and visitor data collection fields.</p>
+            <div className="border-b border-border pb-4 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <Ticket className="h-5 w-5 text-primary" /> {isScrollable ? "5. Ticketing & Visitor Registration Setup" : "Step 6: Ticketing & Visitor Registration Setup"}
+                </h3>
+                <p className="text-xs text-muted-foreground">Configure registration rules and visitor data collection fields.</p>
+              </div>
+              {renderSectionResetButton(6)}
             </div>
 
             {/* Free vs Paid Toggle */}
@@ -4289,13 +4374,16 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 <p className="text-xs text-muted-foreground">Verify public details and search engine optimization grade.</p>
               </div>
               
-              {/* SEO Score Badge */}
-              <div className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 px-4 py-2">
-                <Star className="h-5 w-5 text-emerald-500 fill-emerald-500" />
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-emerald-500 tracking-wider">SEO Score Grade</span>
-                  <p className="text-lg font-extrabold text-emerald-500 leading-none">{seoScore} / 100</p>
+              <div className="flex items-center gap-2 shrink-0">
+                {/* SEO Score Badge */}
+                <div className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 px-4 py-2">
+                  <Star className="h-5 w-5 text-emerald-500 fill-emerald-500" />
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-emerald-500 tracking-wider">SEO Score Grade</span>
+                    <p className="text-lg font-extrabold text-emerald-500 leading-none">{seoScore} / 100</p>
+                  </div>
                 </div>
+                {renderSectionResetButton(7)}
               </div>
             </div>
 
@@ -4667,28 +4755,6 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               </button>
             </div>
 
-            {(formData.title || currentStep > 1) && (
-              <button
-                type="button"
-                onClick={async () => {
-                  const confirmed = await showSweetConfirm({
-                    title: 'Clear Event Form?',
-                    text: 'Are you sure you want to clear all fields and start fresh? All unsaved inputs will be cleared.',
-                    icon: 'warning',
-                    confirmButtonText: 'Yes, Clear Form',
-                    cancelButtonText: 'Cancel',
-                    isDanger: true
-                  });
-                  if (confirmed) {
-                    handleResetForm();
-                  }
-                }}
-                className="text-xs font-semibold text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 px-3 py-1.5 rounded-lg border border-border hover:border-rose-500/30 bg-muted/20 hover:bg-rose-500/10 transition-all cursor-pointer"
-                title="Clear all fields and start fresh"
-              >
-                Clear Form
-              </button>
-            )}
           </div>
         </div>
 
