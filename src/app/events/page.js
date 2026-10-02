@@ -10,6 +10,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { renderCardDescription } from '../../utils/textFormatters.js';
@@ -93,6 +94,10 @@ export default function EventsDirectoryPage() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedState, setSelectedState] = useState('all');
   const [selectedCity, setSelectedCity] = useState('all');
+  const [selectedCountry, setSelectedCountry] = useState('all');
+  const [locationQuery, setLocationQuery] = useState('');
+  const [isLocationListOpen, setIsLocationListOpen] = useState(false);
+  const [activeLocationIndex, setActiveLocationIndex] = useState(0);
   const [selectedVenue, setSelectedVenue] = useState('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -104,6 +109,7 @@ export default function EventsDirectoryPage() {
   const [dateQuickFilter, setDateQuickFilter] = useState('all'); // 'all' | 'this_month' | 'next_30' | 'next_90' | 'this_year' | 'weekend'
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortReferenceTime] = useState(() => Date.now());
 
   // Proximity / Nearby State
   const [isNearbyActive, setIsNearbyActive] = useState(false);
@@ -123,6 +129,7 @@ export default function EventsDirectoryPage() {
     if (typeof window !== 'undefined') {
       const sp = new URLSearchParams(window.location.search);
       const cityParam = sp.get('city');
+      const countryParam = sp.get('country');
       const catParam = sp.get('category');
       const searchParam = sp.get('search') || sp.get('q') || sp.get('organizer');
 
@@ -130,7 +137,12 @@ export default function EventsDirectoryPage() {
       const filterParam = sp.get('filter');
 
       if (cityParam) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- Apply URL filters after hydration to avoid server/client markup mismatches.
         setSelectedCity(cityParam);
+        setLocationQuery(`City: ${cityParam}`);
+      } else if (countryParam) {
+        setSelectedCountry(countryParam);
+        setLocationQuery(`Country: ${countryParam}`);
       }
       if (catParam) {
         setSelectedCategory(catParam);
@@ -185,6 +197,7 @@ export default function EventsDirectoryPage() {
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem('visitexpo_saved_events');
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- Hydrate saved state after mount to keep the initial render consistent with the server.
         if (saved) setSavedEventIds(new Set(JSON.parse(saved)));
         const followed = localStorage.getItem('visitexpo_followed_events');
         if (followed) setFollowedSlugs(new Set(JSON.parse(followed)));
@@ -253,6 +266,44 @@ export default function EventsDirectoryPage() {
     return Array.from(set).sort();
   }, [events]);
 
+  const availableCountries = useMemo(() => {
+    const countries = new Map();
+    events.forEach((event) => {
+      const country = (event.country || '').trim();
+      if (country) countries.set(country.toLowerCase(), country);
+    });
+    return Array.from(countries.values()).sort((a, b) => a.localeCompare(b));
+  }, [events]);
+
+  const locationOptions = useMemo(() => [
+    ...availableCountries.map((value) => ({ type: 'Country', value })),
+    ...availableCities.map((value) => ({ type: 'City', value }))
+  ], [availableCountries, availableCities]);
+
+  const filteredLocationOptions = useMemo(() => {
+    const query = locationQuery.replace(/^(country|city):\s*/i, '').trim().toLowerCase();
+    if (!query) return locationOptions;
+    return locationOptions.filter((option) => option.value.toLowerCase().includes(query));
+  }, [locationOptions, locationQuery]);
+
+  const selectLocation = (option) => {
+    if (!option) {
+      setSelectedCity('all');
+      setSelectedCountry('all');
+      setLocationQuery('');
+    } else if (option.type === 'City') {
+      setSelectedCity(option.value);
+      setSelectedCountry('all');
+      setLocationQuery(`City: ${option.value}`);
+    } else {
+      setSelectedCity('all');
+      setSelectedCountry(option.value);
+      setLocationQuery(`Country: ${option.value}`);
+    }
+    setIsLocationListOpen(false);
+    setActiveLocationIndex(0);
+  };
+
   // Distinct states list from events
   const availableStates = useMemo(() => {
     const set = new Set();
@@ -310,6 +361,10 @@ export default function EventsDirectoryPage() {
     // City Filter (All Cities)
     if (selectedCity && selectedCity !== 'all') {
       list = list.filter((e) => (e.city || '').toLowerCase() === selectedCity.toLowerCase());
+    }
+
+    if (selectedCountry && selectedCountry !== 'all') {
+      list = list.filter((e) => (e.country || '').toLowerCase() === selectedCountry.toLowerCase());
     }
 
     // Venue Filter (All Venue)
@@ -433,7 +488,7 @@ export default function EventsDirectoryPage() {
             return parseTurnout(b.attendees) - parseTurnout(a.attendees);
           }
           // Default: upcoming startDate (upcoming events chronologically first, then past events)
-          const now = Date.now();
+          const now = sortReferenceTime;
           const timeA = a.startDate ? new Date(a.startDate).getTime() : 0;
           const timeB = b.startDate ? new Date(b.startDate).getTime() : 0;
           const isFutureA = timeA >= now;
@@ -448,12 +503,13 @@ export default function EventsDirectoryPage() {
     }
 
     return list;
-  }, [events, searchQuery, selectedCategory, selectedState, selectedCity, selectedVenue, fromDate, toDate, sortBy, featuredOnly, isNearbyActive, userLocation, top10Only, freePassOnly, minRating, dateQuickFilter]);
+  }, [events, searchQuery, selectedCategory, selectedState, selectedCity, selectedCountry, selectedVenue, fromDate, toDate, sortBy, featuredOnly, isNearbyActive, userLocation, top10Only, freePassOnly, minRating, dateQuickFilter, sortReferenceTime]);
 
   // Reset page when filters change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Keep filter changes returning users to the first result page.
     setCurrentPage(1);
-  }, [searchQuery, selectedCategory, selectedState, selectedCity, selectedVenue, fromDate, toDate, sortBy, featuredOnly, isNearbyActive, top10Only, freePassOnly, minRating, dateQuickFilter]);
+  }, [searchQuery, selectedCategory, selectedState, selectedCity, selectedCountry, selectedVenue, fromDate, toDate, sortBy, featuredOnly, isNearbyActive, top10Only, freePassOnly, minRating, dateQuickFilter]);
 
   // Pagination calculation
   const totalPages = Math.ceil(filteredEvents.length / ITEMS_PER_PAGE) || 1;
@@ -667,6 +723,9 @@ export default function EventsDirectoryPage() {
     setSelectedCategory('All');
     setSelectedState('all');
     setSelectedCity('all');
+    setSelectedCountry('all');
+    setLocationQuery('');
+    setIsLocationListOpen(false);
     setSelectedVenue('all');
     setFromDate('');
     setToDate('');
@@ -685,6 +744,7 @@ export default function EventsDirectoryPage() {
     selectedCategory !== 'All' ||
     selectedState !== 'all' ||
     selectedCity !== 'all' ||
+    selectedCountry !== 'all' ||
     selectedVenue !== 'all' ||
     fromDate !== '' ||
     toDate !== '' ||
@@ -773,21 +833,117 @@ export default function EventsDirectoryPage() {
               </div>
 
               {/* 2. City Dropdown */}
+              {/* 2. Searchable Country / City Picker */}
               <div className="lg:col-span-3 relative flex items-center">
                 <MapPin className="absolute left-3.5 h-4 w-4 text-rose-500 pointer-events-none" />
-                <select
-                  value={selectedCity}
-                  onChange={(e) => setSelectedCity(e.target.value)}
-                  className="w-full pl-10 pr-8 py-2.5 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-amber-400 transition-all cursor-pointer appearance-none shadow-2xs"
-                >
-                  <option value="all">All Locations / Cities</option>
-                  {availableCities.map((city) => (
-                    <option key={city} value={city}>
-                      {city}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 h-4 w-4 text-zinc-400 pointer-events-none" />
+                <input
+                  type="text"
+                  role="combobox"
+                  aria-label="Search locations by country or city"
+                  aria-autocomplete="list"
+                  aria-expanded={isLocationListOpen}
+                  aria-controls="event-location-options"
+                  aria-activedescendant={isLocationListOpen && filteredLocationOptions[activeLocationIndex]
+                    ? `event-location-option-${activeLocationIndex}`
+                    : undefined}
+                  value={locationQuery}
+                  onFocus={() => setIsLocationListOpen(true)}
+                  onBlur={() => setIsLocationListOpen(false)}
+                  onChange={(e) => {
+                    setLocationQuery(e.target.value);
+                    setSelectedCity('all');
+                    setSelectedCountry('all');
+                    setActiveLocationIndex(0);
+                    setIsLocationListOpen(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      setIsLocationListOpen(true);
+                      if (filteredLocationOptions.length) {
+                        setActiveLocationIndex((index) => Math.min(index + 1, filteredLocationOptions.length - 1));
+                      }
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      setActiveLocationIndex((index) => Math.max(index - 1, 0));
+                    } else if (e.key === 'Enter' && isLocationListOpen && filteredLocationOptions[activeLocationIndex]) {
+                      e.preventDefault();
+                      selectLocation(filteredLocationOptions[activeLocationIndex]);
+                    } else if (e.key === 'Escape') {
+                      setIsLocationListOpen(false);
+                    }
+                  }}
+                  placeholder="Search country or city..."
+                  className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-white border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-amber-400 transition-all shadow-2xs"
+                />
+                {locationQuery ? (
+                  <button
+                    type="button"
+                    aria-label="Clear location filter"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => selectLocation(null)}
+                    className="absolute right-3 text-zinc-400 hover:text-zinc-700 cursor-pointer"
+                  >
+                    <span aria-hidden="true">×</span>
+                  </button>
+                ) : (
+                  <ChevronDown className="absolute right-3 h-4 w-4 text-zinc-400 pointer-events-none" />
+                )}
+                {isLocationListOpen && (
+                  <div
+                    id="event-location-options"
+                    role="listbox"
+                    aria-label="Matching countries and cities"
+                    className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-xl border border-zinc-200 bg-white py-1 shadow-lg"
+                  >
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={selectedCity === 'all' && selectedCountry === 'all' && !locationQuery}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => selectLocation(null)}
+                      className="w-full px-3 py-2 text-left text-xs font-semibold text-zinc-600 hover:bg-zinc-50 cursor-pointer"
+                    >
+                      All Locations
+                    </button>
+                    {['Country', 'City'].map((type) => {
+                      const options = filteredLocationOptions
+                        .map((option, index) => ({ ...option, index }))
+                        .filter((option) => option.type === type);
+                      if (!options.length) return null;
+                      return (
+                        <div key={type}>
+                          <div className="px-3 pt-2 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-zinc-400">
+                            {type === 'Country' ? 'Countries' : 'Cities'}
+                          </div>
+                          {options.map((option) => (
+                            <button
+                              key={`${type}-${option.value}`}
+                              id={`event-location-option-${option.index}`}
+                              type="button"
+                              role="option"
+                              aria-selected={type === 'City'
+                                ? selectedCity === option.value
+                                : selectedCountry === option.value}
+                              onMouseDown={(e) => e.preventDefault()}
+                              onMouseEnter={() => setActiveLocationIndex(option.index)}
+                              onClick={() => selectLocation(option)}
+                              className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-left text-xs sm:text-sm cursor-pointer ${
+                                activeLocationIndex === option.index ? 'bg-amber-50 text-zinc-950' : 'text-zinc-700 hover:bg-zinc-50'
+                              }`}
+                            >
+                              <span className="truncate">{option.value}</span>
+                              <span className="shrink-0 text-[10px] font-bold text-zinc-400">{type}</span>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })}
+                    {filteredLocationOptions.length === 0 && (
+                      <p className="px-3 py-3 text-xs text-zinc-500">No matching country or city</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* 3. Sort Dropdown */}
@@ -1114,6 +1270,18 @@ export default function EventsDirectoryPage() {
                     </button>
                   </span>
                 )}
+                {selectedCountry !== 'all' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-900 border border-zinc-300 font-bold text-[11px] shadow-2xs">
+                    <span>Country: {selectedCountry}</span>
+                    <button
+                      type="button"
+                      onClick={() => selectLocation(null)}
+                      className="hover:text-zinc-950 font-black cursor-pointer ml-0.5"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                )}
                 {selectedState !== 'all' && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-900 border border-zinc-300 font-bold text-[11px] shadow-2xs">
                     <span>State: {selectedState}</span>
@@ -1333,9 +1501,12 @@ export default function EventsDirectoryPage() {
                 >
                   {/* Card Media Header */}
                   <div className="relative aspect-[16/10] w-full overflow-hidden bg-zinc-100">
-                    <img
+                    <Image
                       src={wpImg}
                       alt={evt.title}
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      unoptimized
                       className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-108"
                       onError={(e) => {
                         e.currentTarget.src =

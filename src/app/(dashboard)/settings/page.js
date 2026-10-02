@@ -403,10 +403,11 @@ export default function SettingsPage() {
 
   // Phone Change Handlers
   const handleOrgPhoneChange = (val) => {
-    setOrgForm((prev) => ({ ...prev, phone: val }));
-    const digits = cleanDigits(val);
+    const sanitizedPhone = val.replace(/[^0-9+\s\-()]/g, '');
+    setOrgForm((prev) => ({ ...prev, phone: sanitizedPhone }));
+    const digits = cleanDigits(sanitizedPhone);
     const initialDigits = cleanDigits(initialOrgPhone);
-    const isInvalidPhone = val.trim() && (digits.length !== 10 || !/^[6-9]\d{9}$/.test(digits));
+    const isInvalidPhone = sanitizedPhone.trim() && (digits.length !== 10 || !/^[6-9]\d{9}$/.test(digits));
     setOrgPhoneError(isInvalidPhone ? 'Enter a valid 10-digit Indian mobile number.' : '');
     if (digits === initialDigits) {
       setOrgPhoneVerified(true);

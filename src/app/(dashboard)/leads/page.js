@@ -64,6 +64,11 @@ const API_URL =
 
 export default function LeadsCRMPage() {
   const { user, accessToken } = useAuth();
+  const accessTokenRef = React.useRef(accessToken);
+
+  useEffect(() => {
+    accessTokenRef.current = accessToken;
+  }, [accessToken]);
 
   // Primary Data State
   const [events, setEvents] = useState([]);
@@ -86,6 +91,7 @@ export default function LeadsCRMPage() {
 
   // Slide-over CRM Drawer state
   const [drawerLead, setDrawerLead] = useState(null);
+  const [isDeletingSelected, setIsDeletingSelected] = useState(false);
   const [newActivityContent, setNewActivityContent] = useState('');
   const [newActivityType, setNewActivityType] = useState('note');
   const [followUpTitle, setFollowUpTitle] = useState('');
@@ -202,7 +208,7 @@ export default function LeadsCRMPage() {
   }, [user, accessToken]);
 
   // 2. Fetch Leads for Active Event
-  const fetchLeads = async () => {
+  const fetchLeads = React.useCallback(async () => {
     if (!selectedEventId) {
       setLoading(false);
       return;
@@ -210,7 +216,8 @@ export default function LeadsCRMPage() {
     setLoading(true);
     setError('');
     try {
-      const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+      const token = accessTokenRef.current;
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const params = { limit: 300 };
       if (selectedEventId !== 'all') {
         params.eventId = selectedEventId;
@@ -230,11 +237,14 @@ export default function LeadsCRMPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedEventId]);
+
+  const hasAccessToken = Boolean(accessToken);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Fetch leads only when the active event changes or authentication first becomes available.
     fetchLeads();
-  }, [selectedEventId, accessToken]);
+  }, [fetchLeads, hasAccessToken]);
 
   // Active selected event object
   const currentEvent = useMemo(() => {
@@ -410,6 +420,59 @@ export default function LeadsCRMPage() {
     } catch (err) {
       console.error('Error deleting lead', err);
       showSweetError('Failed to delete lead');
+    }
+  };
+
+  const handleDeleteSelectedLeads = async () => {
+    const leadIds = Array.from(selectedLeadIds);
+    if (!leadIds.length || isDeletingSelected) return;
+
+    const confirmed = await showSweetConfirm({
+      title: `Delete ${leadIds.length} selected lead${leadIds.length === 1 ? '' : 's'}?`,
+      text: 'This action cannot be undone.',
+      icon: 'warning',
+      confirmButtonText: 'Delete Selected',
+      cancelButtonText: 'Cancel',
+      isDanger: true
+    });
+    if (!confirmed) return;
+
+    setIsDeletingSelected(true);
+    try {
+      const results = await Promise.allSettled(
+        leadIds.map((leadId) =>
+          axios.delete(`${API_URL}/leads/${leadId}`, {
+            headers: { Authorization: `Bearer ${accessToken}` }
+          })
+        )
+      );
+      const deletedIds = new Set(
+        leadIds.filter((_, index) =>
+          results[index].status === 'fulfilled' && results[index].value.data?.success
+        )
+      );
+
+      if (!deletedIds.size) {
+        showSweetError('No selected leads could be deleted. Please try again.');
+        return;
+      }
+
+      setLeads((prev) => prev.filter((lead) => !deletedIds.has(lead._id)));
+      setSelectedLeadIds((prev) => {
+        const next = new Set(prev);
+        deletedIds.forEach((leadId) => next.delete(leadId));
+        return next;
+      });
+      setDrawerLead((prev) => (prev && deletedIds.has(prev._id) ? null : prev));
+
+      const failedCount = leadIds.length - deletedIds.size;
+      if (failedCount) {
+        showSweetError(`${deletedIds.size} lead${deletedIds.size === 1 ? '' : 's'} deleted; ${failedCount} could not be deleted.`);
+      } else {
+        showSweetSuccess(`${deletedIds.size} lead${deletedIds.size === 1 ? '' : 's'} deleted successfully.`);
+      }
+    } finally {
+      setIsDeletingSelected(false);
     }
   };
 
@@ -934,7 +997,12 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
   const handlePhoneChange = (e) => {
     const rawVal = e.target.value;
     // Strip alphabets and non-phone characters immediately so letters cannot be typed
-    const sanitizedVal = rawVal.replace(/[a-zA-Z]/g, '').replace(/[^0-9+\s\-()]/g, '');
+    const allowedChars = rawVal.replace(/[a-zA-Z]/g, '').replace(/[^0-9+\s\-()]/g, '');
+    let digitCount = 0;
+    const sanitizedVal = allowedChars.replace(/\d/g, (digit) => {
+      digitCount += 1;
+      return digitCount <= 15 ? digit : '';
+    });
     setLeadForm(prev => ({ ...prev, phone: sanitizedVal }));
     if (leadFormErrors.phone) {
       setLeadFormErrors(prev => ({ ...prev, phone: null }));
@@ -1151,7 +1219,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
       </div>
 
       {/* 2. SUB-HEADER: INTENT TABS & BATCH ACTION TOOLS ROW */}
-      <div className="flex flex-col 2xl:flex-row 2xl:items-center 2xl:justify-between gap-3 border-b border-border/80 pb-3">
+      <div className="flex flex-col gap-3 border-b border-border/80 pb-3">
         {/* Left: Categorized Intent Navigation Tabs */}
         <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5 max-w-full">
           {/* Tab 1: All Inquiries */}
@@ -1248,6 +1316,17 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
 
         {/* Right: Batch Action Toolbar Buttons */}
         <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {selectedLeadIds.size > 0 && (
+            <button
+              type="button"
+              onClick={handleDeleteSelectedLeads}
+              disabled={isDeletingSelected}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 transition-all shadow-2xs cursor-pointer btn-press active:scale-95 select-none shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>{isDeletingSelected ? 'Deleting...' : `Delete Selected (${selectedLeadIds.size})`}</span>
+            </button>
+          )}
           <button
             onClick={() => setShowBadgeModal(true)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/30 hover:bg-sky-500/20 transition-all shadow-2xs cursor-pointer btn-press active:scale-95 select-none shrink-0"
@@ -1546,6 +1625,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                   <th className="px-4 py-3 w-10 text-center">
                     <input
                       type="checkbox"
+                      aria-label="Select all filtered leads"
                       checked={isAllSelected}
                       ref={(el) => {
                         if (el) el.indeterminate = isSomeSelected;
@@ -1577,15 +1657,13 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                       {/* Checkbox column */}
                       <td
                         className="px-4 py-3.5 text-center"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleSelectLead(item._id);
-                        }}
                       >
                         <input
                           type="checkbox"
+                          aria-label={`Select ${item.name || 'lead'}`}
                           checked={isSelected}
-                          onChange={() => {}}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => toggleSelectLead(item._id)}
                           className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer"
                         />
                       </td>
@@ -2601,6 +2679,7 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
                   <input
                     type="text"
                     inputMode="tel"
+                    maxLength={24}
                     placeholder="+91 98765 43210"
                     value={leadForm.phone}
                     onChange={handlePhoneChange}
@@ -2616,7 +2695,7 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
                     </p>
                   ) : (
                     <p className="mt-0.5 text-[10px] text-muted-foreground">
-                      Digits and symbols (+, -, space) only. No letters.
+                      Up to 15 digits; +, -, spaces, and parentheses allowed. No letters.
                     </p>
                   )}
                 </div>
