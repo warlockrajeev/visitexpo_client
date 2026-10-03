@@ -79,6 +79,20 @@
   box-sizing: border-box;
 }
 
+button:not(:disabled):not([aria-disabled="true"]),
+[role="button"]:not([aria-disabled="true"]),
+[role="tab"]:not(:disabled):not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+button:disabled,
+button[aria-disabled="true"],
+[role="button"][aria-disabled="true"],
+[role="tab"]:disabled,
+[role="tab"][aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
@@ -273,16 +287,11 @@ html.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
 .wysiwyg-editor font[size="6"] { font-size: 30px; }
 .wysiwyg-editor font[size="7"] { font-size: 36px; }
 
-/* Tactile Pressing Effect & Global Pointer Cursor for Buttons */
-button:not(:disabled),
-[role="button"]:not(:disabled) {
-  cursor: pointer;
-}
-
+/* Tactile Pressing Effect */
 .btn-press {
   transition: transform 0.12s cubic-bezier(0.4, 0, 0.2, 1), filter 0.12s ease, box-shadow 0.12s ease;
   user-select: none;
-  cursor: pointer !important;
+  cursor: pointer;
 }
 
 .btn-press:hover:not(:disabled) {
@@ -479,4 +488,3 @@ button:not(:disabled),
     display: none !important;
   }
 }
-

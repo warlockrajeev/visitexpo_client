@@ -2124,7 +2124,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
             <div className="flex justify-end pt-3 border-t border-border">
               <button
                 onClick={() => setShowEmbedModal(false)}
-                className="px-4 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-all cursor-pointer btn-press active:scale-95 select-none"
+                className="px-4 py-2 text-xs font-semibold rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-700 dark:text-rose-400 transition-all cursor-pointer btn-press active:scale-95 select-none"
               >
                 Close
               </button>

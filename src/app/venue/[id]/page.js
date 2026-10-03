@@ -1530,7 +1530,7 @@ export default function VenueDetailsPage() {
               <button
                 type="button"
                 onClick={() => setShowContactModal(false)}
-                className="px-4 py-2 rounded-lg bg-zinc-900 text-white font-bold text-xs"
+                className="px-4 py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-700 font-bold text-xs"
               >
                 Close
               </button>

@@ -440,7 +440,7 @@ export default function EventDetailModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 rounded-lg border border-zinc-200 text-zinc-700 hover:bg-zinc-50 font-bold cursor-pointer"
+            className="px-4 py-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 font-bold cursor-pointer"
           >
             Close
           </button>

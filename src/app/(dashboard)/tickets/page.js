@@ -1599,7 +1599,7 @@ export default function TicketingPage() {
               <button
                 type="button"
                 onClick={() => setSelectedOrder(null)}
-                className="text-xs font-semibold text-white bg-primary hover:bg-primary/90 px-4.5 py-2 rounded-xl transition-colors cursor-pointer shadow-sm"
+                className="text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/30 px-4.5 py-2 rounded-xl transition-colors cursor-pointer shadow-sm"
               >
                 Close
               </button>
