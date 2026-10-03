@@ -112,6 +112,8 @@ export default function LandingPage() {
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCountry, setSelectedCountry] = useState('');
+  const [selectedState, setSelectedState] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [activeCategoryTab, setActiveCategoryTab] = useState('all');
@@ -241,14 +243,36 @@ export default function LandingPage() {
     }
   }, [user]);
 
-  // Distinct cities list from live WordPress events
-  const availableCities = useMemo(() => {
-    const set = new Set();
-    events.forEach(e => {
-      if (e.city && e.city !== 'India') set.add(e.city);
+  // Distinct location values from live WordPress events
+  const availableCountries = useMemo(() => {
+    const values = new Map();
+    events.forEach((event) => {
+      const country = event.country?.trim();
+      if (country && !values.has(country.toLowerCase())) values.set(country.toLowerCase(), country);
     });
-    return Array.from(set);
+    return Array.from(values.values()).sort((a, b) => a.localeCompare(b));
   }, [events]);
+
+  const availableStates = useMemo(() => {
+    const values = new Map();
+    events.forEach((event) => {
+      if (selectedCountry && event.country?.toLowerCase() !== selectedCountry.toLowerCase()) return;
+      const state = event.state?.trim();
+      if (state && !values.has(state.toLowerCase())) values.set(state.toLowerCase(), state);
+    });
+    return Array.from(values.values()).sort((a, b) => a.localeCompare(b));
+  }, [events, selectedCountry]);
+
+  const availableCities = useMemo(() => {
+    const values = new Map();
+    events.forEach((event) => {
+      if (selectedCountry && event.country?.toLowerCase() !== selectedCountry.toLowerCase()) return;
+      if (selectedState && event.state?.toLowerCase() !== selectedState.toLowerCase()) return;
+      const city = event.city?.trim();
+      if (city && city !== 'India' && !values.has(city.toLowerCase())) values.set(city.toLowerCase(), city);
+    });
+    return Array.from(values.values()).sort((a, b) => a.localeCompare(b));
+  }, [events, selectedCountry, selectedState]);
 
   // Distinct categories list from live WordPress events
   const availableCategories = useMemo(() => {
@@ -301,6 +325,12 @@ export default function LandingPage() {
           item.organizer?.toLowerCase().includes(q) ||
           item.description?.toLowerCase().includes(q);
         if (!matches) return false;
+      }
+      if (selectedCountry && item.country?.toLowerCase() !== selectedCountry.toLowerCase()) {
+        return false;
+      }
+      if (selectedState && item.state?.toLowerCase() !== selectedState.toLowerCase()) {
+        return false;
       }
       if (selectedCity && selectedCity !== 'All Cities') {
         if (!item.city?.toLowerCase().includes(selectedCity.toLowerCase()) && !item.venue?.toLowerCase().includes(selectedCity.toLowerCase())) {
@@ -396,7 +426,7 @@ export default function LandingPage() {
     }
 
     return result;
-  }, [enrichedEvents, searchQuery, selectedCity, selectedCategory, activeCategoryTab, quickFilter, formatFilter, entryTypeFilter, dateRangeFilter, sortBy, isNearbyActive, userLocation]);
+  }, [enrichedEvents, searchQuery, selectedCountry, selectedState, selectedCity, selectedCategory, activeCategoryTab, quickFilter, formatFilter, entryTypeFilter, dateRangeFilter, sortBy, isNearbyActive, userLocation]);
 
   // Displayed slice
   const displayedEvents = useMemo(() => {
@@ -927,12 +957,14 @@ export default function LandingPage() {
                     <Filter className="h-4 w-4 text-[#FF2E63]" />
                     <span>Search Filters</span>
                   </div>
-                  {(dateRangeFilter !== 'all' || formatFilter !== 'all' || entryTypeFilter !== 'all' || selectedCity || activeCategoryTab !== 'all' || searchQuery || isNearbyActive) && (
+                  {(dateRangeFilter !== 'all' || formatFilter !== 'all' || entryTypeFilter !== 'all' || selectedCountry || selectedState || selectedCity || activeCategoryTab !== 'all' || searchQuery || isNearbyActive) && (
                     <button
                       onClick={() => {
                         setDateRangeFilter('all');
                         setFormatFilter('all');
                         setEntryTypeFilter('all');
+                        setSelectedCountry('');
+                        setSelectedState('');
                         setSelectedCity('');
                         setActiveCategoryTab('all');
                         setSearchQuery('');
@@ -982,6 +1014,57 @@ export default function LandingPage() {
                       </button>
                     </div>
                   )}
+                </div>
+
+                {/* Country, State & City Filters */}
+                <div className="space-y-2 pt-2 border-t border-zinc-100">
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-zinc-400">
+                    Filter by Location
+                  </label>
+                  <div className="space-y-2">
+                    <select
+                      aria-label="Filter events by country"
+                      value={selectedCountry}
+                      onChange={(e) => {
+                        setSelectedCountry(e.target.value);
+                        setSelectedState('');
+                        setSelectedCity('');
+                      }}
+                      className="w-full px-3 py-2 text-xs bg-zinc-50 hover:bg-zinc-100/70 focus:bg-white border border-zinc-200 focus:border-[#FF2E63] rounded-xl text-zinc-700 focus:outline-none focus:ring-1 focus:ring-[#FF2E63]/20 transition-all font-medium"
+                    >
+                      <option value="">All Countries</option>
+                      {availableCountries.map((country) => (
+                        <option key={country} value={country}>{country}</option>
+                      ))}
+                    </select>
+                    <select
+                      aria-label="Filter events by state or region"
+                      value={selectedState}
+                      onChange={(e) => {
+                        setSelectedState(e.target.value);
+                        setSelectedCity('');
+                      }}
+                      disabled={availableStates.length === 0}
+                      className="w-full px-3 py-2 text-xs bg-zinc-50 hover:bg-zinc-100/70 focus:bg-white border border-zinc-200 focus:border-[#FF2E63] rounded-xl text-zinc-700 focus:outline-none focus:ring-1 focus:ring-[#FF2E63]/20 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">All States / Regions</option>
+                      {availableStates.map((state) => (
+                        <option key={state} value={state}>{state}</option>
+                      ))}
+                    </select>
+                    <select
+                      aria-label="Filter events by city"
+                      value={selectedCity}
+                      onChange={(e) => setSelectedCity(e.target.value)}
+                      disabled={availableCities.length === 0}
+                      className="w-full px-3 py-2 text-xs bg-zinc-50 hover:bg-zinc-100/70 focus:bg-white border border-zinc-200 focus:border-[#FF2E63] rounded-xl text-zinc-700 focus:outline-none focus:ring-1 focus:ring-[#FF2E63]/20 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">All Cities</option>
+                      {availableCities.map((city) => (
+                        <option key={city} value={city}>{city}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 {/* Date Filter */}

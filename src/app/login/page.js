@@ -59,6 +59,7 @@ export default function LoginPage() {
 
   // Auth Form State
   const [userRole, setUserRole] = useState('organizer'); // 'organizer', 'exhibitor', or 'visitor'
+  const [roleOnly, setRoleOnly] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState('');
@@ -156,10 +157,15 @@ export default function LoginPage() {
         setRedirectUrl(redirectParam);
       }
       const roleParam = params.get('role');
+      const isRoleLocked = params.get('roleOnly') === 'true';
+      setRoleOnly(isRoleLocked);
       if (roleParam === 'visitor' || params.get('event')) {
         setUserRole('visitor');
       } else if (roleParam === 'exhibitor') {
         setUserRole('exhibitor');
+        if (isRoleLocked) {
+          setGoogleDetailsForm((prev) => ({ ...prev, role: 'exhibitor' }));
+        }
       } else if (roleParam === 'organizer') {
         setUserRole('organizer');
       }
@@ -677,7 +683,7 @@ export default function LoginPage() {
             )}
 
             {/* Role switch toggle in Google step (Organizer, Exhibitor, Visitor) */}
-            <div className="grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-zinc-100 border border-zinc-200/80 text-xs font-semibold">
+            {!roleOnly && <div className="grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-zinc-100 border border-zinc-200/80 text-xs font-semibold">
               <button
                 type="button"
                 onClick={() => {
@@ -726,7 +732,7 @@ export default function LoginPage() {
                 <Ticket className="h-3.5 w-3.5 text-amber-500" />
                 <span className="truncate">Visitor</span>
               </button>
-            </div>
+            </div>}
 
             {/* Basic Details Form */}
             <form onSubmit={handleGoogleDetailsSubmit} className="space-y-4">
@@ -995,6 +1001,8 @@ export default function LoginPage() {
                     : userRole === 'exhibitor'
                     ? 'Create Exhibitor Account'
                     : 'Create Organizer Account'
+                  : roleOnly && userRole === 'exhibitor'
+                  ? 'Exhibitor Sign In'
                   : 'Welcome to VisitExpo'}
               </h2>
               <p className="text-xs text-zinc-500 max-w-sm mx-auto leading-relaxed">
@@ -1009,7 +1017,7 @@ export default function LoginPage() {
             </div>
 
             {/* 3-Role Selector: Organizer, Exhibitor, Visitor */}
-            <div className="grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-zinc-100 border border-zinc-200/80 text-xs font-semibold">
+            {!roleOnly && <div className="grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-zinc-100 border border-zinc-200/80 text-xs font-semibold">
               <button
                 type="button"
                 onClick={() => {
@@ -1058,7 +1066,7 @@ export default function LoginPage() {
                 <Ticket className="h-3.5 w-3.5 text-amber-500" />
                 <span className="truncate">Visitor</span>
               </button>
-            </div>
+            </div>}
 
             {formError && (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl bg-red-50 border border-red-200 p-3.5 text-xs text-red-700">
@@ -1066,7 +1074,7 @@ export default function LoginPage() {
                   <Lock className="h-4 w-4 flex-shrink-0 text-red-600" />
                   <span className="font-medium">{formError}</span>
                 </div>
-                {formError.includes('Organizer tab') && userRole !== 'organizer' && (
+                {!roleOnly && formError.includes('Organizer tab') && userRole !== 'organizer' && (
                   <button
                     type="button"
                     onClick={() => {
@@ -1078,7 +1086,7 @@ export default function LoginPage() {
                     Switch to Organizer &rarr;
                   </button>
                 )}
-                {formError.includes('Exhibitor tab') && userRole !== 'exhibitor' && (
+                {!roleOnly && formError.includes('Exhibitor tab') && userRole !== 'exhibitor' && (
                   <button
                     type="button"
                     onClick={() => {
@@ -1090,7 +1098,7 @@ export default function LoginPage() {
                     Switch to Exhibitor &rarr;
                   </button>
                 )}
-                {formError.includes('Visitor tab') && userRole !== 'visitor' && (
+                {!roleOnly && formError.includes('Visitor tab') && userRole !== 'visitor' && (
                   <button
                     type="button"
                     onClick={() => {

@@ -223,12 +223,12 @@ export default function GoogleCalendarModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-zinc-950/75 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
+      className="fixed inset-x-0 top-16 bottom-0 z-[60] flex items-center justify-center p-3 sm:top-20 sm:p-4 bg-zinc-950/75 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative w-full max-w-xl my-auto bg-white rounded-2xl shadow-2xl border border-zinc-200 overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="relative w-full max-w-xl my-auto bg-white rounded-2xl shadow-2xl border border-zinc-200 overflow-hidden flex flex-col max-h-full">
         
         {/* Modal Header: VisitExpo Brand Dark Slate Theme */}
         <div className="bg-zinc-950 text-white p-5 sm:p-6 relative border-b border-zinc-800">

@@ -23,7 +23,6 @@ import { useAuth } from '../../../context/AuthContext.js';
 import { getCurrencySymbol } from '../../(dashboard)/events/wizard/page.js';
 import Navbar from '../../../components/Navbar.js';
 import Footer from '../../../components/Footer.js';
-import GatedAuthModal from '../../../components/GatedAuthModal.js';
 import InterestedAttendeesModal from '../../../components/InterestedAttendeesModal.js';
 import OrganizerChatWidget from '../../../components/OrganizerChatWidget.js';
 import GoogleCalendarButton from '../../../components/GoogleCalendarButton.js';
@@ -303,8 +302,7 @@ export default function ExpoDetailsPage() {
   const [connectionModalUser, setConnectionModalUser] = useState(null);
   const [connectionNote, setConnectionNote] = useState('');
   const [connectionSent, setConnectionSent] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
-  const [gatedContext, setGatedContext] = useState(null);
+  const [isSharing, setIsSharing] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
   // Virtual & Hybrid Event State
@@ -897,18 +895,47 @@ export default function ExpoDetailsPage() {
     return Array.from(tags);
   }, [event]);
 
-  const handleShare = () => {
-    if (typeof window !== 'undefined') {
-      navigator.clipboard.writeText(window.location.href);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2500);
-      showToast('Event link copied to clipboard!');
+  const handleShare = async () => {
+    if (typeof window === 'undefined' || isSharing) return;
+    if (!navigator.share) {
+      showToast('Sharing is not supported by this browser.');
+      return;
     }
+
+    setIsSharing(true);
+    try {
+      await navigator.share({
+        title: event?.title || 'VisitExpo Event',
+        text: `Check out ${event?.title || 'this event'} on VisitExpo`,
+        url: window.location.href
+      });
+      showToast('Event shared successfully!');
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+      console.error('Could not share event:', error);
+      showToast('Could not share the event. Please try again.');
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const redirectToLogin = () => {
+    const redirect = typeof window !== 'undefined'
+      ? `${window.location.pathname}${window.location.search}`
+      : `/expo/${slug}`;
+    router.push(`/login?role=visitor&redirect=${encodeURIComponent(redirect)}`);
+  };
+
+  const redirectToExhibitorLogin = () => {
+    const redirect = typeof window !== 'undefined'
+      ? `${window.location.pathname}${window.location.search}`
+      : `/expo/${slug}`;
+    router.push(`/login?role=exhibitor&roleOnly=true&redirect=${encodeURIComponent(redirect)}`);
   };
 
   const handleInterested = async () => {
     if (!user) {
-      setGatedContext({ action: 'ticket', event });
+      redirectToLogin();
       return;
     }
     const next = !isInterested;
@@ -965,7 +992,7 @@ export default function ExpoDetailsPage() {
 
   const handleToggleFollowExpo = async () => {
     if (!user) {
-      setGatedContext({ action: 'follow', event });
+      redirectToLogin();
       return;
     }
     const next = !isFollowingExpo;
@@ -1022,7 +1049,7 @@ export default function ExpoDetailsPage() {
 
   const handleToggleFollowAttendee = (att) => {
     if (!user) {
-      setGatedContext({ action: 'connect', event, attendee: att });
+      redirectToLogin();
       return;
     }
     setFollowedAttendeeIds((prev) => {
@@ -1044,7 +1071,7 @@ export default function ExpoDetailsPage() {
 
   const handleConnectAttendee = (att) => {
     if (!user) {
-      setGatedContext({ action: 'connect', event, attendee: att });
+      redirectToLogin();
       return;
     }
     setConnectionModalUser(att);
@@ -1136,14 +1163,6 @@ export default function ExpoDetailsPage() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const handleAuthSuccess = () => {
-    setIsInterested(true);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(`visitexpo_interested_${slug}`, 'true');
-    }
-    showToast(`Welcome! You are registered as Interested in ${event?.title}.`);
-  };
-
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
     if (!reviewText.trim()) return;
@@ -1205,6 +1224,29 @@ export default function ExpoDetailsPage() {
   const ratingValue = event?.rating || '4.0';
   const reviewsCount = event?.reviewCount || 88;
   const editionLabel = event?.edition || '11th Edition';
+  const mapCoordinates = event?.mapCoordinates;
+  const hasExactMapCoordinates =
+    mapCoordinates?.lat !== undefined &&
+    mapCoordinates?.lat !== null &&
+    mapCoordinates?.lng !== undefined &&
+    mapCoordinates?.lng !== null &&
+    Number.isFinite(Number(mapCoordinates.lat)) &&
+    Number.isFinite(Number(mapCoordinates.lng));
+  const exactMapLocation = [
+    event?.venue,
+    event?.address,
+    event?.city,
+    event?.state,
+    event?.country
+  ]
+    .filter((part) => typeof part === 'string' && part.trim())
+    .filter((part, index, parts) => parts.findIndex((candidate) => candidate.toLowerCase() === part.toLowerCase()) === index)
+    .join(', ');
+  const mapQuery = hasExactMapCoordinates
+    ? `${mapCoordinates.lat},${mapCoordinates.lng}`
+    : exactMapLocation;
+  const mapSearchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`;
+  const mapDirectionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapQuery)}`;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F6F7F9] text-zinc-900 font-sans antialiased selection:bg-[#FF2E63] selection:text-white">
@@ -1217,6 +1259,23 @@ export default function ExpoDetailsPage() {
 
         {/* Breadcrumb Navigation */}
         <div className="flex items-center gap-2 text-xs text-zinc-500 pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (window.history.length > 1) {
+                router.back();
+              } else {
+                router.push('/#events');
+              }
+            }}
+            className="inline-flex shrink-0 items-center gap-1 font-semibold text-zinc-600 hover:text-zinc-950 transition-colors"
+            aria-label="Go back"
+            title="Go back"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span>Back</span>
+          </button>
+          <span>/</span>
           <Link href="/" className="hover:text-zinc-900 font-medium">Home</Link>
           <span>/</span>
           <Link href="/#events" className="hover:text-zinc-900 font-medium">Trade Shows</Link>
@@ -1340,7 +1399,7 @@ export default function ExpoDetailsPage() {
                     </span>
                   )}
                   <a
-                    href={event?.mapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event?.address || event?.venue || `${event?.city} ${event?.country}`)}`}
+                    href={mapSearchUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[11px] font-bold text-[#FF2E63] hover:text-[#E82054] hover:underline inline-flex items-center gap-1 ml-0.5"
@@ -1440,10 +1499,11 @@ export default function ExpoDetailsPage() {
                 <button
                   type="button"
                   onClick={handleShare}
-                  className="inline-flex items-center gap-1 hover:text-zinc-900 cursor-pointer"
+                  disabled={isSharing}
+                  className="inline-flex items-center gap-1 hover:text-zinc-900 cursor-pointer disabled:opacity-60"
                 >
                   <Share2 className="h-4 w-4" />
-                  <span>{copiedLink ? 'Copied!' : 'Share'}</span>
+                  <span>{isSharing ? 'Sharing…' : 'Share'}</span>
                 </button>
 
                 <GoogleCalendarButton
@@ -1519,7 +1579,7 @@ export default function ExpoDetailsPage() {
         {/* ========================================================================= */}
         {/* 2. STICKY NAVIGATION TABS (MATCHING 10TIMES SCREENSHOT 1 & 2)             */}
         {/* ========================================================================= */}
-        <div className="sticky top-16 sm:top-20 z-30 bg-white border border-zinc-200/90 rounded-xl px-4 sm:px-6 shadow-xs flex items-center justify-between">
+        <div className="sticky top-16 sm:top-20 z-30 bg-white border border-zinc-200/90 rounded-xl px-4 sm:px-6 shadow-xs">
           
           {/* Navigation Links */}
           <div className="flex items-center gap-6 sm:gap-8 overflow-x-auto text-xs sm:text-sm font-bold text-zinc-600 no-scrollbar">
@@ -1545,39 +1605,6 @@ export default function ExpoDetailsPage() {
                 {tab.label}
               </button>
             ))}
-          </div>
-
-          {/* Sticky Right CTA */}
-          <div className="hidden md:flex items-center gap-2.5 py-2">
-            <span className="text-xs font-bold text-zinc-800 truncate max-w-xs line-clamp-1">
-              {event?.title}
-            </span>
-            <button
-              onClick={handleInterested}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                isInterested
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-extrabold'
-              }`}
-            >
-              {isInterested ? 'Interested ✓' : 'Interested'}
-            </button>
-            <button
-              type="button"
-              onClick={handleToggleFollowExpo}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                isFollowingExpo
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-zinc-900 hover:bg-zinc-800 text-white'
-              }`}
-            >
-              <Bell className={`h-3 w-3 ${isFollowingExpo ? 'fill-white' : ''}`} />
-              <span>{isFollowingExpo ? 'Following' : 'Follow'}</span>
-            </button>
-            <GoogleCalendarButton
-              event={event}
-              variant="mini"
-            />
           </div>
 
         </div>
@@ -1995,7 +2022,7 @@ export default function ExpoDetailsPage() {
                   </div>
                   <div className="flex items-center gap-2 self-start sm:self-auto">
                     <a
-                      href={event?.mapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event?.address || event?.venue || `${event?.city} ${event?.country}`)}`}
+                      href={mapSearchUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[11px] font-bold text-[#FF2E63] hover:text-[#E82054] hover:underline inline-flex items-center gap-1 bg-rose-50/70 border border-rose-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
@@ -2063,14 +2090,10 @@ export default function ExpoDetailsPage() {
                       loading="lazy"
                       allowFullScreen
                       referrerPolicy="no-referrer-when-downgrade"
-                      src={`https://maps.google.com/maps?q=${encodeURIComponent(
-                        (event?.mapCoordinates?.lat && event?.mapCoordinates?.lng)
-                          ? `${event.mapCoordinates.lat},${event.mapCoordinates.lng}`
-                          : (event?.address || event?.venue || `${event?.city || ''} ${event?.country || ''}`)
-                      )}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                      src={`https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&z=18&ie=UTF8&iwloc=B&output=embed`}
                     />
                     <a
-                      href={event?.mapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event?.address || event?.venue || `${event?.city} ${event?.country}`)}`}
+                      href={mapSearchUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="absolute bottom-3 right-3 px-3 py-1.5 rounded-lg bg-zinc-900/90 hover:bg-zinc-900 text-white text-[11px] font-bold inline-flex items-center gap-1.5 backdrop-blur-xs shadow-md transition-all cursor-pointer opacity-90 group-hover:opacity-100"
@@ -2085,7 +2108,7 @@ export default function ExpoDetailsPage() {
                   {/* Actions: Google Maps Directions & External Link */}
                   <div className="pt-1 flex flex-wrap items-center gap-3">
                     <a
-                      href={event?.mapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event?.address || event?.venue || `${event?.city} ${event?.country}`)}`}
+                      href={mapDirectionsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold inline-flex items-center gap-2 shadow-xs transition-all cursor-pointer"
@@ -2360,10 +2383,11 @@ export default function ExpoDetailsPage() {
               <button
                 type="button"
                 onClick={handleShare}
-                className="px-5 py-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs shrink-0 cursor-pointer"
+                disabled={isSharing}
+                className="px-5 py-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs shrink-0 cursor-pointer disabled:opacity-60"
               >
                 <Share2 className="h-3.5 w-3.5" />
-                <span>Share</span>
+                <span>{isSharing ? 'Sharing…' : 'Share'}</span>
               </button>
             </div>
 
@@ -2482,7 +2506,7 @@ export default function ExpoDetailsPage() {
                 <div>
                   <button
                     type="button"
-                    onClick={handleInterested}
+                    onClick={redirectToExhibitorLogin}
                     className="inline-flex items-center gap-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold px-5 py-2.5 text-xs transition-colors cursor-pointer"
                   >
                     <span>Unlock Full Exhibitor Directory</span>
@@ -3678,37 +3702,7 @@ export default function ExpoDetailsPage() {
           {/* ----------------------------------------------------------------------- */}
           <div className="lg:col-span-4 space-y-6">
             
-            {/* Sidebar Card 1: Job Vacancies / Ads Widget (Image 1 & 2) */}
-            <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-xs">
-              <div className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-3.5 text-xs font-extrabold flex items-center justify-between">
-                <span>Available job vacancies — hiring now</span>
-                <span className="text-[10px] font-normal opacity-80">Sponsored</span>
-              </div>
-              <div className="divide-y divide-zinc-100 text-xs">
-                {[
-                  'View urgent exhibition positions',
-                  'Immediate start (this week)',
-                  'Booth host & translator roles — no CV'
-                ].map((item, idx) => (
-                  <div key={idx} className="p-3.5 hover:bg-zinc-50 flex items-center justify-between cursor-pointer group">
-                    <span className="font-semibold text-zinc-800 group-hover:text-blue-700">{item}</span>
-                    <ChevronRight className="h-4 w-4 text-zinc-400 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                ))}
-              </div>
-              <div className="p-3.5 bg-zinc-50 border-t border-zinc-100">
-                <button
-                  type="button"
-                  onClick={() => showToast('Opening career portal...')}
-                  className="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <span>View in minutes</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Sidebar Card 2: Networking & Attendee Partner (Image 2) */}
+            {/* Sidebar Card: Networking & Attendee Partner */}
             <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs space-y-4">
               <div className="space-y-1">
                 <div className="text-xs font-extrabold uppercase tracking-wider text-[#FF2E63]">
@@ -3821,7 +3815,7 @@ export default function ExpoDetailsPage() {
         onToggleFollowAttendee={handleToggleFollowAttendee}
         isUserInterested={isInterested}
         currentUser={user}
-        onTriggerGated={(action, attendee) => setGatedContext({ action, event, attendee })}
+        onTriggerGated={redirectToLogin}
         onConnectAttendee={handleConnectAttendee}
       />
 
@@ -3898,13 +3892,6 @@ export default function ExpoDetailsPage() {
           </div>
         </div>
       )}
-
-      <GatedAuthModal
-        isOpen={Boolean(gatedContext)}
-        onClose={() => setGatedContext(null)}
-        context={gatedContext}
-        onSuccess={handleAuthSuccess}
-      />
 
       {/* Review Modal */}
       {showReviewModal && (

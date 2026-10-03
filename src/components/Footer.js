@@ -64,7 +64,7 @@ export default function Footer({ className = '' }) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10">
           
           {/* Brand & Newsletter Column */}
-          <div className="lg:col-span-8 space-y-4">
+          <div className="lg:col-span-5 space-y-4">
             <div className="flex items-center gap-2">
               <Logo className="h-7 w-7" />
               <span className="text-sm font-bold text-zinc-100 tracking-tight">VisitExpo</span>
@@ -101,6 +101,35 @@ export default function Footer({ className = '' }) {
               <p>Email: support@visitexpo.in</p>
               <p>Helpline: +91 93236 77688 (Mon–Fri, 9am–6pm IST)</p>
             </div>
+          </div>
+
+          {/* Navigation */}
+          <div className="lg:col-span-3 space-y-3">
+            <h4 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
+              Explore
+            </h4>
+            <ul className="space-y-2 text-xs">
+              <li>
+                <Link href="/events" className="hover:text-zinc-200 transition-colors">
+                  Explore Events
+                </Link>
+              </li>
+              <li>
+                <Link href="/recommendations" className="hover:text-zinc-200 transition-colors">
+                  For You
+                </Link>
+              </li>
+              <li>
+                <Link href="/#claim" className="hover:text-zinc-200 transition-colors">
+                  Claim Listing
+                </Link>
+              </li>
+              <li>
+                <Link href="/contact" className="hover:text-zinc-200 transition-colors">
+                  Contact
+                </Link>
+              </li>
+            </ul>
           </div>
 
           {/* Company & Support */}
@@ -145,18 +174,6 @@ export default function Footer({ className = '' }) {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-zinc-500 text-[11px]">
           <div>
             &copy; {new Date().getFullYear()} VisitExpo Inc. All rights reserved.
-          </div>
-
-          <div className="flex items-center gap-4">
-            <Link href="/terms" className="hover:text-zinc-300 transition-colors">Terms</Link>
-            <span>·</span>
-            <Link href="/privacy" className="hover:text-zinc-300 transition-colors">Privacy</Link>
-            <span>·</span>
-            <Link href="/refund-policy" className="hover:text-zinc-300 transition-colors">Refunds</Link>
-            <span>·</span>
-            <Link href="/about" className="hover:text-zinc-300 transition-colors">About</Link>
-            <span>·</span>
-            <Link href="/contact" className="hover:text-zinc-300 transition-colors">Contact</Link>
           </div>
 
           {/* Official Social Links */}

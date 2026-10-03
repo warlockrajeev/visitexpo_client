@@ -502,7 +502,7 @@ export default function FeaturedOrganizers({ onSelectOrganizer, activeOrganizer 
   };
 
   return (
-    <section id="organizers" className="space-y-3.5">
+    <section id="organizers" className="relative z-20 space-y-3.5">
       {/* Header matching Screenshot & 10times UI */}
       <div className="flex items-end justify-between gap-4">
         <div>
@@ -545,7 +545,7 @@ export default function FeaturedOrganizers({ onSelectOrganizer, activeOrganizer 
       <div className="relative">
         <div
           ref={scrollContainerRef}
-          className="flex items-center gap-3 overflow-x-auto scrollbar-none py-2 px-0.5 scroll-smooth"
+          className="flex items-center gap-3 overflow-x-auto scrollbar-none pt-9 pb-2 px-0.5 scroll-smooth"
         >
           {organizers.map((org) => {
             const isHovered = hoveredOrg === org.id;
@@ -568,7 +568,7 @@ export default function FeaturedOrganizers({ onSelectOrganizer, activeOrganizer 
               >
                 {/* Tooltip on hover matching Screenshot with full details */}
                 {isHovered && (
-                  <div className="absolute -bottom-9 left-1/2 -translate-x-1/2 z-30 pointer-events-none whitespace-nowrap bg-zinc-950/95 text-white text-[11px] font-medium px-2.5 py-1 rounded-md shadow-xl border border-zinc-800 flex items-center gap-1.5 transition-opacity duration-150">
+                  <div className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 z-30 pointer-events-none whitespace-nowrap bg-zinc-950/95 text-white text-[11px] font-medium px-2.5 py-1 rounded-md shadow-xl border border-zinc-800 flex items-center gap-1.5 transition-opacity duration-150">
                     <span className="font-semibold text-white">{org.name}</span>
                     <span className="text-zinc-400">•</span>
                     <span className="text-emerald-400 font-bold">{org.countFormatted || `${org.count} Events`}</span>
