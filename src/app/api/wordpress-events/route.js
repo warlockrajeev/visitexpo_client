@@ -9,7 +9,7 @@ const BACKEND_API_URL =
   (process.env.NODE_ENV === 'production' ? 'https://api.visitexpo.in/api' : 'http://localhost:5000/api');
 
 // Persistent in-memory cache across Next.js module evaluations
-const CACHE_TTL_MS = 30 * 1000; // 30 seconds max to guarantee freshness
+const CACHE_TTL_MS = 5 * 60 * 1000; // Keep landing page event data warm between visits
 if (!globalThis._wpEventsMemoryCache) {
   globalThis._wpEventsMemoryCache = {
     events: null,

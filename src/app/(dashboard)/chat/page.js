@@ -80,6 +80,7 @@ export default function OrganizerChatPage() {
   // Filter & Search
   const [filterRole, setFilterRole] = useState('all'); // 'all', 'visitor', 'exhibitor', 'unread'
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
 
   // Message Input State
   const [messageText, setMessageText] = useState('');
@@ -95,6 +96,11 @@ export default function OrganizerChatPage() {
 
   const messagesEndRef = useRef(null);
   const pollingRef = useRef(null);
+  const activeConversationRef = useRef(null);
+
+  useEffect(() => {
+    activeConversationRef.current = activeConversation;
+  }, [activeConversation]);
 
   // Quick reply snippets
   const quickReplies = [
@@ -133,8 +139,8 @@ export default function OrganizerChatPage() {
       } else if (filterRole !== 'all') {
         params.role = filterRole;
       }
-      if (searchQuery.trim()) {
-        params.search = searchQuery.trim();
+      if (debouncedSearchQuery.trim()) {
+        params.search = debouncedSearchQuery.trim();
       }
 
       const res = await axios.get(`${API_URL}/chat/conversations`, {
@@ -146,10 +152,15 @@ export default function OrganizerChatPage() {
         setConversations(res.data.conversations);
 
         // Keep active conversation updated if one is open
-        if (activeConversation) {
-          const updatedActive = res.data.conversations.find((c) => c._id === activeConversation._id);
-          if (updatedActive && updatedActive.messages?.length !== activeConversation.messages?.length) {
-            setActiveConversation(updatedActive);
+        const currentActive = activeConversationRef.current;
+        if (currentActive) {
+          const updatedActive = res.data.conversations.find((c) => c._id === currentActive._id);
+          if (updatedActive && updatedActive.lastMessageAt !== currentActive.lastMessageAt) {
+            setActiveConversation({
+              ...currentActive,
+              ...updatedActive,
+              messages: currentActive.messages || []
+            });
           }
         }
       }
@@ -160,23 +171,28 @@ export default function OrganizerChatPage() {
     }
   };
 
-  // Initial load
+  // Debounce search so typing does not trigger a request for every keystroke.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchQuery(searchQuery), 250);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Load settings once; the conversation list refreshes independently.
   useEffect(() => {
     fetchSettingsAndStats();
-    fetchConversations();
-  }, [filterRole, searchQuery]);
+  }, []);
 
-  // Polling for live updates every 4 seconds
+  // Poll summaries only while the chat tab is visible.
   useEffect(() => {
+    fetchConversations();
     pollingRef.current = setInterval(() => {
-      fetchConversations(true);
-      fetchSettingsAndStats();
-    }, 4000);
+      if (document.visibilityState === 'visible') fetchConversations(true);
+    }, 15000);
 
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
-  }, [filterRole, searchQuery, activeConversation?._id]);
+  }, [filterRole, debouncedSearchQuery]);
 
   // Scroll to bottom when messages update
   useEffect(() => {

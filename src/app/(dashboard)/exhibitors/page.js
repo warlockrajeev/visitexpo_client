@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
+import { buildDashboardEventsUrl } from '../../../utils/dashboardEvents.js';
 import SearchableSelect from '../../../components/SearchableSelect.js';
 import { showSweetAlert, showSweetConfirm, showSweetSuccess, showSweetError, showSweetWarning } from '../../../utils/sweetalert.js';
 import {
@@ -91,13 +92,7 @@ export default function ExhibitorsPage() {
     const fetchEvents = async () => {
       try {
         const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
-        const orgId = user.organization?._id || user.organization;
-        
-        let url = `${API_URL}/events?limit=100&all=true`;
-        if (user.role !== 'super_admin') {
-          const filterId = orgId || user._id;
-          url = `${API_URL}/events?organizerId=${filterId}&all=true`;
-        }
+        const url = buildDashboardEventsUrl(API_URL, user);
 
         let res = await axios.get(url, { headers });
         let docs = res.data?.data?.docs || [];

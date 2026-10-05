@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
+import { buildDashboardEventsUrl } from '../../../utils/dashboardEvents.js';
 import SearchableSelect from '../../../components/SearchableSelect.js';
 import {
   Ticket,
@@ -197,7 +198,7 @@ export default function TicketingPage() {
     const fetchEvents = async () => {
       try {
         const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
-        const res = await axios.get(`${API_URL}/events?limit=1000&all=true`, { headers });
+        const res = await axios.get(buildDashboardEventsUrl(API_URL, user), { headers });
         if (res.data && res.data.success && res.data.data.docs) {
           const rawEvents = res.data.data.docs;
           const userOrgId = user?.organization?._id || user?.organization;
@@ -235,24 +236,29 @@ export default function TicketingPage() {
     setError('');
     try {
       const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
-      const ticketRes = await axios.get(`${API_URL}/tickets`, {
-        params: { eventId: selectedEventId },
-        headers
-      });
-      if (ticketRes.data && ticketRes.data.success) {
-        setTickets(ticketRes.data.data || []);
-        if (ticketRes.data.data.length > 0) {
-          setSimulateForm(prev => ({ ...prev, ticketId: ticketRes.data.data[0]._id }));
+      const [ticketResult, orderResult] = await Promise.allSettled([
+        axios.get(`${API_URL}/tickets`, {
+          params: { eventId: selectedEventId },
+          headers
+        }),
+        axios.get(`${API_URL}/orders`, {
+          params: { eventId: selectedEventId, limit: 20 },
+          headers
+        })
+      ]);
+      if (ticketResult.status === 'fulfilled' && ticketResult.value.data?.success) {
+        const ticketData = ticketResult.value.data.data || [];
+        setTickets(ticketData);
+        if (ticketData.length > 0) {
+          setSimulateForm(prev => ({ ...prev, ticketId: ticketData[0]._id }));
         }
       }
-
-      const orderRes = await axios.get(`${API_URL}/orders`, {
-        params: { eventId: selectedEventId, limit: 20 },
-        headers
-      });
-      if (orderRes.data && orderRes.data.success) {
-        setOrders(orderRes.data.data.docs || []);
-        setTotalRevenue(orderRes.data.data.totalRevenue || 0);
+      if (orderResult.status === 'fulfilled' && orderResult.value.data?.success) {
+        setOrders(orderResult.value.data.data.docs || []);
+        setTotalRevenue(orderResult.value.data.data.totalRevenue || 0);
+      }
+      if (ticketResult.status === 'rejected' || orderResult.status === 'rejected') {
+        throw ticketResult.status === 'rejected' ? ticketResult.reason : orderResult.reason;
       }
     } catch (err) {
       console.error('Error fetching ticketing details', err);

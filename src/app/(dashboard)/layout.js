@@ -38,20 +38,11 @@ import {
   Bell
 } from 'lucide-react';
 
-import axios from 'axios';
 import { initSweetAlertInterceptors } from '../../utils/sweetalert.js';
 import OrganizerSupportWidget from '../../components/OrganizerSupportWidget.js';
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  (typeof window !== 'undefined' && window.location.hostname.includes('visitexpo.in')
-    ? 'https://api.visitexpo.in/api'
-    : 'http://localhost:5000/api');
-
 export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [dynamicEvents, setDynamicEvents] = useState([]);
-  const [unreadChatCount, setUnreadChatCount] = useState(0);
   const pathname = usePathname();
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
@@ -60,25 +51,6 @@ export default function DashboardLayout({ children }) {
   useEffect(() => {
     initSweetAlertInterceptors();
   }, []);
-
-  // Poll chat settings & unread count for organizers
-  useEffect(() => {
-    let timer;
-    const fetchChatStats = async () => {
-      if (user && user.role !== 'visitor') {
-        try {
-          const res = await axios.get(`${API_URL}/chat/settings`, { withCredentials: true });
-          if (res.data?.success && res.data?.stats) {
-            setUnreadChatCount(res.data.stats.unreadConversations || 0);
-          }
-        } catch (_) {}
-      }
-    };
-
-    fetchChatStats();
-    timer = setInterval(fetchChatStats, 12000);
-    return () => clearInterval(timer);
-  }, [user]);
 
   const handleToggleView = () => {
     if (typeof toggleDashboardView === 'function') {
@@ -108,24 +80,6 @@ export default function DashboardLayout({ children }) {
       }
     }
   }, [user, loading, pathname, router, isExhibitorView]);
-
-  // Dynamically fetch live directory events from backend API for organizer sidebar only
-  useEffect(() => {
-    const fetchDynamicSidebarEvents = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/wordpress/claimable-events?limit=5`);
-        if (res.data && res.data.success && res.data.data.docs) {
-          setDynamicEvents(res.data.data.docs.slice(0, 5));
-        }
-      } catch (err) {
-        console.warn('Could not fetch dynamic sidebar events from backend API.');
-      }
-    };
-
-    if (user && user.isVerified && user.role !== 'visitor' && !isExhibitorView) {
-      fetchDynamicSidebarEvents();
-    }
-  }, [user, isExhibitorView]);
 
   if (loading) {
     return (
@@ -233,7 +187,7 @@ export default function DashboardLayout({ children }) {
           name: 'Live Chat',
           href: '/chat',
           icon: MessageSquare,
-          badge: unreadChatCount > 0 ? `${unreadChatCount} new` : (user.isChatEnabled ? 'Live' : null)
+          badge: user.isChatEnabled ? 'Live' : null
         },
         { name: 'Saved Bookmarks', href: '/bookmarks', icon: Bookmark },
         { name: 'Interested Events', href: '/interested', icon: Star },
@@ -337,29 +291,6 @@ export default function DashboardLayout({ children }) {
             );
           })}
 
-          {/* Dynamic Backend Synced WP Events Subsection */}
-          {dynamicEvents.length > 0 && !isExhibitorView && (
-            <div className="pt-4 mt-2 border-t border-border/60">
-              <span className="block px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center justify-between">
-                <span>Live Synced Events</span>
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
-              </span>
-              <div className="space-y-1">
-                {dynamicEvents.map((evt) => (
-                  <Link
-                    key={evt._id || evt.id}
-                    href="/events/claim"
-                    className="flex items-center justify-between px-3 py-2 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-primary hover:bg-secondary/60 transition-colors truncate"
-                  >
-                    <span className="truncate max-w-[140px]">{evt.title}</span>
-                    <span className="text-[9px] font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                      DIR
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
         </nav>
 
         {/* Footer Area with Theme Toggle & User Info */}

@@ -90,6 +90,7 @@ export function OrganizerDashboardInner() {
 
   useEffect(() => {
     if (!user) return;
+    let isMounted = true;
     const fetchDashboardData = async () => {
       setLoading(true);
       try {
@@ -98,34 +99,37 @@ export function OrganizerDashboardInner() {
         const orgId = user.organization?._id || user.organization;
         const userId = user.id || user._id;
         const eventsUrl = user.role === 'super_admin'
-          ? `${API_URL}/events`
-          : `${API_URL}/events?organizerId=${orgId || userId}`;
+          ? `${API_URL}/events?limit=5`
+          : `${API_URL}/events?organizerId=${orgId || userId}&limit=5`;
 
 
-        const [eventsRes, visitorsRes, exhibitorsRes, leadsRes, engRes] = await Promise.allSettled([
+        const [eventsRes, visitorsRes, exhibitorsRes, leadsRes] = await Promise.allSettled([
           axios.get(eventsUrl, { headers }),
-          axios.get(`${API_URL}/visitors`, { headers }),
-          axios.get(`${API_URL}/exhibitors`, { headers }),
-          axios.get(`${API_URL}/leads`, { headers }),
-          axios.get(`${API_URL}/engagements/all`)
+          axios.get(`${API_URL}/visitors?limit=20`, { headers }),
+          axios.get(`${API_URL}/exhibitors?limit=1`, { headers }),
+          axios.get(`${API_URL}/leads?limit=20`, { headers })
         ]);
 
-        const events = eventsRes.status === 'fulfilled' && eventsRes.value.data.success ? eventsRes.value.data.data.docs || [] : [];
-        const visitorsDocs = visitorsRes.status === 'fulfilled' && visitorsRes.value.data.success ? visitorsRes.value.data.data.docs || [] : [];
-        const exhibitors = exhibitorsRes.status === 'fulfilled' && exhibitorsRes.value.data.success ? exhibitorsRes.value.data.data.docs || [] : [];
-        const leadsDocs = leadsRes.status === 'fulfilled' && leadsRes.value.data.success ? leadsRes.value.data.data.docs || [] : [];
-        const engDocs = engRes.status === 'fulfilled' && engRes.value.data.success ? engRes.value.data.data?.engagements || [] : [];
+        if (!isMounted) return;
+
+        const eventData = eventsRes.status === 'fulfilled' && eventsRes.value.data.success ? eventsRes.value.data.data : {};
+        const visitorData = visitorsRes.status === 'fulfilled' && visitorsRes.value.data.success ? visitorsRes.value.data.data : {};
+        const exhibitorData = exhibitorsRes.status === 'fulfilled' && exhibitorsRes.value.data.success ? exhibitorsRes.value.data.data : {};
+        const leadData = leadsRes.status === 'fulfilled' && leadsRes.value.data.success ? leadsRes.value.data.data : {};
+        const events = eventData.docs || [];
+        const visitorsDocs = visitorData.docs || [];
+        const exhibitors = exhibitorData.docs || [];
+        const leadsDocs = leadData.docs || [];
 
         setDashboardStats({
-          totalEvents: events.length || 0,
-          totalVisitors: visitorsDocs.length || 0,
-          totalExhibitors: exhibitors.length || 0,
-          totalLeads: leadsDocs.length || 0
+          totalEvents: eventData.total ?? events.length,
+          totalVisitors: visitorData.total ?? visitorsDocs.length,
+          totalExhibitors: exhibitorData.total ?? exhibitors.length,
+          totalLeads: leadData.total ?? leadsDocs.length
         });
 
         setVisitors(visitorsDocs);
         setLeads(leadsDocs);
-        setEngagements(engDocs);
 
         if (visitorsDocs.length > 0) {
           setRecentVisitors(visitorsDocs.slice(0, 5));
@@ -136,13 +140,37 @@ export function OrganizerDashboardInner() {
       } catch (err) {
         console.error('Error loading dynamic dashboard stats:', err);
       } finally {
-        setLoading(false);
-        setLoadingEngagements(false);
+        if (isMounted) setLoading(false);
       }
     };
 
     fetchDashboardData();
+    return () => {
+      isMounted = false;
+    };
   }, [user, accessToken]);
+
+  useEffect(() => {
+    if (!user) return;
+    let isMounted = true;
+    const fetchEngagements = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/engagements/all`, { timeout: 8000 });
+        if (isMounted && res.data?.success) {
+          setEngagements(res.data.data?.engagements || []);
+        }
+      } catch (err) {
+        console.error('Error loading dashboard engagements:', err);
+      } finally {
+        if (isMounted) setLoadingEngagements(false);
+      }
+    };
+
+    fetchEngagements();
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
 
   // Calculate dynamic check-in trend from visitors
   const dynamicCheckinTrend = React.useMemo(() => {

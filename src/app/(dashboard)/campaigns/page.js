@@ -9,6 +9,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
+import { buildDashboardEventsUrl } from '../../../utils/dashboardEvents.js';
 import SearchableSelect from '../../../components/SearchableSelect.js';
 import {
   Mail,
@@ -79,7 +80,7 @@ export default function CampaignsPage() {
     const fetchEvents = async () => {
       try {
         const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
-        const res = await axios.get(`${API_URL}/events?limit=1000&all=true`, { headers });
+        const res = await axios.get(buildDashboardEventsUrl(API_URL, user), { headers });
         if (res.data && res.data.success && res.data.data.docs) {
           const rawEvents = res.data.data.docs;
           const userOrgId = user?.organization?._id || user?.organization;

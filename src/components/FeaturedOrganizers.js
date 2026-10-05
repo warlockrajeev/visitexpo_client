@@ -417,7 +417,7 @@ export default function FeaturedOrganizers({ onSelectOrganizer, activeOrganizer 
     async function loadBackendOrganizers() {
       try {
         const [res, delRes] = await Promise.all([
-          fetch(`/api/organizers?t=${Date.now()}&refresh=true`, { cache: 'no-store' }),
+          fetch('/api/organizers'),
           fetch(`${API_URL}/events/deleted-organizers`, { cache: 'no-store' }).catch(() => null)
         ]);
 

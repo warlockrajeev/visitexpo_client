@@ -3,11 +3,11 @@
 /**
  * @file page.js
  * @description Minimalist, high-end Event Management & Expo Discovery Platform Landing Page for VisitExpo.
- * Fetches events directly from visitexpo.in.
+ * OPTIMIZED: Lazy loading, parallel API calls, skeleton screens
  * Palette: Pure White canvas, VisitExpo Yellow (#FFCC00), and vibrant Pink (#FF2E63).
  */
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, lazy, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext.js';
@@ -58,15 +58,30 @@ import {
 import axios from 'axios';
 import Navbar, { Logo } from '../components/Navbar.js';
 import ActionDiscoveryBanner from '../components/ActionDiscoveryBanner.js';
-import RecommendationEngineSection from '../components/RecommendationEngineSection.js';
 import AdvertiseModal from '../components/AdvertiseModal.js';
 import BrowseByCategory from '../components/BrowseByCategory.js';
-import BrowseByCity from '../components/BrowseByCity.js';
-import ExploreVenues from '../components/ExploreVenues.js';
-import FeaturedOrganizers from '../components/FeaturedOrganizers.js';
-import PeoplesReviews from '../components/PeoplesReviews.js';
 import TopRatedExhibitions from '../components/TopRatedExhibitions.js';
-import Footer from '../components/Footer.js';
+
+// Lazy load components below the fold for faster initial render
+const RecommendationEngineSection = lazy(() => import('../components/RecommendationEngineSection.js'));
+const BrowseByCity = lazy(() => import('../components/BrowseByCity.js'));
+const ExploreVenues = lazy(() => import('../components/ExploreVenues.js'));
+const FeaturedOrganizers = lazy(() => import('../components/FeaturedOrganizers.js'));
+const PeoplesReviews = lazy(() => import('../components/PeoplesReviews.js'));
+const Footer = lazy(() => import('../components/Footer.js'));
+
+// Skeleton Components for loading states
+const SkeletonSection = ({ height = 'h-64' }) => (
+  <div className={`${height} bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 rounded-xl animate-pulse`} />
+);
+
+const SkeletonCard = () => (
+  <div className="bg-white border border-zinc-200 rounded-2xl p-6 space-y-4 animate-pulse">
+    <div className="h-4 bg-zinc-200 rounded w-3/4" />
+    <div className="h-4 bg-zinc-200 rounded w-full" />
+    <div className="h-4 bg-zinc-200 rounded w-2/3" />
+  </div>
+);
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -161,26 +176,6 @@ export default function LandingPage() {
   const [activeFaqCategory, setActiveFaqCategory] = useState('All');
   const [loadingFaqs, setLoadingFaqs] = useState(true);
 
-  // Fetch dynamic FAQs from server
-  useEffect(() => {
-    const fetchFaqs = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/faqs`);
-        if (res.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
-          setFaqsList(res.data.data);
-          if (Array.isArray(res.data.categories) && res.data.categories.length > 0) {
-            setFaqCategories(res.data.categories);
-          }
-        }
-      } catch (err) {
-        console.log('Using default FAQs fallback:', err?.message);
-      } finally {
-        setLoadingFaqs(false);
-      }
-    };
-    fetchFaqs();
-  }, []);
-
   const displayedFaqs = useMemo(() => {
     const source = faqsList.length > 0 ? faqsList : FALLBACK_FAQS;
     if (activeFaqCategory === 'All') return source;
@@ -189,48 +184,54 @@ export default function LandingPage() {
     );
   }, [faqsList, activeFaqCategory]);
 
-  // 1. Purge any stale event cache from previous sessions so old data never appears
-  useEffect(() => {
-    try {
-      localStorage.removeItem('visitexpo_landing_events_v1');
-      sessionStorage.removeItem('visitexpo_landing_events_v1');
-    } catch (e) {
-      // Storage unavailable, continue
-    }
-  }, []);
-
-  // 2. Fetch fresh events directly from WordPress website via route handler (always live, never cached)
+  // OPTIMIZED: Parallelize all critical API calls instead of sequential useEffects
   useEffect(() => {
     let isMounted = true;
-    const fetchWordPressEvents = async () => {
+
+    // Fetch critical data in parallel for faster page load
+    const fetchCriticalData = async () => {
       try {
-        const res = await axios.get(`/api/wordpress-events?_t=${Date.now()}`, {
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
+        // Parallel API calls using Promise.all()
+        const [eventsRes, faqsRes] = await Promise.all([
+          axios.get('/api/wordpress-events', { timeout: 8000 })
+            .catch(err => ({ data: { success: false } })),
+          axios.get(`${API_URL}/faqs`, { timeout: 5000 }).catch(err => ({ data: { success: false } }))
+        ]);
+
+        if (isMounted) {
+          // Process events
+          if (eventsRes.data?.success && Array.isArray(eventsRes.data?.events) && eventsRes.data.events.length > 0) {
+            setEvents(eventsRes.data.events);
+            setWpSource(eventsRes.data.source || 'wordpress_direct');
           }
-        });
-        if (isMounted && res.data?.success && Array.isArray(res.data?.events) && res.data.events.length > 0) {
-          setEvents(res.data.events);
-          setWpSource(res.data.source || 'wordpress_direct');
+          setIsFetchingWp(false);
+
+          // Process FAQs
+          if (faqsRes.data?.success && Array.isArray(faqsRes.data.data) && faqsRes.data.data.length > 0) {
+            setFaqsList(faqsRes.data.data);
+            if (Array.isArray(faqsRes.data.categories) && faqsRes.data.categories.length > 0) {
+              setFaqCategories(faqsRes.data.categories);
+            }
+          }
+          setLoadingFaqs(false);
         }
       } catch (err) {
-        console.error('Failed to fetch WordPress events:', err);
-      } finally {
+        console.error('Critical data fetch error:', err?.message);
         if (isMounted) {
           setIsFetchingWp(false);
+          setLoadingFaqs(false);
         }
       }
     };
-    fetchWordPressEvents();
+
+    fetchCriticalData();
     return () => { isMounted = false; };
   }, []);
 
-  // Fetch followed exhibitions for logged-in user
+  // DEFERRED: Fetch user-specific data separately (not blocking initial render)
   useEffect(() => {
     if (user?.email) {
-      axios.get(`/api/engagements/user/${encodeURIComponent(user.email)}`)
+      axios.get(`/api/engagements/user/${encodeURIComponent(user.email)}`, { timeout: 5000 })
         .then(res => {
           if (res.data?.success && res.data?.data?.followedEvents) {
             const slugs = res.data.data.followedEvents.map(e => (e.eventSlug || e.slug || '').toLowerCase().trim()).filter(Boolean);
@@ -814,36 +815,40 @@ export default function LandingPage() {
       {/* ========================================================================= */}
       {/* 3.2 AI RECOMMENDATION ENGINE (LOCATION & INTEREST MATCHMAKING)            */}
       {/* ========================================================================= */}
-      <RecommendationEngineSection />
+      <Suspense fallback={<SkeletonSection height="h-96" />}>
+        <RecommendationEngineSection />
+      </Suspense>
 
       {/* ========================================================================= */}
       {/* 3.5 10TIMES BROWSE BY CATEGORY & BROWSE EVENTS BY CITY (DISCOVERY HUB)    */}
       {/* ========================================================================= */}
-      <section className="py-12 bg-zinc-50/70 border-t border-zinc-200/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-12">
-          <BrowseByCategory
-            activeCategory={selectedCategory}
-            onSelectCategory={handleCategorySelect}
-            onResetCategory={handleResetCategory}
-          />
+      <Suspense fallback={<SkeletonSection height="h-80" />}>
+        <section className="py-12 bg-zinc-50/70 border-t border-zinc-200/80">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-12">
+            <BrowseByCategory
+              activeCategory={selectedCategory}
+              onSelectCategory={handleCategorySelect}
+              onResetCategory={handleResetCategory}
+            />
 
-          <BrowseByCity
-            activeCity={selectedCity}
-            onSelectCity={handleCitySelect}
-            onResetCity={() => setSelectedCity('')}
-          />
+            <BrowseByCity
+              activeCity={selectedCity}
+              onSelectCity={handleCitySelect}
+              onResetCity={() => setSelectedCity('')}
+            />
 
-          {/* Featured Trade Show Organizers */}
-          <div className="pt-8 border-t border-zinc-200/70">
-            <FeaturedOrganizers onSelectOrganizer={handleOrganizerSelect} activeOrganizer={searchQuery} />
+            {/* Featured Trade Show Organizers */}
+            <div className="pt-8 border-t border-zinc-200/70">
+              <FeaturedOrganizers onSelectOrganizer={handleOrganizerSelect} activeOrganizer={searchQuery} />
+            </div>
+
+            {/* Explored Convention & Exhibition Venues */}
+            <div className="pt-8 border-t border-zinc-200/70">
+              <ExploreVenues onSelectVenue={handleVenueSelect} />
+            </div>
           </div>
-
-          {/* Explored Convention & Exhibition Venues */}
-          <div className="pt-8 border-t border-zinc-200/70">
-            <ExploreVenues onSelectVenue={handleVenueSelect} />
-          </div>
-        </div>
-      </section>
+        </section>
+      </Suspense>
 
       {/* ========================================================================= */}
       {/* 4. 10TIMES-STYLE EVENT DISCOVERY FEED & MONETIZATION SIDEBAR              */}
@@ -1713,11 +1718,13 @@ export default function LandingPage() {
       {/* ========================================================================= */}
       {/* 4.5 PEOPLE'S REVIEWS ON EVENTS (ATTENDEE & EXHIBITOR SOCIAL PROOF)        */}
       {/* ========================================================================= */}
-      <section className="py-16 bg-white border-t border-zinc-200/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <PeoplesReviews />
-        </div>
-      </section>
+      <Suspense fallback={<SkeletonSection height="h-96" />}>
+        <section className="py-16 bg-white border-t border-zinc-200/80">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            <PeoplesReviews />
+          </div>
+        </section>
+      </Suspense>
 
       {/* ========================================================================= */}
       {/* 5. DIRECTORY CLAIM FOR ORGANIZERS (Search from live WP events)            */}
@@ -2006,7 +2013,9 @@ export default function LandingPage() {
       {/* ========================================================================= */}
       {/* 8. FOOTER COMPONENT                                                       */}
       {/* ========================================================================= */}
-      <Footer />
+      <Suspense fallback={<SkeletonSection height="h-64" />}>
+        <Footer />
+      </Suspense>
 
       {/* ========================================================================= */}
       {/* 9. MODALS: ADVERTISE MODAL & TOAST                                          */}
