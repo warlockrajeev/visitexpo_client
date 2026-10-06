@@ -403,7 +403,18 @@ export default function SettingsPage() {
 
   // Phone Change Handlers
   const handleOrgPhoneChange = (val) => {
-    const sanitizedPhone = val.replace(/[^0-9+\s\-()]/g, '');
+    let digitCount = 0;
+    const sanitizedPhone = val
+      .replace(/[^0-9+\s\-()]/g, '')
+      .split('')
+      .filter((character) => {
+        if (/\d/.test(character)) {
+          digitCount += 1;
+          return digitCount <= 15;
+        }
+        return true;
+      })
+      .join('');
     setOrgForm((prev) => ({ ...prev, phone: sanitizedPhone }));
     const digits = cleanDigits(sanitizedPhone);
     const initialDigits = cleanDigits(initialOrgPhone);

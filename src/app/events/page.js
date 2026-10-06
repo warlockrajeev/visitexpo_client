@@ -8,7 +8,7 @@
  * Theme: VisitExpo Yellow (#FFCC00), Pink/Rose (#FF2E63), and Dark Slate (#18181B).
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -74,6 +74,101 @@ const CATEGORIES = [
 
 const ITEMS_PER_PAGE = 12;
 
+function DirectoryDropdown({ value, options, onChange, searchable = false, icon: Icon }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const closeOnOutsideClick = (event) => {
+      if (!dropdownRef.current?.contains(event.target)) {
+        setIsOpen(false);
+        setQuery('');
+      }
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+        setQuery('');
+      }
+    };
+
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [isOpen]);
+
+  const selectedOption = options.find((option) => option.value === value) || options[0];
+  const visibleOptions = options.filter((option) =>
+    option.label.toLowerCase().includes(query.trim().toLowerCase())
+  );
+
+  return (
+    <div ref={dropdownRef} className="relative w-full">
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((open) => !open)}
+        className={`flex w-full items-center gap-2 rounded-xl border bg-white px-3 py-2.5 text-left text-xs font-semibold text-zinc-900 shadow-2xs transition-all hover:border-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] ${
+          isOpen ? 'border-amber-400 ring-2 ring-[#FFCC00]' : 'border-zinc-200'
+        }`}
+      >
+        {Icon && <Icon className="h-4 w-4 shrink-0 text-zinc-400" aria-hidden="true" />}
+        <span className="min-w-0 flex-1 truncate">{selectedOption?.label}</span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl">
+          {searchable && (
+            <div className="border-b border-zinc-100 p-2">
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => event.stopPropagation()}
+                placeholder="Search options..."
+                aria-label="Search dropdown options"
+                className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+              />
+            </div>
+          )}
+          <div role="listbox" className="max-h-64 overflow-y-auto overscroll-contain p-1">
+            {visibleOptions.length > 0 ? visibleOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={option.value === value}
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                  setQuery('');
+                }}
+                className={`block w-full truncate rounded-lg px-3 py-2 text-left text-xs transition-colors ${
+                  option.value === value
+                    ? 'bg-amber-100 font-bold text-zinc-950'
+                    : 'text-zinc-700 hover:bg-zinc-50'
+                }`}
+              >
+                {option.label}
+              </button>
+            )) : (
+              <p className="px-3 py-3 text-xs text-zinc-500">No matching options</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EventsDirectoryPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -95,9 +190,6 @@ export default function EventsDirectoryPage() {
   const [selectedState, setSelectedState] = useState('all');
   const [selectedCity, setSelectedCity] = useState('all');
   const [selectedCountry, setSelectedCountry] = useState('all');
-  const [locationQuery, setLocationQuery] = useState('');
-  const [isLocationListOpen, setIsLocationListOpen] = useState(false);
-  const [activeLocationIndex, setActiveLocationIndex] = useState(0);
   const [selectedVenue, setSelectedVenue] = useState('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -139,10 +231,9 @@ export default function EventsDirectoryPage() {
       if (cityParam) {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- Apply URL filters after hydration to avoid server/client markup mismatches.
         setSelectedCity(cityParam);
-        setLocationQuery(`City: ${cityParam}`);
-      } else if (countryParam) {
+      }
+      if (countryParam) {
         setSelectedCountry(countryParam);
-        setLocationQuery(`Country: ${countryParam}`);
       }
       if (catParam) {
         setSelectedCategory(catParam);
@@ -257,15 +348,6 @@ export default function EventsDirectoryPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Distinct cities list from events
-  const availableCities = useMemo(() => {
-    const set = new Set();
-    events.forEach((e) => {
-      if (e.city && e.city !== 'India') set.add(e.city);
-    });
-    return Array.from(set).sort();
-  }, [events]);
-
   const availableCountries = useMemo(() => {
     const countries = new Map();
     events.forEach((event) => {
@@ -275,33 +357,25 @@ export default function EventsDirectoryPage() {
     return Array.from(countries.values()).sort((a, b) => a.localeCompare(b));
   }, [events]);
 
-  const locationOptions = useMemo(() => [
-    ...availableCountries.map((value) => ({ type: 'Country', value })),
-    ...availableCities.map((value) => ({ type: 'City', value }))
-  ], [availableCountries, availableCities]);
+  const availableCities = useMemo(() => {
+    const cities = new Set();
+    events.forEach((event) => {
+      const city = (event.city || '').trim();
+      const country = (event.country || '').trim();
+      if (
+        city &&
+        city !== 'India' &&
+        (selectedCountry === 'all' || country.toLowerCase() === selectedCountry.toLowerCase())
+      ) {
+        cities.add(city);
+      }
+    });
+    return Array.from(cities).sort((a, b) => a.localeCompare(b));
+  }, [events, selectedCountry]);
 
-  const filteredLocationOptions = useMemo(() => {
-    const query = locationQuery.replace(/^(country|city):\s*/i, '').trim().toLowerCase();
-    if (!query) return locationOptions;
-    return locationOptions.filter((option) => option.value.toLowerCase().includes(query));
-  }, [locationOptions, locationQuery]);
-
-  const selectLocation = (option) => {
-    if (!option) {
-      setSelectedCity('all');
-      setSelectedCountry('all');
-      setLocationQuery('');
-    } else if (option.type === 'City') {
-      setSelectedCity(option.value);
-      setSelectedCountry('all');
-      setLocationQuery(`City: ${option.value}`);
-    } else {
-      setSelectedCity('all');
-      setSelectedCountry(option.value);
-      setLocationQuery(`Country: ${option.value}`);
-    }
-    setIsLocationListOpen(false);
-    setActiveLocationIndex(0);
+  const handleCountryChange = (country) => {
+    setSelectedCountry(country);
+    setSelectedCity('all');
   };
 
   // Distinct states list from events
@@ -724,8 +798,6 @@ export default function EventsDirectoryPage() {
     setSelectedState('all');
     setSelectedCity('all');
     setSelectedCountry('all');
-    setLocationQuery('');
-    setIsLocationListOpen(false);
     setSelectedVenue('all');
     setFromDate('');
     setToDate('');
@@ -812,7 +884,7 @@ export default function EventsDirectoryPage() {
           <div className="bg-zinc-50/90 border border-zinc-200 rounded-2xl p-2 sm:p-2.5 shadow-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 sm:gap-2.5 items-center">
               {/* 1. Keyword Search */}
-              <div className="lg:col-span-5 relative flex items-center">
+              <div className="lg:col-span-4 relative flex items-center">
                 <Search className="absolute left-3.5 h-4 w-4 text-zinc-400 pointer-events-none" />
                 <input
                   type="text"
@@ -832,134 +904,47 @@ export default function EventsDirectoryPage() {
                 )}
               </div>
 
-              {/* 2. City Dropdown */}
-              {/* 2. Searchable Country / City Picker */}
-              <div className="lg:col-span-3 relative flex items-center">
-                <MapPin className="absolute left-3.5 h-4 w-4 text-rose-500 pointer-events-none" />
-                <input
-                  type="text"
-                  role="combobox"
-                  aria-label="Search locations by country or city"
-                  aria-autocomplete="list"
-                  aria-expanded={isLocationListOpen}
-                  aria-controls="event-location-options"
-                  aria-activedescendant={isLocationListOpen && filteredLocationOptions[activeLocationIndex]
-                    ? `event-location-option-${activeLocationIndex}`
-                    : undefined}
-                  value={locationQuery}
-                  onFocus={() => setIsLocationListOpen(true)}
-                  onBlur={() => setIsLocationListOpen(false)}
-                  onChange={(e) => {
-                    setLocationQuery(e.target.value);
-                    setSelectedCity('all');
-                    setSelectedCountry('all');
-                    setActiveLocationIndex(0);
-                    setIsLocationListOpen(true);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'ArrowDown') {
-                      e.preventDefault();
-                      setIsLocationListOpen(true);
-                      if (filteredLocationOptions.length) {
-                        setActiveLocationIndex((index) => Math.min(index + 1, filteredLocationOptions.length - 1));
-                      }
-                    } else if (e.key === 'ArrowUp') {
-                      e.preventDefault();
-                      setActiveLocationIndex((index) => Math.max(index - 1, 0));
-                    } else if (e.key === 'Enter' && isLocationListOpen && filteredLocationOptions[activeLocationIndex]) {
-                      e.preventDefault();
-                      selectLocation(filteredLocationOptions[activeLocationIndex]);
-                    } else if (e.key === 'Escape') {
-                      setIsLocationListOpen(false);
-                    }
-                  }}
-                  placeholder="Search country or city..."
-                  className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-white border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-amber-400 transition-all shadow-2xs"
+              {/* Country filter */}
+              <div className="lg:col-span-2">
+                <DirectoryDropdown
+                  value={selectedCountry}
+                  onChange={handleCountryChange}
+                  searchable
+                  icon={Globe}
+                  options={[
+                    { value: 'all', label: 'All Countries' },
+                    ...availableCountries.map((country) => ({ value: country, label: country }))
+                  ]}
                 />
-                {locationQuery ? (
-                  <button
-                    type="button"
-                    aria-label="Clear location filter"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => selectLocation(null)}
-                    className="absolute right-3 text-zinc-400 hover:text-zinc-700 cursor-pointer"
-                  >
-                    <span aria-hidden="true">×</span>
-                  </button>
-                ) : (
-                  <ChevronDown className="absolute right-3 h-4 w-4 text-zinc-400 pointer-events-none" />
-                )}
-                {isLocationListOpen && (
-                  <div
-                    id="event-location-options"
-                    role="listbox"
-                    aria-label="Matching countries and cities"
-                    className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-xl border border-zinc-200 bg-white py-1 shadow-lg"
-                  >
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={selectedCity === 'all' && selectedCountry === 'all' && !locationQuery}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => selectLocation(null)}
-                      className="w-full px-3 py-2 text-left text-xs font-semibold text-zinc-600 hover:bg-zinc-50 cursor-pointer"
-                    >
-                      All Locations
-                    </button>
-                    {['Country', 'City'].map((type) => {
-                      const options = filteredLocationOptions
-                        .map((option, index) => ({ ...option, index }))
-                        .filter((option) => option.type === type);
-                      if (!options.length) return null;
-                      return (
-                        <div key={type}>
-                          <div className="px-3 pt-2 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-zinc-400">
-                            {type === 'Country' ? 'Countries' : 'Cities'}
-                          </div>
-                          {options.map((option) => (
-                            <button
-                              key={`${type}-${option.value}`}
-                              id={`event-location-option-${option.index}`}
-                              type="button"
-                              role="option"
-                              aria-selected={type === 'City'
-                                ? selectedCity === option.value
-                                : selectedCountry === option.value}
-                              onMouseDown={(e) => e.preventDefault()}
-                              onMouseEnter={() => setActiveLocationIndex(option.index)}
-                              onClick={() => selectLocation(option)}
-                              className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-left text-xs sm:text-sm cursor-pointer ${
-                                activeLocationIndex === option.index ? 'bg-amber-50 text-zinc-950' : 'text-zinc-700 hover:bg-zinc-50'
-                              }`}
-                            >
-                              <span className="truncate">{option.value}</span>
-                              <span className="shrink-0 text-[10px] font-bold text-zinc-400">{type}</span>
-                            </button>
-                          ))}
-                        </div>
-                      );
-                    })}
-                    {filteredLocationOptions.length === 0 && (
-                      <p className="px-3 py-3 text-xs text-zinc-500">No matching country or city</p>
-                    )}
-                  </div>
-                )}
+              </div>
+
+              {/* City filter */}
+              <div className="lg:col-span-2">
+                <DirectoryDropdown
+                  value={selectedCity}
+                  onChange={setSelectedCity}
+                  searchable
+                  icon={MapPin}
+                  options={[
+                    { value: 'all', label: selectedCountry === 'all' ? 'All Cities' : 'All Cities in Country' },
+                    ...availableCities.map((city) => ({ value: city, label: city }))
+                  ]}
+                />
               </div>
 
               {/* 3. Sort Dropdown */}
-              <div className="lg:col-span-2 relative flex items-center">
-                <SlidersHorizontal className="absolute left-3.5 h-4 w-4 text-zinc-400 pointer-events-none" />
-                <select
+              <div className="lg:col-span-2">
+                <DirectoryDropdown
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="w-full pl-10 pr-8 py-2.5 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-amber-400 transition-all cursor-pointer appearance-none shadow-2xs"
-                >
-                  <option value="upcoming">Upcoming</option>
-                  <option value="rating">Top Rated</option>
-                  <option value="turnout">Trending &amp; Turnout</option>
-                  <option value="title">A-Z</option>
-                </select>
-                <ChevronDown className="absolute right-3 h-4 w-4 text-zinc-400 pointer-events-none" />
+                  onChange={setSortBy}
+                  icon={SlidersHorizontal}
+                  options={[
+                    { value: 'upcoming', label: 'Upcoming' },
+                    { value: 'rating', label: 'Top Rated' },
+                    { value: 'turnout', label: 'Trending & Turnout' },
+                    { value: 'title', label: 'A-Z' }
+                  ]}
+                />
               </div>
 
               {/* 4. Find Expos Button */}
@@ -980,9 +965,9 @@ export default function EventsDirectoryPage() {
           </div>
 
           {/* Category Chips Bar + Quick Tools */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-0.5">
-            {/* Horizontal Category Carousel */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+          <div className="flex flex-col gap-3 pt-0.5">
+            {/* Category tabs */}
+            <div role="group" aria-label="Filter by event category" className="flex flex-wrap items-center gap-2 text-xs">
               {CATEGORIES.map((cat) => {
                 const active = selectedCategory === cat;
                 return (
@@ -990,10 +975,11 @@ export default function EventsDirectoryPage() {
                     key={cat}
                     type="button"
                     onClick={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all duration-200 cursor-pointer shrink-0 text-xs font-bold ${
+                    aria-pressed={active}
+                    className={`px-3.5 py-2 rounded-full whitespace-nowrap transition-all duration-200 cursor-pointer text-xs font-bold border ${
                       active
-                        ? 'bg-zinc-950 text-[#FFCC00] shadow-sm ring-1 ring-zinc-950'
-                        : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950'
+                        ? 'bg-zinc-950 text-[#FFCC00] border-zinc-950 shadow-sm'
+                        : 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950'
                     }`}
                   >
                     {cat}
@@ -1003,7 +989,7 @@ export default function EventsDirectoryPage() {
             </div>
 
             {/* Quick Tools on Right: Top 10 Rated, Nearby, Featured & Reset */}
-            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <div className="flex flex-wrap items-center gap-2">
               {/* Top 10 Rated Quick Button */}
               <button
                 type="button"
@@ -1153,18 +1139,14 @@ export default function EventsDirectoryPage() {
                   <label className="text-[10px] font-extrabold text-zinc-500 uppercase tracking-wider block">
                     Filter by State / Region
                   </label>
-                  <select
+                  <DirectoryDropdown
                     value={selectedState}
-                    onChange={(e) => setSelectedState(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-semibold rounded-xl bg-white border border-zinc-200 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] cursor-pointer shadow-2xs"
-                  >
-                    <option value="all">All States &amp; Regions</option>
-                    {availableStates.map((st) => (
-                      <option key={st} value={st}>
-                        {st}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setSelectedState}
+                    options={[
+                      { value: 'all', label: 'All States & Regions' },
+                      ...availableStates.map((state) => ({ value: state, label: state }))
+                    ]}
+                  />
                 </div>
 
                 {/* Venue Dropdown */}
@@ -1172,18 +1154,15 @@ export default function EventsDirectoryPage() {
                   <label className="text-[10px] font-extrabold text-zinc-500 uppercase tracking-wider block">
                     Filter by Venue / Center
                   </label>
-                  <select
+                  <DirectoryDropdown
                     value={selectedVenue}
-                    onChange={(e) => setSelectedVenue(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-semibold rounded-xl bg-white border border-zinc-200 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] cursor-pointer shadow-2xs"
-                  >
-                    <option value="all">All Venues &amp; Centers</option>
-                    {availableVenues.map((v) => (
-                      <option key={v} value={v}>
-                        {v}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setSelectedVenue}
+                    searchable
+                    options={[
+                      { value: 'all', label: 'All Venues & Centers' },
+                      ...availableVenues.map((venue) => ({ value: venue, label: venue }))
+                    ]}
+                  />
                 </div>
 
                 {/* Minimum Rating Dropdown */}
@@ -1191,16 +1170,16 @@ export default function EventsDirectoryPage() {
                   <label className="text-[10px] font-extrabold text-zinc-500 uppercase tracking-wider block">
                     Minimum Rating
                   </label>
-                  <select
+                  <DirectoryDropdown
                     value={minRating}
-                    onChange={(e) => setMinRating(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-semibold rounded-xl bg-white border border-zinc-200 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] cursor-pointer shadow-2xs"
-                  >
-                    <option value="all">All Ratings (Any Star)</option>
-                    <option value="4.8">⭐ 4.8 Stars &amp; Above</option>
-                    <option value="4.5">⭐ 4.5 Stars &amp; Above</option>
-                    <option value="4.0">⭐ 4.0 Stars &amp; Above</option>
-                  </select>
+                    onChange={setMinRating}
+                    options={[
+                      { value: 'all', label: 'All Ratings (Any Star)' },
+                      { value: '4.8', label: '⭐ 4.8 Stars & Above' },
+                      { value: '4.5', label: '⭐ 4.5 Stars & Above' },
+                      { value: '4.0', label: '⭐ 4.0 Stars & Above' }
+                    ]}
+                  />
                 </div>
 
                 {/* Date Range Picker */}
@@ -1275,7 +1254,7 @@ export default function EventsDirectoryPage() {
                     <span>Country: {selectedCountry}</span>
                     <button
                       type="button"
-                      onClick={() => selectLocation(null)}
+                      onClick={() => handleCountryChange('all')}
                       className="hover:text-zinc-950 font-black cursor-pointer ml-0.5"
                     >
                       ✕
