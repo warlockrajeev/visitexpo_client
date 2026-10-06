@@ -188,12 +188,26 @@ export default function LandingPage() {
   useEffect(() => {
     let isMounted = true;
 
+    // Fast instant hydration from sessionStorage if available (0ms render on tab switch or navigation)
+    if (typeof window !== 'undefined') {
+      try {
+        const cachedEvents = sessionStorage.getItem('visitexpo_home_events');
+        if (cachedEvents) {
+          const parsed = JSON.parse(cachedEvents);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setEvents(parsed);
+            setIsFetchingWp(false);
+          }
+        }
+      } catch (_) {}
+    }
+
     // Fetch critical data in parallel for faster page load
     const fetchCriticalData = async () => {
       try {
         // Parallel API calls using Promise.all()
         const [eventsRes, faqsRes] = await Promise.all([
-          axios.get('/api/wordpress-events', { timeout: 8000 })
+          axios.get('/api/wordpress-events', { timeout: 10000 })
             .catch(err => ({ data: { success: false } })),
           axios.get(`${API_URL}/faqs`, { timeout: 5000 }).catch(err => ({ data: { success: false } }))
         ]);
@@ -202,7 +216,12 @@ export default function LandingPage() {
           // Process events
           if (eventsRes.data?.success && Array.isArray(eventsRes.data?.events) && eventsRes.data.events.length > 0) {
             setEvents(eventsRes.data.events);
-            setWpSource(eventsRes.data.source || 'wordpress_direct');
+            setWpSource(eventsRes.data.source || 'database_stored');
+            try {
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem('visitexpo_home_events', JSON.stringify(eventsRes.data.events.slice(0, 300)));
+              }
+            } catch (_) {}
           }
           setIsFetchingWp(false);
 

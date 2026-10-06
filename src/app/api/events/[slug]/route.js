@@ -235,7 +235,64 @@ export async function GET(request, { params }) {
       return NextResponse.json({ success: true, data: cached.data }, { headers: NO_CACHE_HEADERS });
     }
 
-    // 2. Prioritize WordPress Event Lookup via cached docs
+    // 2. Prioritize Fast MongoDB Database Lookup (Served in < 20ms)
+    try {
+      const mongoRes = await fetch(`${BACKEND_API_URL}/events/${cleanSlug}`, {
+        cache: 'no-store'
+      });
+      if (mongoRes.ok) {
+        const mongoJson = await mongoRes.json();
+        if (mongoJson.success && mongoJson.event) {
+          const e = mongoJson.event;
+          const rawLoc = (e.venue === 'Exhibition Center' && e.address) ? e.address : (e.venue || e.address || '');
+          const mongoLoc = parseWpLocation(rawLoc, e.city);
+          const formatted = {
+            id: String(e._id || e.id),
+            wpPostId: e.wpPostId || null,
+            title: decodeHtmlEntities(e.title),
+            slug: e.slug,
+            description: e.description,
+            venue: mongoLoc.venue === 'Exhibition Center' ? '' : mongoLoc.venue,
+            address: mongoLoc.address,
+            location: mongoLoc.location,
+            city: mongoLoc.city,
+            country: mongoLoc.country,
+            state: mongoLoc.state,
+            mapUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mongoLoc.address || mongoLoc.venue || `${mongoLoc.city} ${mongoLoc.country}`)}`,
+            startDate: e.startDate,
+            endDate: e.endDate,
+            dates: formatDateRange(e.startDate, e.endDate),
+            timings: e.timings || '9:00 AM – 6:00 PM',
+            category: Array.isArray(e.categories) && e.categories[0] ? e.categories[0] : 'Trade & Industry',
+            categories: e.categories || [],
+            image: e.banner || (e.gallery && e.gallery[0]) || null,
+            gallery: e.gallery || [],
+            organizer: e.orgName || (e.organizer && e.organizer.name) || 'VisitExpo Verified Organizer',
+            organizerWebsite: e.orgWebsite || (e.organizer && e.organizer.website) || '',
+            organizerDesc: e.orgDesc || (e.organizer && e.organizer.description) || '',
+            organizerEmail: e.orgEmail || (e.organizer && e.organizer.email) || '',
+            organizerPhone: e.orgPhone || (e.organizer && e.organizer.phone) || '',
+            isFreeEvent: e.isFreeEvent,
+            paidTicketPrice: e.paidTicketPrice,
+            schedules: e.schedules || [],
+            faqs: (e.faqsList || []).map(f => ({ question: decodeHtmlEntities(f.question), answer: decodeHtmlEntities(f.answer) })),
+            sponsors: e.sponsorsList || [],
+            speakers: e.speakers || [],
+            exhibitors: e.exhibitors || [],
+            status: e.status || 'published',
+            isWordPress: !!e.wpPostId,
+            wpUrl: e.wpUrl || `https://visitexpo.in/event/${e.slug}/`,
+            isRealImage: !!(e.banner || (e.gallery && e.gallery[0]))
+          };
+          singleEventCache.set(cleanSlug, { data: formatted, timestamp: Date.now() });
+          return NextResponse.json({ success: true, data: formatted }, { headers: NO_CACHE_HEADERS });
+        }
+      }
+    } catch (mErr) {
+      console.warn('Fast MongoDB lookup failed, checking WordPress fallback:', mErr.message);
+    }
+
+    // 3. Fallback to WordPress Event Lookup if not yet synced to MongoDB
     let wpDoc = null;
     try {
       const docs = await getWpDocs();
@@ -356,62 +413,6 @@ export async function GET(request, { params }) {
 
       singleEventCache.set(cleanSlug, { data: formatted, timestamp: Date.now() });
       return NextResponse.json({ success: true, data: formatted }, { headers: NO_CACHE_HEADERS });
-    }
-
-    // 3. Fallback to native MongoDB backend for platform-only events
-    try {
-      const mongoRes = await fetch(`${BACKEND_API_URL}/events/${cleanSlug}`, {
-        cache: 'no-store'
-      });
-      if (mongoRes.ok) {
-        const mongoJson = await mongoRes.json();
-        if (mongoJson.success && mongoJson.event) {
-          const e = mongoJson.event;
-          const rawLoc = (e.venue === 'Exhibition Center' && e.address) ? e.address : (e.venue || e.address || '');
-          const mongoLoc = parseWpLocation(rawLoc, e.city);
-          const formatted = {
-            id: String(e._id || e.id),
-            wpPostId: e.wpPostId || null,
-            title: decodeHtmlEntities(e.title),
-            slug: e.slug,
-            description: e.description,
-            venue: mongoLoc.venue === 'Exhibition Center' ? '' : mongoLoc.venue,
-            address: mongoLoc.address,
-            location: mongoLoc.location,
-            city: mongoLoc.city,
-            country: mongoLoc.country,
-            state: mongoLoc.state,
-            mapUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mongoLoc.address || mongoLoc.venue || `${mongoLoc.city} ${mongoLoc.country}`)}`,
-            startDate: e.startDate,
-            endDate: e.endDate,
-            dates: formatDateRange(e.startDate, e.endDate),
-            timings: e.timings || '9:00 AM – 6:00 PM',
-            category: Array.isArray(e.categories) && e.categories[0] ? e.categories[0] : 'Trade & Industry',
-            categories: e.categories || [],
-            image: e.banner || (e.gallery && e.gallery[0]) || null,
-            gallery: e.gallery || [],
-            organizer: e.orgName || (e.organizer && e.organizer.name) || 'VisitExpo Verified Organizer',
-            organizerWebsite: e.orgWebsite || (e.organizer && e.organizer.website) || '',
-            organizerDesc: e.orgDesc || (e.organizer && e.organizer.description) || '',
-            organizerEmail: e.orgEmail || (e.organizer && e.organizer.email) || '',
-            organizerPhone: e.orgPhone || (e.organizer && e.organizer.phone) || '',
-            isFreeEvent: e.isFreeEvent,
-            paidTicketPrice: e.paidTicketPrice,
-            schedules: e.schedules || [],
-            faqs: (e.faqsList || []).map(f => ({ question: decodeHtmlEntities(f.question), answer: decodeHtmlEntities(f.answer) })),
-            sponsors: e.sponsorsList || [],
-            speakers: e.speakers || [],
-            exhibitors: e.exhibitors || [],
-            status: e.status || 'published',
-            isWordPress: !!e.wpPostId,
-            isRealImage: !!(e.banner || (e.gallery && e.gallery[0]))
-          };
-          singleEventCache.set(cleanSlug, { data: formatted, timestamp: Date.now() });
-          return NextResponse.json({ success: true, data: formatted }, { headers: NO_CACHE_HEADERS });
-        }
-      }
-    } catch (mErr) {
-      console.warn('MongoDB fallback lookup failed:', mErr.message);
     }
 
     return NextResponse.json({ success: false, error: 'Event not found' }, { status: 404, headers: NO_CACHE_HEADERS });

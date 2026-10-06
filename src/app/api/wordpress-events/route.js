@@ -9,7 +9,7 @@ const BACKEND_API_URL =
   (process.env.NODE_ENV === 'production' ? 'https://api.visitexpo.in/api' : 'http://localhost:5000/api');
 
 // Persistent in-memory cache across Next.js module evaluations
-const CACHE_TTL_MS = 5 * 60 * 1000; // Keep landing page event data warm between visits
+const CACHE_TTL_MS = 15 * 60 * 1000; // Keep landing page event data warm between visits
 if (!globalThis._wpEventsMemoryCache) {
   globalThis._wpEventsMemoryCache = {
     events: null,
@@ -440,27 +440,45 @@ export async function GET(request) {
     }
 
     let rawEvents = [];
-    let source = 'wordpress_inspect_meta';
+    let source = 'database_stored';
 
-    // 1. Fetch from unified events directory endpoint on Express port 5000
+    // 1. Fetch from high-speed database-backed directory endpoint on Express server (MongoDB Atlas)
     try {
-      const dirRes = await fetch(`${BACKEND_API_URL}/events/directory`, {
+      const allRes = await fetch(`${BACKEND_API_URL}/events/all-directory`, {
         cache: 'no-store'
       });
-      if (dirRes.ok) {
-        const dirJson = await dirRes.json();
-        const orgs = dirJson.data?.organizers || [];
-        const allEvts = [];
-        orgs.forEach((o) => {
-          (o.events || []).forEach((e) => allEvts.push(e));
-        });
-        if (allEvts.length > 0) {
-          rawEvents = allEvts;
-          source = 'unified_directory_sync';
+      if (allRes.ok) {
+        const allJson = await allRes.json();
+        if (Array.isArray(allJson.events) && allJson.events.length > 0) {
+          rawEvents = allJson.events;
+          source = 'database_stored';
         }
       }
-    } catch (dirErr) {
-      console.warn('Unified directory fetch failed, trying direct WordPress inspect-event-meta:', dirErr.message);
+    } catch (allErr) {
+      console.warn('[WP-Route] Fast all-directory fetch failed, trying directory fallback:', allErr.message);
+    }
+
+    // 2. Fallback to unified organizers directory on Express port 5000
+    if (!rawEvents || rawEvents.length === 0) {
+      try {
+        const dirRes = await fetch(`${BACKEND_API_URL}/events/directory`, {
+          cache: 'no-store'
+        });
+        if (dirRes.ok) {
+          const dirJson = await dirRes.json();
+          const orgs = dirJson.data?.organizers || [];
+          const allEvts = [];
+          orgs.forEach((o) => {
+            (o.events || []).forEach((e) => allEvts.push(e));
+          });
+          if (allEvts.length > 0) {
+            rawEvents = allEvts;
+            source = 'unified_directory_sync';
+          }
+        }
+      } catch (dirErr) {
+        console.warn('Unified directory fetch failed, trying direct WordPress inspect-event-meta:', dirErr.message);
+      }
     }
 
     // 2. Direct WordPress inspect-event-meta fallback
