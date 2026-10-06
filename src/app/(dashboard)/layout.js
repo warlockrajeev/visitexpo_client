@@ -427,11 +427,11 @@ export default function DashboardLayout({ children }) {
         </header>
 
         {/* Scrollable Panel Area */}
-        <main className="flex-1 overflow-y-auto p-6 bg-muted/10">
+        <main className={`flex-1 min-h-0 ${pathname === '/chat' ? 'flex flex-col overflow-hidden p-0 bg-background' : 'overflow-y-auto p-6 bg-muted/10'}`}>
           {children}
         </main>
       </div>
-      {user?.role === 'organizer' && !isExhibitorView && <OrganizerSupportWidget />}
+      {user?.role === 'organizer' && !isExhibitorView && pathname !== '/chat' && <OrganizerSupportWidget />}
     </div>
   );
 }

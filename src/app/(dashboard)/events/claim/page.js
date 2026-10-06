@@ -50,6 +50,7 @@ export default function ClaimEventPage() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Form State
   const [claimForm, setClaimForm] = useState({
@@ -59,6 +60,61 @@ export default function ClaimEventPage() {
     proofFileName: '',
     additionalNotes: ''
   });
+
+  const validateSingleField = (name, value) => {
+    let errorMsg = '';
+    if (name === 'officialEmail') {
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (!value || !value.trim()) {
+        errorMsg = 'Official corporate email is mandatory.';
+      } else if (!emailRegex.test(value.trim())) {
+        errorMsg = 'Please enter a valid email address (e.g. organizer@company.com).';
+      }
+    } else if (name === 'website') {
+      const urlRegex = /^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/[^\s]*)?$/i;
+      if (!value || !value.trim()) {
+        errorMsg = 'Official website URL is mandatory.';
+      } else if (!urlRegex.test(value.trim())) {
+        errorMsg = 'Please enter a valid URL (e.g. https://eventdomain.com).';
+      }
+    } else if (name === 'phone') {
+      if (!value || !value.trim()) {
+        errorMsg = 'Contact phone hotline is mandatory.';
+      } else {
+        const hasLetters = /[a-zA-Z]/.test(value);
+        const cleanDigits = value.replace(/\D/g, '');
+        if (hasLetters) {
+          errorMsg = 'Phone number cannot contain letters or alphabets.';
+        } else if (cleanDigits.length < 10) {
+          errorMsg = `Phone number must have at least 10 digits (currently ${cleanDigits.length}).`;
+        } else if (cleanDigits.length > 15) {
+          errorMsg = `Phone number cannot exceed 15 digits (currently ${cleanDigits.length}).`;
+        }
+      }
+    } else if (name === 'proofFileName') {
+      if (!value || !value.trim()) {
+        errorMsg = 'Upload proof of ownership document is mandatory.';
+      }
+    } else if (name === 'additionalNotes') {
+      if (value && value.length > 1000) {
+        errorMsg = `Notes cannot exceed 1000 characters (currently ${value.length}).`;
+      }
+    }
+    return errorMsg;
+  };
+
+  const validateAllFields = () => {
+    const errors = {
+      officialEmail: validateSingleField('officialEmail', claimForm.officialEmail),
+      website: validateSingleField('website', claimForm.website),
+      phone: validateSingleField('phone', claimForm.phone),
+      proofFileName: validateSingleField('proofFileName', claimForm.proofFileName),
+      additionalNotes: validateSingleField('additionalNotes', claimForm.additionalNotes)
+    };
+    const activeErrors = Object.fromEntries(Object.entries(errors).filter(([_, v]) => Boolean(v)));
+    setFieldErrors(activeErrors);
+    return Object.keys(activeErrors).length === 0;
+  };
 
   // Fetch live claimable WP events from API and read URL search param if present
   useEffect(() => {
@@ -89,13 +145,43 @@ export default function ClaimEventPage() {
   const handleFormChange = (e) => {
     const { name, value } = e.target;
     setClaimForm(prev => ({ ...prev, [name]: value }));
+    const errorMsg = validateSingleField(name, value);
+    setFieldErrors(prev => ({ ...prev, [name]: errorMsg }));
+  };
+
+  const handlePhoneChange = (e) => {
+    const val = e.target.value;
+    setClaimForm(prev => ({ ...prev, phone: val }));
+    const errorMsg = validateSingleField('phone', val);
+    setFieldErrors(prev => ({ ...prev, phone: errorMsg }));
   };
 
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setClaimForm(prev => ({ ...prev, proofFileName: file.name }));
+    if (!file) return;
+
+    const allowedExtensions = ['.pdf', '.png', '.jpg', '.jpeg'];
+    const lowerName = file.name.toLowerCase();
+    const isValidExt = allowedExtensions.some(ext => lowerName.endsWith(ext));
+
+    if (!isValidExt) {
+      setFieldErrors(prev => ({
+        ...prev,
+        proofFileName: 'Unsupported file format. Please upload PDF, PNG, JPG, or JPEG file.'
+      }));
+      return;
     }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setFieldErrors(prev => ({
+        ...prev,
+        proofFileName: `File size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds 5MB limit.`
+      }));
+      return;
+    }
+
+    setClaimForm(prev => ({ ...prev, proofFileName: file.name }));
+    setFieldErrors(prev => ({ ...prev, proofFileName: '' }));
   };
 
   const handleSubmitClaim = async (e) => {
@@ -104,19 +190,34 @@ export default function ClaimEventPage() {
       setError('Please select an event to claim.');
       return;
     }
+
+    const isValid = validateAllFields();
+    if (!isValid) {
+      setError('Please fix the highlighted validation errors before submitting.');
+      return;
+    }
+
     setSubmitting(true);
     setError('');
 
     try {
       const payload = {
         name: user?.name || 'Organizer User',
-        email: claimForm.officialEmail,
-        password: 'Password123!',
-        organizationName: claimForm.website ? claimForm.website.replace('https://', '').replace('http://', '').split('/')[0] : 'Event Corp',
+        email: user?.email || claimForm.officialEmail,
+        officialEmail: claimForm.officialEmail,
+        city: selectedEvent.city || user?.city || 'India',
+        organizationName: claimForm.website 
+          ? claimForm.website.replace('https://', '').replace('http://', '').split('/')[0] 
+          : (user?.company || user?.name || 'Event Organization'),
         website: claimForm.website,
         phone: claimForm.phone,
         claimType: 'claim_existing',
-        eventId: selectedEvent._id || selectedEvent.id
+        eventId: selectedEvent._id || selectedEvent.id,
+        eventSlug: selectedEvent.slug,
+        wpPostId: selectedEvent.wpPostId || selectedEvent.id,
+        eventData: selectedEvent,
+        proofFileName: claimForm.proofFileName,
+        additionalNotes: claimForm.additionalNotes
       };
 
       const config = accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {};
@@ -282,21 +383,29 @@ export default function ClaimEventPage() {
               </div>
 
               {selectedEvent ? (
-                <form onSubmit={handleSubmitClaim} className="space-y-4">
+                <form onSubmit={handleSubmitClaim} noValidate className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
-                      Official Corporate Email *
+                    <label className="block text-xs font-bold text-muted-foreground uppercase mb-1 flex items-center justify-between">
+                      <span>Official Corporate Email *</span>
+                      {fieldErrors.officialEmail && (
+                        <span className="text-[10px] text-red-500 font-semibold lowercase">
+                          {fieldErrors.officialEmail}
+                        </span>
+                      )}
                     </label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-2.5 h-4.5 w-4.5 text-muted-foreground" />
+                      <Mail className={`absolute left-3 top-2.5 h-4.5 w-4.5 transition-colors ${fieldErrors.officialEmail ? 'text-red-500' : 'text-muted-foreground'}`} />
                       <input
                         type="email"
                         name="officialEmail"
-                        required
                         value={claimForm.officialEmail}
                         onChange={handleFormChange}
                         placeholder="organizer@officialdomain.com"
-                        className="w-full rounded-xl border border-border bg-background py-2.5 pl-10 pr-4 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                        className={`w-full rounded-xl border bg-background py-2.5 pl-10 pr-4 text-xs text-foreground focus:outline-none focus:ring-2 transition-all ${
+                          fieldErrors.officialEmail
+                            ? 'border-red-500/80 bg-red-500/5 focus:ring-red-500/30 ring-1 ring-red-500/20'
+                            : 'border-border focus:ring-primary'
+                        }`}
                       />
                     </div>
                     <p className="text-[10px] text-muted-foreground mt-1">Must match official event organizer website domain.</p>
@@ -304,79 +413,133 @@ export default function ClaimEventPage() {
 
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
-                        Official Website URL *
+                      <label className="block text-xs font-bold text-muted-foreground uppercase mb-1 flex items-center justify-between">
+                        <span>Official Website URL *</span>
+                        {fieldErrors.website && (
+                          <span className="text-[10px] text-red-500 font-semibold lowercase">
+                            {fieldErrors.website}
+                          </span>
+                        )}
                       </label>
                       <div className="relative">
-                        <Globe className="absolute left-3 top-2.5 h-4.5 w-4.5 text-muted-foreground" />
+                        <Globe className={`absolute left-3 top-2.5 h-4.5 w-4.5 transition-colors ${fieldErrors.website ? 'text-red-500' : 'text-muted-foreground'}`} />
                         <input
-                          type="url"
+                          type="text"
                           name="website"
-                          required
                           value={claimForm.website}
                           onChange={handleFormChange}
                           placeholder="https://eventdomain.com"
-                          className="w-full rounded-xl border border-border bg-background py-2.5 pl-10 pr-4 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                          className={`w-full rounded-xl border bg-background py-2.5 pl-10 pr-4 text-xs text-foreground focus:outline-none focus:ring-2 transition-all ${
+                            fieldErrors.website
+                              ? 'border-red-500/80 bg-red-500/5 focus:ring-red-500/30 ring-1 ring-red-500/20'
+                              : 'border-border focus:ring-primary'
+                          }`}
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
-                        Contact Phone Hotline *
+                      <label className="block text-xs font-bold text-muted-foreground uppercase mb-1 flex items-center justify-between">
+                        <span>Contact Phone Hotline *</span>
+                        {fieldErrors.phone && (
+                          <span className="text-[10px] text-red-500 font-semibold lowercase">
+                            {fieldErrors.phone}
+                          </span>
+                        )}
                       </label>
                       <div className="relative">
-                        <Phone className="absolute left-3 top-2.5 h-4.5 w-4.5 text-muted-foreground" />
+                        <Phone className={`absolute left-3 top-2.5 h-4.5 w-4.5 transition-colors ${fieldErrors.phone ? 'text-red-500' : 'text-muted-foreground'}`} />
                         <input
-                          type="text"
+                          type="tel"
                           name="phone"
-                          required
                           value={claimForm.phone}
-                          onChange={handleFormChange}
+                          onChange={handlePhoneChange}
                           placeholder="+91 98765 43210"
-                          className="w-full rounded-xl border border-border bg-background py-2.5 pl-10 pr-4 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                          className={`w-full rounded-xl border bg-background py-2.5 pl-10 pr-4 text-xs text-foreground focus:outline-none focus:ring-2 transition-all ${
+                            fieldErrors.phone
+                              ? 'border-red-500/80 bg-red-500/5 focus:ring-red-500/30 ring-1 ring-red-500/20'
+                              : 'border-border focus:ring-primary'
+                          }`}
                         />
                       </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">10 to 15 digits (numbers and + only, no letters).</p>
                     </div>
                   </div>
 
                   {/* Document Proof Upload */}
                   <div>
-                    <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
-                      Upload Proof of Ownership (Incorporation Cert / Authorization Letter) *
+                    <label className="block text-xs font-bold text-muted-foreground uppercase mb-1 flex items-center justify-between">
+                      <span>Upload Proof of Ownership (Incorporation Cert / Authorization Letter) *</span>
+                      {fieldErrors.proofFileName && (
+                        <span className="text-[10px] text-red-500 font-semibold lowercase">
+                          {fieldErrors.proofFileName}
+                        </span>
+                      )}
                     </label>
-                    <label className="flex items-center gap-3 rounded-xl border-2 border-dashed border-border p-4 bg-muted/10 cursor-pointer hover:border-primary transition-colors">
-                      <Upload className="h-5 w-5 text-muted-foreground" />
+                    <label className={`flex items-center gap-3 rounded-xl border-2 border-dashed p-4 cursor-pointer transition-colors ${
+                      fieldErrors.proofFileName
+                        ? 'border-red-500/80 bg-red-500/5 hover:border-red-500'
+                        : claimForm.proofFileName
+                        ? 'border-primary/60 bg-primary/5 hover:border-primary'
+                        : 'border-border bg-muted/10 hover:border-primary'
+                    }`}>
+                      <Upload className={`h-5 w-5 ${fieldErrors.proofFileName ? 'text-red-500' : claimForm.proofFileName ? 'text-primary' : 'text-muted-foreground'}`} />
                       <div className="flex-1 overflow-hidden">
-                        <span className="text-xs font-semibold text-foreground truncate block">
+                        <span className={`text-xs font-semibold truncate block ${claimForm.proofFileName ? 'text-foreground' : 'text-muted-foreground'}`}>
                           {claimForm.proofFileName || 'Click to select PDF or Image file'}
                         </span>
                         <span className="text-[10px] text-muted-foreground">PDF, JPG, PNG up to 5MB</span>
                       </div>
+                      {claimForm.proofFileName && (
+                        <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                          Selected
+                        </span>
+                      )}
                       <input type="file" onChange={handleFileUpload} className="hidden" accept=".pdf,.png,.jpg,.jpeg" />
                     </label>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
-                      Notes to Moderation Team
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-muted-foreground uppercase">
+                        Notes to Moderation Team
+                      </label>
+                      <span className={`text-[10px] ${claimForm.additionalNotes.length > 1000 ? 'text-red-500 font-bold' : 'text-muted-foreground'}`}>
+                        {claimForm.additionalNotes.length}/1000
+                      </span>
+                    </div>
                     <textarea
                       name="additionalNotes"
                       rows={3}
+                      maxLength={1000}
                       value={claimForm.additionalNotes}
                       onChange={handleFormChange}
                       placeholder="Briefly state your role (e.g. Event Director) and verification request details..."
-                      className="w-full rounded-xl border border-border bg-background p-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      className={`w-full rounded-xl border bg-background p-3 text-xs text-foreground focus:outline-none focus:ring-2 transition-all ${
+                        fieldErrors.additionalNotes
+                          ? 'border-red-500/80 bg-red-500/5 focus:ring-red-500/30 ring-1 ring-red-500/20'
+                          : 'border-border focus:ring-primary'
+                      }`}
                     />
+                    {fieldErrors.additionalNotes && (
+                      <p className="text-[10px] text-red-500 mt-1">{fieldErrors.additionalNotes}</p>
+                    )}
                   </div>
 
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-xs font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-all mt-2"
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-xs font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-all mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {submitting ? 'Submitting Request...' : 'Submit Claim for Moderation'} <ArrowRight className="h-4 w-4" />
+                    {submitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Submitting Request...
+                      </>
+                    ) : (
+                      <>
+                        Submit Claim for Moderation <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
                   </button>
                 </form>
               ) : (

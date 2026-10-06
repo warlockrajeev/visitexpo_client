@@ -292,6 +292,54 @@ export default function SettingsPage() {
     newPassword: '',
     confirmPassword: ''
   });
+  const [securityErrors, setSecurityErrors] = useState({});
+
+  // Password Strength Calculator
+  const getPasswordStrength = (pass) => {
+    if (!pass) return { score: 0, label: 'None', color: 'bg-zinc-700 text-zinc-500' };
+    let score = 0;
+    if (pass.length >= 6) score += 1;
+    if (pass.length >= 8) score += 1;
+    if (/[A-Z]/.test(pass) && /[a-z]/.test(pass)) score += 1;
+    if (/\d/.test(pass)) score += 1;
+    if (/[^a-zA-Z0-9]/.test(pass)) score += 1;
+
+    if (score <= 2) return { score: 1, label: 'Weak', color: 'bg-red-500 text-red-500' };
+    if (score <= 3) return { score: 2, label: 'Medium', color: 'bg-amber-500 text-amber-500' };
+    return { score: 3, label: 'Strong', color: 'bg-emerald-500 text-emerald-500' };
+  };
+
+  const validateSecurityField = (name, value, formState = securityForm) => {
+    let err = '';
+    if (name === 'currentPassword') {
+      if (!isGoogleWithoutPassword && (formState.newPassword || formState.confirmPassword)) {
+        if (!value) {
+          err = 'Current password is required to authorize change.';
+        }
+      }
+    } else if (name === 'newPassword') {
+      if (!value) {
+        if (formState.currentPassword || formState.confirmPassword || isGoogleWithoutPassword) {
+          err = 'New password is required.';
+        }
+      } else if (value.length < 6) {
+        err = `Password must be at least 6 characters (currently ${value.length}).`;
+      } else if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(value)) {
+        err = 'Password must contain at least one letter and one number.';
+      } else if (!isGoogleWithoutPassword && formState.currentPassword && value === formState.currentPassword) {
+        err = 'New password cannot be the same as your current password.';
+      }
+    } else if (name === 'confirmPassword') {
+      if (!value) {
+        if (formState.newPassword) {
+          err = 'Please confirm your new password.';
+        }
+      } else if (value !== formState.newPassword) {
+        err = 'Passwords do not match.';
+      }
+    }
+    return err;
+  };
 
   // Clean phone number helper (extract last 10 digits)
   const cleanDigits = (val) => String(val || '').replace(/\D/g, '').slice(-10);
@@ -828,22 +876,46 @@ export default function SettingsPage() {
       }
 
       // 2. Update Password Logic
-      if (isGoogleWithoutPassword) {
-        // Google auth user without custom password: only require new password
-        if (securityForm.newPassword || securityForm.confirmPassword) {
-          if (!securityForm.newPassword || securityForm.newPassword.length < 6) {
-            setErrorMessage('New password must be at least 6 characters long.');
-            setTimeout(() => setErrorMessage(''), 4000);
-            setSavingSecurity(false);
-            return;
-          }
-          if (securityForm.newPassword !== securityForm.confirmPassword) {
-            setErrorMessage('New password and confirmation password do not match.');
-            setTimeout(() => setErrorMessage(''), 4000);
-            setSavingSecurity(false);
-            return;
-          }
+      const isAttemptingPasswordChange = Boolean(
+        securityForm.newPassword || securityForm.confirmPassword || (!isGoogleWithoutPassword && securityForm.currentPassword)
+      );
 
+      if (isAttemptingPasswordChange) {
+        const errors = {};
+        if (!isGoogleWithoutPassword) {
+          if (!securityForm.currentPassword) {
+            errors.currentPassword = 'Current password is required to authorize password change.';
+          }
+        }
+
+        if (!securityForm.newPassword) {
+          errors.newPassword = 'New password is required.';
+        } else if (securityForm.newPassword.length < 6) {
+          errors.newPassword = `Password must be at least 6 characters (currently ${securityForm.newPassword.length}).`;
+        } else if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(securityForm.newPassword)) {
+          errors.newPassword = 'Password must contain at least one letter and one number.';
+        } else if (!isGoogleWithoutPassword && securityForm.currentPassword === securityForm.newPassword) {
+          errors.newPassword = 'New password cannot be the same as your current password.';
+        }
+
+        if (!securityForm.confirmPassword) {
+          errors.confirmPassword = 'Confirmation password is required.';
+        } else if (securityForm.newPassword !== securityForm.confirmPassword) {
+          errors.confirmPassword = 'New password and confirmation password do not match.';
+        }
+
+        if (Object.keys(errors).length > 0) {
+          setSecurityErrors(errors);
+          const firstErr = Object.values(errors)[0];
+          setErrorMessage(firstErr);
+          setTimeout(() => setErrorMessage(''), 4000);
+          setSavingSecurity(false);
+          return;
+        }
+
+        setSecurityErrors({});
+
+        if (isGoogleWithoutPassword) {
           const res = await axios.put(
             `${API_URL}/auth/change-password`,
             { newPassword: securityForm.newPassword },
@@ -863,35 +935,7 @@ export default function SettingsPage() {
           setTimeout(() => setSaveSuccess(''), 5000);
           setSavingSecurity(false);
           return;
-        }
-      } else {
-        // Standard user or Google user who already created a password: require current password
-        if (securityForm.currentPassword || securityForm.newPassword || securityForm.confirmPassword) {
-          if (!securityForm.currentPassword) {
-            setErrorMessage('Current password is required to authorize password change.');
-            setTimeout(() => setErrorMessage(''), 4000);
-            setSavingSecurity(false);
-            return;
-          }
-          if (!securityForm.newPassword || securityForm.newPassword.length < 6) {
-            setErrorMessage('New password must be at least 6 characters long.');
-            setTimeout(() => setErrorMessage(''), 4000);
-            setSavingSecurity(false);
-            return;
-          }
-          if (securityForm.newPassword !== securityForm.confirmPassword) {
-            setErrorMessage('New password and confirmation password do not match.');
-            setTimeout(() => setErrorMessage(''), 4000);
-            setSavingSecurity(false);
-            return;
-          }
-          if (securityForm.currentPassword === securityForm.newPassword) {
-            setErrorMessage('New password cannot be the same as your current password.');
-            setTimeout(() => setErrorMessage(''), 4000);
-            setSavingSecurity(false);
-            return;
-          }
-
+        } else {
           const res = await axios.put(
             `${API_URL}/auth/change-password`,
             {
@@ -2067,14 +2111,31 @@ export default function SettingsPage() {
                 {/* Current Password Field (Only shown for non-Google users or Google users who already set a custom password) */}
                 {!isGoogleWithoutPassword && (
                   <div>
-                    <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Current Password</label>
+                    <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase flex items-center justify-between">
+                      <span>Current Password *</span>
+                      {securityErrors.currentPassword && (
+                        <span className="text-[10px] text-red-500 font-semibold lowercase">
+                          {securityErrors.currentPassword}
+                        </span>
+                      )}
+                    </label>
                     <div className="relative">
                       <input
                         type={showCurrentPassword ? 'text' : 'password'}
                         value={securityForm.currentPassword}
-                        onChange={(e) => setSecurityForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSecurityForm((prev) => ({ ...prev, currentPassword: val }));
+                          if (securityErrors.currentPassword) {
+                            setSecurityErrors((prev) => ({ ...prev, currentPassword: val ? '' : 'Current password is required.' }));
+                          }
+                        }}
                         placeholder="Enter current password to authorize change"
-                        className="w-full rounded-xl border border-border bg-background py-2 pl-3.5 pr-10 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                        className={`w-full rounded-xl border bg-background py-2 pl-3.5 pr-10 text-xs text-foreground focus:outline-none focus:ring-2 transition-all ${
+                          securityErrors.currentPassword
+                            ? 'border-red-500/80 bg-red-500/5 focus:ring-red-500/30 ring-1 ring-red-500/20'
+                            : 'border-border focus:ring-primary'
+                        }`}
                       />
                       <button
                         type="button"
@@ -2091,16 +2152,34 @@ export default function SettingsPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">
-                      {isGoogleWithoutPassword ? 'New Password *' : 'New Password'}
+                    <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase flex items-center justify-between">
+                      <span>{isGoogleWithoutPassword ? 'New Password *' : 'New Password *'}</span>
+                      {securityErrors.newPassword && (
+                        <span className="text-[10px] text-red-500 font-semibold lowercase">
+                          {securityErrors.newPassword}
+                        </span>
+                      )}
                     </label>
                     <div className="relative">
                       <input
                         type={showNewPassword ? 'text' : 'password'}
                         value={securityForm.newPassword}
-                        onChange={(e) => setSecurityForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-                        placeholder="Min. 6 characters"
-                        className="w-full rounded-xl border border-border bg-background py-2 pl-3.5 pr-10 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSecurityForm((prev) => ({ ...prev, newPassword: val }));
+                          const err = validateSecurityField('newPassword', val, { ...securityForm, newPassword: val });
+                          setSecurityErrors((prev) => ({
+                            ...prev,
+                            newPassword: err,
+                            confirmPassword: securityForm.confirmPassword && val !== securityForm.confirmPassword ? 'Passwords do not match.' : ''
+                          }));
+                        }}
+                        placeholder="Min. 6 characters (letters & numbers)"
+                        className={`w-full rounded-xl border bg-background py-2 pl-3.5 pr-10 text-xs text-foreground focus:outline-none focus:ring-2 transition-all ${
+                          securityErrors.newPassword
+                            ? 'border-red-500/80 bg-red-500/5 focus:ring-red-500/30 ring-1 ring-red-500/20'
+                            : 'border-border focus:ring-primary'
+                        }`}
                       />
                       <button
                         type="button"
@@ -2112,19 +2191,57 @@ export default function SettingsPage() {
                         {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
+                    {/* Password Strength Indicator */}
+                    {securityForm.newPassword && (
+                      <div className="mt-2 space-y-1">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-muted-foreground">Password strength:</span>
+                          <span className={`font-bold ${getPasswordStrength(securityForm.newPassword).color.split(' ')[1]}`}>
+                            {getPasswordStrength(securityForm.newPassword).label}
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-muted/40 rounded-full overflow-hidden flex gap-1">
+                          <div
+                            className={`h-full transition-all duration-300 rounded-full ${
+                              getPasswordStrength(securityForm.newPassword).score >= 1 ? getPasswordStrength(securityForm.newPassword).color.split(' ')[0] : 'bg-transparent'
+                            } ${
+                              getPasswordStrength(securityForm.newPassword).score === 1
+                                ? 'w-1/3'
+                                : getPasswordStrength(securityForm.newPassword).score === 2
+                                ? 'w-2/3'
+                                : 'w-full'
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">
-                      {isGoogleWithoutPassword ? 'Confirm Password *' : 'Confirm New Password'}
+                    <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase flex items-center justify-between">
+                      <span>{isGoogleWithoutPassword ? 'Confirm Password *' : 'Confirm New Password *'}</span>
+                      {securityErrors.confirmPassword && (
+                        <span className="text-[10px] text-red-500 font-semibold lowercase">
+                          {securityErrors.confirmPassword}
+                        </span>
+                      )}
                     </label>
                     <div className="relative">
                       <input
                         type={showConfirmPassword ? 'text' : 'password'}
                         value={securityForm.confirmPassword}
-                        onChange={(e) => setSecurityForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSecurityForm((prev) => ({ ...prev, confirmPassword: val }));
+                          const err = validateSecurityField('confirmPassword', val, { ...securityForm, confirmPassword: val });
+                          setSecurityErrors((prev) => ({ ...prev, confirmPassword: err }));
+                        }}
                         placeholder="Re-enter new password"
-                        className="w-full rounded-xl border border-border bg-background py-2 pl-3.5 pr-10 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                        className={`w-full rounded-xl border bg-background py-2 pl-3.5 pr-10 text-xs text-foreground focus:outline-none focus:ring-2 transition-all ${
+                          securityErrors.confirmPassword
+                            ? 'border-red-500/80 bg-red-500/5 focus:ring-red-500/30 ring-1 ring-red-500/20'
+                            : 'border-border focus:ring-primary'
+                        }`}
                       />
                       <button
                         type="button"
@@ -2136,6 +2253,18 @@ export default function SettingsPage() {
                         {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
+                    {/* Live Match Feedback */}
+                    {securityForm.confirmPassword && (
+                      <p className={`text-[10px] mt-1 font-semibold flex items-center gap-1 ${
+                        securityForm.confirmPassword === securityForm.newPassword
+                          ? 'text-emerald-500'
+                          : 'text-red-500'
+                      }`}>
+                        {securityForm.confirmPassword === securityForm.newPassword
+                          ? '✓ Passwords match'
+                          : '✕ Passwords do not match'}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

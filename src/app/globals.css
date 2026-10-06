@@ -79,6 +79,10 @@
   box-sizing: border-box;
 }
 
+.flex-shrink-0 {
+  flex-shrink: 0 !important;
+}
+
 button:not(:disabled):not([aria-disabled="true"]),
 [role="button"]:not([aria-disabled="true"]),
 [role="tab"]:not(:disabled):not([aria-disabled="true"]) {

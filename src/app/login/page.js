@@ -535,6 +535,8 @@ export default function LoginPage() {
         errors.password = 'Password is required.';
       } else if (formData.password.length < 6) {
         errors.password = 'Password must be at least 6 characters long.';
+      } else if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(formData.password)) {
+        errors.password = 'Password must contain at least one letter and one number.';
       }
 
       if (Object.keys(errors).length > 0) {
