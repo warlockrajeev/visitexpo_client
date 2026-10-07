@@ -51,19 +51,42 @@ export default function ExposPage() {
   const [claimError, setClaimError] = useState('');
   const [selectedPassForBadge, setSelectedPassForBadge] = useState(null);
 
-  // Fetch events from WordPress endpoint and backend
+  // Fetch events from WordPress endpoint and backend with instant sessionStorage hydration
   useEffect(() => {
+    // 1. Instant hydration from sessionStorage
+    try {
+      if (typeof window !== 'undefined') {
+        const cached = sessionStorage.getItem('visitexpo_dashboard_expos_cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setEvents(parsed);
+            setLoadingEvents(false);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Could not read expos cache:', e);
+    }
+
     const fetchEvents = async () => {
-      setLoadingEvents(true);
       try {
         const res = await axios.get('/api/wordpress-events');
         if (res.data?.success && Array.isArray(res.data?.events) && res.data.events.length > 0) {
-          setEvents(res.data.events);
+          const freshEvents = res.data.events;
+          setEvents(freshEvents);
+          try {
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('visitexpo_dashboard_expos_cache', JSON.stringify(freshEvents));
+            }
+          } catch (e) {
+            console.warn('Could not cache expos:', e);
+          }
         } else {
           // Fallback to backend events
           const fallbackRes = await axios.get(`${API_URL}/events?limit=20`);
           if (fallbackRes.data?.success && fallbackRes.data?.data?.docs) {
-            setEvents(fallbackRes.data.data.docs.map(e => ({
+            const fallbackEvents = fallbackRes.data.data.docs.map(e => ({
               id: e._id || e.id,
               title: e.title,
               image: e.banner || e.logo,
@@ -73,7 +96,15 @@ export default function ExposPage() {
               venue: e.venue || 'Convention Center',
               city: e.city || 'India',
               description: e.shortDescription || e.description || ''
-            })));
+            }));
+            setEvents(fallbackEvents);
+            try {
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem('visitexpo_dashboard_expos_cache', JSON.stringify(fallbackEvents));
+              }
+            } catch (e) {
+              console.warn('Could not cache fallback expos:', e);
+            }
           }
         }
       } catch (err) {

@@ -351,8 +351,6 @@ export default function EventsPage() {
 
   // Fetch events owned/claimed by logged in organizer (including drafts)
   const fetchEvents = async () => {
-    setLoading(true);
-    setError('');
     try {
       const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
       const orgId = user?.organization?._id || user?.organization;
@@ -368,11 +366,9 @@ export default function EventsPage() {
       
       if (res.data && res.data.success) {
         const allDocs = res.data.data?.docs || [];
+        let finalEvents = allDocs;
 
-        if (isSuperAdmin) {
-          // Super admins see all events
-          setEvents(allDocs);
-        } else {
+        if (!isSuperAdmin) {
           // Apply additional client-side ownership filter as safeguard
           const userIdStr = String(userId || '');
           const userEmail = (user?.email || '').toLowerCase().trim();
@@ -394,18 +390,48 @@ export default function EventsPage() {
           });
 
           // Use server-filtered results if client filter returns empty but server returned data
-          setEvents(myEvents.length > 0 ? myEvents : allDocs);
+          finalEvents = myEvents.length > 0 ? myEvents : allDocs;
+        }
+
+        setEvents(finalEvents);
+        try {
+          if (typeof window !== 'undefined') {
+            const cacheKey = `visitexpo_manage_events_${userId || 'admin'}`;
+            sessionStorage.setItem(cacheKey, JSON.stringify(finalEvents));
+          }
+        } catch (e) {
+          console.warn('Could not cache manage-events:', e);
         }
       }
     } catch (err) {
       console.error('Failed to fetch events', err);
-      setError('Could not load events. Make sure server is running and database connected.');
+      if (events.length === 0) {
+        setError('Could not load events. Make sure server is running and database connected.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    // 1. Instant hydration from sessionStorage
+    try {
+      if (typeof window !== 'undefined' && user) {
+        const userId = user?._id || user?.id;
+        const cacheKey = `visitexpo_manage_events_${userId || 'admin'}`;
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setEvents(parsed);
+            setLoading(false);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Could not read manage-events cache:', e);
+    }
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchEvents();
 

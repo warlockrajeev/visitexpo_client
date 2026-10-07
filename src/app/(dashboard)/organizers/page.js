@@ -123,28 +123,49 @@ export default function OrganizersDirectoryPage() {
     }
   }, [user]);
 
-  // Fetch Organizers & Expos from Backend Directory
+  // Fetch Organizers & Expos from Backend Directory with instant sessionStorage caching
   const fetchDirectory = async () => {
-    setLoading(true);
-    setError('');
     try {
       const res = await axios.get(`${API_URL}/chat/organizers-directory`, {
         withCredentials: true
       });
       if (res.data?.success && Array.isArray(res.data.organizers)) {
         setOrganizers(res.data.organizers);
+        try {
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('visitexpo_organizers_dir_cache', JSON.stringify(res.data.organizers));
+          }
+        } catch (e) {
+          console.warn('Could not cache organizers directory:', e);
+        }
       } else {
-        setError('Could not load organizers directory.');
+        if (organizers.length === 0) setError('Could not load organizers directory.');
       }
     } catch (err) {
       console.error('Error fetching directory:', err);
-      setError('Unable to load directory data. Please check your network connection.');
+      if (organizers.length === 0) setError('Unable to load directory data. Please check your network connection.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    // 1. Instant hydration from sessionStorage
+    try {
+      if (typeof window !== 'undefined') {
+        const cached = sessionStorage.getItem('visitexpo_organizers_dir_cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setOrganizers(parsed);
+            setLoading(false);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Could not read organizers cache:', e);
+    }
+
     fetchDirectory();
   }, []);
 

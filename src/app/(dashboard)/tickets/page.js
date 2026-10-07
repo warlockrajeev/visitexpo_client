@@ -193,8 +193,26 @@ export default function TicketingPage() {
     setReplyMessage('');
   };
 
-  // 1. Fetch Events
+  // 1. Fetch Events with instant sessionStorage caching
   useEffect(() => {
+    const userId = user?._id || user?.id || 'anonymous';
+    const cacheKey = `visitexpo_dashboard_events_${userId}`;
+
+    try {
+      if (typeof window !== 'undefined') {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setEvents(parsed);
+            setSelectedEventId(prev => prev || parsed[0]._id);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Could not read cached events:', e);
+    }
+
     const fetchEvents = async () => {
       try {
         const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
@@ -202,7 +220,6 @@ export default function TicketingPage() {
         if (res.data && res.data.success && res.data.data.docs) {
           const rawEvents = res.data.data.docs;
           const userOrgId = user?.organization?._id || user?.organization;
-          const userId = user?._id || user?.id;
 
           // Prioritize organizer's own / claimed events at the top
           const sorted = [...rawEvents].sort((a, b) => {
@@ -218,12 +235,22 @@ export default function TicketingPage() {
 
           setEvents(sorted);
           if (sorted.length > 0) {
-            setSelectedEventId(sorted[0]._id);
+            setSelectedEventId(prev => prev || sorted[0]._id);
+          }
+
+          try {
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem(cacheKey, JSON.stringify(sorted));
+            }
+          } catch (e) {
+            console.warn('Could not cache events:', e);
           }
         }
       } catch (err) {
         console.error('Failed to load events', err);
-        setError('Could not connect to API server. Ensure backend is running.');
+        if (events.length === 0) {
+          setError('Could not connect to API server. Ensure backend is running.');
+        }
       }
     };
     fetchEvents();

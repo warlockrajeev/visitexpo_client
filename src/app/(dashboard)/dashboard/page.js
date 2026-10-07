@@ -91,17 +91,36 @@ export function OrganizerDashboardInner() {
   useEffect(() => {
     if (!user) return;
     let isMounted = true;
+    const userId = user.id || user._id;
+
+    // 1. Instant hydration from sessionStorage
+    try {
+      if (typeof window !== 'undefined') {
+        const cached = sessionStorage.getItem(`visitexpo_organizer_dashboard_cache_${userId}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.stats) {
+            setDashboardStats(parsed.stats);
+            if (Array.isArray(parsed.visitors)) setVisitors(parsed.visitors);
+            if (Array.isArray(parsed.leads)) setLeads(parsed.leads);
+            if (Array.isArray(parsed.recentVisitors)) setRecentVisitors(parsed.recentVisitors);
+            if (Array.isArray(parsed.recentEvents)) setRecentEvents(parsed.recentEvents);
+            setLoading(false);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Could not read dashboard cache:', e);
+    }
+
     const fetchDashboardData = async () => {
-      setLoading(true);
       try {
         const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
 
         const orgId = user.organization?._id || user.organization;
-        const userId = user.id || user._id;
         const eventsUrl = user.role === 'super_admin'
           ? `${API_URL}/events?limit=5`
           : `${API_URL}/events?organizerId=${orgId || userId}&limit=5`;
-
 
         const [eventsRes, visitorsRes, exhibitorsRes, leadsRes] = await Promise.allSettled([
           axios.get(eventsUrl, { headers }),
@@ -121,21 +140,35 @@ export function OrganizerDashboardInner() {
         const exhibitors = exhibitorData.docs || [];
         const leadsDocs = leadData.docs || [];
 
-        setDashboardStats({
+        const newStats = {
           totalEvents: eventData.total ?? events.length,
           totalVisitors: visitorData.total ?? visitorsDocs.length,
           totalExhibitors: exhibitorData.total ?? exhibitors.length,
           totalLeads: leadData.total ?? leadsDocs.length
-        });
+        };
 
+        setDashboardStats(newStats);
         setVisitors(visitorsDocs);
         setLeads(leadsDocs);
 
-        if (visitorsDocs.length > 0) {
-          setRecentVisitors(visitorsDocs.slice(0, 5));
-        }
-        if (events.length > 0) {
-          setRecentEvents(events.slice(0, 5));
+        const newRecentVisitors = visitorsDocs.length > 0 ? visitorsDocs.slice(0, 5) : [];
+        const newRecentEvents = events.length > 0 ? events.slice(0, 5) : [];
+
+        if (newRecentVisitors.length > 0) setRecentVisitors(newRecentVisitors);
+        if (newRecentEvents.length > 0) setRecentEvents(newRecentEvents);
+
+        try {
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem(`visitexpo_organizer_dashboard_cache_${userId}`, JSON.stringify({
+              stats: newStats,
+              visitors: visitorsDocs,
+              leads: leadsDocs,
+              recentVisitors: newRecentVisitors,
+              recentEvents: newRecentEvents
+            }));
+          }
+        } catch (e) {
+          console.warn('Could not save dashboard cache:', e);
         }
       } catch (err) {
         console.error('Error loading dynamic dashboard stats:', err);
@@ -761,14 +794,44 @@ function ExhibitorDashboard() {
   // Staff States
   const [newStaff, setNewStaff] = useState({ name: '', email: '', phone: '' });
 
-  // Load available events for booth selection
+  // Load available events for booth selection with instant sessionStorage hydration
   useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const cached = sessionStorage.getItem('visitexpo_exhibitor_events_cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setAvailableEvents(parsed);
+            setSetupForm(prev => ({
+              ...prev,
+              eventId: prev.eventId || parsed[0]._id,
+              name: prev.name || user?.company || user?.name || 'Exhibition Partner',
+              contactPhone: prev.contactPhone || user?.phone || '+91 98765 43210',
+              staffName: prev.staffName || user?.name || 'Primary Representative',
+              staffEmail: prev.staffEmail || user?.email || '',
+              staffPhone: prev.staffPhone || user?.phone || '+91 98765 43210'
+            }));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Could not read exhibitor events cache:', e);
+    }
+
     const loadEvents = async () => {
       try {
         const res = await axios.get(`${API_URL}/events?limit=50&all=true`);
         if (res.data && res.data.success && res.data.data && res.data.data.docs) {
           const docs = res.data.data.docs;
           setAvailableEvents(docs);
+          try {
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('visitexpo_exhibitor_events_cache', JSON.stringify(docs));
+            }
+          } catch (e) {
+            console.warn('Could not cache exhibitor events:', e);
+          }
           if (docs.length > 0) {
             setSetupForm(prev => ({
               ...prev,
@@ -1621,17 +1684,32 @@ function VisitorDashboard() {
     }
   };
 
-  // Fetch upcoming exhibitions from backend API
+  // Fetch upcoming exhibitions from backend API with instant sessionStorage hydration
   const fetchExpos = async () => {
     try {
-      setLoadingExpos(true);
       const res = await axios.get(`${API_URL}/events?limit=12`);
       if (res.data && res.data.success && res.data.data.docs) {
-        setExpos(res.data.data.docs);
+        const docs = res.data.data.docs;
+        setExpos(docs);
+        try {
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('visitexpo_visitor_expos_cache', JSON.stringify(docs));
+          }
+        } catch (e) {
+          console.warn('Could not cache visitor expos:', e);
+        }
       } else {
         const fallbackRes = await axios.get(`${API_URL}/wordpress/claimable-events?limit=8`);
         if (fallbackRes.data && fallbackRes.data.success && fallbackRes.data.data.docs) {
-          setExpos(fallbackRes.data.data.docs);
+          const fallbackDocs = fallbackRes.data.data.docs;
+          setExpos(fallbackDocs);
+          try {
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('visitexpo_visitor_expos_cache', JSON.stringify(fallbackDocs));
+            }
+          } catch (e) {
+            console.warn('Could not cache fallback expos:', e);
+          }
         }
       }
     } catch (err) {
@@ -1642,6 +1720,32 @@ function VisitorDashboard() {
   };
 
   useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const cachedExpos = sessionStorage.getItem('visitexpo_visitor_expos_cache');
+        if (cachedExpos) {
+          const parsed = JSON.parse(cachedExpos);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setExpos(parsed);
+            setLoadingExpos(false);
+          }
+        }
+        if (user) {
+          const userId = user.id || user._id;
+          const cachedPasses = sessionStorage.getItem(`visitexpo_visitor_passes_cache_${userId}`);
+          if (cachedPasses) {
+            const parsed = JSON.parse(cachedPasses);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setPasses(parsed);
+              setLoadingPasses(false);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Could not read visitor cache:', e);
+    }
+
     fetchMyPasses();
     fetchExpos();
     fetchMyEngagements();

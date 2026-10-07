@@ -142,13 +142,33 @@ export default function LeadsCRMPage() {
   const [leadFormErrors, setLeadFormErrors] = useState({});
   const [isSubmittingLead, setIsSubmittingLead] = useState(false);
 
-  // 1. Fetch Events (Organizers see only their own and claimed expo editions)
+  // 1. Fetch Events (Organizers see only their own and claimed expo editions) with instant sessionStorage caching
   useEffect(() => {
+    const userId = user?._id || user?.id || 'anonymous';
+    const cacheKey = `visitexpo_leads_events_${userId}`;
+
+    try {
+      if (typeof window !== 'undefined' && user) {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setEvents(parsed);
+            setSelectedEventId(prev => {
+              if (prev && (prev === 'all' || parsed.some(e => e._id === prev))) return prev;
+              return parsed[0]._id;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Could not read cached leads events:', e);
+    }
+
     const fetchEvents = async () => {
       try {
         const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
         const orgId = user?.organization?._id || user?.organization;
-        const userId = user?._id || user?.id;
         const isSuperAdmin = user?.role === 'super_admin';
 
         const ids = [orgId, userId].filter(Boolean).map(String);
@@ -190,6 +210,14 @@ export default function LeadsCRMPage() {
             setLeads([]);
             setLoading(false);
           }
+
+          try {
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem(cacheKey, JSON.stringify(eventList));
+            }
+          } catch (e) {
+            console.warn('Could not cache leads events:', e);
+          }
         } else {
           setEvents([]);
           setSelectedEventId('');
@@ -198,8 +226,10 @@ export default function LeadsCRMPage() {
         }
       } catch (err) {
         console.error('Failed to load events', err);
-        setError('Could not connect to API server. Ensure backend is running.');
-        setLoading(false);
+        if (events.length === 0) {
+          setError('Could not connect to API server. Ensure backend is running.');
+          setLoading(false);
+        }
       }
     };
     if (user) {

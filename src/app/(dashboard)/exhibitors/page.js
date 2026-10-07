@@ -89,6 +89,24 @@ export default function ExhibitorsPage() {
   // 1. Fetch Events on Load
   useEffect(() => {
     if (!user) return;
+    const userId = user._id || user.id || 'anonymous';
+    const cacheKey = `visitexpo_dashboard_events_${userId}`;
+
+    try {
+      if (typeof window !== 'undefined') {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setEvents(parsed);
+            setSelectedEventId(prev => prev || parsed[0]._id);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Could not read cached events:', e);
+    }
+
     const fetchEvents = async () => {
       try {
         const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
@@ -107,9 +125,19 @@ export default function ExhibitorsPage() {
         if (docs.length > 0) {
           setSelectedEventId(prev => prev || docs[0]._id);
         }
+
+        try {
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem(cacheKey, JSON.stringify(docs));
+          }
+        } catch (e) {
+          console.warn('Could not cache events:', e);
+        }
       } catch (err) {
         console.error('Failed to load events', err);
-        setError('Could not connect to API server. Ensure backend is running.');
+        if (events.length === 0) {
+          setError('Could not connect to API server. Ensure backend is running.');
+        }
       }
     };
     fetchEvents();

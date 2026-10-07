@@ -6,7 +6,7 @@
  * Fetches all live VisitExpo event directory items, allows domain email verification, proof document upload, and claim moderation tracking.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
 import { useAuth } from '../../../../context/AuthContext.js';
@@ -116,7 +116,7 @@ export default function ClaimEventPage() {
     return Object.keys(activeErrors).length === 0;
   };
 
-  // Fetch live claimable WP events from API and read URL search param if present
+  // Fetch live claimable WP events from API and read URL search param if present with instant sessionStorage cache
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -124,14 +124,35 @@ export default function ClaimEventPage() {
       if (initialSearch) {
         setSearchTerm(initialSearch);
       }
+
+      // 1. Instant hydration from sessionStorage
+      try {
+        const cached = sessionStorage.getItem('visitexpo_claimable_events_cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setWpEvents(parsed);
+            setLoading(false);
+          }
+        }
+      } catch (e) {
+        console.warn('Could not read claimable events cache:', e);
+      }
     }
 
     const fetchClaimableEvents = async () => {
-      setLoading(true);
       try {
         const res = await axios.get(`${API_URL}/wordpress/claimable-events`);
         if (res.data && res.data.success && res.data.data.docs) {
-          setWpEvents(res.data.data.docs);
+          const freshEvents = res.data.data.docs;
+          setWpEvents(freshEvents);
+          try {
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('visitexpo_claimable_events_cache', JSON.stringify(freshEvents));
+            }
+          } catch (e) {
+            console.warn('Could not save claimable events cache:', e);
+          }
         }
       } catch (err) {
         console.error('Failed to load claimable events from API', err);
@@ -139,6 +160,7 @@ export default function ClaimEventPage() {
         setLoading(false);
       }
     };
+
     fetchClaimableEvents();
   }, []);
 
@@ -234,16 +256,21 @@ export default function ClaimEventPage() {
     }
   };
 
-  const filteredEvents = wpEvents.filter(evt => {
-    const cleanTitle = evt.title.toLowerCase().trim();
-    const isSystem = EXCLUDED_SYSTEM_TITLES.some(sys => cleanTitle === sys || cleanTitle.includes(sys));
-    if (isSystem) return false;
+  const filteredEvents = useMemo(() => {
+    const q = searchTerm.toLowerCase().trim();
+    return wpEvents.filter(evt => {
+      const cleanTitle = (evt.title || '').toLowerCase().trim();
+      const isSystem = EXCLUDED_SYSTEM_TITLES.some(sys => cleanTitle === sys || cleanTitle.includes(sys));
+      if (isSystem) return false;
 
-    return (
-      evt.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (evt.city && evt.city.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-  });
+      if (!q) return true;
+      return (
+        cleanTitle.includes(q) ||
+        (evt.city && evt.city.toLowerCase().includes(q)) ||
+        (evt.venue && evt.venue.toLowerCase().includes(q))
+      );
+    });
+  }, [wpEvents, searchTerm]);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12">
