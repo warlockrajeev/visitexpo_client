@@ -33,21 +33,34 @@ import {
   Home,
   ArrowLeft,
   ArrowRight,
+  Check,
+  CheckCircle2,
+  AlertCircle,
   MessageSquare,
   Bookmark,
   Star,
   Bell
 } from 'lucide-react';
+import axios from 'axios';
+import Swal from 'sweetalert2';
+import { isCorporateEmail } from '../../utils/emailValidator.js';
 
 import { initSweetAlertInterceptors } from '../../utils/sweetalert.js';
 import OrganizerSupportWidget from '../../components/OrganizerSupportWidget.js';
 
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== 'undefined' && window.location.hostname.includes('visitexpo.in')
+    ? 'https://api.visitexpo.in/api'
+    : 'http://localhost:5000/api');
+
 export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activatingPlan, setActivatingPlan] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
-  const { user, loading, logout, isExhibitorView, setIsExhibitorView, toggleDashboardView, hasExhibitorProfile } = useAuth();
+  const { user, loading, logout, updateUser, isExhibitorView, setIsExhibitorView, toggleDashboardView, hasExhibitorProfile } = useAuth();
 
   useEffect(() => {
     initSweetAlertInterceptors();
@@ -97,34 +110,145 @@ export default function DashboardLayout({ children }) {
     return null;
   }
 
-  // Lock dashboard if organizer account is pending Super Admin verification
-  if (user.role === 'organizer' && !user.isVerified) {
+  // Handle Free Organizer Plan activation (₹0 corporate, ₹1,499 general)
+  const handleActivateFreePlan = async () => {
+    setActivatingPlan(true);
+    try {
+      const res = await axios.post(`${API_URL}/plans/activate-free-plan`, {
+        transactionId: `TXN_DASH_${Date.now()}`
+      });
+      if (res.data?.success) {
+        if (updateUser && res.data.user) {
+          updateUser(res.data.user);
+        }
+        await Swal.fire({
+          icon: 'success',
+          title: 'Plan Activated Successfully!',
+          text: res.data.message || 'Free Organizer Plan is now active. Welcome to your organizer dashboard!',
+          confirmButtonColor: '#FFCC00',
+          confirmButtonText: 'Enter Dashboard'
+        });
+      }
+    } catch (err) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Activation Failed',
+        text: err.response?.data?.message || 'Could not activate plan. Please try again or contact support.'
+      });
+    } finally {
+      setActivatingPlan(false);
+    }
+  };
+
+  // Lock dashboard if organizer account has not yet activated their plan
+  if (user.role === 'organizer' && (!user.isVerified || !user.isPlanActive)) {
+    const isCorporate = user?.emailType === 'corporate' || isCorporateEmail(user?.email);
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4 text-foreground">
-        <div className="max-w-md w-full bg-card border border-border rounded-2xl p-8 shadow-xl text-center space-y-6">
+        <div className="max-w-lg w-full bg-card border border-border rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-6">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-amber-500/10 text-amber-500 mx-auto ring-8 ring-amber-500/20">
-            <ShieldCheck className="h-10 w-10 animate-pulse" />
+            <ShieldCheck className="h-10 w-10 text-amber-600" />
           </div>
 
           <div className="space-y-2">
-            <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-              Account Pending Super Admin Approval
+            <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border ${
+              isCorporate
+                ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+            }`}>
+              {isCorporate ? 'Corporate Domain Detected' : 'Personal Email Registration'}
             </span>
             <h2 className="text-2xl font-extrabold text-foreground">
-              Welcome, {user.name}!
+              {isCorporate ? 'Activate Free Organizer Plan' : 'Free Organizer Plan Activation'}
             </h2>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Your organizer account registration request is currently under review by our Super Admin moderation team. Dashboard access will be unlocked automatically once approved.
+              {isCorporate ? (
+                <>
+                  Your account is registered with corporate domain <span className="font-bold text-foreground">@{user.email?.split('@')[1]}</span>. You qualify for 100% Free Organizer Plan access (₹0). Click below to activate your dashboard immediately.
+                </>
+              ) : (
+                <>
+                  Your account is registered with personal email <span className="font-bold text-foreground">{user.email}</span>. Corporate business emails qualify for free registration, while personal emails require a one-time verification fee of <strong>₹1,499</strong> to unlock all organizer capabilities.
+                </>
+              )}
             </p>
           </div>
 
-          <div className="pt-2">
+          {/* Pricing & Plan Details Box */}
+          <div className="p-4 rounded-2xl bg-secondary/50 border border-border text-left space-y-3">
+            <div className="flex items-baseline justify-between">
+              <div>
+                <span className="text-xs font-bold text-foreground block">Free Organizer Plan</span>
+                <span className="text-[11px] text-muted-foreground">Lifetime validity · No monthly fee</span>
+              </div>
+              <div className="text-right">
+                <span className="text-2xl font-black font-mono text-foreground">
+                  {isCorporate ? '₹0' : '₹1,499'}
+                </span>
+                <span className="text-[10px] text-muted-foreground block">
+                  {isCorporate ? 'Corporate complimentary' : 'One-time verification fee'}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-border/60 space-y-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                <span>Claim any number of expos (up to 3 claims per day)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                <span>Publish new, upcoming &amp; prospective B2B/B2C exhibitions</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                <span>Token demand test: 1/10 nominal token request model</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                <span>Real-time buyer and exhibitor inquiry counts</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="space-y-3 pt-2">
             <button
-              onClick={logout}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-secondary border border-border hover:bg-secondary/80 px-6 py-2.5 text-xs font-bold text-foreground transition-all"
+              onClick={handleActivateFreePlan}
+              disabled={activatingPlan}
+              className="w-full py-3.5 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-black text-xs font-extrabold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              Sign Out & Return to Login
+              {activatingPlan ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin text-black" />
+                  <span>Activating Your Plan...</span>
+                </>
+              ) : (
+                <>
+                  <CreditCard className="h-4 w-4 text-black" />
+                  <span>
+                    {isCorporate ? 'Activate Free Organizer Plan (₹0)' : 'Pay ₹1,499 & Unlock Organizer Dashboard'}
+                  </span>
+                </>
+              )}
             </button>
+
+            <div className="flex items-center justify-center gap-4 text-xs font-medium">
+              <Link
+                href="/pricing"
+                className="text-muted-foreground hover:text-foreground transition-colors underline"
+              >
+                View Full Pricing Details
+              </Link>
+              <span className="text-muted-foreground/40">•</span>
+              <button
+                onClick={logout}
+                className="text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
+              >
+                Sign Out
+              </button>
+            </div>
           </div>
         </div>
       </div>

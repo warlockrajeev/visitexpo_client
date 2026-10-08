@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { auth, googleProvider, signInWithPopup } from '../../lib/firebase.js';
 import { showSweetAlert, showSweetWarning, showSweetError, showSweetSuccess } from '../../utils/sweetalert.js';
+import { isCorporateEmail } from '../../utils/emailValidator.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -154,6 +155,7 @@ export default function LoginPage() {
       const params = new URLSearchParams(window.location.search);
       const redirectParam = params.get('redirect');
       if (redirectParam) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setRedirectUrl(redirectParam);
       }
       const roleParam = params.get('role');
@@ -664,6 +666,32 @@ export default function LoginPage() {
                 <p className="text-[11px] text-zinc-500 truncate">{googlePendingUser.email}</p>
               </div>
             </div>
+
+            {googleDetailsForm.role === 'organizer' && googlePendingUser.email && (
+              <div className={`p-2.5 rounded-xl border text-[11px] text-left flex items-start gap-2 ${
+                isCorporateEmail(googlePendingUser.email)
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : 'bg-amber-50 border-amber-200 text-amber-900'
+              }`}>
+                {isCorporateEmail(googlePendingUser.email) ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold">Corporate Work Email: Free Organizer Plan (₹0)</span>
+                      <p className="text-[10px] text-emerald-700">Your account will be automatically verified with instant dashboard approval.</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold">Personal Email: ₹1,499 Verification Fee Applies</span>
+                      <p className="text-[10px] text-amber-800">One-time ₹1,499 activation fee required to unlock your organizer dashboard.</p>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             <div className="text-center space-y-1">
               <h2 className="text-xl font-bold text-zinc-900 tracking-tight flex items-center justify-center gap-2">
@@ -1392,6 +1420,30 @@ export default function LoginPage() {
                   <p className="mt-1 text-[11px] text-red-600 font-medium flex items-center gap-1">
                     <AlertCircle className="h-3 w-3 shrink-0" /> {fieldErrors.email}
                   </p>
+                )}
+
+                {isSignup && userRole === 'organizer' && formData.email && formData.email.includes('@') && formData.email.includes('.') && (
+                  isCorporateEmail(formData.email) ? (
+                    <div className="mt-2 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 flex items-start gap-2 animate-fade-in">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold">Corporate Work Email Verified (@{formData.email.split('@')[1]})</span>
+                        <p className="text-[10px] text-emerald-700 leading-tight mt-0.5">
+                          Free Organizer Plan will be <strong>automatically activated (₹0)</strong> with instant dashboard access.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2 animate-fade-in">
+                      <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold">Personal Email Domain (@{formData.email.split('@')[1] || 'domain.com'})</span>
+                        <p className="text-[10px] text-amber-800 leading-tight mt-0.5">
+                          Personal email domains require a <strong>₹1,499 one-time verification fee</strong> to unlock the organizer dashboard. (Use your corporate work domain for 100% Free automatic activation!)
+                        </p>
+                      </div>
+                    </div>
+                  )
                 )}
               </div>
 

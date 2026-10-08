@@ -14,11 +14,11 @@ import axios from 'axios';
 import Navbar from '../../components/Navbar.js';
 import Footer from '../../components/Footer.js';
 import { useAuth } from '../../context/AuthContext.js';
+import { isCorporateEmail } from '../../utils/emailValidator.js';
 import {
   Check,
   X,
   CreditCard,
-  Sparkles,
   Zap,
   ShieldCheck,
   Building,
@@ -57,7 +57,7 @@ const API_URL =
     : 'http://localhost:5000/api');
 
 export default function PricingPage() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
 
   // Billing Cycle Switcher: 'quarterly' or 'yearly'
   const [billingCycle, setBillingCycle] = useState('yearly');
@@ -65,6 +65,12 @@ export default function PricingPage() {
   // Work email domain checker state
   const [emailCheckInput, setEmailCheckInput] = useState('');
   const [emailCheckResult, setEmailCheckResult] = useState(null);
+
+  // My current plan & Free plan activation state
+  const [myPlan, setMyPlan] = useState(null);
+  const [publicFreePlan, setPublicFreePlan] = useState(null);
+  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   // Selected growth service filter
   const [growthCategory, setGrowthCategory] = useState('all');
@@ -90,6 +96,75 @@ export default function PricingPage() {
 
   // FAQ Accordion State
   const [openFaqIndex, setOpenFaqIndex] = useState(0);
+
+  // Fetch active plans and user plan status on load
+  useEffect(() => {
+    axios
+      .get(`${API_URL}/plans`)
+      .then((res) => {
+        if (res.data?.success && Array.isArray(res.data.data)) {
+          const free = res.data.data.find((p) => p.planId === 'free');
+          if (free) setPublicFreePlan(free);
+        }
+      })
+      .catch(() => {});
+
+    if (user) {
+      axios
+        .get(`${API_URL}/plans/my-plan`)
+        .then((res) => {
+          if (res.data?.success) {
+            setMyPlan(res.data);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user]);
+
+  const generalEmailPrice = myPlan?.generalEmailPrice ?? publicFreePlan?.pricing?.generalEmailPrice ?? 1499;
+  const isGeneralFree = Number(generalEmailPrice) === 0;
+
+  const isUserCorporate =
+    myPlan?.isCorporate ?? (user?.emailType === 'corporate' || isCorporateEmail(user?.email));
+  const isUserPlanActive = myPlan?.isPlanActive ?? (user?.isPlanActive && user?.isVerified);
+
+  // Handle Free Organizer General Email Activation payment (₹1,499)
+  const handleActivateGeneralPlan = async () => {
+    if (!user) {
+      window.location.href = '/login?role=organizer&signup=true';
+      return;
+    }
+    setIsProcessingPayment(true);
+    try {
+      const res = await axios.post(`${API_URL}/plans/activate-free-plan`, {
+        transactionId: isGeneralFree ? `FREE_PROMO_${Date.now()}` : `TXN_PAGE_${Date.now()}`
+      });
+      if (res.data?.success) {
+        if (updateUser && res.data.user) {
+          updateUser(res.data.user);
+        }
+        setIsPayModalOpen(false);
+        await Swal.fire({
+          icon: 'success',
+          title: 'Plan Activated Successfully!',
+          text: res.data.message || (isGeneralFree 
+            ? 'Your Free Organizer Plan has been activated with ₹0 charge. Your organizer dashboard is fully unlocked.' 
+            : 'Your Free Organizer Plan is now active. Your organizer dashboard is fully unlocked.'),
+          confirmButtonColor: '#FFCC00',
+          confirmButtonText: 'Go to Dashboard'
+        });
+        window.location.href = '/dashboard';
+      }
+    } catch (err) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Activation Failed',
+        text: err.response?.data?.message || 'Could not complete plan activation. Please try again.'
+      });
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
 
   // Handle corporate email validation checker
   const handleCheckEmail = (e) => {
@@ -120,11 +195,19 @@ export default function PricingPage() {
     ];
 
     if (freeProviders.includes(domain)) {
-      setEmailCheckResult({
-        isCorporate: false,
-        domain,
-        message: 'Personal email detected. Registration fee is ₹1,499 one-time. Use your corporate work domain (@yourcompany.com) for 100% FREE registration!'
-      });
+      if (isGeneralFree) {
+        setEmailCheckResult({
+          isCorporate: false,
+          domain,
+          message: `Personal email detected (@${domain}). Special Platform Offer: No charge (₹0 FREE)! You can register and activate your organizer account without any fee.`
+        });
+      } else {
+        setEmailCheckResult({
+          isCorporate: false,
+          domain,
+          message: `Personal email detected. Registration fee is ₹${generalEmailPrice.toLocaleString()} one-time. Use your corporate work domain (@yourcompany.com) for 100% FREE registration!`
+        });
+      }
     } else {
       setEmailCheckResult({
         isCorporate: true,
@@ -234,7 +317,7 @@ export default function PricingPage() {
       category: 'digital',
       pricing: 'Point-wise price uses',
       desc: 'Algorithmic buyer-seller matchmaking and smart AI attendee recommendations.',
-      icon: Sparkles
+      icon: Zap
     },
     {
       id: 'sms_promotion',
@@ -440,7 +523,9 @@ export default function PricingPage() {
       items: [
         {
           label: 'Registration Fee',
-          free: 'Free for corporate / ₹1,499 general',
+          free: isGeneralFree
+            ? '100% Free (Corporate & General Email)'
+            : `Free for corporate / ₹${generalEmailPrice.toLocaleString()} general`,
           freeStatus: 'ok',
           starter: 'Included in subscription',
           starterStatus: 'ok',
@@ -604,7 +689,7 @@ export default function PricingPage() {
         {/* ========================================================= */}
         <section className="relative px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center pt-4 pb-12">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-amber-300 bg-amber-50 text-amber-900 text-xs font-bold uppercase tracking-wider mb-4 shadow-2xs">
-            <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+            <ShieldCheck className="h-3.5 w-3.5 text-amber-600" />
             <span>VisitExpo Official Organizer Ecosystem</span>
           </div>
 
@@ -669,24 +754,71 @@ export default function PricingPage() {
                 <div>
                   <h3 className="text-xl font-bold text-zinc-950">Free Organizer</h3>
                   <p className="text-xs text-zinc-500 mt-1 min-h-[32px]">
-                    Free for corporate email · Paid for general email 1499/-
+                    {isGeneralFree
+                      ? 'Free for corporate email · No charge for general email (₹0 Free)'
+                      : `Free for corporate email · Paid for general email ₹${generalEmailPrice.toLocaleString()}/-`}
                   </p>
                 </div>
 
                 {/* Price Display */}
                 <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2">
                   <div className="flex items-baseline justify-between">
-                    <span className="text-xs text-zinc-500 font-medium">Work Email:</span>
+                    <div>
+                      <span className="text-xs text-zinc-700 font-semibold block">Work / Corporate Email:</span>
+                      <span className="text-[10px] text-emerald-700 font-medium">Automatic Instant Activation</span>
+                    </div>
                     <span className="text-2xl font-black text-emerald-600 font-mono">₹0</span>
                   </div>
-                  <div className="flex items-baseline justify-between text-xs pt-1.5 border-t border-zinc-200">
-                    <span className="text-zinc-500 font-medium">General Email:</span>
-                    <span className="font-bold text-zinc-900 font-mono">₹1,499</span>
+                  <div className="flex items-baseline justify-between text-xs pt-2 border-t border-zinc-200">
+                    <div>
+                      <span className="text-zinc-700 font-semibold block">General / Personal Email:</span>
+                      <span className={`text-[10px] font-medium ${isGeneralFree ? 'text-emerald-700 font-semibold' : 'text-zinc-500'}`}>
+                        {isGeneralFree ? 'No Charge · Platform Offer' : 'One-Time Verification Fee'}
+                      </span>
+                    </div>
+                    <div>
+                      {isGeneralFree ? (
+                        <div className="flex items-baseline gap-1.5 justify-end">
+                          <span className="text-xs line-through text-zinc-400 font-mono">₹1,499</span>
+                          <span className="text-2xl font-black text-emerald-600 font-mono">₹0</span>
+                        </div>
+                      ) : (
+                        <span className="text-xl font-bold text-zinc-900 font-mono">₹{generalEmailPrice.toLocaleString()}</span>
+                      )}
+                    </div>
                   </div>
                   <p className="text-[10px] text-zinc-500 pt-1 leading-tight">
-                    One-time registration for personal domains (@gmail, etc).
+                    {isGeneralFree
+                      ? 'Special offer: Zero activation fee for personal domains (@gmail, @yahoo, etc). 100% Free!'
+                      : 'One-time activation for personal domains (@gmail, @yahoo, etc). Zero recurring subscription fees.'}
                   </p>
                 </div>
+
+                {/* Status Indicator if User Logged In */}
+                {user?.role === 'organizer' && (
+                  <div className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
+                    isUserCorporate || isUserPlanActive || isGeneralFree
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                      : 'bg-amber-50 border-amber-200 text-amber-900'
+                  }`}>
+                    {isUserCorporate || isUserPlanActive ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <span>Plan Active: {isUserCorporate ? 'Corporate Domain (₹0 Free)' : isGeneralFree ? 'Personal Email (No Charge ₹0)' : `Personal Email (₹${generalEmailPrice.toLocaleString()} Paid)`}</span>
+                      </>
+                    ) : isGeneralFree ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <span>Special Offer: No charge for general mail! Click below to activate free.</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                        <span>Payment Pending: Personal email requires ₹{generalEmailPrice.toLocaleString()} activation</span>
+                      </>
+                    )}
+                  </div>
+                )}
 
                 {/* Highlights */}
                 <div className="space-y-2.5 pt-2">
@@ -723,14 +855,70 @@ export default function PricingPage() {
               </div>
 
               <div className="pt-4 border-t border-zinc-200 space-y-2">
-                <button
-                  onClick={() => handleSelectPlan('free', 'Free Organizer')}
-                  className="w-full py-3 rounded-xl border border-zinc-200 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-xs font-bold transition-all cursor-pointer"
-                >
-                  Start Free with Corporate Email
-                </button>
+                {user?.role === 'organizer' ? (
+                  isUserCorporate || isUserPlanActive ? (
+                    <Link
+                      href="/dashboard"
+                      className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 shadow-xs"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span>Plan Active · Open Dashboard</span>
+                    </Link>
+                  ) : isGeneralFree ? (
+                    <button
+                      onClick={handleActivateGeneralPlan}
+                      disabled={isProcessingPayment}
+                      className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                    >
+                      {isProcessingPayment ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin text-white" />
+                          <span>Activating Plan...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="h-4 w-4" />
+                          <span>Activate Free Plan (₹0 No Charge)</span>
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setIsPayModalOpen(true)}
+                      className="w-full py-3 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-black text-xs font-extrabold transition-all text-center flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      <span>Pay ₹{generalEmailPrice.toLocaleString()} &amp; Activate Plan</span>
+                    </button>
+                  )
+                ) : user ? (
+                  <Link
+                    href="/login?role=organizer"
+                    className="w-full py-3 rounded-xl border border-zinc-300 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-xs font-bold transition-all text-center block"
+                  >
+                    Switch to Organizer Account
+                  </Link>
+                ) : (
+                  <Link
+                    href="/login?role=organizer&signup=true"
+                    className="w-full py-3 rounded-xl bg-zinc-900 hover:bg-black text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <span>Activate Free Organizer Plan</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                )}
                 <p className="text-[10px] text-center text-zinc-400">
-                  Zero credit card required for work domains
+                  {user?.role === 'organizer'
+                    ? isUserCorporate
+                      ? 'Complimentary lifetime access for corporate domain'
+                      : isUserPlanActive
+                      ? 'Plan is active'
+                      : isGeneralFree
+                      ? 'No charge for general mail · Instant 100% Free activation'
+                      : `One-time ₹${generalEmailPrice.toLocaleString()} activation fee required for personal email`
+                    : isGeneralFree
+                    ? '100% Free for all corporate & general email domains'
+                    : `Free for corporate email (@company.com) · ₹${generalEmailPrice.toLocaleString()} for personal domains`}
                 </p>
               </div>
             </div>
@@ -1363,6 +1551,117 @@ export default function PricingPage() {
           </div>
         </section>
       </main>
+
+      {/* ========================================================= */}
+      {/* FREE PLAN GENERAL EMAIL ACTIVATION PAYMENT MODAL (₹1,499) */}
+      {/* ========================================================= */}
+      {isPayModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="relative w-full max-w-md bg-white border border-zinc-200 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 animate-fade-in text-zinc-900">
+            <div className="flex items-start justify-between border-b border-zinc-200 pb-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                  Organizer Account Verification
+                </span>
+                <h3 className="text-lg font-bold text-zinc-950 mt-0.5">
+                  Activate Free Organizer Plan
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsPayModalOpen(false)}
+                className="p-1 rounded-xl text-zinc-400 hover:text-zinc-700 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className={`p-3.5 rounded-2xl border text-xs leading-relaxed ${
+              isGeneralFree
+                ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+                : 'bg-amber-50/70 border-amber-200 text-amber-900'
+            }`}>
+              {isGeneralFree ? (
+                <span>
+                  <strong>🎉 Special Platform Promotion:</strong> Verification fee is currently <strong>waived (₹0 Free)</strong> for <span className="font-bold underline">{user?.email || 'your email'}</span>. You can activate your organizer account instantly with zero charge!
+                </span>
+              ) : (
+                <span>
+                  <strong>Personal Email Detected:</strong> Your account is registered with <span className="font-bold underline">{user?.email || 'a personal email'}</span>. To unlock your organizer dashboard and prevent unverified listings, a one-time verification fee of <strong>₹{generalEmailPrice.toLocaleString()}</strong> applies.
+                </span>
+              )}
+            </div>
+
+            {/* Bill Summary */}
+            <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2.5 text-xs">
+              <div className="flex justify-between text-zinc-600">
+                <span>Free Organizer Plan (Lifetime)</span>
+                <span className="font-semibold text-emerald-600">Included</span>
+              </div>
+              <div className="flex justify-between text-zinc-600">
+                <span>Personal Email Verification Fee</span>
+                <span className="font-mono font-bold text-zinc-900">
+                  {isGeneralFree ? '₹0.00 (Waived)' : `₹${generalEmailPrice.toLocaleString()}.00`}
+                </span>
+              </div>
+              <div className="flex justify-between text-zinc-600">
+                <span>GST (18%)</span>
+                <span className="font-semibold text-zinc-500">
+                  {isGeneralFree ? '₹0.00' : 'Inclusive'}
+                </span>
+              </div>
+              <div className="border-t border-zinc-200 pt-2 flex justify-between items-baseline text-sm font-bold text-zinc-950">
+                <span>Total Amount Due</span>
+                <span className={`text-xl font-black font-mono ${isGeneralFree ? 'text-emerald-600' : 'text-zinc-950'}`}>
+                  ₹{isGeneralFree ? '0' : generalEmailPrice.toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 text-[11px] text-zinc-600">
+              <div className="flex items-center gap-1.5 font-semibold text-zinc-800">
+                <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                <span>Instant organizer dashboard activation {isGeneralFree ? 'immediately' : 'upon payment'}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                <span>Publish B2B/B2C expos &amp; claim up to 3 expos per day</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                <span>{isGeneralFree ? 'Zero hidden fees or surprise renewals' : 'GST tax invoice provided with payment receipt'}</span>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-zinc-200 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsPayModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-zinc-200 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isProcessingPayment}
+                onClick={handleActivateGeneralPlan}
+                className="px-6 py-2.5 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-black font-extrabold text-xs transition-all cursor-pointer flex items-center gap-2 shadow-sm disabled:opacity-50"
+              >
+                {isProcessingPayment ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin text-black" />
+                    <span>{isGeneralFree ? 'Activating Plan...' : 'Processing Payment...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="h-4 w-4 text-black" />
+                    <span>{isGeneralFree ? 'Activate Free (₹0) & Unlock Dashboard' : `Pay ₹${generalEmailPrice.toLocaleString()} & Unlock Dashboard`}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================= */}
       {/* INQUIRY / UPGRADE MODAL (WHITE CLEAN MODAL) */}
