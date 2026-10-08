@@ -18,6 +18,7 @@ import {
   Target,
   Mail,
   Ticket,
+  CreditCard,
   Settings,
   LogOut,
   Menu,
@@ -63,7 +64,10 @@ export default function DashboardLayout({ children }) {
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/login');
+      const storedUser = typeof window !== 'undefined' ? localStorage.getItem('visitexpo_user') : null;
+      if (!storedUser) {
+        router.push('/login');
+      }
     }
   }, [user, loading, router]);
 
@@ -201,6 +205,7 @@ export default function DashboardLayout({ children }) {
         { name: 'Marketing & Campaigns', href: '/campaigns', icon: Mail },
         { name: 'Exhibitor Discovery', href: '/campaigns/exhibitor-discovery', icon: Compass },
         { name: 'Ticketing', href: '/tickets', icon: Ticket },
+        { name: 'Plans & Pricing', href: '/pricing', icon: CreditCard, badge: 'Upgrade' },
         { name: 'Settings', href: '/settings', icon: Settings },
       ];
 

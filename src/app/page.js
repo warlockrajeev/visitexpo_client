@@ -2030,6 +2030,66 @@ export default function LandingPage() {
       </section>
 
       {/* ========================================================================= */}
+      {/* 7.5 ORGANIZER PRICING TEASER SECTION                                      */}
+      {/* ========================================================================= */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 my-16">
+        <div className="rounded-3xl border border-zinc-200 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black p-8 sm:p-12 text-white shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-[#FFCC00]/10 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="relative z-10 grid lg:grid-cols-12 gap-8 items-center">
+            <div className="lg:col-span-8 space-y-4">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-[#FFCC00]/20 text-[#FFCC00] border border-[#FFCC00]/30">
+                <Ticket className="h-3.5 w-3.5" />
+                Organizer Pricing &amp; Plans
+              </span>
+              <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white leading-tight">
+                Transparent Pricing Built to Scale Your Exhibitions
+              </h2>
+              <p className="text-xs sm:text-sm text-zinc-400 max-w-xl leading-relaxed">
+                Free for verified corporate domains, ₹14,999/Qtr for Starter operations, and enterprise packages with full CRM, API, and unlimited lead export.
+              </p>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                <div className="p-3 rounded-xl bg-zinc-800/60 border border-zinc-700/60">
+                  <span className="text-[10px] text-zinc-400 uppercase font-bold">Free Organizer</span>
+                  <div className="text-base font-extrabold text-white mt-0.5 font-mono">₹0 / ₹1,499</div>
+                  <span className="text-[10px] text-emerald-400">Corp Email Free</span>
+                </div>
+                <div className="p-3 rounded-xl bg-zinc-800/60 border border-zinc-700/60">
+                  <span className="text-[10px] text-zinc-400 uppercase font-bold">Starter Plan</span>
+                  <div className="text-base font-extrabold text-white mt-0.5 font-mono">₹14,999</div>
+                  <span className="text-[10px] text-[#FFCC00]">Per Quarter</span>
+                </div>
+                <div className="p-3 rounded-xl bg-zinc-800/60 border border-zinc-700/60">
+                  <span className="text-[10px] text-zinc-400 uppercase font-bold">Enterprise</span>
+                  <div className="text-base font-extrabold text-white mt-0.5 font-mono">₹89,999</div>
+                  <span className="text-[10px] text-indigo-400">Per Quarter</span>
+                </div>
+                <div className="p-3 rounded-xl bg-zinc-800/60 border border-zinc-700/60">
+                  <span className="text-[10px] text-zinc-400 uppercase font-bold">Growth Top-Ups</span>
+                  <div className="text-base font-extrabold text-white mt-0.5 font-mono">From ₹1k</div>
+                  <span className="text-[10px] text-emerald-400">13 Channels</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-4 flex flex-col items-start lg:items-end gap-3">
+              <Link
+                href="/pricing"
+                className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-[#FFCC00] hover:bg-[#FFCC00]/90 text-black font-extrabold text-xs transition-all shadow-lg text-center cursor-pointer inline-flex items-center justify-center gap-2"
+              >
+                <span>View Full Pricing &amp; Comparison</span>
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <span className="text-[11px] text-zinc-400">
+                Proposed Event Validation available at ₹4,999
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
       {/* 8. FOOTER COMPONENT                                                       */}
       {/* ========================================================================= */}
       <Suspense fallback={<SkeletonSection height="h-64" />}>

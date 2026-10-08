@@ -212,6 +212,12 @@ export default function Navbar({ solid = false }) {
       isAnchor: false
     },
     {
+      id: 'pricing',
+      label: 'Pricing Plans',
+      href: '/pricing',
+      isAnchor: false
+    },
+    {
       id: 'claim',
       label: 'Claim Listing',
       href: pathname === '/' ? '#claim' : '/#claim',
