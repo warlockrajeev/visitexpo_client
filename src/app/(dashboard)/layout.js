@@ -39,7 +39,8 @@ import {
   MessageSquare,
   Bookmark,
   Star,
-  Bell
+  Bell,
+  Zap
 } from 'lucide-react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
@@ -83,6 +84,40 @@ export default function DashboardLayout({ children }) {
       }
     }
   }, [user, loading, router]);
+
+  // Auto-sync organizer active plan from backend
+  useEffect(() => {
+    if (!user || user.role !== 'organizer') return;
+    let isMounted = true;
+    const syncOrganizerPlan = async () => {
+      try {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('visitexpo_token') : null;
+        if (!token) return;
+        const res = await axios.get(`${API_URL}/plans/my-plan`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (isMounted && res.data?.success && res.data.plan) {
+          const freshPlan = res.data.plan;
+          const freshActive = res.data.isPlanActive ?? true;
+          if (freshPlan !== user.plan || (freshActive && !user.isPlanActive)) {
+            if (updateUser) {
+              updateUser({
+                ...user,
+                plan: freshPlan,
+                isPlanActive: freshActive
+              });
+            }
+          }
+        }
+      } catch (e) {
+        // quiet fallback
+      }
+    };
+    syncOrganizerPlan();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, user?._id]);
 
   // Strict role-based route protection: prevent visitors and exhibitors in exhibitor view from accessing organizer features
   useEffect(() => {
@@ -463,7 +498,12 @@ export default function DashboardLayout({ children }) {
                   </>
                 ) : (
                   <>
-                    <Building className="h-3 w-3 text-primary" /> {user?.role || 'Organizer'}
+                    <span className="flex items-center gap-1">
+                      <Building className="h-3 w-3 text-primary" /> Organizer
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 font-extrabold uppercase text-[9px] border border-amber-500/30">
+                      {user?.plan || 'Free'}
+                    </span>
                   </>
                 )}
               </span>
@@ -505,6 +545,21 @@ export default function DashboardLayout({ children }) {
               <ArrowLeft className="h-3.5 w-3.5 text-primary" />
               <span>Explore Events</span>
             </Link>
+
+            {/* Active Plan Pill for Organizer */}
+            {user?.role === 'organizer' && !isExhibitorView && (
+              <Link
+                href="/pricing"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 text-xs font-bold text-amber-500 transition-all shadow-2xs cursor-pointer btn-press active:scale-95"
+                title="View active plan details and pricing"
+              >
+                <Zap className="h-3.5 w-3.5 text-amber-500" />
+                <span className="capitalize">{user?.plan ? `${user.plan} Plan` : 'Free Plan'}</span>
+                <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  Active
+                </span>
+              </Link>
+            )}
 
             {user?.role === 'visitor' ? (
               <Link

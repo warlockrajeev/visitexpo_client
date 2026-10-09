@@ -115,18 +115,28 @@ export default function PricingPage() {
         .then((res) => {
           if (res.data?.success) {
             setMyPlan(res.data);
+            if (updateUser && res.data.plan && (user.plan !== res.data.plan || !user.isPlanActive)) {
+              updateUser({
+                ...user,
+                plan: res.data.plan,
+                isPlanActive: res.data.isPlanActive,
+                planStatus: res.data.planStatus
+              });
+            }
           }
         })
         .catch(() => {});
     }
-  }, [user]);
+  }, [user, updateUser]);
 
+  const activePlanId = (myPlan?.subscription?.plan || myPlan?.plan || user?.plan || 'free').toLowerCase();
+  const isPlanActive = Boolean(myPlan?.isPlanActive ?? (user?.isPlanActive && user?.isVerified));
   const generalEmailPrice = myPlan?.generalEmailPrice ?? publicFreePlan?.pricing?.generalEmailPrice ?? 1499;
   const isGeneralFree = Number(generalEmailPrice) === 0;
 
   const isUserCorporate =
     myPlan?.isCorporate ?? (user?.emailType === 'corporate' || isCorporateEmail(user?.email));
-  const isUserPlanActive = myPlan?.isPlanActive ?? (user?.isPlanActive && user?.isVerified);
+  const isUserPlanActive = isPlanActive;
 
   // Handle Free Organizer General Email Activation payment (₹1,499)
   const handleActivateGeneralPlan = async () => {
@@ -740,6 +750,50 @@ export default function PricingPage() {
         {/* 4 CORE PRICING CARDS (PURE WHITE WITH CRISP BORDERS) */}
         {/* ========================================================= */}
         <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+          {/* Current Active Plan Status Banner for Logged-in Organizers */}
+          {user?.role === 'organizer' && (
+            <div className="mb-6 p-4 rounded-2xl border bg-gradient-to-r from-amber-500/10 via-primary/10 to-amber-500/10 border-primary/40 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+              <div className="flex items-center gap-3.5">
+                <div className="h-11 w-11 rounded-2xl bg-[#FFCC00] text-black font-extrabold flex items-center justify-center shrink-0 shadow-sm">
+                  <Award className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-zinc-600 font-medium">Your Active Plan:</span>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#FFCC00] text-black uppercase tracking-wider">
+                      {activePlanId === 'starter'
+                        ? 'Organizer Starter'
+                        : activePlanId === 'enterprise'
+                        ? 'Organizer Enterprise'
+                        : activePlanId === 'growth'
+                        ? 'Organizer Growth'
+                        : 'Free Organizer'}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      ✓ Active
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Signed in as <strong>{user?.email}</strong> •{' '}
+                    {activePlanId === 'starter'
+                      ? 'Ticket monetization unlocked · Full unmasked leads enabled · Operational CRM active'
+                      : activePlanId === 'enterprise'
+                      ? 'Enterprise scale unlocked · Unlimited CRM & API exports · Dedicated VIP account director'
+                      : 'Free organizer tier active · Upgrade below to unlock full ticketing & unmasked leads.'}
+                  </p>
+                </div>
+              </div>
+
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-bold transition-all shrink-0 shadow-sm"
+              >
+                <span>Go to Dashboard</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          )}
+
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 items-stretch">
             {/* ---------------- CARD 1: FREE ORGANIZER ---------------- */}
             <div className="rounded-3xl border border-zinc-200 bg-white p-6 sm:p-7 shadow-sm hover:border-zinc-300 hover:shadow-md transition-all flex flex-col justify-between space-y-6">
@@ -796,28 +850,35 @@ export default function PricingPage() {
 
                 {/* Status Indicator if User Logged In */}
                 {user?.role === 'organizer' && (
-                  <div className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
-                    isUserCorporate || isUserPlanActive || isGeneralFree
-                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                      : 'bg-amber-50 border-amber-200 text-amber-900'
-                  }`}>
-                    {isUserCorporate || isUserPlanActive ? (
-                      <>
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                        <span>Plan Active: {isUserCorporate ? 'Corporate Domain (₹0 Free)' : isGeneralFree ? 'Personal Email (No Charge ₹0)' : `Personal Email (₹${generalEmailPrice.toLocaleString()} Paid)`}</span>
-                      </>
-                    ) : isGeneralFree ? (
-                      <>
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                        <span>Special Offer: No charge for general mail! Click below to activate free.</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
-                        <span>Payment Pending: Personal email requires ₹{generalEmailPrice.toLocaleString()} activation</span>
-                      </>
-                    )}
-                  </div>
+                  activePlanId === 'free' ? (
+                    <div className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
+                      isUserCorporate || isPlanActive || isGeneralFree
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                        : 'bg-amber-50 border-amber-200 text-amber-900'
+                    }`}>
+                      {isUserCorporate || isPlanActive ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                          <span>Plan Active: {isUserCorporate ? 'Corporate Domain (₹0 Free)' : isGeneralFree ? 'Personal Email (No Charge ₹0)' : `Personal Email (₹${generalEmailPrice.toLocaleString()} Paid)`}</span>
+                        </>
+                      ) : isGeneralFree ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                          <span>Special Offer: No charge for general mail! Click below to activate free.</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                          <span>Payment Pending: Personal email requires ₹${generalEmailPrice.toLocaleString()} activation</span>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl border bg-zinc-50 border-zinc-200 text-zinc-600 text-xs font-semibold flex items-center gap-2">
+                      <Check className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span>Included in your {activePlanId.toUpperCase()} plan</span>
+                    </div>
+                  )
                 )}
 
                 {/* Highlights */}
@@ -856,40 +917,49 @@ export default function PricingPage() {
 
               <div className="pt-4 border-t border-zinc-200 space-y-2">
                 {user?.role === 'organizer' ? (
-                  isUserCorporate || isUserPlanActive ? (
+                  activePlanId === 'free' ? (
+                    isUserCorporate || isPlanActive ? (
+                      <Link
+                        href="/dashboard"
+                        className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 shadow-xs"
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span>Plan Active · Open Dashboard</span>
+                      </Link>
+                    ) : isGeneralFree ? (
+                      <button
+                        onClick={handleActivateGeneralPlan}
+                        disabled={isProcessingPayment}
+                        className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                      >
+                        {isProcessingPayment ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin text-white" />
+                            <span>Activating Plan...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="h-4 w-4" />
+                            <span>Activate Free Plan (₹0 No Charge)</span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setIsPayModalOpen(true)}
+                        className="w-full py-3 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-black text-xs font-extrabold transition-all text-center flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                      >
+                        <CreditCard className="h-4 w-4" />
+                        <span>Pay ₹{generalEmailPrice.toLocaleString()} &amp; Activate Plan</span>
+                      </button>
+                    )
+                  ) : (
                     <Link
                       href="/dashboard"
-                      className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 shadow-xs"
+                      className="w-full py-3 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 text-xs font-bold transition-all text-center block"
                     >
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span>Plan Active · Open Dashboard</span>
+                      Included in Your {activePlanId.toUpperCase()} Plan
                     </Link>
-                  ) : isGeneralFree ? (
-                    <button
-                      onClick={handleActivateGeneralPlan}
-                      disabled={isProcessingPayment}
-                      className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
-                    >
-                      {isProcessingPayment ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin text-white" />
-                          <span>Activating Plan...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="h-4 w-4" />
-                          <span>Activate Free Plan (₹0 No Charge)</span>
-                        </>
-                      )}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setIsPayModalOpen(true)}
-                      className="w-full py-3 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-black text-xs font-extrabold transition-all text-center flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
-                    >
-                      <CreditCard className="h-4 w-4" />
-                      <span>Pay ₹{generalEmailPrice.toLocaleString()} &amp; Activate Plan</span>
-                    </button>
                   )
                 ) : user ? (
                   <Link
@@ -909,13 +979,15 @@ export default function PricingPage() {
                 )}
                 <p className="text-[10px] text-center text-zinc-400">
                   {user?.role === 'organizer'
-                    ? isUserCorporate
-                      ? 'Complimentary lifetime access for corporate domain'
-                      : isUserPlanActive
-                      ? 'Plan is active'
-                      : isGeneralFree
-                      ? 'No charge for general mail · Instant 100% Free activation'
-                      : `One-time ₹${generalEmailPrice.toLocaleString()} activation fee required for personal email`
+                    ? activePlanId === 'free'
+                      ? isUserCorporate
+                        ? 'Complimentary lifetime access for corporate domain'
+                        : isPlanActive
+                        ? 'Plan is active'
+                        : isGeneralFree
+                        ? 'No charge for general mail · Instant 100% Free activation'
+                        : `One-time ₹${generalEmailPrice.toLocaleString()} activation fee required for personal email`
+                      : `Included in your active ${activePlanId.toUpperCase()} subscription`
                     : isGeneralFree
                     ? '100% Free for all corporate & general email domains'
                     : `Free for corporate email (@company.com) · ₹${generalEmailPrice.toLocaleString()} for personal domains`}
@@ -963,6 +1035,14 @@ export default function PricingPage() {
                   </p>
                 </div>
 
+                {/* Active Plan Indicator for Starter */}
+                {user?.role === 'organizer' && activePlanId === 'starter' && (
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span>✓ Current Active Plan · Starter Tier Activated</span>
+                  </div>
+                )}
+
                 {/* Highlights */}
                 <div className="space-y-2.5 pt-2">
                   <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">
@@ -1002,15 +1082,34 @@ export default function PricingPage() {
               </div>
 
               <div className="pt-4 border-t border-zinc-200 space-y-2">
-                <button
-                  onClick={() => handleSelectPlan('starter', 'Organizer Starter')}
-                  className="w-full py-3 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-black text-xs font-extrabold transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <span>Choose Starter Plan</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
+                {user?.role === 'organizer' && activePlanId === 'starter' ? (
+                  <Link
+                    href="/dashboard"
+                    className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Plan Active · Open Dashboard</span>
+                  </Link>
+                ) : user?.role === 'organizer' && (activePlanId === 'enterprise' || activePlanId === 'growth') ? (
+                  <button
+                    disabled
+                    className="w-full py-3 rounded-xl bg-zinc-100 text-zinc-400 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed"
+                  >
+                    <span>Included in your higher plan</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleSelectPlan('starter', 'Organizer Starter')}
+                    className="w-full py-3 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-black text-xs font-extrabold transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <span>Choose Starter Plan</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                )}
                 <p className="text-[10px] text-center text-zinc-400">
-                  Instant activation &amp; payment gateway unlock
+                  {user?.role === 'organizer' && activePlanId === 'starter'
+                    ? 'All Starter lead CRM & ticket capabilities are unlocked'
+                    : 'Instant activation & payment gateway unlock'}
                 </p>
               </div>
             </div>
@@ -1048,6 +1147,14 @@ export default function PricingPage() {
                       : 'Billed every 3 months (₹89,999 / Qtr)'}
                   </p>
                 </div>
+
+                {/* Active Plan Indicator for Enterprise */}
+                {user?.role === 'organizer' && activePlanId === 'enterprise' && (
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span>✓ Current Active Plan · Enterprise Tier Activated</span>
+                  </div>
+                )}
 
                 {/* Highlights */}
                 <div className="space-y-2.5 pt-2">
@@ -1088,13 +1195,23 @@ export default function PricingPage() {
               </div>
 
               <div className="pt-4 border-t border-zinc-200 space-y-2">
-                <button
-                  onClick={() => handleSelectPlan('enterprise', 'Organizer Enterprise')}
-                  className="w-full py-3 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <span>Choose Enterprise Plan</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
+                {user?.role === 'organizer' && activePlanId === 'enterprise' ? (
+                  <Link
+                    href="/dashboard"
+                    className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Plan Active · Open Dashboard</span>
+                  </Link>
+                ) : (
+                  <button
+                    onClick={() => handleSelectPlan('enterprise', 'Organizer Enterprise')}
+                    className="w-full py-3 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <span>Choose Enterprise Plan</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                )}
                 <p className="text-[10px] text-center text-zinc-400">
                   Custom billing &amp; GST tax invoices supported
                 </p>

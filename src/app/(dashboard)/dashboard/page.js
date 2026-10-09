@@ -47,7 +47,14 @@ import {
   Bell,
   Bookmark,
   X,
-  MessageSquare
+  MessageSquare,
+  Zap,
+  Award,
+  CreditCard,
+  Sparkles,
+  Check,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -72,8 +79,9 @@ const API_URL =
 
 
 export function OrganizerDashboardInner() {
-  const { user, accessToken } = useAuth();
+  const { user, accessToken, updateUser } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [myPlan, setMyPlan] = useState(null);
   const [dashboardStats, setDashboardStats] = useState({
     totalEvents: 0,
     totalVisitors: 0,
@@ -87,6 +95,8 @@ export function OrganizerDashboardInner() {
   const [engagements, setEngagements] = useState([]);
   const [loadingEngagements, setLoadingEngagements] = useState(true);
   const [engagementSearch, setEngagementSearch] = useState('');
+  const [engagementPage, setEngagementPage] = useState(1);
+  const [engagementPageSize, setEngagementPageSize] = useState(10);
 
   useEffect(() => {
     if (!user) return;
@@ -123,14 +133,31 @@ export function OrganizerDashboardInner() {
           ? `${API_URL}/events?limit=5`
           : `${API_URL}/events?organizerId=${orgId || userId}&limit=5`;
 
-        const [eventsRes, visitorsRes, exhibitorsRes, leadsRes] = await Promise.allSettled([
+        const [eventsRes, visitorsRes, exhibitorsRes, leadsRes, planRes] = await Promise.allSettled([
           axios.get(eventsUrl, { headers }),
           axios.get(`${API_URL}/visitors?limit=20`, { headers }),
           axios.get(`${API_URL}/exhibitors?limit=1`, { headers }),
-          axios.get(`${API_URL}/leads?limit=20`, { headers })
+          axios.get(`${API_URL}/leads?limit=20`, { headers }),
+          axios.get(`${API_URL}/plans/my-plan`, { headers })
         ]);
 
         if (!isMounted) return;
+
+        if (planRes.status === 'fulfilled' && planRes.value.data?.success) {
+          const planData = planRes.value.data;
+          setMyPlan(planData);
+          if (updateUser && planData.plan) {
+            const freshPlan = planData.plan;
+            const freshActive = planData.isPlanActive ?? true;
+            if (freshPlan !== user.plan || (freshActive && !user.isPlanActive)) {
+              updateUser({
+                ...user,
+                plan: freshPlan,
+                isPlanActive: freshActive
+              });
+            }
+          }
+        }
 
         const eventData = eventsRes.status === 'fulfilled' && eventsRes.value.data.success ? eventsRes.value.data.data : {};
         const visitorData = visitorsRes.status === 'fulfilled' && visitorsRes.value.data.success ? visitorsRes.value.data.data : {};
@@ -334,15 +361,87 @@ export function OrganizerDashboardInner() {
     ].some((value) => String(value || '').toLowerCase().includes(engagementQuery));
   });
 
+  const totalEngagementPages = Math.max(1, Math.ceil(filteredEngagements.length / engagementPageSize));
+  const safeEngagementPage = Math.min(Math.max(1, engagementPage), totalEngagementPages);
+  const paginatedEngagements = filteredEngagements.slice(
+    (safeEngagementPage - 1) * engagementPageSize,
+    safeEngagementPage * engagementPageSize
+  );
+
+  const activePlanId = (myPlan?.subscription?.plan || myPlan?.plan || user?.plan || 'free').toLowerCase();
+
+  const planConfig = {
+    starter: {
+      name: 'Organizer Starter',
+      tier: 'Validated Operations Tier',
+      badge: 'Starter Plan · Active',
+      color: 'text-amber-500',
+      border: 'border-amber-500/40',
+      bg: 'bg-amber-500/10 text-amber-500 border-amber-500/30',
+      tagColor: 'text-amber-500',
+      description: 'Detailed unmasked lead contacts, operational Lead CRM, and paid ticketing enabled.',
+      nextTier: 'Organizer Enterprise'
+    },
+    enterprise: {
+      name: 'Organizer Enterprise',
+      tier: 'Enterprise Scale Tier',
+      badge: 'Enterprise Plan · Active',
+      color: 'text-indigo-400',
+      border: 'border-indigo-500/40',
+      bg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
+      tagColor: 'text-indigo-400',
+      description: 'Full REST API keys for ERP/CRM, unlimited lead export, and dedicated VIP support.',
+      nextTier: null
+    },
+    growth: {
+      name: 'Organizer Growth',
+      tier: 'Marketing & Top-Up Tier',
+      badge: 'Growth Plan · Active',
+      color: 'text-emerald-400',
+      border: 'border-emerald-500/40',
+      bg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+      tagColor: 'text-emerald-400',
+      description: 'On-demand promotional points, WhatsApp blasts, and search spotlight #1 priority.',
+      nextTier: 'Organizer Enterprise'
+    },
+    free: {
+      name: 'Free Organizer Plan',
+      tier: 'Standard Discovery Tier',
+      badge: 'Free Plan · Active',
+      color: 'text-blue-400',
+      border: 'border-blue-500/40',
+      bg: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+      tagColor: 'text-blue-400',
+      description: 'Expo claiming, event publishing, and masked inquiry volume intelligence.',
+      nextTier: 'Organizer Starter'
+    }
+  };
+
+  const currentPlan = planConfig[activePlanId] || planConfig.free;
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Top Banner Header */}
       <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
             <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-500 uppercase tracking-wider bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
               <Activity className="h-3.5 w-3.5" /> Sync Active
             </span>
+            <Link
+              href="/pricing"
+              className={`inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border transition-all ${
+                activePlanId === 'starter'
+                  ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25'
+                  : activePlanId === 'enterprise'
+                  ? 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30 hover:bg-indigo-500/25'
+                  : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+              }`}
+              title="Click to view subscription and upgrade options"
+            >
+              <Zap className="h-3.5 w-3.5" />
+              <span>Active Plan: {currentPlan.name}</span>
+            </Link>
           </div>
           <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
             Welcome back, {user?.name || 'Organizer'}!
@@ -375,12 +474,22 @@ export function OrganizerDashboardInner() {
             <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
             <h3 className="text-sm font-bold text-foreground">Organizer Operations &amp; Profile Hub</h3>
           </div>
-          <span className="text-[11px] text-muted-foreground">
-            Signed in as <strong className="text-foreground">{user?.email}</strong> • Organizer Portal
-          </span>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            <span>
+              Signed in as <strong className="text-foreground">{user?.email}</strong>
+            </span>
+            <span>•</span>
+            <span className="inline-flex items-center gap-1 text-emerald-500 font-bold">
+              <CheckCircle2 className="h-3.5 w-3.5" /> {currentPlan.name} (Active)
+            </span>
+            <span>•</span>
+            <Link href="/pricing" className="text-primary hover:underline font-bold">
+              Manage / Upgrade &rarr;
+            </Link>
+          </div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Organizer Setup Card */}
           <div className="rounded-xl border border-border bg-background/50 p-4 flex flex-col justify-between hover:border-amber-400/60 transition-all space-y-3">
             <div className="space-y-2">
@@ -443,6 +552,40 @@ export function OrganizerDashboardInner() {
                 className="text-xs font-bold text-emerald-500 hover:text-emerald-400 hover:underline inline-flex items-center gap-1"
               >
                 <span>Claim Existing Event</span> &rarr;
+              </Link>
+            </div>
+          </div>
+
+          {/* Active Plan & Subscription Hub Card */}
+          <div className={`rounded-xl border ${currentPlan.border} bg-gradient-to-br from-amber-500/5 via-background/60 to-background p-4 flex flex-col justify-between hover:border-amber-400 transition-all space-y-3 shadow-xs`}>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className={`flex items-center gap-1.5 ${currentPlan.color} text-xs font-bold`}>
+                  <Zap className="h-4 w-4" />
+                  <span>Current Subscription</span>
+                </div>
+                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                  Active
+                </span>
+              </div>
+              <div>
+                <h4 className="text-xs font-extrabold text-foreground">
+                  {currentPlan.name}
+                </h4>
+                <span className={`text-[10px] ${currentPlan.tagColor} font-semibold block`}>
+                  {currentPlan.tier}
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                {currentPlan.description}
+              </p>
+            </div>
+            <div className="pt-2 flex items-center justify-between border-t border-border/50">
+              <Link
+                href="/pricing"
+                className="text-xs font-bold text-amber-500 hover:text-amber-400 hover:underline inline-flex items-center gap-1"
+              >
+                <span>{currentPlan.nextTier ? `Upgrade to ${currentPlan.nextTier.replace('Organizer ', '')}` : 'View Subscription'}</span> &rarr;
               </Link>
             </div>
           </div>
@@ -639,7 +782,10 @@ export function OrganizerDashboardInner() {
               <input
                 type="search"
                 value={engagementSearch}
-                onChange={(e) => setEngagementSearch(e.target.value)}
+                onChange={(e) => {
+                  setEngagementSearch(e.target.value);
+                  setEngagementPage(1);
+                }}
                 placeholder="Search delegates or events..."
                 aria-label="Search event engagements"
                 className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -647,9 +793,12 @@ export function OrganizerDashboardInner() {
               {engagementSearch && (
                 <button
                   type="button"
-                  onClick={() => setEngagementSearch('')}
+                  onClick={() => {
+                    setEngagementSearch('');
+                    setEngagementPage(1);
+                  }}
                   aria-label="Clear engagement search"
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -681,8 +830,8 @@ export function OrganizerDashboardInner() {
                     <span className="text-xs font-semibold">Loading delegate insights...</span>
                   </td>
                 </tr>
-              ) : filteredEngagements.length > 0 ? (
-                filteredEngagements.map((eng) => (
+              ) : paginatedEngagements.length > 0 ? (
+                paginatedEngagements.map((eng) => (
                   <tr key={eng._id} className="hover:bg-muted/10 transition-colors">
                     <td className="p-3">
                       <div className="flex items-center gap-2.5">
@@ -752,6 +901,107 @@ export function OrganizerDashboardInner() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {!loadingEngagements && filteredEngagements.length > 0 && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-border/60 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <span>
+                Showing <strong className="text-foreground">{Math.min((safeEngagementPage - 1) * engagementPageSize + 1, filteredEngagements.length)}</strong>–<strong className="text-foreground">{Math.min(safeEngagementPage * engagementPageSize, filteredEngagements.length)}</strong> of <strong className="text-foreground">{filteredEngagements.length}</strong> delegates
+                {filteredEngagements.length !== engagements.length && (
+                  <span className="ml-1 text-[11px] text-muted-foreground/80">
+                    (filtered from {engagements.length})
+                  </span>
+                )}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2">
+                <span>Rows per page:</span>
+                <select
+                  value={engagementPageSize}
+                  onChange={(e) => {
+                    setEngagementPageSize(Number(e.target.value));
+                    setEngagementPage(1);
+                  }}
+                  className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                  aria-label="Rows per page"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </label>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setEngagementPage((p) => Math.max(1, p - 1))}
+                  disabled={safeEngagementPage <= 1}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-border bg-background hover:bg-secondary disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold text-foreground transition-all cursor-pointer"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Prev</span>
+                </button>
+
+                <div className="flex items-center gap-1 px-1">
+                  {Array.from({ length: totalEngagementPages }, (_, i) => i + 1)
+                    .filter((p) => {
+                      if (totalEngagementPages <= 5) return true;
+                      if (p === 1 || p === totalEngagementPages) return true;
+                      return Math.abs(p - safeEngagementPage) <= 1;
+                    })
+                    .reduce((acc, p, idx, arr) => {
+                      if (idx > 0 && p - arr[idx - 1] > 1) {
+                        acc.push(-idx);
+                      }
+                      acc.push(p);
+                      return acc;
+                    }, [])
+                    .map((item) => {
+                      if (item < 0) {
+                        return (
+                          <span key={`ellipsis-${item}`} className="px-1 text-muted-foreground">
+                            …
+                          </span>
+                        );
+                      }
+                      const p = item;
+                      const isActive = p === safeEngagementPage;
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setEngagementPage(p)}
+                          className={`h-7 w-7 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${
+                            isActive
+                              ? 'bg-primary text-primary-foreground shadow-sm'
+                              : 'border border-border bg-background hover:bg-secondary text-foreground'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      );
+                    })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setEngagementPage((p) => Math.min(totalEngagementPages, p + 1))}
+                  disabled={safeEngagementPage >= totalEngagementPages}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-border bg-background hover:bg-secondary disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold text-foreground transition-all cursor-pointer"
+                  aria-label="Next page"
+                >
+                  <span className="hidden sm:inline">Next</span>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
