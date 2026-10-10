@@ -128,13 +128,6 @@ export default function OrganizerChatPage() {
     } catch (_) {}
   }, []);
 
-  // Sync current note when active conversation changes
-  useEffect(() => {
-    if (activeConversation?._id) {
-      setCurrentNote(internalNotes[activeConversation._id] || '');
-    }
-  }, [activeConversation?._id, internalNotes]);
-
   // Redirect visitors and exhibitors to Organizers directory & live chat
   useEffect(() => {
     if (user && (user.role === 'visitor' || user.role === 'exhibitor' || isExhibitorView)) {
@@ -183,6 +176,15 @@ export default function OrganizerChatPage() {
   useEffect(() => {
     activeConversationRef.current = activeConversation;
   }, [activeConversation]);
+
+  // Sync current note when active conversation changes
+  useEffect(() => {
+    if (activeConversation?._id) {
+      setCurrentNote(internalNotes[activeConversation._id] || '');
+    } else {
+      setCurrentNote('');
+    }
+  }, [activeConversation?._id, internalNotes]);
 
   // Quick reply snippets
   const quickReplies = [
