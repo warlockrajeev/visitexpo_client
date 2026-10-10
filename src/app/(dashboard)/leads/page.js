@@ -129,12 +129,13 @@ export default function LeadsCRMPage() {
   // Tab State: 'all' | 'high_intent' | 'verified_delegates' | 'stall_inquiries'
   const [activeTab, setActiveTab] = useState('all');
 
-  // Search & Filter State
-  const [searchField, setSearchField] = useState('all'); // 'all' | 'name' | 'email' | 'company' | 'phone'
+  // Search & Filter State (Basic for Starter, Advanced Multi-Filter for Enterprise)
+  const [searchField, setSearchField] = useState('all'); // 'all' | 'name' | 'email' | 'company' | 'phone' | 'designation'
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'new' | 'contacted' | 'qualified' | 'proposal' | 'won' | 'lost'
   const [sourceFilter, setSourceFilter] = useState('all'); // 'all' | 'event_click' | 'interested' | 'follower' | 'inquiry' | ...
   const [dateFilter, setDateFilter] = useState('');
+  const [intentScoreFilter, setIntentScoreFilter] = useState('all'); // 'all' | 'hot' (>=70) | 'warm' (40-69) | 'cold' (<40)
 
   // Selection state for batch operations
   const [selectedLeadIds, setSelectedLeadIds] = useState(new Set());
@@ -363,12 +364,12 @@ export default function LeadsCRMPage() {
         if (!isStall) return false;
       }
 
-      // 2. Source Filter
-      if (sourceFilter !== 'all' && item.source !== sourceFilter) {
+      // 2. Source Filter (Enterprise exclusive)
+      if (isEnterprisePlan && sourceFilter !== 'all' && item.source !== sourceFilter) {
         return false;
       }
 
-      // 3. Status Filter
+      // 3. Status Filter (Basic supports 'new' and 'contacted'; Enterprise supports all)
       if (statusFilter !== 'all' && item.status !== statusFilter) {
         return false;
       }
@@ -376,16 +377,18 @@ export default function LeadsCRMPage() {
       // 4. Search Filter
       if (searchTerm.trim()) {
         const query = searchTerm.toLowerCase().trim();
-        if (searchField === 'name') {
+        if (isEnterprisePlan && searchField === 'name') {
           if (!item.name?.toLowerCase().includes(query)) return false;
-        } else if (searchField === 'email') {
+        } else if (isEnterprisePlan && searchField === 'email') {
           if (!item.email?.toLowerCase().includes(query)) return false;
-        } else if (searchField === 'company') {
+        } else if (isEnterprisePlan && searchField === 'company') {
           if (!item.company?.toLowerCase().includes(query)) return false;
-        } else if (searchField === 'phone') {
+        } else if (isEnterprisePlan && searchField === 'phone') {
           if (!item.phone?.toLowerCase().includes(query)) return false;
+        } else if (isEnterprisePlan && searchField === 'designation') {
+          if (!item.designation?.toLowerCase().includes(query)) return false;
         } else {
-          // 'all' fields
+          // 'all' / Basic search across all core contact fields
           const matchAll =
             item.name?.toLowerCase().includes(query) ||
             item.email?.toLowerCase().includes(query) ||
@@ -397,15 +400,23 @@ export default function LeadsCRMPage() {
         }
       }
 
-      // 5. Date Filter
-      if (dateFilter) {
+      // 5. Date Filter (Enterprise exclusive)
+      if (isEnterprisePlan && dateFilter) {
         const itemDate = new Date(item.createdAt).toISOString().split('T')[0];
         if (itemDate !== dateFilter) return false;
       }
 
+      // 6. Intent Score Filter (Enterprise exclusive)
+      if (isEnterprisePlan && intentScoreFilter !== 'all') {
+        const score = item.leadScore || 0;
+        if (intentScoreFilter === 'hot' && score < 70) return false;
+        if (intentScoreFilter === 'warm' && (score < 40 || score >= 70)) return false;
+        if (intentScoreFilter === 'cold' && score >= 40) return false;
+      }
+
       return true;
     });
-  }, [leads, activeTab, sourceFilter, statusFilter, searchTerm, searchField, dateFilter]);
+  }, [leads, activeTab, sourceFilter, statusFilter, searchTerm, searchField, dateFilter, intentScoreFilter, isEnterprisePlan]);
 
   // Tab counts for badges
   const tabCounts = useMemo(() => {
@@ -457,6 +468,22 @@ export default function LeadsCRMPage() {
     setSelectedLeadIds(nextSet);
   };
 
+  // Show Upgrade modal when Starter users click advanced filters
+  const showAdvancedFilterUpgradeModal = (featureName = 'Advanced Multi-Filter') => {
+    showSweetAlert({
+      title: 'Enterprise Plan Exclusive',
+      text: `${featureName} is available exclusively on the Enterprise Plan. Starter Plan includes basic search & standard status filters. Upgrade to Enterprise to unlock multi-dimensional filters, 10+ acquisition sources, buyer intent score tiers, and exact date ranges.`,
+      icon: 'info',
+      confirmButtonText: 'Upgrade to Enterprise',
+      showCancelButton: true,
+      cancelButtonText: 'Continue on Starter'
+    }).then((res) => {
+      if (res?.isConfirmed) {
+        window.location.href = '/pricing';
+      }
+    });
+  };
+
   // Reset all filters
   const handleResetFilters = () => {
     setSearchField('all');
@@ -464,6 +491,7 @@ export default function LeadsCRMPage() {
     setStatusFilter('all');
     setSourceFilter('all');
     setDateFilter('');
+    setIntentScoreFilter('all');
     setActiveTab('all');
     setSelectedLeadIds(new Set());
   };
@@ -1287,10 +1315,11 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
   // Filter active state for dynamic Reset button styling and contextual feedback
   const hasActiveFilters = Boolean(
     searchTerm.trim() ||
-    searchField !== 'all' ||
+    (isEnterprisePlan && searchField !== 'all') ||
     statusFilter !== 'all' ||
-    sourceFilter !== 'all' ||
-    dateFilter ||
+    (isEnterprisePlan && sourceFilter !== 'all') ||
+    (isEnterprisePlan && dateFilter) ||
+    (isEnterprisePlan && intentScoreFilter !== 'all') ||
     activeTab !== 'all'
   );
 
@@ -1424,7 +1453,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
       <div className="flex flex-col gap-3 border-b border-border/80 pb-3">
         {/* Left: Categorized Intent Navigation Tabs */}
         <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5 max-w-full">
-          {/* Tab 1: All Inquiries */}
+          {/* Tab 1: All Inquiries (Basic & Advanced) */}
           <button
             onClick={() => setActiveTab('all')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
@@ -1448,15 +1477,27 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
 
           {/* Tab 2: High-Intent Buyers */}
           <button
-            onClick={() => setActiveTab('high_intent')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
+            onClick={() => {
+              if (isEnterprisePlan) {
+                setActiveTab('high_intent');
+              } else {
+                showAdvancedFilterUpgradeModal('High-Intent Buyer Scoring Filter');
+              }
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
               activeTab === 'high_intent'
                 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shadow-xs'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent'
             }`}
           >
-            <Flame className="h-3.5 w-3.5" />
+            <Flame className="h-3.5 w-3.5 text-emerald-500" />
             <span>High-Intent Buyers</span>
+            {!isEnterprisePlan && (
+              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                <Crown className="h-2.5 w-2.5 text-amber-500" />
+                Enterprise
+              </span>
+            )}
             <span
               className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
                 activeTab === 'high_intent'
@@ -1470,15 +1511,27 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
 
           {/* Tab 3: Event Clicks & Views */}
           <button
-            onClick={() => setActiveTab('event_clicks')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
+            onClick={() => {
+              if (isEnterprisePlan) {
+                setActiveTab('event_clicks');
+              } else {
+                showAdvancedFilterUpgradeModal('Event Clicks & Traffic Source Analytics Filter');
+              }
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
               activeTab === 'event_clicks'
                 ? 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400 border border-cyan-500/30 shadow-xs'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent'
             }`}
           >
             <Eye className="h-3.5 w-3.5 text-cyan-500" />
-            <span>Event Clicks & Views</span>
+            <span>Event Clicks &amp; Views</span>
+            {!isEnterprisePlan && (
+              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                <Crown className="h-2.5 w-2.5 text-amber-500" />
+                Enterprise
+              </span>
+            )}
             <span
               className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
                 activeTab === 'event_clicks'
@@ -1490,17 +1543,29 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
             </span>
           </button>
 
-          {/* Tab 3: Verified Delegates */}
+          {/* Tab 4: Verified Delegates */}
           <button
-            onClick={() => setActiveTab('verified_delegates')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
+            onClick={() => {
+              if (isEnterprisePlan) {
+                setActiveTab('verified_delegates');
+              } else {
+                showAdvancedFilterUpgradeModal('Verified Delegate Classification Filter');
+              }
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
               activeTab === 'verified_delegates'
                 ? 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30 shadow-xs'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent'
             }`}
           >
-            <Users className="h-3.5 w-3.5" />
+            <Users className="h-3.5 w-3.5 text-sky-500" />
             <span>Verified Delegates</span>
+            {!isEnterprisePlan && (
+              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                <Crown className="h-2.5 w-2.5 text-amber-500" />
+                Enterprise
+              </span>
+            )}
             <span
               className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
                 activeTab === 'verified_delegates'
@@ -1512,20 +1577,33 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
             </span>
           </button>
 
-          {/* Tab 4: Stall Inquiries with "New" Tag */}
+          {/* Tab 5: Stall Inquiries */}
           <button
-            onClick={() => setActiveTab('stall_inquiries')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
+            onClick={() => {
+              if (isEnterprisePlan) {
+                setActiveTab('stall_inquiries');
+              } else {
+                showAdvancedFilterUpgradeModal('Stall & Exhibitor Inquiries Filter');
+              }
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
               activeTab === 'stall_inquiries'
                 ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 shadow-xs'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent'
             }`}
           >
-            <Building2 className="h-3.5 w-3.5" />
+            <Building2 className="h-3.5 w-3.5 text-rose-500" />
             <span>Stall Inquiries</span>
-            <span className="text-[9px] font-extrabold uppercase px-1 py-0.2 rounded bg-rose-500 text-white leading-tight">
-              New
-            </span>
+            {!isEnterprisePlan ? (
+              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                <Crown className="h-2.5 w-2.5 text-amber-500" />
+                Enterprise
+              </span>
+            ) : (
+              <span className="text-[9px] font-extrabold uppercase px-1 py-0.2 rounded bg-rose-500 text-white leading-tight">
+                New
+              </span>
+            )}
             <span
               className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
                 activeTab === 'stall_inquiries'
@@ -1608,105 +1686,342 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
         </div>
       </div>
 
-      {/* 3. FILTER & SEARCH TOOLBAR */}
+      {/* 3. FILTER & SEARCH TOOLBAR (Basic for Starter Plan, Advanced Multi-Filter for Enterprise Plan) */}
       <div className="rounded-xl border border-border bg-card p-3 shadow-xs space-y-2.5">
-        <div className="flex flex-col 2xl:flex-row items-stretch 2xl:items-center justify-between gap-2.5">
-          {/* Search by dropdown + Search input combo */}
-          <div className="flex items-center flex-1 min-w-0 w-full 2xl:max-w-md">
-            <div className="relative shrink-0">
-              <select
-                value={searchField}
-                onChange={(e) => setSearchField(e.target.value)}
-                className="appearance-none bg-muted/60 hover:bg-muted/80 text-foreground text-xs font-semibold pl-3 pr-7 py-2 rounded-l-lg border border-r-0 border-border focus:outline-none cursor-pointer h-9 transition-colors"
-              >
-                <option value="all">Search All</option>
-                <option value="name">Buyer Name</option>
-                <option value="email">Work Email</option>
-                <option value="company">Organization</option>
-                <option value="phone">Phone Number</option>
-              </select>
-              <ChevronDown className="h-3 w-3 text-muted-foreground absolute right-2.5 top-3 pointer-events-none" />
+        {/* Tier Indicator Header */}
+        {isEnterprisePlan ? (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-1 border-b border-border/50">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs font-bold shadow-2xs">
+                <Crown className="h-3.5 w-3.5 text-amber-500 fill-amber-500/20" />
+                Enterprise Advanced Multi-Filter Suite
+              </span>
+              <span className="text-[11px] text-muted-foreground hidden lg:inline">
+                Field targeting • 10+ sources • Pipeline stages • Date picker • Intent score tiers
+              </span>
             </div>
-
-            <div className="relative flex-1 min-w-0">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder={
-                  searchField === 'name'
-                    ? 'Search by buyer name...'
-                    : searchField === 'email'
-                    ? 'Search by email address...'
-                    : searchField === 'company'
-                    ? 'Search by organization name...'
-                    : searchField === 'phone'
-                    ? 'Search by phone number...'
-                    : 'Search by name, email, company, phone...'
-                }
-                className="w-full bg-background text-foreground text-xs h-9 py-2 pl-3 pr-8 rounded-r-lg border border-border focus:outline-none focus:ring-1 focus:ring-primary focus:border-transparent placeholder:text-muted-foreground"
-              />
-              {searchTerm ? (
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-2.5 top-2.5 p-0.5 text-muted-foreground hover:text-foreground cursor-pointer rounded transition-colors"
-                  title="Clear search"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              ) : (
-                <div className="absolute right-2.5 top-2.5 text-muted-foreground pointer-events-none">
-                  <Search className="h-3.5 w-3.5" />
-                </div>
-              )}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                <Zap className="h-3 w-3" /> Real-time Lead Scoring Active
+              </span>
             </div>
           </div>
-
-          {/* Filters dropdowns and reset */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full 2xl:w-auto shrink-0">
-            {/* Event Edition Selector */}
-            <div className="w-full sm:w-[220px] md:w-[260px] shrink-0">
-              <SearchableSelect
-                options={[
-                  ...(events.length > 1 ? [{ value: 'all', label: 'All My Expo Editions' }] : []),
-                  ...events.map((evt) => ({
-                    value: evt._id,
-                    label: evt.title
-                  }))
-                ]}
-                value={selectedEventId}
-                onChange={(val) => setSelectedEventId(val)}
-                placeholder={events.length === 0 ? 'No Active Editions' : 'Select Edition...'}
-                searchPlaceholder="Search editions..."
-                className="h-9 py-1 text-xs font-medium"
-              />
+        ) : (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-1 border-b border-border/50">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-muted text-foreground border border-border text-xs font-semibold shadow-2xs">
+                <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                Basic Search &amp; Filters (Starter Plan)
+              </span>
+              <span className="text-[11px] text-muted-foreground hidden lg:inline">
+                Unified buyer search across name, email &amp; company • Standard status filter
+              </span>
             </div>
+            <button
+              type="button"
+              onClick={() => showAdvancedFilterUpgradeModal('Enterprise Multi-Filter Suite')}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/35 transition-all cursor-pointer btn-press active:scale-95 shrink-0"
+              title="Upgrade to unlock field-targeted search, 10+ sources, date filters & intent score tiers"
+            >
+              <Crown className="h-3.5 w-3.5 text-amber-500" />
+              <span>Unlock Advanced Multi-Filter</span>
+              <ArrowRight className="h-3 w-3 ml-0.5" />
+            </button>
+          </div>
+        )}
 
-            {/* Status & Date Filter Group (2 cols on mobile, inline on sm+) */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:flex sm:items-center shrink-0">
-              {/* Source Dropdown */}
-              <div className="relative w-full sm:w-[145px] shrink-0">
-                <select
-                  value={sourceFilter}
-                  onChange={(e) => setSourceFilter(e.target.value)}
-                  className="w-full h-9 appearance-none rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground pr-8 focus:outline-none focus:ring-1 focus:ring-primary font-medium cursor-pointer"
-                >
-                  <option value="all">All Sources</option>
-                  <option value="event_click">Event Clicks & Views</option>
-                  <option value="interested">Marked Interested</option>
-                  <option value="follower">Followed Expo</option>
-                  <option value="inquiry">Direct Inquiries</option>
-                  <option value="ticket_checkout">Ticket Checkout</option>
-                  <option value="visitor_pass">Visitor Pass Badges</option>
-                  <option value="walk_in">On-site Walk-In</option>
-                  <option value="bulk_upload">CSV / Bulk Import</option>
-                  <option value="website">Website Form</option>
-                </select>
-                <ChevronDown className="h-3 w-3 text-muted-foreground absolute right-2.5 top-3 pointer-events-none" />
+        {/* Controls Layout */}
+        {isEnterprisePlan ? (
+          /* ENTERPRISE PLAN ADVANCED CONTROLS */
+          <div className="space-y-2.5">
+            <div className="flex flex-col 2xl:flex-row items-stretch 2xl:items-center justify-between gap-2.5">
+              {/* Field-targeted search combo */}
+              <div className="flex items-center flex-1 min-w-0 w-full 2xl:max-w-md">
+                <div className="relative shrink-0">
+                  <select
+                    value={searchField}
+                    onChange={(e) => setSearchField(e.target.value)}
+                    className="appearance-none bg-muted/60 hover:bg-muted/80 text-foreground text-xs font-semibold pl-3 pr-7 py-2 rounded-l-lg border border-r-0 border-border focus:outline-none cursor-pointer h-9 transition-colors"
+                  >
+                    <option value="all">Search All Fields</option>
+                    <option value="name">Buyer Name</option>
+                    <option value="email">Work Email</option>
+                    <option value="company">Organization</option>
+                    <option value="phone">Phone Number</option>
+                    <option value="designation">Designation / Role</option>
+                  </select>
+                  <ChevronDown className="h-3 w-3 text-muted-foreground absolute right-2.5 top-3 pointer-events-none" />
+                </div>
+
+                <div className="relative flex-1 min-w-0">
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder={
+                      searchField === 'name'
+                        ? 'Search by buyer name...'
+                        : searchField === 'email'
+                        ? 'Search by work email...'
+                        : searchField === 'company'
+                        ? 'Search by organization name...'
+                        : searchField === 'phone'
+                        ? 'Search by phone number...'
+                        : searchField === 'designation'
+                        ? 'Search by designation or role...'
+                        : 'Search by name, email, company, phone...'
+                    }
+                    className="w-full bg-background text-foreground text-xs h-9 py-2 pl-3 pr-8 rounded-r-lg border border-border focus:outline-none focus:ring-1 focus:ring-primary focus:border-transparent placeholder:text-muted-foreground"
+                  />
+                  {searchTerm ? (
+                    <button
+                      type="button"
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-2.5 top-2.5 p-0.5 text-muted-foreground hover:text-foreground cursor-pointer rounded transition-colors"
+                      title="Clear search"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  ) : (
+                    <div className="absolute right-2.5 top-2.5 text-muted-foreground pointer-events-none">
+                      <Search className="h-3.5 w-3.5" />
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Status Dropdown */}
+              {/* Filters dropdowns & reset */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full 2xl:w-auto shrink-0 flex-wrap">
+                {/* Event Edition Selector */}
+                <div className="w-full sm:w-[200px] md:w-[230px] shrink-0">
+                  <SearchableSelect
+                    options={[
+                      ...(events.length > 1 ? [{ value: 'all', label: 'All My Expo Editions' }] : []),
+                      ...events.map((evt) => ({
+                        value: evt._id,
+                        label: evt.title
+                      }))
+                    ]}
+                    value={selectedEventId}
+                    onChange={(val) => setSelectedEventId(val)}
+                    placeholder={events.length === 0 ? 'No Active Editions' : 'Select Edition...'}
+                    searchPlaceholder="Search editions..."
+                    className="h-9 py-1 text-xs font-medium"
+                  />
+                </div>
+
+                {/* Source Dropdown */}
+                <div className="relative w-full sm:w-[135px] shrink-0">
+                  <select
+                    value={sourceFilter}
+                    onChange={(e) => setSourceFilter(e.target.value)}
+                    className="w-full h-9 appearance-none rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground pr-8 focus:outline-none focus:ring-1 focus:ring-primary font-medium cursor-pointer"
+                  >
+                    <option value="all">All Sources</option>
+                    <option value="event_click">Event Clicks & Views</option>
+                    <option value="interested">Marked Interested</option>
+                    <option value="follower">Followed Expo</option>
+                    <option value="inquiry">Direct Inquiries</option>
+                    <option value="ticket_checkout">Ticket Checkout</option>
+                    <option value="visitor_pass">Visitor Pass Badges</option>
+                    <option value="walk_in">On-site Walk-In</option>
+                    <option value="bulk_upload">CSV / Bulk Import</option>
+                    <option value="website">Website Form</option>
+                  </select>
+                  <ChevronDown className="h-3 w-3 text-muted-foreground absolute right-2.5 top-3 pointer-events-none" />
+                </div>
+
+                {/* Status Dropdown */}
+                <div className="relative w-full sm:w-[125px] shrink-0">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="w-full h-9 appearance-none rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground pr-8 focus:outline-none focus:ring-1 focus:ring-primary font-medium cursor-pointer"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="new">New Inflow</option>
+                    <option value="contacted">Contacted</option>
+                    <option value="qualified">Qualified</option>
+                    <option value="proposal">Proposal Sent</option>
+                    <option value="won">Deal Won</option>
+                    <option value="lost">Closed Lost</option>
+                  </select>
+                  <ChevronDown className="h-3 w-3 text-muted-foreground absolute right-2.5 top-3 pointer-events-none" />
+                </div>
+
+                {/* Date Filter */}
+                <div className="relative w-full sm:w-[130px] shrink-0">
+                  <input
+                    type="date"
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    className="w-full h-9 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary dark:[color-scheme:dark] cursor-pointer"
+                    title="Filter by Registration Date"
+                  />
+                </div>
+
+                {/* Intent Score Tier Dropdown */}
+                <div className="relative w-full sm:w-[140px] shrink-0">
+                  <select
+                    value={intentScoreFilter}
+                    onChange={(e) => setIntentScoreFilter(e.target.value)}
+                    className="w-full h-9 appearance-none rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground pr-8 focus:outline-none focus:ring-1 focus:ring-primary font-medium cursor-pointer"
+                  >
+                    <option value="all">All Scores</option>
+                    <option value="hot">🔥 Hot (70+)</option>
+                    <option value="warm">⚡ Warm (40-69)</option>
+                    <option value="cold">❄️ Cold (&lt;40)</option>
+                  </select>
+                  <ChevronDown className="h-3 w-3 text-muted-foreground absolute right-2 top-3 pointer-events-none" />
+                </div>
+
+                {/* Reset Button */}
+                <button
+                  onClick={handleResetFilters}
+                  className={`inline-flex items-center justify-center gap-1.5 h-9 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
+                    hasActiveFilters
+                      ? 'text-amber-600 dark:text-amber-400 hover:text-amber-700 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30'
+                      : 'text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/70 border border-border/60'
+                  }`}
+                  title="Reset all filters and search"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>Reset</span>
+                  {hasActiveFilters && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Presets Pills (Enterprise) */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-border/40 text-xs">
+              <span className="text-[11px] font-semibold text-muted-foreground mr-1 flex items-center gap-1">
+                <SlidersHorizontal className="h-3 w-3" /> Quick Presets:
+              </span>
+              <button
+                type="button"
+                onClick={() => setIntentScoreFilter(intentScoreFilter === 'hot' ? 'all' : 'hot')}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
+                  intentScoreFilter === 'hot'
+                    ? 'bg-amber-500 text-white shadow-xs font-semibold'
+                    : 'bg-muted/60 hover:bg-muted text-foreground border border-border/70'
+                }`}
+              >
+                <Flame className="h-3 w-3 text-amber-500" />
+                <span>🔥 Hot Buyers (70+)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter(statusFilter === 'new' ? 'all' : 'new')}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
+                  statusFilter === 'new'
+                    ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                    : 'bg-muted/60 hover:bg-muted text-foreground border border-border/70'
+                }`}
+              >
+                <Mail className="h-3 w-3 text-blue-500" />
+                <span>📩 Uncontacted (New)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter(statusFilter === 'qualified' ? 'all' : 'qualified')}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
+                  statusFilter === 'qualified'
+                    ? 'bg-purple-600 text-white shadow-xs font-semibold'
+                    : 'bg-muted/60 hover:bg-muted text-foreground border border-border/70'
+                }`}
+              >
+                <CheckCircle2 className="h-3 w-3 text-purple-500" />
+                <span>⚡ Qualified Leads</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSourceFilter(sourceFilter === 'inquiry' ? 'all' : 'inquiry')}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
+                  sourceFilter === 'inquiry'
+                    ? 'bg-rose-600 text-white shadow-xs font-semibold'
+                    : 'bg-muted/60 hover:bg-muted text-foreground border border-border/70'
+                }`}
+              >
+                <Building2 className="h-3 w-3 text-rose-500" />
+                <span>🏢 Stall Inquiries</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSourceFilter(sourceFilter === 'event_click' ? 'all' : 'event_click')}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
+                  sourceFilter === 'event_click'
+                    ? 'bg-cyan-600 text-white shadow-xs font-semibold'
+                    : 'bg-muted/60 hover:bg-muted text-foreground border border-border/70'
+                }`}
+              >
+                <Eye className="h-3 w-3 text-cyan-500" />
+                <span>👁️ Event Clicks</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* STARTER PLAN BASIC CONTROLS */
+          <div className="flex flex-col 2xl:flex-row items-stretch 2xl:items-center justify-between gap-2.5">
+            {/* Unified Basic Search bar */}
+            <div className="flex items-center flex-1 min-w-0 w-full 2xl:max-w-md">
+              <button
+                type="button"
+                onClick={() => showAdvancedFilterUpgradeModal('Targeted Field Search')}
+                className="appearance-none bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-medium px-3 py-2 rounded-l-lg border border-r-0 border-border cursor-pointer h-9 transition-colors flex items-center gap-1.5 shrink-0"
+                title="Targeted search by specific field (e.g. Email only, Organization only) is an Enterprise feature"
+              >
+                <span>Search All</span>
+                <Lock className="h-3 w-3 text-amber-500" />
+              </button>
+
+              <div className="relative flex-1 min-w-0">
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search attendee name, email, company, or phone..."
+                  className="w-full bg-background text-foreground text-xs h-9 py-2 pl-3 pr-8 rounded-r-lg border border-border focus:outline-none focus:ring-1 focus:ring-primary focus:border-transparent placeholder:text-muted-foreground"
+                />
+                {searchTerm ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2.5 top-2.5 p-0.5 text-muted-foreground hover:text-foreground cursor-pointer rounded transition-colors"
+                    title="Clear search"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                ) : (
+                  <div className="absolute right-2.5 top-2.5 text-muted-foreground pointer-events-none">
+                    <Search className="h-3.5 w-3.5" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Filters dropdowns and reset */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full 2xl:w-auto shrink-0 flex-wrap">
+              {/* Event Edition Selector */}
+              <div className="w-full sm:w-[220px] md:w-[260px] shrink-0">
+                <SearchableSelect
+                  options={[
+                    ...(events.length > 1 ? [{ value: 'all', label: 'All My Expo Editions' }] : []),
+                    ...events.map((evt) => ({
+                      value: evt._id,
+                      label: evt.title
+                    }))
+                  ]}
+                  value={selectedEventId}
+                  onChange={(val) => setSelectedEventId(val)}
+                  placeholder={events.length === 0 ? 'No Active Editions' : 'Select Edition...'}
+                  searchPlaceholder="Search editions..."
+                  className="h-9 py-1 text-xs font-medium"
+                />
+              </div>
+
+              {/* Status Dropdown (Basic) */}
               <div className="relative w-full sm:w-[130px] shrink-0">
                 <select
                   value={statusFilter}
@@ -1716,44 +2031,72 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                   <option value="all">All Status</option>
                   <option value="new">New Inflow</option>
                   <option value="contacted">Contacted</option>
-                  <option value="qualified">Qualified</option>
-                  <option value="proposal">Proposal Sent</option>
-                  <option value="won">Deal Won</option>
-                  <option value="lost">Closed Lost</option>
                 </select>
                 <ChevronDown className="h-3 w-3 text-muted-foreground absolute right-2.5 top-3 pointer-events-none" />
               </div>
 
-              {/* Date Filter */}
-              <div className="relative w-full sm:w-[135px] shrink-0">
-                <input
-                  type="date"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                  className="w-full h-9 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary dark:[color-scheme:dark] cursor-pointer"
-                  title="Filter by Registration Date"
-                />
-              </div>
-            </div>
+              {/* Locked Sources Button */}
+              <button
+                type="button"
+                onClick={() => showAdvancedFilterUpgradeModal('Acquisition Sources Filter')}
+                className="w-full sm:w-[125px] h-9 inline-flex items-center justify-between px-2.5 py-1.5 rounded-lg border border-dashed border-border hover:border-amber-500/40 bg-muted/30 hover:bg-muted/60 text-xs text-muted-foreground hover:text-foreground font-medium transition-all cursor-pointer group shrink-0"
+                title="Filter by 10+ acquisition sources (Passes, Clicks, Forms, etc.) is exclusive to Enterprise Plan"
+              >
+                <span className="truncate">All Sources</span>
+                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 group-hover:bg-amber-500/25">
+                  <Crown className="h-2.5 w-2.5 text-amber-500" /> Enterprise
+                </span>
+              </button>
 
-            {/* Reset Button */}
-            <button
-              onClick={handleResetFilters}
-              className={`inline-flex items-center justify-center gap-1.5 h-9 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
-                hasActiveFilters
-                  ? 'text-amber-600 dark:text-amber-400 hover:text-amber-700 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30'
-                  : 'text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/70 border border-border/60'
-              }`}
-              title="Reset all filters and search"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span>Reset</span>
-              {hasActiveFilters && (
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-              )}
-            </button>
+              {/* Locked Date Picker Button */}
+              <button
+                type="button"
+                onClick={() => showAdvancedFilterUpgradeModal('Date Range Filter')}
+                className="w-full sm:w-[105px] h-9 inline-flex items-center justify-between px-2.5 py-1.5 rounded-lg border border-dashed border-border hover:border-amber-500/40 bg-muted/30 hover:bg-muted/60 text-xs text-muted-foreground hover:text-foreground font-medium transition-all cursor-pointer group shrink-0"
+                title="Filter by exact registration date is exclusive to Enterprise Plan"
+              >
+                <span className="truncate flex items-center gap-1">
+                  <Calendar className="h-3 w-3 text-muted-foreground" /> Date
+                </span>
+                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 group-hover:bg-amber-500/25">
+                  <Lock className="h-2.5 w-2.5 text-amber-500" />
+                </span>
+              </button>
+
+              {/* Locked Intent Score Button */}
+              <button
+                type="button"
+                onClick={() => showAdvancedFilterUpgradeModal('Buyer Intent Score Tiers')}
+                className="w-full sm:w-[120px] h-9 inline-flex items-center justify-between px-2.5 py-1.5 rounded-lg border border-dashed border-border hover:border-amber-500/40 bg-muted/30 hover:bg-muted/60 text-xs text-muted-foreground hover:text-foreground font-medium transition-all cursor-pointer group shrink-0"
+                title="Filter by AI buyer intent score (Hot 70+, Warm 40-69) is exclusive to Enterprise Plan"
+              >
+                <span className="truncate flex items-center gap-1">
+                  <Flame className="h-3 w-3 text-muted-foreground" /> Intent
+                </span>
+                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 group-hover:bg-amber-500/25">
+                  <Crown className="h-2.5 w-2.5 text-amber-500" />
+                </span>
+              </button>
+
+              {/* Reset Button */}
+              <button
+                onClick={handleResetFilters}
+                className={`inline-flex items-center justify-center gap-1.5 h-9 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
+                  hasActiveFilters
+                    ? 'text-amber-600 dark:text-amber-400 hover:text-amber-700 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30'
+                    : 'text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/70 border border-border/60'
+                }`}
+                title="Reset basic search and status"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Reset</span>
+                {hasActiveFilters && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                )}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* 4. CONTEXT / SUMMARY BAR */}

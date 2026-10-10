@@ -622,7 +622,7 @@ export function OrganizerDashboardInner() {
               </div>
               <h2 className="text-2xl md:text-3xl font-black tracking-tight text-foreground flex items-center gap-2">
                 Welcome back, {user?.name || 'Organizer'}!
-                <span className="text-amber-400">👑</span>
+                <span className="text-amber-400"></span>
               </h2>
               <p className="text-xs text-muted-foreground mt-1 max-w-2xl leading-relaxed">
                 Enterprise Command Center: Unlimited lead intelligence, advance exhibitor management, unmasked CRM contacts, and top directory spotlight visibility are active.

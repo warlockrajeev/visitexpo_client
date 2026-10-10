@@ -445,7 +445,7 @@ export default function PricingPage() {
           label: 'Lead Search & Filtering',
           free: 'Basic',
           freeStatus: 'limited',
-          starter: 'Ok',
+          starter: 'Basic',
           starterStatus: 'ok',
           enterprise: 'Advanced Multi-Filter',
           enterpriseStatus: 'adv'
