@@ -53,7 +53,7 @@ export default function OrganizerChatWidget({
   const [isChatEnabled, setIsChatEnabled] = useState(false);
   const [organizerInfo, setOrganizerInfo] = useState(null);
   const [welcomeMessage, setWelcomeMessage] = useState(
-    'Hello! Welcome to our exhibition desk. How can we assist you today?'
+    'Connect directly with our exhibition desk team. Leave your message below and we will assist you.'
   );
 
   const handleOpen = () => {

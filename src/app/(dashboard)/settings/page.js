@@ -49,8 +49,10 @@ import {
   Clock,
   Smartphone,
   ExternalLink,
-  RefreshCw
+  RefreshCw,
+  Crown
 } from 'lucide-react';
+import Link from 'next/link';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -68,6 +70,7 @@ export default function SettingsPage() {
   const isSuperAdmin = user?.role === 'super_admin';
   const rawPlan = (user?.plan || 'free').toLowerCase();
   const isFreePlan = !isSuperAdmin && (rawPlan === 'free' || !rawPlan);
+  const isEnterprisePlan = isSuperAdmin || (user?.isPlanActive !== false && ['enterprise', 'growth'].includes(rawPlan));
 
   const [activeTab, setActiveTab] = useState('profile'); // profile, security
   const [saveSuccess, setSaveSuccess] = useState('');
@@ -112,8 +115,20 @@ export default function SettingsPage() {
     }
     setSavingChat(true);
     try {
-      await axios.patch(`${API_URL}/chat/settings`, chatSettings, { withCredentials: true });
-      setSaveSuccess('Live Chat settings updated successfully!');
+      const payload = {
+        isChatEnabled: chatSettings.isChatEnabled,
+        chatStatus: chatSettings.chatStatus
+      };
+      if (isEnterprisePlan) {
+        payload.chatWelcomeMessage = chatSettings.chatWelcomeMessage;
+        payload.chatAutoReply = chatSettings.chatAutoReply;
+      }
+      await axios.patch(`${API_URL}/chat/settings`, payload, { withCredentials: true });
+      setSaveSuccess(
+        isEnterprisePlan
+          ? 'Live Chat settings and custom greeting updated successfully!'
+          : 'Live Chat availability settings updated successfully!'
+      );
       setTimeout(() => setSaveSuccess(''), 4000);
     } catch (err) {
       setErrorMessage(err.response?.data?.message || 'Failed to update live chat settings.');
@@ -1665,41 +1680,69 @@ export default function SettingsPage() {
 
                   {chatSettings.isChatEnabled && (
                     <div className="space-y-3 pt-2 border-t border-border/50">
-                      <div>
-                        <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">
-                          Custom Welcome Greeting Message
-                        </label>
-                        <textarea
-                          rows={2}
-                          value={chatSettings.chatWelcomeMessage}
-                          onChange={(e) =>
-                            setChatSettings((prev) => ({ ...prev, chatWelcomeMessage: e.target.value }))
-                          }
-                          placeholder="Type your greeting message..."
-                          className="w-full rounded-xl border border-border bg-background p-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                        />
-                      </div>
+                      {isEnterprisePlan ? (
+                        <>
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="block text-xs font-bold text-muted-foreground uppercase">
+                                Custom Welcome Greeting Message
+                              </label>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                                <Crown className="h-2.5 w-2.5" />
+                                Enterprise Active
+                              </span>
+                            </div>
+                            <textarea
+                              rows={2}
+                              value={chatSettings.chatWelcomeMessage}
+                              onChange={(e) =>
+                                setChatSettings((prev) => ({ ...prev, chatWelcomeMessage: e.target.value }))
+                              }
+                              placeholder="Type your greeting message..."
+                              className="w-full rounded-xl border border-border bg-background p-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                            />
+                          </div>
 
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-foreground">
-                          Send greeting automatically on first message
-                        </span>
-                        <input
-                          type="checkbox"
-                          checked={chatSettings.chatAutoReply}
-                          onChange={(e) =>
-                            setChatSettings((prev) => ({ ...prev, chatAutoReply: e.target.checked }))
-                          }
-                          className="h-4 w-4 rounded border-border text-primary"
-                        />
-                      </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-foreground">
+                              Send greeting automatically on first message
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={chatSettings.chatAutoReply}
+                              onChange={(e) =>
+                                setChatSettings((prev) => ({ ...prev, chatAutoReply: e.target.checked }))
+                              }
+                              className="h-4 w-4 rounded border-border text-primary cursor-pointer"
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-amber-500 flex items-center gap-1.5">
+                              <Crown className="h-3.5 w-3.5" />
+                              Auto Welcome Message — Enterprise Exclusive
+                            </span>
+                            <Link
+                              href="/pricing"
+                              className="text-[11px] font-bold text-primary hover:underline"
+                            >
+                              Upgrade to Enterprise &rarr;
+                            </Link>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground leading-relaxed">
+                            Configuring custom welcome messages and automatic greetings is exclusive to the <strong className="text-foreground">Enterprise Plan</strong>. On the Starter Plan, live attendee conversations occur via direct manual messaging.
+                          </p>
+                        </div>
+                      )}
 
                       <div className="pt-1">
                         <button
                           type="button"
                           onClick={handleSaveChatSettings}
                           disabled={savingChat}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all shadow-xs"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all shadow-xs cursor-pointer"
                         >
                           {savingChat ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                           Update Live Chat Settings

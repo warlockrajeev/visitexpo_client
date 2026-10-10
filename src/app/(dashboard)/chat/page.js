@@ -361,19 +361,28 @@ export default function OrganizerChatPage() {
     e.preventDefault();
     setIsSavingSettings(true);
     try {
+      const payload = {
+        isChatEnabled,
+        chatStatus
+      };
+      if (isEnterprisePlan) {
+        payload.chatWelcomeMessage = welcomeMessage;
+        payload.chatAutoReply = chatAutoReply;
+      }
+
       const res = await axios.patch(
         `${API_URL}/chat/settings`,
-        {
-          isChatEnabled,
-          chatStatus,
-          chatWelcomeMessage: welcomeMessage,
-          chatAutoReply
-        },
+        payload,
         { withCredentials: true }
       );
 
       if (res.data?.success) {
-        showSweetSuccess('Settings Saved', 'Your chat greeting and preferences have been updated.');
+        showSweetSuccess(
+          'Settings Saved',
+          isEnterprisePlan
+            ? 'Your chat greeting and preferences have been updated.'
+            : 'Your live chat availability status has been updated.'
+        );
         setShowSettingsModal(false);
       }
     } catch (err) {
@@ -909,7 +918,7 @@ export default function OrganizerChatPage() {
                 <ul className="space-y-2 text-xs text-foreground/90">
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
-                    <span><strong>Live Chat Desk Active:</strong> 1-on-1 direct messaging with visitors &amp; exhibitors</span>
+                    <span><strong>1-on-1 Live Chat Desk:</strong> Real-time manual messaging with attendees (Auto-welcome greetings reserved for Enterprise)</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
@@ -921,15 +930,7 @@ export default function OrganizerChatPage() {
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
-                    <span><strong>Standard Live Chat Desk:</strong> 1-on-1 direct messaging (Normal Level)</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
                     <span><strong>Standard Quick Replies:</strong> 5 built-in canned responses &amp; notifications</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
-                    <span><strong>Full Unmasked Leads:</strong> Visitor, exhibitor &amp; vendor contacts unlocked</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
@@ -990,6 +991,10 @@ export default function OrganizerChatPage() {
                   What&apos;s Included:
                 </span>
                 <ul className="space-y-2 text-xs text-foreground/90">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
+                    <span><strong>Automated Welcome Message:</strong> Instant custom greeting auto-dispatched to new visitors</span>
+                  </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
                     <span><strong>AI Chat Co-Pilot:</strong> Automated smart reply generation &amp; intent analysis</span>
@@ -2325,7 +2330,7 @@ export default function OrganizerChatPage() {
                   onClick={() => setShowSettingsModal(true)}
                   className="px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground border border-border text-xs font-semibold cursor-pointer"
                 >
-                  Configure Welcome Message
+                  {isEnterprisePlan ? 'Configure Welcome Message' : 'Live Chat Availability'}
                 </button>
               </div>
             </div>
@@ -2428,38 +2433,70 @@ export default function OrganizerChatPage() {
                 </div>
               </div>
 
-              {/* Automated Welcome Message */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground">
-                  Custom Welcome Greeting Message
-                </label>
-                <textarea
-                  rows={3}
-                  value={welcomeMessage}
-                  onChange={(e) => setWelcomeMessage(e.target.value)}
-                  placeholder="Type the message attendees see immediately upon opening chat..."
-                  className="w-full p-3 bg-secondary/50 border border-border rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-                <p className="text-[10px] text-muted-foreground">
-                  This greeting automatically greets visitors & exhibitors as soon as they open the chat drawer.
-                </p>
-              </div>
+              {/* Automated Welcome Message - ENTERPRISE ONLY */}
+              {isEnterprisePlan ? (
+                <>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-foreground">
+                        Custom Welcome Greeting Message
+                      </label>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                        <Crown className="h-2.5 w-2.5" />
+                        Enterprise Active
+                      </span>
+                    </div>
+                    <textarea
+                      rows={3}
+                      value={welcomeMessage}
+                      onChange={(e) => setWelcomeMessage(e.target.value)}
+                      placeholder="Type the message attendees see immediately upon opening chat..."
+                      className="w-full p-3 bg-secondary/50 border border-border rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      This greeting is automatically dispatched to visitors &amp; exhibitors as soon as a new chat thread is initiated.
+                    </p>
+                  </div>
 
-              {/* Auto Reply Toggle */}
-              <div className="flex items-center justify-between pt-1">
-                <div>
-                  <h4 className="text-xs font-bold text-foreground">Instant Welcome Auto-Reply</h4>
-                  <p className="text-[10px] text-muted-foreground">
-                    Automatically send the greeting message when a new conversation starts.
+                  {/* Auto Reply Toggle */}
+                  <div className="flex items-center justify-between pt-1">
+                    <div>
+                      <h4 className="text-xs font-bold text-foreground">Instant Welcome Auto-Reply</h4>
+                      <p className="text-[10px] text-muted-foreground">
+                        Automatically dispatch the greeting message when a new conversation starts.
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={chatAutoReply}
+                      onChange={(e) => setChatAutoReply(e.target.checked)}
+                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20 cursor-pointer"
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-500 flex items-center gap-1.5">
+                      <Crown className="h-3.5 w-3.5" />
+                      Automated Welcome Message — Enterprise Only
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowSettingsModal(false);
+                        router.push('/pricing');
+                      }}
+                      className="text-[11px] font-bold text-primary hover:underline cursor-pointer"
+                    >
+                      Upgrade &rarr;
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Automated welcome greetings and instant bot auto-replies are exclusive to the <strong className="text-foreground">Enterprise Plan</strong>. On the Starter Plan, you can manually chat 1-on-1 with attendees in real-time.
                   </p>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={chatAutoReply}
-                  onChange={(e) => setChatAutoReply(e.target.checked)}
-                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20 cursor-pointer"
-                />
-              </div>
+              )}
 
               {/* Actions */}
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">

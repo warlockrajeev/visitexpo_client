@@ -1006,7 +1006,7 @@ export default function OrganizersDirectoryPage() {
                     </div>
                     <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
                       {activeChatOrganizer.chatWelcomeMessage ||
-                        'Hello! Welcome to our exhibition desk. How can we assist you today?'}
+                        `Welcome to ${activeChatOrganizer.name}'s exhibition desk. Leave your message below to connect directly with our team.`}
                     </p>
                   </div>
 
