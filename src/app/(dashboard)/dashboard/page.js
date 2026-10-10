@@ -617,7 +617,7 @@ export function OrganizerDashboardInner() {
                   <Activity className="h-3.5 w-3.5" /> Live Sync &amp; Webhooks Active
                 </span>
                 <span className="hidden lg:inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground bg-muted/40 px-2.5 py-1 rounded-full border border-border">
-                  <Award className="h-3.5 w-3.5 text-amber-400" /> Dedicated Desk: Rajesh Sharma (+91 93236 77688)
+                  <Award className="h-3.5 w-3.5 text-amber-400" /> Dedicated Enterprise Concierge Desk Active
                 </span>
               </div>
               <h2 className="text-2xl md:text-3xl font-black tracking-tight text-foreground flex items-center gap-2">
@@ -1772,7 +1772,7 @@ export function OrganizerDashboardInner() {
             {/* Modal Actions */}
             <div className="pt-2 flex items-center justify-between border-t border-border">
               <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                Need custom IP whitelisting? Contact your Dedicated Account Manager.
+                Need custom IP whitelisting? Contact <a href="mailto:support@visitexpo.in" className="text-primary underline">support@visitexpo.in</a>.
               </span>
               <button
                 type="button"
