@@ -152,9 +152,33 @@ export default function VisitorsCRMPage() {
   };
 
   // Enterprise helpers: Export to Excel
+  // Business Rule: ONLY Enterprise Plan organizers can export reports
   const handleExportVisitors = () => {
-    if (isFreePlan) {
-      showSweetWarning('Visitor export is available on Starter and Enterprise plans. Please upgrade.');
+    if (!isEnterprisePlan) {
+      showSweetAlert({
+        title: 'Enterprise Feature: Attendee Report Export',
+        html: `
+          <div style="text-align: left; font-size: 13px; line-height: 1.6;">
+            <p style="margin-bottom: 10px; color: inherit;">
+              Exporting attendee &amp; visitor reports is exclusively available for <strong>Enterprise Plan</strong> organizers.
+            </p>
+            <div style="padding: 12px; border-radius: 10px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3); color: inherit; font-size: 12px;">
+              <strong>Current Plan:</strong> ${userPlan === 'starter' ? 'Organizer Starter' : 'Free Organizer'}<br/>
+              Upgrade to <strong>Organizer Enterprise</strong> to download full Excel &amp; CSV attendee directories.
+            </div>
+          </div>
+        `,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Upgrade to Enterprise Plan',
+        cancelButtonText: 'Maybe Later',
+        confirmButtonColor: '#FFCC00',
+        cancelButtonColor: '#3f3f46'
+      }).then((result) => {
+        if (result?.isConfirmed) {
+          window.location.href = '/pricing';
+        }
+      });
       return;
     }
     try {
@@ -180,8 +204,31 @@ export default function VisitorsCRMPage() {
   };
 
   const handleExportEngagements = () => {
-    if (isFreePlan) {
-      showSweetWarning('Engagement export is available on Starter and Enterprise plans. Please upgrade.');
+    if (!isEnterprisePlan) {
+      showSweetAlert({
+        title: 'Enterprise Feature: Delegate Report Export',
+        html: `
+          <div style="text-align: left; font-size: 13px; line-height: 1.6;">
+            <p style="margin-bottom: 10px; color: inherit;">
+              Exporting interested delegate reports is exclusively available for <strong>Enterprise Plan</strong> organizers.
+            </p>
+            <div style="padding: 12px; border-radius: 10px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3); color: inherit; font-size: 12px;">
+              <strong>Current Plan:</strong> ${userPlan === 'starter' ? 'Organizer Starter' : 'Free Organizer'}<br/>
+              Upgrade to <strong>Organizer Enterprise</strong> to download full engagement reports.
+            </div>
+          </div>
+        `,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Upgrade to Enterprise Plan',
+        cancelButtonText: 'Maybe Later',
+        confirmButtonColor: '#FFCC00',
+        cancelButtonColor: '#3f3f46'
+      }).then((result) => {
+        if (result?.isConfirmed) {
+          window.location.href = '/pricing';
+        }
+      });
       return;
     }
     try {
@@ -516,21 +563,55 @@ export default function VisitorsCRMPage() {
             <button
               type="button"
               onClick={handleExportVisitors}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-secondary hover:bg-secondary/80 border border-border px-3.5 py-2 text-xs font-semibold text-foreground transition-all shadow-xs cursor-pointer"
-              title="Export attendees to Excel"
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-xs font-semibold transition-all shadow-xs cursor-pointer ${
+                isEnterprisePlan
+                  ? 'bg-secondary hover:bg-secondary/80 border-border text-foreground'
+                  : 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
+              }`}
+              title={
+                isEnterprisePlan
+                  ? 'Export attendees to Excel'
+                  : 'Attendee Report Export is exclusive to Enterprise Plan'
+              }
             >
-              <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              {isEnterprisePlan ? (
+                <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              )}
               <span>Export Excel</span>
+              {!isEnterprisePlan && (
+                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 ml-0.5">
+                  Enterprise
+                </span>
+              )}
             </button>
           ) : (
             <button
               type="button"
               onClick={handleExportEngagements}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-secondary hover:bg-secondary/80 border border-border px-3.5 py-2 text-xs font-semibold text-foreground transition-all shadow-xs cursor-pointer"
-              title="Export interested delegates to Excel"
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-xs font-semibold transition-all shadow-xs cursor-pointer ${
+                isEnterprisePlan
+                  ? 'bg-secondary hover:bg-secondary/80 border-border text-foreground'
+                  : 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
+              }`}
+              title={
+                isEnterprisePlan
+                  ? 'Export interested delegates to Excel'
+                  : 'Delegate Report Export is exclusive to Enterprise Plan'
+              }
             >
-              <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              {isEnterprisePlan ? (
+                <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              )}
               <span>Export Excel</span>
+              {!isEnterprisePlan && (
+                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 ml-0.5">
+                  Enterprise
+                </span>
+              )}
             </button>
           )}
           <button

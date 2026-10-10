@@ -46,7 +46,8 @@ import {
   Calendar,
   Share2,
   Flame,
-  BadgeCheck
+  BadgeCheck,
+  Info
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
@@ -796,501 +797,644 @@ export default function PricingPage() {
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 items-stretch">
             {/* ---------------- CARD 1: FREE ORGANIZER ---------------- */}
-            <div className="rounded-3xl border border-zinc-200 bg-white p-6 sm:p-7 shadow-sm hover:border-zinc-300 hover:shadow-md transition-all flex flex-col justify-between space-y-6">
+            <div className="rounded-3xl border border-zinc-200 bg-white p-6 sm:p-7 shadow-sm hover:border-zinc-300 hover:shadow-md transition-all flex flex-col justify-between space-y-5">
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-zinc-100 text-zinc-700 border border-zinc-200">
-                    Free Forever
+                {/* Top Badge */}
+                <div>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200/80">
+                    Get Started
                   </span>
-                  <Building className="h-5 w-5 text-zinc-400" />
                 </div>
 
+                {/* Title & Simple Description */}
                 <div>
                   <h3 className="text-xl font-bold text-zinc-950">Free Organizer</h3>
-                  <p className="text-xs text-zinc-500 mt-1 min-h-[32px]">
-                    {isGeneralFree
-                      ? 'Free for corporate email · No charge for general email (₹0 Free)'
-                      : `Free for corporate email · Paid for general email ₹${generalEmailPrice.toLocaleString()}/-`}
+                  <p className="text-xs text-zinc-600 mt-1 min-h-[34px] leading-relaxed">
+                    Start listing your events and build your presence on VisitExpo.
                   </p>
                 </div>
 
-                {/* Price Display */}
-                <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2">
-                  <div className="flex items-baseline justify-between">
-                    <div>
-                      <span className="text-xs text-zinc-700 font-semibold block">Work / Corporate Email:</span>
-                      <span className="text-[10px] text-emerald-700 font-medium">Automatic Instant Activation</span>
-                    </div>
-                    <span className="text-2xl font-black text-emerald-600 font-mono">₹0</span>
-                  </div>
-                  <div className="flex items-baseline justify-between text-xs pt-2 border-t border-zinc-200">
-                    <div>
-                      <span className="text-zinc-700 font-semibold block">General / Personal Email:</span>
-                      <span className={`text-[10px] font-medium ${isGeneralFree ? 'text-emerald-700 font-semibold' : 'text-zinc-500'}`}>
-                        {isGeneralFree ? 'No Charge · Platform Offer' : 'One-Time Verification Fee'}
-                      </span>
-                    </div>
-                    <div>
-                      {isGeneralFree ? (
-                        <div className="flex items-baseline gap-1.5 justify-end">
-                          <span className="text-xs line-through text-zinc-400 font-mono">₹1,499</span>
-                          <span className="text-2xl font-black text-emerald-600 font-mono">₹0</span>
-                        </div>
-                      ) : (
-                        <span className="text-xl font-bold text-zinc-900 font-mono">₹{generalEmailPrice.toLocaleString()}</span>
-                      )}
-                    </div>
-                  </div>
-                  <p className="text-[10px] text-zinc-500 pt-1 leading-tight">
-                    {isGeneralFree
-                      ? 'Special offer: Zero activation fee for personal domains (@gmail, @yahoo, etc). 100% Free!'
-                      : 'One-time activation for personal domains (@gmail, @yahoo, etc). Zero recurring subscription fees.'}
-                  </p>
+                {/* Illustration Banner */}
+                <div className="w-full h-28 rounded-2xl bg-amber-50/40 flex items-center justify-center overflow-hidden border border-amber-200/60 p-2">
+                  <svg viewBox="0 0 240 100" className="w-full h-full object-contain">
+                    <circle cx="120" cy="50" r="45" fill="#FEF3C7" opacity="0.7" />
+                    {/* Calendar */}
+                    <rect x="50" y="18" width="70" height="64" rx="10" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="2" />
+                    <rect x="50" y="18" width="70" height="18" rx="10" fill="#FFCC00" />
+                    <rect x="62" y="12" width="4" height="10" rx="2" fill="#334155" />
+                    <rect x="83" y="12" width="4" height="10" rx="2" fill="#334155" />
+                    <rect x="104" y="12" width="4" height="10" rx="2" fill="#334155" />
+                    <circle cx="64" cy="48" r="3" fill="#CBD5E1" />
+                    <circle cx="78" cy="48" r="3" fill="#CBD5E1" />
+                    <circle cx="92" cy="48" r="3" fill="#CBD5E1" />
+                    <circle cx="106" cy="48" r="3.5" fill="#10B981" />
+                    <circle cx="64" cy="62" r="3" fill="#CBD5E1" />
+                    <circle cx="78" cy="62" r="3" fill="#CBD5E1" />
+                    <circle cx="106" cy="62" r="3" fill="#CBD5E1" />
+                    <circle cx="64" cy="74" r="3" fill="#CBD5E1" />
+                    <circle cx="78" cy="74" r="3.5" fill="#3B82F6" />
+                    <circle cx="92" cy="62" r="7" fill="#FFCC00" />
+                    <path d="M89 62 L91.5 64.5 L95 60" stroke="#000000" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    {/* Person */}
+                    <circle cx="155" cy="32" r="9" fill="#FDBA74" />
+                    <path d="M150 25 Q155 20 162 25 Q164 28 160 30" fill="#1E293B" />
+                    <path d="M143 50 L149 41 Q155 39 161 41 L167 50 L163 76 L147 76 Z" fill="#1E293B" />
+                    <path d="M148 45 L132 55 L130 50 L145 42 Z" fill="#FDBA74" />
+                    <circle cx="130" cy="51" r="3.5" fill="#FDBA74" />
+                    <path d="M161 45 L174 58 L170 61 L158 48 Z" fill="#FDBA74" />
+                    {/* Badge */}
+                    <circle cx="185" cy="30" r="12" fill="#10B981" />
+                    <path d="M180 30 L183.5 33.5 L190 27" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </div>
 
-                {/* Status Indicator if User Logged In */}
-                {user?.role === 'organizer' && (
-                  activePlanId === 'free' ? (
-                    <div className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
-                      isUserCorporate || isPlanActive || isGeneralFree
-                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                        : 'bg-amber-50 border-amber-200 text-amber-900'
-                    }`}>
-                      {isUserCorporate || isPlanActive ? (
-                        <>
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                          <span>Plan Active: {isUserCorporate ? 'Corporate Domain (₹0 Free)' : isGeneralFree ? 'Personal Email (No Charge ₹0)' : `Personal Email (₹${generalEmailPrice.toLocaleString()} Paid)`}</span>
-                        </>
+                {/* Price Block */}
+                <div className="pt-1">
+                  <div className="text-3xl font-black text-zinc-950 font-sans tracking-tight">₹0</div>
+                  <div className="text-xs font-semibold text-zinc-700 mt-0.5">Forever</div>
+                </div>
+
+                {/* Action CTA Button */}
+                <div>
+                  {user?.role === 'organizer' ? (
+                    activePlanId === 'free' ? (
+                      isUserCorporate || isPlanActive ? (
+                        <Link
+                          href="/dashboard"
+                          className="w-full py-2.5 px-4 rounded-xl border-2 border-zinc-950 text-zinc-950 hover:bg-zinc-950 hover:text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                        >
+                          List Your First Event
+                        </Link>
                       ) : isGeneralFree ? (
-                        <>
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                          <span>Special Offer: No charge for general mail! Click below to activate free.</span>
-                        </>
+                        <button
+                          onClick={handleActivateGeneralPlan}
+                          disabled={isProcessingPayment}
+                          className="w-full py-2.5 px-4 rounded-xl border-2 border-zinc-950 text-zinc-950 hover:bg-zinc-950 hover:text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                        >
+                          {isProcessingPayment ? 'Activating Plan...' : 'List Your First Event (₹0 Free)'}
+                        </button>
                       ) : (
-                        <>
-                          <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
-                          <span>Payment Pending: Personal email requires ₹${generalEmailPrice.toLocaleString()} activation</span>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="p-3 rounded-xl border bg-zinc-50 border-zinc-200 text-zinc-600 text-xs font-semibold flex items-center gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0" />
-                      <span>Included in your {activePlanId.toUpperCase()} plan</span>
-                    </div>
-                  )
-                )}
-
-                {/* Highlights */}
-                <div className="space-y-2.5 pt-2">
-                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                    Core Capabilities:
-                  </span>
-                  <ul className="space-y-2 text-xs text-zinc-600">
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Expo Claiming:</strong> Any number of expos (verification per expo, max 3/day)</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Event Creation:</strong> Publish new, upcoming &amp; prospective B2B/B2C expos</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Token Demand Test:</strong> 1/10 nominal token request model</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Lead Intelligence:</strong> Visible inquiry counts &amp; volume (masked details)</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Organic Positioning:</strong> Directory visibility on VisitExpo</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Prospective Validation:</strong> ₹4,999 per proposed event</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-zinc-200 space-y-2">
-                {user?.role === 'organizer' ? (
-                  activePlanId === 'free' ? (
-                    isUserCorporate || isPlanActive ? (
+                        <button
+                          onClick={() => setIsPayModalOpen(true)}
+                          className="w-full py-2.5 px-4 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-black text-xs font-extrabold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                        >
+                          Pay ₹{generalEmailPrice.toLocaleString()} &amp; Activate
+                        </button>
+                      )
+                    ) : (
                       <Link
                         href="/dashboard"
-                        className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 shadow-xs"
+                        className="w-full py-2.5 px-4 rounded-xl border border-zinc-300 text-zinc-700 hover:bg-zinc-50 text-xs font-bold transition-all text-center block"
                       >
-                        <CheckCircle2 className="h-4 w-4" />
-                        <span>Plan Active · Open Dashboard</span>
+                        Included in Your {activePlanId.toUpperCase()} Plan
                       </Link>
-                    ) : isGeneralFree ? (
-                      <button
-                        onClick={handleActivateGeneralPlan}
-                        disabled={isProcessingPayment}
-                        className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
-                      >
-                        {isProcessingPayment ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin text-white" />
-                            <span>Activating Plan...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Zap className="h-4 w-4" />
-                            <span>Activate Free Plan (₹0 No Charge)</span>
-                          </>
-                        )}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => setIsPayModalOpen(true)}
-                        className="w-full py-3 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-black text-xs font-extrabold transition-all text-center flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
-                      >
-                        <CreditCard className="h-4 w-4" />
-                        <span>Pay ₹{generalEmailPrice.toLocaleString()} &amp; Activate Plan</span>
-                      </button>
                     )
                   ) : (
                     <Link
-                      href="/dashboard"
-                      className="w-full py-3 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 text-xs font-bold transition-all text-center block"
+                      href="/login?role=organizer&signup=true"
+                      className="w-full py-2.5 px-4 rounded-xl border-2 border-zinc-950 text-zinc-950 hover:bg-zinc-950 hover:text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
                     >
-                      Included in Your {activePlanId.toUpperCase()} Plan
+                      List Your First Event
                     </Link>
-                  )
-                ) : user ? (
-                  <Link
-                    href="/login?role=organizer"
-                    className="w-full py-3 rounded-xl border border-zinc-300 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-xs font-bold transition-all text-center block"
-                  >
-                    Switch to Organizer Account
-                  </Link>
-                ) : (
-                  <Link
-                    href="/login?role=organizer&signup=true"
-                    className="w-full py-3 rounded-xl bg-zinc-900 hover:bg-black text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 shadow-sm"
-                  >
-                    <span>Activate Free Organizer Plan</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Link>
-                )}
-                <p className="text-[10px] text-center text-zinc-400">
-                  {user?.role === 'organizer'
-                    ? activePlanId === 'free'
-                      ? isUserCorporate
-                        ? 'Complimentary lifetime access for corporate domain'
-                        : isPlanActive
-                        ? 'Plan is active'
-                        : isGeneralFree
-                        ? 'No charge for general mail · Instant 100% Free activation'
-                        : `One-time ₹${generalEmailPrice.toLocaleString()} activation fee required for personal email`
-                      : `Included in your active ${activePlanId.toUpperCase()} subscription`
-                    : isGeneralFree
-                    ? '100% Free for all corporate & general email domains'
-                    : `Free for corporate email (@company.com) · ₹${generalEmailPrice.toLocaleString()} for personal domains`}
-                </p>
+                  )}
+                </div>
+
+                {/* Section 1: Best for you if: */}
+                <div className="pt-2 border-t border-zinc-100 space-y-2">
+                  <p className="font-bold text-xs text-zinc-900">Best for you if:</p>
+                  <ul className="space-y-2 text-xs text-zinc-600">
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>You are new to VisitExpo</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Want to list your first event</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Want basic visibility on platform</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Section 2: Key Inclusions: ⓘ */}
+                <div className="pt-2 border-t border-zinc-100 space-y-2">
+                  <div className="flex items-center gap-1 font-bold text-xs text-zinc-900">
+                    <span>Key Inclusions:</span>
+                    <span title="Core allowances included in the Free Organizer plan tier" className="cursor-pointer">
+                      <Info className="h-3.5 w-3.5 text-zinc-400 hover:text-zinc-600" />
+                    </span>
+                  </div>
+                  <ul className="space-y-2 text-xs text-zinc-600">
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Free registration (corporate email)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span className="flex items-center gap-1 flex-wrap">
+                        <span>Paid registration for general email (₹1,499)</span>
+                        <span title="Corporate emails (@yourcompany.com) are ₹0 Free. Personal email domains pay a one-time verification fee." className="cursor-pointer">
+                          <Info className="h-3 w-3 text-zinc-400 hover:text-zinc-600" />
+                        </span>
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Limited event claiming</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Create &amp; publish events</span>
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
 
             {/* ---------------- CARD 2: ORGANIZER STARTER ---------------- */}
-            <div className="rounded-3xl border-2 border-[#FFCC00] bg-white p-6 sm:p-7 shadow-xl shadow-amber-500/10 relative flex flex-col justify-between space-y-6">
-              {/* Popular Badge */}
-              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#FFCC00] text-black px-4 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider shadow-md flex items-center gap-1">
-                <Flame className="h-3 w-3 fill-black" />
-                <span>Most Popular for Active Expos</span>
-              </div>
-
+            <div className="rounded-3xl border-2 border-[#FFCC00] bg-white p-6 sm:p-7 shadow-xl shadow-amber-500/10 ring-4 ring-amber-400/20 relative flex flex-col justify-between space-y-5 transition-all hover:shadow-2xl">
               <div className="space-y-4">
-                <div className="flex items-center justify-between pt-1">
-                  <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-900 border border-amber-200">
-                    Validated Operations
+                {/* Top Badge: Most Popular with VisitExpo signature styling */}
+                <div>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black bg-[#FFCC00] text-black border border-amber-300 shadow-xs">
+                    👑 Most Popular →
                   </span>
-                  <Zap className="h-5 w-5 text-amber-500" />
                 </div>
 
+                {/* Title & Simple Description */}
                 <div>
                   <h3 className="text-xl font-bold text-zinc-950">Organizer Starter</h3>
-                  <p className="text-xs text-zinc-500 mt-1 min-h-[32px]">
-                    Operate validated events and unlock usable lead/ticket functionality
+                  <p className="text-xs text-zinc-600 mt-1 min-h-[34px] leading-relaxed">
+                    Get more leads and unlock valuable organizer tools.
                   </p>
                 </div>
 
-                {/* Price Display */}
-                <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-1">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black text-zinc-950 font-mono">
-                      ₹{billingCycle === 'yearly' ? '49,999' : '14,999'}
-                    </span>
-                    <span className="text-xs text-zinc-500 font-medium">
-                      /{billingCycle === 'yearly' ? 'Year' : 'Quarter'}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-emerald-700 font-semibold">
-                    {billingCycle === 'yearly'
-                      ? 'Save ₹9,997 (Equivalent to ₹4,166 / mo)'
-                      : 'Billed every 3 months (₹14,999 / Qtr)'}
-                  </p>
+                {/* Illustration Banner */}
+                <div className="w-full h-28 rounded-2xl bg-amber-50/50 flex items-center justify-center overflow-hidden border border-amber-200/80 p-2">
+                  <svg viewBox="0 0 240 100" className="w-full h-full object-contain">
+                    <circle cx="120" cy="50" r="45" fill="#FEF3C7" opacity="0.8" />
+                    {/* Analytics Board */}
+                    <rect x="130" y="16" width="80" height="56" rx="8" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="2" />
+                    <rect x="136" y="22" width="68" height="6" rx="3" fill="#F1F5F9" />
+                    <rect x="142" y="46" width="8" height="20" rx="3" fill="#93C5FD" />
+                    <rect x="156" y="38" width="8" height="28" rx="3" fill="#60A5FA" />
+                    <rect x="170" y="42" width="8" height="24" rx="3" fill="#3B82F6" />
+                    <rect x="184" y="30" width="8" height="36" rx="3" fill="#FFCC00" />
+                    <path d="M142 44 Q160 36 172 40 T190 26" stroke="#D97706" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+                    <circle cx="190" cy="26" r="3.5" fill="#D97706" />
+                    {/* Person with laptop */}
+                    <rect x="35" y="74" width="85" height="4" rx="2" fill="#CBD5E1" />
+                    <circle cx="68" cy="34" r="8" fill="#FDBA74" />
+                    <path d="M63 28 Q68 24 74 28 Q75 31 71 33" fill="#1E293B" />
+                    <path d="M57 48 Q68 44 79 48 L76 74 L60 74 Z" fill="#2563EB" />
+                    {/* Laptop */}
+                    <polygon points="68,54 94,54 88,68 62,68" fill="#E2E8F0" />
+                    <rect x="68" y="46" width="26" height="18" rx="3" fill="#1E293B" />
+                    <rect x="71" y="48" width="20" height="14" rx="2" fill="#FFCC00" />
+                    <polygon points="56,70 100,70 96,74 58,74" fill="#94A3B8" />
+                    {/* Upward Growth Arrow */}
+                    <circle cx="205" cy="24" r="10" fill="#10B981" />
+                    <path d="M201 26 L205 21 L209 26 M205 21 L205 28" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </div>
 
-                {/* Active Plan Indicator for Starter */}
-                {user?.role === 'organizer' && activePlanId === 'starter' && (
-                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-semibold flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                    <span>✓ Current Active Plan · Starter Tier Activated</span>
+                {/* Price Block */}
+                <div className="pt-1">
+                  <div className="text-3xl font-black text-zinc-950 font-sans tracking-tight">₹14,999</div>
+                  <div className="text-xs font-medium text-zinc-600 mt-0.5">per quarter</div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs font-semibold text-zinc-600">₹49,999 per year</span>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      Save 17%
+                    </span>
                   </div>
-                )}
+                </div>
 
-                {/* Highlights */}
-                <div className="space-y-2.5 pt-2">
-                  <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">
-                    Everything in Free, plus:
-                  </span>
+                {/* Action CTA Button */}
+                <div>
+                  {user?.role === 'organizer' && activePlanId === 'starter' ? (
+                    <Link
+                      href="/dashboard"
+                      className="w-full py-2.5 px-4 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-black text-xs font-black transition-all text-center flex items-center justify-center gap-1.5 shadow-md shadow-amber-400/25 active:scale-[0.99] cursor-pointer"
+                    >
+                      <span>Plan Active · Open Dashboard</span>
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={() => handleSelectPlan('starter', 'Organizer Starter')}
+                      className="w-full py-2.5 px-4 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-black text-xs font-black transition-all text-center flex items-center justify-center gap-1.5 shadow-md shadow-amber-400/25 active:scale-[0.99] cursor-pointer"
+                    >
+                      <span>Choose Starter Plan</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Section 1: Best for you if: */}
+                <div className="pt-2 border-t border-zinc-100 space-y-2">
+                  <p className="font-bold text-xs text-zinc-900">Best for you if:</p>
                   <ul className="space-y-2 text-xs text-zinc-600">
                     <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Detailed Lead Access:</strong> Full unmasked contacts</span>
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>You organize one or a few events</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Lead CRM:</strong> Basic operational CRM pipeline</span>
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Want genuine leads and contacts</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Visitor &amp; Exhibitor Leads:</strong> Fully unlocked</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Paid Ticket Selling:</strong> Unlocked with integrated payment gateway</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Analytics:</strong> Basic ticket sales &amp; visitor conversion stats</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Proposed Validation:</strong> Limited allowance included</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Support:</strong> Priority Organizer Support</span>
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Need tools to manage your events</span>
                     </li>
                   </ul>
                 </div>
-              </div>
 
-              <div className="pt-4 border-t border-zinc-200 space-y-2">
-                {user?.role === 'organizer' && activePlanId === 'starter' ? (
-                  <Link
-                    href="/dashboard"
-                    className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>Plan Active · Open Dashboard</span>
-                  </Link>
-                ) : user?.role === 'organizer' && (activePlanId === 'enterprise' || activePlanId === 'growth') ? (
-                  <button
-                    disabled
-                    className="w-full py-3 rounded-xl bg-zinc-100 text-zinc-400 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed"
-                  >
-                    <span>Included in your higher plan</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleSelectPlan('starter', 'Organizer Starter')}
-                    className="w-full py-3 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-black text-xs font-extrabold transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <span>Choose Starter Plan</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </button>
-                )}
-                <p className="text-[10px] text-center text-zinc-400">
-                  {user?.role === 'organizer' && activePlanId === 'starter'
-                    ? 'All Starter lead CRM & ticket capabilities are unlocked'
-                    : 'Instant activation & payment gateway unlock'}
-                </p>
+                {/* Section 2: Key Inclusions: ⓘ */}
+                <div className="pt-2 border-t border-zinc-100 space-y-2">
+                  <div className="flex items-center gap-1 font-bold text-xs text-zinc-900">
+                    <span>Key Inclusions:</span>
+                    <span title="Complete suite of lead intelligence and CRM tools unlocked" className="cursor-pointer">
+                      <Info className="h-3.5 w-3.5 text-zinc-400 hover:text-zinc-600" />
+                    </span>
+                  </div>
+                  <ul className="space-y-2 text-xs text-zinc-600">
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Everything in Free plan</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Detailed lead access</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Basic lead management (CRM)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Advanced event search</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Visitor, exhibitor &amp; vendor leads</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>In-dashboard lead CRM &amp; pipeline</span>
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
 
             {/* ---------------- CARD 3: ORGANIZER ENTERPRISE ---------------- */}
-            <div className="rounded-3xl border border-indigo-200 bg-white p-6 sm:p-7 shadow-sm hover:border-indigo-300 hover:shadow-md transition-all flex flex-col justify-between space-y-6">
+            <div className="rounded-3xl border border-zinc-200 bg-white p-6 sm:p-7 shadow-sm hover:border-zinc-300 hover:shadow-md transition-all flex flex-col justify-between space-y-5">
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
-                    Enterprise Scale
+                {/* Top Badge */}
+                <div>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-zinc-100 text-zinc-800 border border-zinc-200">
+                    For Large Organizers
                   </span>
-                  <Award className="h-5 w-5 text-indigo-600" />
                 </div>
 
+                {/* Title & Simple Description */}
                 <div>
                   <h3 className="text-xl font-bold text-zinc-950">Organizer Enterprise</h3>
-                  <p className="text-xs text-zinc-500 mt-1 min-h-[32px]">
-                    Large organizers managing multiple expos and enterprise operations
+                  <p className="text-xs text-zinc-600 mt-1 min-h-[34px] leading-relaxed">
+                    Advanced tools for multiple expos and enterprise operations.
                   </p>
                 </div>
 
-                {/* Price Display */}
-                <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100 space-y-1">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black text-zinc-950 font-mono">
-                      ₹{billingCycle === 'yearly' ? '2,99,999' : '89,999'}
-                    </span>
-                    <span className="text-xs text-zinc-500 font-medium">
-                      /{billingCycle === 'yearly' ? 'Year' : 'Quarter'}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-indigo-700 font-semibold">
-                    {billingCycle === 'yearly'
-                      ? 'Save ₹59,997 (Equivalent to ₹24,999 / mo)'
-                      : 'Billed every 3 months (₹89,999 / Qtr)'}
-                  </p>
+                {/* Illustration Banner */}
+                <div className="w-full h-28 rounded-2xl bg-zinc-50 flex items-center justify-center overflow-hidden border border-zinc-200/80 p-2">
+                  <svg viewBox="0 0 240 100" className="w-full h-full object-contain">
+                    <circle cx="120" cy="50" r="45" fill="#F4F4F5" opacity="0.8" />
+                    <ellipse cx="45" cy="74" rx="12" ry="8" fill="#86EFAC" />
+                    <ellipse cx="195" cy="74" rx="12" ry="8" fill="#86EFAC" />
+                    <ellipse cx="40" cy="76" rx="9" ry="6" fill="#4ADE80" />
+                    <ellipse cx="200" cy="76" rx="9" ry="6" fill="#4ADE80" />
+                    <rect x="20" y="78" width="200" height="8" rx="4" fill="#E2E8F0" />
+                    <rect x="75" y="24" width="90" height="54" rx="6" fill="#FFFFFF" stroke="#CBD5E1" strokeWidth="1.5" />
+                    <path d="M70 26 Q120 14 170 26 L168 30 Q120 18 72 30 Z" fill="#18181B" />
+                    <rect x="96" y="24" width="48" height="12" rx="3" fill="#FFCC00" />
+                    <text x="120" y="33" fill="#000000" fontSize="8" fontWeight="900" textAnchor="middle" fontFamily="sans-serif">EXPO</text>
+                    <rect x="82" y="40" width="16" height="24" rx="2" fill="#E2E8F0" />
+                    <rect x="102" y="40" width="16" height="24" rx="2" fill="#E2E8F0" />
+                    <rect x="122" y="40" width="16" height="24" rx="2" fill="#E2E8F0" />
+                    <rect x="142" y="40" width="16" height="24" rx="2" fill="#E2E8F0" />
+                    <rect x="106" y="62" width="28" height="16" rx="1" fill="#3B82F6" opacity="0.3" stroke="#2563EB" strokeWidth="1" />
+                    <rect x="44" y="38" width="34" height="40" rx="4" fill="#F8FAFC" stroke="#CBD5E1" strokeWidth="1" />
+                    <rect x="48" y="44" width="26" height="12" rx="2" fill="#E2E8F0" />
+                    <rect x="48" y="60" width="26" height="14" rx="2" fill="#E2E8F0" />
+                    <rect x="162" y="38" width="34" height="40" rx="4" fill="#F8FAFC" stroke="#CBD5E1" strokeWidth="1" />
+                    <rect x="166" y="44" width="26" height="12" rx="2" fill="#E2E8F0" />
+                    <rect x="166" y="60" width="26" height="14" rx="2" fill="#E2E8F0" />
+                    <line x1="60" y1="26" x2="60" y2="38" stroke="#64748B" strokeWidth="1.5" />
+                    <polygon points="60,26 70,29 60,32" fill="#FFCC00" />
+                    <line x1="180" y1="26" x2="180" y2="38" stroke="#64748B" strokeWidth="1.5" />
+                    <polygon points="180,26 190,29 180,32" fill="#FFCC00" />
+                  </svg>
                 </div>
 
-                {/* Active Plan Indicator for Enterprise */}
-                {user?.role === 'organizer' && activePlanId === 'enterprise' && (
-                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-semibold flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                    <span>✓ Current Active Plan · Enterprise Tier Activated</span>
+                {/* Price Block */}
+                <div className="pt-1">
+                  <div className="text-3xl font-black text-zinc-950 font-sans tracking-tight">₹89,999</div>
+                  <div className="text-xs font-medium text-zinc-600 mt-0.5">per quarter</div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs font-semibold text-zinc-600">₹2,99,999 per year</span>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      Save 17%
+                    </span>
                   </div>
-                )}
+                </div>
 
-                {/* Highlights */}
-                <div className="space-y-2.5 pt-2">
-                  <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">
-                    Everything in Starter, plus:
-                  </span>
+                {/* Action CTA Button */}
+                <div>
+                  {user?.role === 'organizer' && activePlanId === 'enterprise' ? (
+                    <Link
+                      href="/dashboard"
+                      className="w-full py-2.5 px-4 rounded-xl border-2 border-zinc-950 text-zinc-950 hover:bg-zinc-950 hover:text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                    >
+                      <span>Plan Active · Open Dashboard</span>
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={() => handleSelectPlan('enterprise', 'Organizer Enterprise')}
+                      className="w-full py-2.5 px-4 rounded-xl border-2 border-zinc-950 text-zinc-950 hover:bg-zinc-950 hover:text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                    >
+                      <span>Choose Enterprise Plan</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Section 1: Best for you if: */}
+                <div className="pt-2 border-t border-zinc-100 space-y-2">
+                  <p className="font-bold text-xs text-zinc-900">Best for you if:</p>
                   <ul className="space-y-2 text-xs text-zinc-600">
                     <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Advanced CRM + API:</strong> Full REST API keys for your ERP/CRM</span>
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>You manage multiple expos</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Unlimited Lead Export:</strong> CSV, Excel, webhooks with no caps</span>
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Need advanced analytics &amp; tools</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Partner Database:</strong> Searchable database of venues &amp; contractors</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Private Gateway:</strong> Custom payment gateway integration</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Proposed Validations:</strong> Multiple events included</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Featured Placement:</strong> Pinned priority placement on VisitExpo</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Dedicated VIP Support:</strong> Assigned Account Director</span>
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Require API and bulk export options</span>
                     </li>
                   </ul>
                 </div>
-              </div>
 
-              <div className="pt-4 border-t border-zinc-200 space-y-2">
-                {user?.role === 'organizer' && activePlanId === 'enterprise' ? (
-                  <Link
-                    href="/dashboard"
-                    className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>Plan Active · Open Dashboard</span>
-                  </Link>
-                ) : (
-                  <button
-                    onClick={() => handleSelectPlan('enterprise', 'Organizer Enterprise')}
-                    className="w-full py-3 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <span>Choose Enterprise Plan</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </button>
-                )}
-                <p className="text-[10px] text-center text-zinc-400">
-                  Custom billing &amp; GST tax invoices supported
-                </p>
+                {/* Section 2: Key Inclusions: ⓘ */}
+                <div className="pt-2 border-t border-zinc-100 space-y-2">
+                  <div className="flex items-center gap-1 font-bold text-xs text-zinc-900">
+                    <span>Key Inclusions:</span>
+                    <span title="Enterprise scale management, unlimited export & API key integrations" className="cursor-pointer">
+                      <Info className="h-3.5 w-3.5 text-zinc-400 hover:text-zinc-600" />
+                    </span>
+                  </div>
+                  <ul className="space-y-2 text-xs text-zinc-600">
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Everything in Starter plan</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Advanced CRM &amp; analytics</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Multiple expos management</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Developer API &amp; webhooks</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Unlimited lead report export (CSV &amp; Excel)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Advanced search &amp; filtering</span>
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
 
             {/* ---------------- CARD 4: ORGANIZER GROWTH ---------------- */}
-            <div className="rounded-3xl border border-emerald-200 bg-white p-6 sm:p-7 shadow-sm hover:border-emerald-300 hover:shadow-md transition-all flex flex-col justify-between space-y-6">
+            <div className="rounded-3xl border border-zinc-200 bg-white p-6 sm:p-7 shadow-sm hover:border-zinc-300 hover:shadow-md transition-all flex flex-col justify-between space-y-5">
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    On-Demand Top-Up
+                {/* Top Badge */}
+                <div>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    Marketing Engine
                   </span>
-                  <TrendingUp className="h-5 w-5 text-emerald-600" />
                 </div>
 
+                {/* Title & Simple Description */}
                 <div>
                   <h3 className="text-xl font-bold text-zinc-950">Organizer Growth</h3>
-                  <p className="text-xs text-zinc-500 mt-1 min-h-[32px]">
-                    Top-up plan start from 1k to unlimited · Point wise price uses
+                  <p className="text-xs text-zinc-600 mt-1 min-h-[34px] leading-relaxed">
+                    Boost your event visibility with our promotion services.
                   </p>
                 </div>
 
-                {/* Price Display */}
-                <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 space-y-1">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black text-zinc-950 font-mono">From ₹1k</span>
-                    <span className="text-xs text-zinc-500 font-medium">to Unlimited</span>
-                  </div>
-                  <p className="text-[11px] text-emerald-700 font-semibold">
-                    Pay-as-you-use promotional points
-                  </p>
+                {/* Illustration Banner */}
+                <div className="w-full h-28 rounded-2xl bg-zinc-50 flex items-center justify-center overflow-hidden border border-zinc-200/80 p-2">
+                  <svg viewBox="0 0 240 100" className="w-full h-full object-contain">
+                    <circle cx="120" cy="50" r="45" fill="#F4F4F5" opacity="0.8" />
+                    {/* Megaphone */}
+                    <g transform="translate(25, 12)">
+                      <path d="M35 34 L65 18 L65 58 L35 42 Z" fill="#18181B" />
+                      <ellipse cx="65" cy="38" rx="5" ry="20" fill="#FFCC00" />
+                      <rect x="22" y="32" width="15" height="12" rx="3" fill="#3B82F6" />
+                      <ellipse cx="22" cy="38" rx="4" ry="6" fill="#1D4ED8" />
+                      <path d="M28 44 L24 64 L34 64 L34 44 Z" fill="#3F3F46" />
+                      <path d="M28 50 L20 54 L22 58 L30 54 Z" fill="#71717A" />
+                      <path d="M76 28 Q84 38 76 48" stroke="#FFCC00" strokeWidth="3" fill="none" strokeLinecap="round" />
+                      <path d="M84 22 Q96 38 84 54" stroke="#FFCC00" strokeWidth="3" fill="none" strokeLinecap="round" />
+                    </g>
+                    {/* Google 'G' */}
+                    <g transform="translate(135, 18)">
+                      <rect width="20" height="20" rx="6" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="1" />
+                      <circle cx="10" cy="10" r="7" fill="#EA4335" />
+                      <circle cx="10" cy="10" r="4" fill="#FFFFFF" />
+                      <polygon points="10,10 16,10 16,12 10,12" fill="#4285F4" />
+                    </g>
+                    {/* LinkedIn 'in' */}
+                    <g transform="translate(162, 14)">
+                      <rect width="20" height="20" rx="6" fill="#0A66C2" />
+                      <text x="10" y="14" fill="#FFFFFF" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">in</text>
+                    </g>
+                    {/* Meta / Instagram */}
+                    <g transform="translate(142, 45)">
+                      <rect width="22" height="22" rx="7" fill="url(#instaGrad)" />
+                      <rect x="5" y="5" width="12" height="12" rx="4" fill="none" stroke="#FFFFFF" strokeWidth="1.5" />
+                      <circle cx="11" cy="11" r="3" fill="none" stroke="#FFFFFF" strokeWidth="1.5" />
+                      <circle cx="14.5" cy="7.5" r="0.8" fill="#FFFFFF" />
+                    </g>
+                    {/* YouTube Play */}
+                    <g transform="translate(172, 42)">
+                      <rect width="20" height="20" rx="6" fill="#FF0000" />
+                      <polygon points="8,7 8,13 14,10" fill="#FFFFFF" />
+                    </g>
+                    {/* Analytics Growth Icon */}
+                    <g transform="translate(196, 26)">
+                      <rect width="20" height="20" rx="6" fill="#10B981" />
+                      <path d="M5 14 L9 10 L12 13 L16 7" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                    </g>
+                    <defs>
+                      <linearGradient id="instaGrad" x1="0" y1="1" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#F58529" />
+                        <stop offset="50%" stopColor="#DD2A7B" />
+                        <stop offset="100%" stopColor="#8134AF" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
                 </div>
 
-                {/* Highlights */}
-                <div className="space-y-2.5 pt-2">
-                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
-                    13 High-Impact Marketing Channels:
-                  </span>
+                {/* Price Block */}
+                <div className="pt-1">
+                  <div className="text-3xl font-black text-zinc-950 font-sans tracking-tight">From ₹1,000</div>
+                  <div className="text-xs font-medium text-zinc-600 mt-0.5">per top-up pack</div>
+                </div>
+
+                {/* Action CTA Button */}
+                <div>
+                  <a
+                    href="#growth-catalog"
+                    className="w-full py-2.5 px-4 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    Explore Promotion Packs
+                  </a>
+                </div>
+
+                {/* Section 1: Best for you if: */}
+                <div className="pt-2 border-t border-zinc-100 space-y-2">
+                  <p className="font-bold text-xs text-zinc-900">Best for you if:</p>
                   <ul className="space-y-2 text-xs text-zinc-600">
                     <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Google Listing:</strong> Knowledge Panel &amp; rich event indexing</span>
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>You want more visibility &amp; reach</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Paid Lead Generation:</strong> SMO &amp; verified B2B buyer campaigns</span>
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Need targeted promotion for events</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Direct Outreach:</strong> WhatsApp API &amp; SMS blasts</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Smart Promotion:</strong> AI-matchmaking &amp; automated IVR calls</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Platform Spotlight:</strong> Push alerts, banners &amp; popups</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Search Spotlight:</strong> #1 Top Expo Display in directory</span>
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Want flexible, pay-as-you-go options</span>
                     </li>
                   </ul>
                 </div>
-              </div>
 
-              <div className="pt-4 border-t border-zinc-200 space-y-2">
-                <a
-                  href="#growth-catalog"
-                  className="w-full py-3 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <span>Explore Growth Services</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </a>
-                <p className="text-[10px] text-center text-zinc-400">
-                  Available separately for all tiers
-                </p>
+                {/* Section 2: Key Inclusions: ⓘ */}
+                <div className="pt-2 border-t border-zinc-100 space-y-2">
+                  <div className="flex items-center gap-1 font-bold text-xs text-zinc-900">
+                    <span>Key Inclusions:</span>
+                    <span title="On-demand point-wise marketing across 13 omnichannel digital channels" className="cursor-pointer">
+                      <Info className="h-3.5 w-3.5 text-zinc-400 hover:text-zinc-600" />
+                    </span>
+                  </div>
+                  <ul className="space-y-2 text-xs text-zinc-600">
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Top-up packs from ₹1,000</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Use across 13 promotion channels</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Flexible point-wise pricing</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Google listing &amp; search visibility</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Social media optimization (SMO)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </div>
+                      <span>Paid lead generation options</span>
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>

@@ -702,9 +702,33 @@ export default function LeadsCRMPage() {
   };
 
   // Export CSV of filtered, selected, or available leads with intelligent fallback
+  // Business Rule: ONLY Enterprise Plan organizers can export lead reports
   const handleExportCsv = () => {
-    if (isFreePlan) {
-      showSweetWarning('Lead export is available on Starter and Enterprise plans. Please upgrade to download your leads.');
+    if (!isEnterprisePlan) {
+      showSweetAlert({
+        title: 'Enterprise Feature: Lead Report Export',
+        html: `
+          <div style="text-align: left; font-size: 13px; line-height: 1.6;">
+            <p style="margin-bottom: 10px; color: inherit;">
+              Exporting lead reports is exclusively available for <strong>Enterprise Plan</strong> organizers.
+            </p>
+            <div style="padding: 12px; border-radius: 10px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3); color: inherit; font-size: 12px;">
+              <strong>Current Plan:</strong> ${userPlan === 'starter' ? 'Organizer Starter' : 'Free Organizer'}<br/>
+              Upgrade to <strong>Organizer Enterprise</strong> to unlock unlimited CSV &amp; Excel lead downloads, full contact details, and automated exports.
+            </div>
+          </div>
+        `,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Upgrade to Enterprise Plan',
+        cancelButtonText: 'Maybe Later',
+        confirmButtonColor: '#FFCC00',
+        cancelButtonColor: '#3f3f46'
+      }).then((result) => {
+        if (result?.isConfirmed) {
+          window.location.href = '/pricing';
+        }
+      });
       return;
     }
     try {
@@ -1453,11 +1477,28 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
               e.preventDefault();
               handleExportCsv();
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border transition-all shadow-2xs cursor-pointer btn-press active:scale-95 select-none shrink-0"
-            title="Export leads to CSV spreadsheet"
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all shadow-2xs cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
+              isEnterprisePlan
+                ? 'bg-secondary hover:bg-secondary/80 text-foreground border border-border'
+                : 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/30 hover:bg-amber-500/20'
+            }`}
+            title={
+              isEnterprisePlan
+                ? 'Export leads to CSV spreadsheet'
+                : 'Lead Report Export is exclusive to Enterprise Plan (Click to upgrade)'
+            }
           >
-            <Download className="h-3.5 w-3.5" />
+            {isEnterprisePlan ? (
+              <Download className="h-3.5 w-3.5" />
+            ) : (
+              <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+            )}
             <span>Export CSV</span>
+            {!isEnterprisePlan && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 ml-0.5">
+                Enterprise
+              </span>
+            )}
           </button>
         </div>
       </div>
