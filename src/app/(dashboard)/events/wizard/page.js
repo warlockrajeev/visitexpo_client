@@ -1519,7 +1519,7 @@ export const getInitialFormData = (user = null) => ({
   contactShortcode: '',
   // Ticketing & Form
   isFreeEvent: true,
-  paidTicketPrice: '499',
+  paidTicketPrice: '10',
   currency: 'INR',
   formFields: ['name', 'email', 'phone', 'company', 'designation'],
   // SEO
@@ -1544,6 +1544,31 @@ export default function EventWizardPage() {
   const [allCategoriesList, setAllCategoriesList] = useState(() => Object.keys(CATEGORY_SUBSECTORS));
   const [isValidatingStep, setIsValidatingStep] = useState(false);
   const [isNavigatingBack, setIsNavigatingBack] = useState(false);
+  const [organizerPlan, setOrganizerPlan] = useState(() => (user?.plan || 'free').toLowerCase());
+
+  // Detect active plan tier for ticket monetization limits
+  useEffect(() => {
+    let isMounted = true;
+    const fetchMyPlan = async () => {
+      try {
+        const config = accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {};
+        const res = await axios.get(`${API_URL}/plans/my-plan`, config);
+        if (isMounted && res.data?.success) {
+          const planId = (res.data.subscription?.plan || res.data.plan || user?.plan || 'free').toLowerCase();
+          const isPlanActive = res.data.isPlanActive ?? true;
+          setOrganizerPlan(isPlanActive ? planId : 'free');
+        }
+      } catch (e) {
+        // Fallback to user.plan
+      }
+    };
+    if (user) {
+      fetchMyPlan();
+    }
+    return () => { isMounted = false; };
+  }, [user, accessToken]);
+
+  const isPaidPlan = ['starter', 'enterprise', 'growth'].includes(organizerPlan) || ['super_admin', 'admin'].includes(user?.role);
 
   // Dynamically load any custom categories created across the platform
   useEffect(() => {
@@ -1928,6 +1953,9 @@ export default function EventWizardPage() {
           const num = parseFloat(value);
           if (isNaN(num) || num <= 0) {
             return `Ticket price must be a valid amount greater than 0 (${allData.currency || 'INR'}).`;
+          }
+          if (!isPaidPlan && (num < 1 || num > 10)) {
+            return 'Free plan organizers can set token ticket price between ₹1 and ₹10 only. Upgrade to Starter or Enterprise to set custom ticket prices.';
           }
         }
         return '';
@@ -4144,6 +4172,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                         type="number"
                         name="paidTicketPrice"
                         min="1"
+                        max={isPaidPlan ? undefined : 10}
                         step="any"
                         value={formData.paidTicketPrice}
                         onChange={handleChange}
@@ -4164,6 +4193,33 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                       <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 animate-in fade-in-50">
                         <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                         <span>{errors.paidTicketPrice}</span>
+                      </p>
+                    )}
+
+                    {!isPaidPlan ? (
+                      <div className="mt-2.5 p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-amber-500 flex items-center gap-1.5">
+                            <Info className="h-3.5 w-3.5 shrink-0" /> Token Ticket Demand Test (₹1 – ₹10 limit)
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                            Free Plan
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          Free plan organizers can set token ticket prices between <strong>₹1 and ₹10</strong> to measure attendee interest. Upgrade to Starter or Enterprise to set custom ticket prices (₹100, ₹500, ₹1,000+).
+                        </p>
+                        <Link
+                          href="/pricing"
+                          target="_blank"
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline"
+                        >
+                          Upgrade to Starter or Enterprise for Custom Ticket Pricing →
+                        </Link>
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-[11px] text-emerald-500 font-semibold flex items-center gap-1">
+                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> {organizerPlan.charAt(0).toUpperCase() + organizerPlan.slice(1)} Plan Active: Custom ticket pricing enabled (No upper limit)
                       </p>
                     )}
                   </div>

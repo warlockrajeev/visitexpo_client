@@ -73,6 +73,31 @@ export default function TicketingPage() {
   const [isTierModalOpen, setIsTierModalOpen] = useState(false);
   const [isSimulateModalOpen, setIsSimulateModalOpen] = useState(false);
   const [simulating, setSimulating] = useState(false);
+  const [organizerPlan, setOrganizerPlan] = useState(() => (user?.plan || 'free').toLowerCase());
+
+  // Detect active plan tier for ticket monetization limits
+  useEffect(() => {
+    let isMounted = true;
+    const fetchMyPlan = async () => {
+      try {
+        const config = accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {};
+        const res = await axios.get(`${API_URL}/plans/my-plan`, config);
+        if (isMounted && res.data?.success) {
+          const planId = (res.data.subscription?.plan || res.data.plan || user?.plan || 'free').toLowerCase();
+          const isPlanActive = res.data.isPlanActive ?? true;
+          setOrganizerPlan(isPlanActive ? planId : 'free');
+        }
+      } catch (e) {
+        // Fallback to user.plan
+      }
+    };
+    if (user) {
+      fetchMyPlan();
+    }
+    return () => { isMounted = false; };
+  }, [user, accessToken]);
+
+  const isPaidPlan = ['starter', 'enterprise', 'growth'].includes(organizerPlan) || ['super_admin', 'admin'].includes(user?.role);
 
   // New Ticket Tier Form State
   const [newTier, setNewTier] = useState({
@@ -331,6 +356,18 @@ export default function TicketingPage() {
       return;
     }
 
+    if (newTier.type === 'paid') {
+      const p = parseFloat(newTier.price);
+      if (isNaN(p) || p <= 0) {
+        showSweetWarning('Price must be greater than 0');
+        return;
+      }
+      if (!isPaidPlan && (p < 1 || p > 10)) {
+        showSweetWarning('Free plan organizers can create token tickets priced between ₹1 and ₹10 only. Upgrade to Starter or Enterprise to set custom ticket prices.');
+        return;
+      }
+    }
+
     try {
       const res = await axios.post(
         `${API_URL}/tickets`,
@@ -344,7 +381,7 @@ export default function TicketingPage() {
       }
     } catch (err) {
       console.error('Error creating ticket tier', err);
-      showSweetError('Failed to save ticket tier');
+      showSweetError(err.response?.data?.error || 'Failed to save ticket tier');
     }
   };
 
@@ -1294,12 +1331,22 @@ export default function TicketingPage() {
                         type="number"
                         required
                         min="1"
+                        max={isPaidPlan ? undefined : 10}
                         step="any"
                         value={newTier.price}
                         onChange={(e) => setNewTier(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
                         className="w-full rounded-r-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono"
                       />
                     </div>
+                    {!isPaidPlan ? (
+                      <p className="mt-1 text-[11px] text-amber-500 font-medium">
+                        Free plan token ticket limit: <strong>₹1 to ₹10</strong>. Upgrade to Starter or Enterprise for custom ticket pricing.
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-[11px] text-emerald-500 font-medium">
+                        {organizerPlan.charAt(0).toUpperCase() + organizerPlan.slice(1)} plan active: custom ticket pricing enabled.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}

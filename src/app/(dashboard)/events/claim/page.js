@@ -24,7 +24,8 @@ import {
   ArrowLeft,
   FileText,
   AlertCircle,
-  Loader2
+  Loader2,
+  Zap
 } from 'lucide-react';
 
 const API_URL =
@@ -51,6 +52,8 @@ export default function ClaimEventPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+  const [quota, setQuota] = useState(null);
+  const [loadingQuota, setLoadingQuota] = useState(true);
 
   // Form State
   const [claimForm, setClaimForm] = useState({
@@ -164,6 +167,24 @@ export default function ClaimEventPage() {
     fetchClaimableEvents();
   }, []);
 
+  const fetchQuota = async () => {
+    try {
+      const config = accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {};
+      const res = await axios.get(`${API_URL}/wordpress/claim-quota`, config);
+      if (res.data?.success && res.data.quota) {
+        setQuota(res.data.quota);
+      }
+    } catch (err) {
+      console.warn('Could not fetch claim quota:', err);
+    } finally {
+      setLoadingQuota(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchQuota();
+  }, [accessToken, user]);
+
   const handleFormChange = (e) => {
     const { name, value } = e.target;
     setClaimForm(prev => ({ ...prev, [name]: value }));
@@ -248,10 +269,17 @@ export default function ClaimEventPage() {
       if (res.data && res.data.success) {
         setSubmitting(false);
         setSubmitted(true);
+        fetchQuota();
       }
     } catch (err) {
       console.error('Claim submission error', err);
-      setError(err.response?.data?.error || 'Failed to submit claim request. Please check your credentials.');
+      const errData = err.response?.data;
+      if (errData?.dailyLimitReached) {
+        setError(errData.error || 'Daily event claim limit reached (3 claims per day for Free organizers). Upgrade to Starter or Enterprise plan to claim unlimited events.');
+        fetchQuota();
+      } else {
+        setError(errData?.error || 'Failed to submit claim request. Please check your credentials.');
+      }
       setSubmitting(false);
     }
   };
@@ -295,6 +323,103 @@ export default function ClaimEventPage() {
           <ArrowLeft className="h-4 w-4" /> Switch to Create New Event
         </Link>
       </div>
+
+      {/* Daily Claim Limit & Plan Allowance Banner */}
+      {!loadingQuota && quota && (
+        <div className={`p-4 rounded-2xl border transition-all ${
+          quota.isUnlimited
+            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+            : quota.canClaim
+              ? 'bg-card border-border shadow-xs'
+              : 'bg-amber-500/10 border-amber-500/30'
+        }`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className={`p-2 rounded-xl mt-0.5 shrink-0 ${
+                quota.isUnlimited
+                  ? 'bg-emerald-500/20 text-emerald-400'
+                  : quota.canClaim
+                    ? 'bg-primary/10 text-primary'
+                    : 'bg-amber-500/20 text-amber-500'
+              }`}>
+                {quota.canClaim ? (
+                  <ShieldCheck className="h-5 w-5" />
+                ) : (
+                  <AlertCircle className="h-5 w-5" />
+                )}
+              </div>
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="text-sm font-bold text-foreground">
+                    {quota.isUnlimited
+                      ? `${quota.plan ? quota.plan.charAt(0).toUpperCase() + quota.plan.slice(1) : 'Paid'} Tier · Unlimited Event Claims`
+                      : 'Free Organizer Plan · Daily Claim Quota'}
+                  </h4>
+                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                    quota.isUnlimited
+                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                      : quota.canClaim
+                        ? 'bg-primary/10 text-primary border-primary/20'
+                        : 'bg-amber-500/20 text-amber-500 border-amber-500/30'
+                  }`}>
+                    {quota.isUnlimited
+                      ? 'Unlimited Active'
+                      : quota.canClaim
+                        ? `${quota.claimsToday} of 3 Used Today (${quota.claimsRemaining} left)`
+                        : 'Daily Limit Reached (3/3 Used)'}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {quota.isUnlimited
+                    ? 'Your active plan enables you to claim any number of event listings from the VisitExpo directory without daily limits.'
+                    : quota.canClaim
+                      ? `Free organizers can claim up to 3 events per day. You have ${quota.claimsRemaining} claim${quota.claimsRemaining === 1 ? '' : 's'} remaining today (resets daily at midnight).`
+                      : 'You have reached the maximum 3 event claims allowed per day on the Free plan. Daily quota will reset at midnight, or upgrade to Starter/Enterprise for unlimited claiming.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+              {!quota.isUnlimited && (
+                <Link
+                  href="/pricing"
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    !quota.canClaim
+                      ? 'bg-amber-500 hover:bg-amber-400 text-black shadow-xs'
+                      : 'border border-border bg-secondary hover:bg-secondary/80 text-foreground'
+                  }`}
+                >
+                  <Zap className="h-3.5 w-3.5" />
+                  <span>{quota.canClaim ? 'Upgrade Plan' : 'Unlock Unlimited Claims'}</span>
+                </Link>
+              )}
+            </div>
+          </div>
+
+          {/* Visual 3-slot progress indicator for Free plan */}
+          {!quota.isUnlimited && (
+            <div className="mt-3 pt-3 border-t border-border/50 flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-semibold text-muted-foreground mr-1">Daily Claim Slots:</span>
+              {[1, 2, 3].map((slot) => {
+                const isUsed = slot <= quota.claimsToday;
+                return (
+                  <div
+                    key={slot}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                      isUsed
+                        ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                        : 'bg-secondary/60 text-muted-foreground border-border'
+                    }`}
+                  >
+                    <span className={`h-1.5 w-1.5 rounded-full ${isUsed ? 'bg-amber-400' : 'bg-muted-foreground/40'}`} />
+                    <span>Claim {slot}: {isUsed ? 'Used' : 'Available'}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold flex justify-between">
@@ -555,12 +680,16 @@ export default function ClaimEventPage() {
 
                   <button
                     type="submit"
-                    disabled={submitting}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-xs font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-all mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={submitting || (quota && !quota.canClaim)}
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-xs font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-all mt-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
                     {submitting ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" /> Submitting Request...
+                      </>
+                    ) : quota && !quota.canClaim ? (
+                      <>
+                        <AlertCircle className="h-4 w-4" /> Daily Limit Reached (3/3 Used Today)
                       </>
                     ) : (
                       <>
@@ -568,6 +697,21 @@ export default function ClaimEventPage() {
                       </>
                     )}
                   </button>
+
+                  {quota && !quota.canClaim && (
+                    <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-2">
+                      <div className="flex items-center gap-2 text-amber-500">
+                        <AlertCircle className="h-4 w-4 shrink-0" />
+                        <span className="font-semibold">Free organizers can claim up to 3 events per day.</span>
+                      </div>
+                      <Link
+                        href="/pricing"
+                        className="inline-flex items-center gap-1 font-bold text-primary hover:underline shrink-0"
+                      >
+                        Upgrade to Starter or Enterprise <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
+                  )}
                 </form>
               ) : (
                 <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground gap-2 bg-muted/10 rounded-xl border border-border">

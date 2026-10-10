@@ -8,10 +8,11 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
 import SearchableSelect from '../../../components/SearchableSelect.js';
-import { showSweetAlert, showSweetConfirm, showSweetSuccess, showSweetError, showSweetWarning } from '../../../utils/sweetalert.js';
+import { showSweetAlert, showSweetConfirm, showSweetSuccess, showSweetError, showSweetWarning, showSweetInfo } from '../../../utils/sweetalert.js';
 import * as XLSX from 'xlsx';
 import {
   Search,
@@ -53,7 +54,13 @@ import {
   FileText,
   AlertCircle,
   Loader2,
-  MoreHorizontal
+  MoreHorizontal,
+  Lock,
+  Zap,
+  Crown,
+  ShieldCheck,
+  ArrowRight,
+  MessageSquare
 } from 'lucide-react';
 
 const API_URL =
@@ -69,6 +76,45 @@ export default function LeadsCRMPage() {
   useEffect(() => {
     accessTokenRef.current = accessToken;
   }, [accessToken]);
+
+  // Plan Tier State (free, starter, enterprise)
+  const [userPlan, setUserPlan] = useState('free');
+  const [isPlanLoading, setIsPlanLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchMyPlan = async () => {
+      try {
+        const token = accessToken || (typeof window !== 'undefined' ? localStorage.getItem('visitexpo_token') : null);
+        if (!token) {
+          if (user?.plan) setUserPlan(user.plan.toLowerCase());
+          setIsPlanLoading(false);
+          return;
+        }
+        const res = await axios.get(`${API_URL}/plans/my-plan`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (isMounted && res.data?.success && res.data.plan) {
+          setUserPlan(res.data.plan.toLowerCase());
+        } else if (user?.plan) {
+          setUserPlan(user.plan.toLowerCase());
+        }
+      } catch (err) {
+        if (user?.plan) setUserPlan(user.plan.toLowerCase());
+      } finally {
+        if (isMounted) setIsPlanLoading(false);
+      }
+    };
+    fetchMyPlan();
+    return () => {
+      isMounted = false;
+    };
+  }, [user, accessToken]);
+
+  const isSuperAdmin = user?.role === 'super_admin';
+  const isFreePlan = !isSuperAdmin && (userPlan === 'free' || !userPlan);
+  const isStarterPlan = !isSuperAdmin && userPlan === 'starter';
+  const isEnterprisePlan = isSuperAdmin || userPlan === 'enterprise' || userPlan === 'growth';
 
   // Primary Data State
   const [events, setEvents] = useState([]);
@@ -657,6 +703,10 @@ export default function LeadsCRMPage() {
 
   // Export CSV of filtered, selected, or available leads with intelligent fallback
   const handleExportCsv = () => {
+    if (isFreePlan) {
+      showSweetWarning('Lead export is available on Starter and Enterprise plans. Please upgrade to download your leads.');
+      return;
+    }
     try {
       // 1. Determine list of leads to export
       let listToExport = [];
@@ -1203,9 +1253,24 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
       {/* 1. TOP HEADER SECTION */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
-            Attendee & Buyer Leads Hub
-          </h1>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+              Attendee & Buyer Leads Hub
+            </h1>
+            {isFreePlan ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                <Lock className="h-3 w-3" /> Free Plan · 3 Leads Preview
+              </span>
+            ) : isStarterPlan ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <ShieldCheck className="h-3 w-3" /> Starter Plan · Normal Level
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                <Crown className="h-3 w-3 text-indigo-500" /> Enterprise Plan · Advance Intelligence Level
+              </span>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground mt-1">
             Centralized buyer intelligence, delegate registrations, and high-intent inquiry management
           </p>
@@ -1673,28 +1738,38 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredLeads.map((item) => {
+                {filteredLeads.map((item, index) => {
                   const isSelected = selectedLeadIds.has(item._id);
+                  const isBlurred = isFreePlan && index >= 3;
 
                   return (
                     <tr
                       key={item._id}
-                      onClick={() => setDrawerLead(item)}
-                      className={`hover:bg-muted/40 cursor-pointer transition-colors group ${
+                      onClick={() => {
+                        if (isBlurred) {
+                          showSweetWarning('Free plan displays 3 preview leads. Upgrade to Starter or Enterprise to unlock full buyer contacts & CRM intelligence.');
+                          return;
+                        }
+                        setDrawerLead(item);
+                      }}
+                      className={`transition-colors group ${
                         isSelected ? 'bg-primary/5' : ''
+                      } ${
+                        isBlurred
+                          ? 'filter blur-[4.5px] opacity-40 select-none cursor-not-allowed'
+                          : 'hover:bg-muted/40 cursor-pointer'
                       }`}
                     >
                       {/* Checkbox column */}
-                      <td
-                        className="px-4 py-3.5 text-center"
-                      >
+                      <td className="px-4 py-3.5 text-center">
                         <input
                           type="checkbox"
+                          disabled={isBlurred}
                           aria-label={`Select ${item.name || 'lead'}`}
-                          checked={isSelected}
+                          checked={isSelected && !isBlurred}
                           onClick={(e) => e.stopPropagation()}
-                          onChange={() => toggleSelectLead(item._id)}
-                          className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer"
+                          onChange={() => !isBlurred && toggleSelectLead(item._id)}
+                          className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer disabled:cursor-not-allowed"
                         />
                       </td>
 
@@ -1715,10 +1790,12 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                           </div>
                           <div className="min-w-0">
                             <p className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
-                              {item.name}
+                              {isBlurred ? `${item.name?.split(' ')[0] || 'Buyer'} ••••••` : item.name}
                             </p>
                             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                              <span className="truncate">{item.email}</span>
+                              <span className="truncate">
+                                {isBlurred ? (item.email ? item.email.substring(0, 2) + '••••@••••.com' : '••••@••••.com') : item.email}
+                              </span>
                               {item.country && (
                                 <span className="bg-secondary px-1.5 py-0.2 rounded text-[10px] uppercase font-mono">
                                   {item.country}
@@ -1732,11 +1809,19 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                       {/* Organization & Title column */}
                       <td className="px-4 py-3.5">
                         <p className="font-medium text-foreground truncate">
-                          {item.company || 'Individual Attendee'}
+                          {isBlurred ? (item.company ? `${item.company.substring(0, 4)}•••• Inc.` : 'Protected Org') : (item.company || 'Individual Attendee')}
                         </p>
                         <p className="text-[11px] text-muted-foreground truncate">
                           {item.designation || 'Trade Delegate'}
                         </p>
+                        {isEnterprisePlan && !isBlurred && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                              <Crown className="h-2.5 w-2.5" /> High Authority Decision Maker
+                            </span>
+                            <span className="text-[9px] text-muted-foreground font-mono">Est. ₹50L+</span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Buyer Intent & Score */}
@@ -1755,9 +1840,15 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                               <TrendingUp className="h-3 w-3" />
                               {item.leadScore || 0}% Score
                             </span>
-                            <span className="text-[10px] text-muted-foreground capitalize">
-                              {item.source || 'website'}
-                            </span>
+                            {isEnterprisePlan && (item.leadScore || 0) >= 60 && !isBlurred ? (
+                              <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-0.5">
+                                <Flame className="h-2.5 w-2.5 text-amber-500" /> Hot Buyer
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground capitalize">
+                                {item.source || 'website'}
+                              </span>
+                            )}
                           </div>
                           {/* Mini Progress Bar */}
                           <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
@@ -1781,9 +1872,10 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                         onClick={(e) => e.stopPropagation()}
                       >
                         <select
+                          disabled={isBlurred}
                           value={item.status || 'new'}
                           onChange={(e) => handleUpdateLead(item._id, { status: e.target.value })}
-                          className={`appearance-none rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide border cursor-pointer focus:outline-none transition-colors ${
+                          className={`appearance-none rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide border cursor-pointer focus:outline-none transition-colors disabled:cursor-not-allowed ${
                             item.status === 'won'
                               ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
                               : item.status === 'qualified'
@@ -1809,8 +1901,21 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                       {/* Actions column */}
                       <td className="px-4 py-3.5 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Enterprise Quick WhatsApp Direct */}
+                          {isEnterprisePlan && !isBlurred && item.phone && (
+                            <a
+                              href={`https://wa.me/${item.phone.replace(/[^0-9]/g, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-1.5 rounded-md text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10 transition-all cursor-pointer btn-press active:scale-90"
+                              title="1-Click WhatsApp Direct"
+                            >
+                              <MessageSquare className="h-3.5 w-3.5" />
+                            </a>
+                          )}
                           {/* Quick Call */}
-                          {item.phone && (
+                          {item.phone && !isBlurred && (
                             <a
                               href={`tel:${item.phone}`}
                               onClick={(e) => e.stopPropagation()}
@@ -1821,18 +1926,24 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                             </a>
                           )}
                           {/* Quick Email */}
-                          <a
-                            href={`mailto:${item.email}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer btn-press active:scale-90"
-                            title="Send Email"
-                          >
-                            <Mail className="h-3.5 w-3.5" />
-                          </a>
+                          {!isBlurred && (
+                            <a
+                              href={`mailto:${item.email}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer btn-press active:scale-90"
+                              title="Send Email"
+                            >
+                              <Mail className="h-3.5 w-3.5" />
+                            </a>
+                          )}
                           {/* View CRM Drawer */}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (isBlurred) {
+                                showSweetWarning('Upgrade to Starter or Enterprise plan to unlock and view this lead in detail.');
+                                return;
+                              }
                               setDrawerLead(item);
                             }}
                             className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all cursor-pointer btn-press active:scale-90"
@@ -1841,29 +1952,33 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                             <Eye className="h-3.5 w-3.5" />
                           </button>
                           {/* Edit Lead Details */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openEditLeadModal(item);
-                            }}
-                            className="p-1.5 rounded-md text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-all cursor-pointer btn-press active:scale-90"
-                            title="Edit Lead Details"
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                          </button>
+                          {!isBlurred && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditLeadModal(item);
+                              }}
+                              className="p-1.5 rounded-md text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-all cursor-pointer btn-press active:scale-90"
+                              title="Edit Lead Details"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                           {/* Delete Lead */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              handleDeleteLead(item._id, e);
-                            }}
-                            className="p-1.5 rounded-md text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-all cursor-pointer btn-press active:scale-90"
-                            title="Delete Lead"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {!isBlurred && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                handleDeleteLead(item._id, e);
+                              }}
+                              className="p-1.5 rounded-md text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-all cursor-pointer btn-press active:scale-90"
+                              title="Delete Lead"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1871,6 +1986,36 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                 })}
               </tbody>
             </table>
+
+            {/* Free Plan Upgrade Box */}
+            {isFreePlan && filteredLeads.length > 3 && (
+              <div className="p-6 m-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-background to-amber-500/10 border border-amber-500/30 text-center space-y-3 shadow-lg">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-bold">
+                  <Lock className="h-3.5 w-3.5" /> Free Plan Limit: 3 / {filteredLeads.length} Leads Unlocked
+                </div>
+                <h3 className="text-base font-bold text-foreground">
+                  Upgrade to Starter or Enterprise to Unlock All {filteredLeads.length} Buyer Leads
+                </h3>
+                <p className="text-xs text-muted-foreground max-w-lg mx-auto">
+                  Free plan organizers can view only 3 preview leads with remaining entries blurred.
+                  Upgrade to <strong>Starter Plan</strong> to view in normal level or <strong>Enterprise Plan</strong> to view in advance level with AI buying intelligence &amp; unlimited downloads.
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+                  <Link
+                    href="/pricing"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs shadow-md transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Zap className="h-4 w-4" /> Upgrade to Starter or Enterprise
+                  </Link>
+                  <Link
+                    href="/pricing"
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    Compare Plans <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

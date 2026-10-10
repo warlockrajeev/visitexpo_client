@@ -62,6 +62,31 @@ export default function EventsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // all, draft, published, completed, cancelled
   const [isSavingEvent, setIsSavingEvent] = useState(false);
+  const [organizerPlan, setOrganizerPlan] = useState(() => (user?.plan || 'free').toLowerCase());
+
+  // Detect active plan tier for ticket monetization limits
+  useEffect(() => {
+    let isMounted = true;
+    const fetchMyPlan = async () => {
+      try {
+        const config = accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {};
+        const res = await axios.get(`${API_URL}/plans/my-plan`, config);
+        if (isMounted && res.data?.success) {
+          const planId = (res.data.subscription?.plan || res.data.plan || user?.plan || 'free').toLowerCase();
+          const isPlanActive = res.data.isPlanActive ?? true;
+          setOrganizerPlan(isPlanActive ? planId : 'free');
+        }
+      } catch (e) {
+        // Fallback to user.plan
+      }
+    };
+    if (user) {
+      fetchMyPlan();
+    }
+    return () => { isMounted = false; };
+  }, [user, accessToken]);
+
+  const isPaidPlan = ['starter', 'enterprise', 'growth'].includes(organizerPlan) || ['super_admin', 'admin'].includes(user?.role);
   const [deletingEventId, setDeletingEventId] = useState(null);
   const [updatingEventId, setUpdatingEventId] = useState(null);
 
@@ -793,6 +818,9 @@ export default function EventsPage() {
       if (isNaN(price) || price <= 0) {
         errs.paidTicketPrice = `Paid ticket price must be greater than 0 (${data.currency || 'INR'}).`;
         missing.push('Ticket Price (must be > 0 for paid tickets)');
+      } else if (!isPaidPlan && (price < 1 || price > 10)) {
+        errs.paidTicketPrice = 'Free plan organizers can set token ticket price between ₹1 and ₹10 only. Upgrade to Starter or Enterprise to set custom ticket prices.';
+        missing.push('Ticket Price (₹1 - ₹10 limit on Free plan)');
       }
     }
 
@@ -2103,6 +2131,7 @@ export default function EventsPage() {
                             value={eventForm.paidTicketPrice}
                             onChange={handleInputChange}
                             min="1"
+                            max={isPaidPlan ? undefined : 10}
                             step="any"
                             className={`w-full rounded-r-lg border bg-background px-3 py-2 text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono ${
                               formErrors.paidTicketPrice ? 'border-destructive ring-2 ring-destructive/20' : 'border-border'
@@ -2112,6 +2141,15 @@ export default function EventsPage() {
                         {formErrors.paidTicketPrice && (
                           <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
                             <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {formErrors.paidTicketPrice}
+                          </p>
+                        )}
+                        {!isPaidPlan ? (
+                          <p className="mt-1.5 text-[11px] text-amber-500 font-medium">
+                            Free plan token ticket limit: <strong>₹1 to ₹10</strong>. Upgrade to Starter or Enterprise for custom ticket pricing.
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-[11px] text-emerald-500 font-medium">
+                            {organizerPlan.charAt(0).toUpperCase() + organizerPlan.slice(1)} plan active: custom ticket pricing enabled.
                           </p>
                         )}
                       </div>

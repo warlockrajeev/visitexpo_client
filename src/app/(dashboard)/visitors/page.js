@@ -6,7 +6,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 import { useAuth } from '../../../context/AuthContext.js';
 import { buildDashboardEventsUrl } from '../../../utils/dashboardEvents.js';
 import SearchableSelect from '../../../components/SearchableSelect.js';
@@ -31,7 +33,14 @@ import {
   UserCheck,
   Bell,
   Bookmark,
-  ExternalLink
+  ExternalLink,
+  Lock,
+  Zap,
+  Crown,
+  ShieldCheck,
+  ArrowRight,
+  UserPlus,
+  FileSpreadsheet
 } from 'lucide-react';
 
 const API_URL =
@@ -42,11 +51,159 @@ const API_URL =
 
 export default function VisitorsCRMPage() {
   const { user, accessToken } = useAuth();
+
+  // Plan Tier State (free, starter, enterprise)
+  const [userPlan, setUserPlan] = useState('free');
+  const [isPlanLoading, setIsPlanLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchMyPlan = async () => {
+      try {
+        const token = accessToken || (typeof window !== 'undefined' ? localStorage.getItem('visitexpo_token') : null);
+        if (!token) {
+          if (user?.plan) setUserPlan(user.plan.toLowerCase());
+          setIsPlanLoading(false);
+          return;
+        }
+        const res = await axios.get(`${API_URL}/plans/my-plan`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (isMounted && res.data?.success && res.data.plan) {
+          setUserPlan(res.data.plan.toLowerCase());
+        } else if (user?.plan) {
+          setUserPlan(user.plan.toLowerCase());
+        }
+      } catch (err) {
+        if (user?.plan) setUserPlan(user.plan.toLowerCase());
+      } finally {
+        if (isMounted) setIsPlanLoading(false);
+      }
+    };
+    fetchMyPlan();
+    return () => {
+      isMounted = false;
+    };
+  }, [user, accessToken]);
+
+  const isSuperAdmin = user?.role === 'super_admin';
+  const isFreePlan = !isSuperAdmin && (userPlan === 'free' || !userPlan);
+  const isStarterPlan = !isSuperAdmin && userPlan === 'starter';
+  const isEnterprisePlan = isSuperAdmin || userPlan === 'enterprise' || userPlan === 'growth';
+
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [visitors, setVisitors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Enterprise helpers: Convert to CRM Lead
+  const handleConvertVisitorToLead = async (vis) => {
+    try {
+      const res = await axios.post(
+        `${API_URL}/leads`,
+        {
+          name: vis.name,
+          email: vis.email,
+          phone: vis.phone || '',
+          company: vis.company || 'Corporate Attendee',
+          designation: vis.designation || 'Visitor',
+          country: vis.country || 'India',
+          source: vis.attendanceType === 'virtual' ? 'virtual_stream' : 'onboarding',
+          eventId: selectedEventId,
+          leadScore: 85,
+          notes: `Converted from Attendee CRM (${vis.attendanceType || 'in_person'})`
+        },
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (res.data && res.data.success) {
+        showSweetSuccess(`${vis.name} successfully converted to CRM Buyer Lead!`);
+      }
+    } catch (err) {
+      showSweetError(err.response?.data?.error || err.response?.data?.message || 'Failed to convert to lead');
+    }
+  };
+
+  const handleConvertEngagementToLead = async (eng) => {
+    try {
+      const targetEvtId = events.find((e) => e.slug === eng.eventSlug)?._id || selectedEventId;
+      const res = await axios.post(
+        `${API_URL}/leads`,
+        {
+          name: eng.userName,
+          email: eng.userEmail,
+          phone: eng.userPhone || '',
+          company: eng.userCompany || 'Interested Buyer',
+          designation: eng.userDesignation || 'Trade Delegate',
+          country: eng.eventCountry || 'India',
+          source: 'campaign',
+          eventId: targetEvtId,
+          leadScore: 90,
+          notes: `Interested / Follower lead from ${eng.eventTitle || 'event'}`
+        },
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (res.data && res.data.success) {
+        showSweetSuccess(`${eng.userName} added directly into Lead CRM!`);
+      }
+    } catch (err) {
+      showSweetError(err.response?.data?.error || err.response?.data?.message || 'Failed to convert to lead');
+    }
+  };
+
+  // Enterprise helpers: Export to Excel
+  const handleExportVisitors = () => {
+    if (isFreePlan) {
+      showSweetWarning('Visitor export is available on Starter and Enterprise plans. Please upgrade.');
+      return;
+    }
+    try {
+      const rows = filteredVisitors.map((v) => ({
+        'Visitor Name': v.name,
+        'Email Address': v.email,
+        'Phone Number': v.phone || '',
+        'Company': v.company || '',
+        'Designation': v.designation || '',
+        'Country': v.country || 'India',
+        'Attendance Channel': v.attendanceType,
+        'Check-In Status': v.checkInStatus,
+        'Registration Date': v.createdAt ? new Date(v.createdAt).toLocaleDateString() : ''
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Attendees');
+      XLSX.writeFile(wb, `VisitExpo_Attendees_${new Date().toISOString().split('T')[0]}.xlsx`);
+      showSweetSuccess('Attendees directory exported successfully!');
+    } catch (e) {
+      showSweetError('Export failed');
+    }
+  };
+
+  const handleExportEngagements = () => {
+    if (isFreePlan) {
+      showSweetWarning('Engagement export is available on Starter and Enterprise plans. Please upgrade.');
+      return;
+    }
+    try {
+      const rows = engagements.map((e) => ({
+        'Delegate Name': e.userName,
+        'Email Address': e.userEmail,
+        'Phone Number': e.userPhone || '',
+        'Company': e.userCompany || '',
+        'Designation': e.userDesignation || '',
+        'Event': e.eventTitle || '',
+        'Engagement Type': e.type,
+        'Added Date': e.createdAt ? new Date(e.createdAt).toLocaleDateString() : ''
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Engagements');
+      XLSX.writeFile(wb, `VisitExpo_Interested_Delegates_${new Date().toISOString().split('T')[0]}.xlsx`);
+      showSweetSuccess('Interested delegates exported successfully!');
+    } catch (e) {
+      showSweetError('Export failed');
+    }
+  };
   
   // Tab Switcher State: Gate passes vs Interested/Followers
   const [viewTab, setViewTab] = useState('registrations'); // 'registrations' | 'engagements'
@@ -321,15 +478,30 @@ export default function VisitorsCRMPage() {
       {/* Top Banner */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-6 rounded-2xl border border-border shadow-sm">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Users className="h-6 w-6 text-primary" /> Visitor CRM & Registry
-          </h2>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              <Users className="h-6 w-6 text-primary" /> Visitor CRM & Registry
+            </h2>
+            {isFreePlan ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                <Lock className="h-3 w-3" /> Free Plan · 3 Preview Limit
+              </span>
+            ) : isStarterPlan ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <ShieldCheck className="h-3 w-3" /> Starter Plan · Normal Level
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                <Crown className="h-3 w-3 text-indigo-500" /> Enterprise Plan · Advance Intelligence Level
+              </span>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground mt-1">
             Register visitors, manage QR codes for in-person attendees, and track virtual connections.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex flex-col min-w-[280px] sm:min-w-[320px]">
+          <div className="flex flex-col min-w-[240px] sm:min-w-[280px]">
             <label className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Active Event</label>
             <SearchableSelect
               options={events.map((evt) => ({ value: evt._id, label: evt.title }))}
@@ -340,9 +512,30 @@ export default function VisitorsCRMPage() {
               className="w-full"
             />
           </div>
+          {viewTab === 'registrations' ? (
+            <button
+              type="button"
+              onClick={handleExportVisitors}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-secondary hover:bg-secondary/80 border border-border px-3.5 py-2 text-xs font-semibold text-foreground transition-all shadow-xs cursor-pointer"
+              title="Export attendees to Excel"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Export Excel</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleExportEngagements}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-secondary hover:bg-secondary/80 border border-border px-3.5 py-2 text-xs font-semibold text-foreground transition-all shadow-xs cursor-pointer"
+              title="Export interested delegates to Excel"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Export Excel</span>
+            </button>
+          )}
           <button
             onClick={handleOpenModal}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-md mt-4 md:mt-0"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-md mt-4 md:mt-0 cursor-pointer"
           >
             <Plus className="h-4 w-4" /> Onboard Visitor
           </button>
@@ -457,68 +650,133 @@ export default function VisitorsCRMPage() {
                           e.eventTitle?.toLowerCase().includes(q)
                         );
                       })
-                      .map((eng) => (
-                        <tr key={eng._id} className="hover:bg-secondary/40 transition-colors">
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={eng.userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(eng.userName)}&background=FF2E63&color=fff`}
-                                alt={eng.userName}
-                                className="h-9 w-9 rounded-full object-cover border border-border shrink-0"
-                              />
-                              <div>
-                                <p className="font-semibold text-foreground flex items-center gap-1.5">
-                                  <span>{eng.userName}</span>
-                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                                    Live User
+                      .map((eng, index) => {
+                        const isBlurred = isFreePlan && index >= 3;
+
+                        return (
+                          <tr
+                            key={eng._id}
+                            className={`transition-colors ${
+                              isBlurred
+                                ? 'filter blur-[4.5px] opacity-40 select-none cursor-not-allowed'
+                                : 'hover:bg-secondary/40'
+                            }`}
+                          >
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <img
+                                  src={eng.userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(eng.userName)}&background=FF2E63&color=fff`}
+                                  alt={eng.userName}
+                                  className="h-9 w-9 rounded-full object-cover border border-border shrink-0"
+                                />
+                                <div>
+                                  <p className="font-semibold text-foreground flex items-center gap-1.5">
+                                    <span>{isBlurred ? `${eng.userName?.split(' ')[0] || 'Delegate'} ••••••` : eng.userName}</span>
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                      Live User
+                                    </span>
+                                  </p>
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                                    <Mail className="h-3 w-3" />{' '}
+                                    {isBlurred ? (eng.userEmail ? eng.userEmail.substring(0, 2) + '••••@••••.com' : '••••@••••.com') : eng.userEmail}
                                   </span>
-                                </p>
-                                <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                                  <Mail className="h-3 w-3" /> {eng.userEmail}
-                                </span>
-                                {eng.userPhone && (
-                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                    <Phone className="h-3 w-3" /> {eng.userPhone}
-                                  </span>
+                                  {eng.userPhone && (
+                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <Phone className="h-3 w-3" />{' '}
+                                      {isBlurred ? eng.userPhone.substring(0, 4) + ' ••••••••' : eng.userPhone}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="px-6 py-4">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="font-semibold text-foreground">
+                                    {isBlurred
+                                      ? (eng.userCompany ? `${eng.userCompany.substring(0, 4)}••••` : 'Protected Company')
+                                      : (eng.userCompany || 'Independent Professional')}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">{eng.userDesignation || 'Trade Visitor'}</p>
+                                  {isEnterprisePlan && !isBlurred && (
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 mt-1">
+                                      <Crown className="h-2.5 w-2.5" /> High Buying Power
+                                    </span>
+                                  )}
+                                </div>
+                                {isEnterprisePlan && !isBlurred && (
+                                  <button
+                                    onClick={() => handleConvertEngagementToLead(eng)}
+                                    className="inline-flex items-center gap-1 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500 hover:text-white px-2 py-1 text-[11px] font-bold border border-indigo-500/20 transition-all ml-2 cursor-pointer"
+                                    title="Convert to CRM Lead"
+                                  >
+                                    <UserPlus className="h-3 w-3" /> CRM
+                                  </button>
                                 )}
                               </div>
-                            </div>
-                          </td>
+                            </td>
 
-                          <td className="px-6 py-4">
-                            <p className="font-semibold text-foreground">{eng.userCompany || 'Independent Professional'}</p>
-                            <p className="text-xs text-muted-foreground">{eng.userDesignation || 'Trade Visitor'}</p>
-                          </td>
+                            <td className="px-6 py-4">
+                              <Link
+                                href={`/expo/${eng.eventSlug}`}
+                                className="font-semibold text-primary hover:underline block truncate max-w-xs"
+                              >
+                                {eng.eventTitle}
+                              </Link>
+                              <span className="text-xs text-muted-foreground">{eng.eventCity || 'India'}</span>
+                            </td>
 
-                          <td className="px-6 py-4">
-                            <Link
-                              href={`/expo/${eng.eventSlug}`}
-                              className="font-semibold text-primary hover:underline block truncate max-w-xs"
-                            >
-                              {eng.eventTitle}
-                            </Link>
-                            <span className="text-xs text-muted-foreground">{eng.eventCity || 'India'}</span>
-                          </td>
+                            <td className="px-6 py-4">
+                              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                eng.type === 'both'
+                                  ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
+                                  : eng.type === 'follower'
+                                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                              }`}>
+                                {eng.type === 'both' ? 'Interested & Following' : eng.type === 'follower' ? 'Following' : 'Marked Interested'}
+                              </span>
+                            </td>
 
-                          <td className="px-6 py-4">
-                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                              eng.type === 'both'
-                                ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
-                                : eng.type === 'follower'
-                                ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
-                                : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                            }`}>
-                              {eng.type === 'both' ? 'Interested & Following' : eng.type === 'follower' ? 'Following' : 'Marked Interested'}
-                            </span>
-                          </td>
-
-                          <td className="px-6 py-4 text-right text-xs text-muted-foreground whitespace-nowrap">
-                            {eng.createdAt ? new Date(eng.createdAt).toLocaleDateString() : 'Recent'}
-                          </td>
-                        </tr>
-                      ))}
+                            <td className="px-6 py-4 text-right text-xs text-muted-foreground whitespace-nowrap">
+                              {eng.createdAt ? new Date(eng.createdAt).toLocaleDateString() : 'Recent'}
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
+
+                {/* Free Plan Upgrade Box for Engagements */}
+                {isFreePlan && engagements.length > 3 && (
+                  <div className="p-6 m-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-background to-amber-500/10 border border-amber-500/30 text-center space-y-3 shadow-lg">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-bold">
+                      <Lock className="h-3.5 w-3.5" /> Free Plan Limit: 3 / {engagements.length} Interested People &amp; Followers Unlocked
+                    </div>
+                    <h3 className="text-base font-bold text-foreground">
+                      Upgrade to Starter or Enterprise to View All {engagements.length} Interested People &amp; Followers
+                    </h3>
+                    <p className="text-xs text-muted-foreground max-w-lg mx-auto">
+                      Free plan organizers can view only 3 preview delegates with remaining entries blurred.
+                      Upgrade to <strong>Starter Plan</strong> to view in normal level or <strong>Enterprise Plan</strong> to view in advance level with AI buying intelligence &amp; 1-click CRM lead conversions.
+                    </p>
+                    <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+                      <Link
+                        href="/pricing"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs shadow-md transition-all active:scale-95 cursor-pointer"
+                      >
+                        <Zap className="h-4 w-4" /> Upgrade to Starter or Enterprise
+                      </Link>
+                      <Link
+                        href="/pricing"
+                        className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground text-xs font-semibold transition-all cursor-pointer"
+                      >
+                        Compare Plans <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -589,111 +847,184 @@ export default function VisitorsCRMPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredVisitors.map((vis) => (
-                  <tr key={vis._id} className="hover:bg-secondary/40 transition-colors">
-                    <td className="px-6 py-4">
-                      <div>
-                        <p className="font-semibold text-foreground">{vis.name}</p>
-                        <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                          <Mail className="h-3 w-3" /> {vis.email}
+                {filteredVisitors.map((vis, index) => {
+                  const isBlurred = isFreePlan && index >= 3;
+
+                  return (
+                    <tr
+                      key={vis._id}
+                      className={`transition-colors ${
+                        isBlurred
+                          ? 'filter blur-[4.5px] opacity-40 select-none cursor-not-allowed'
+                          : 'hover:bg-secondary/40'
+                      }`}
+                    >
+                      <td className="px-6 py-4">
+                        <div>
+                          <p className="font-semibold text-foreground">
+                            {isBlurred ? `${vis.name?.split(' ')[0] || 'Attendee'} ••••••` : vis.name}
+                          </p>
+                          <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <Mail className="h-3 w-3" />{' '}
+                            {isBlurred ? (vis.email ? vis.email.substring(0, 2) + '••••@••••.com' : '••••@••••.com') : vis.email}
+                          </span>
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Phone className="h-3 w-3" />{' '}
+                            {isBlurred ? (vis.phone ? vis.phone.substring(0, 4) + ' ••••••••' : '••••••••') : vis.phone}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="font-semibold text-foreground">
+                          {isBlurred
+                            ? (vis.company ? `${vis.company.substring(0, 4)}••••` : 'Protected Company')
+                            : (vis.company || 'Individual')}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{vis.designation || 'Visitor'}</p>
+                        <span className="text-xs text-muted-foreground flex items-center gap-0.5 mt-0.5">
+                          <MapPin className="h-3 w-3" /> {vis.country}
                         </span>
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Phone className="h-3 w-3" /> {vis.phone}
+                        {isEnterprisePlan && !isBlurred && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 mt-1">
+                            <Crown className="h-2.5 w-2.5" /> VIP Trade Delegate
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold uppercase ${
+                          vis.attendanceType === 'virtual'
+                            ? 'bg-pink-500/10 text-pink-500'
+                            : 'bg-blue-500/10 text-blue-500'
+                        }`}>
+                          {vis.attendanceType === 'virtual' ? <Video className="h-3 w-3" /> : <QrCode className="h-3 w-3" />}
+                          {vis.attendanceType.replace('_', ' ')}
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="font-semibold text-foreground">{vis.company || 'Individual'}</p>
-                      <p className="text-xs text-muted-foreground">{vis.designation || 'Visitor'}</p>
-                      <span className="text-xs text-muted-foreground flex items-center gap-0.5 mt-0.5">
-                        <MapPin className="h-3 w-3" /> {vis.country}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold uppercase ${
-                        vis.attendanceType === 'virtual'
-                          ? 'bg-pink-500/10 text-pink-500'
-                          : 'bg-blue-500/10 text-blue-500'
-                      }`}>
-                        {vis.attendanceType === 'virtual' ? <Video className="h-3 w-3" /> : <QrCode className="h-3 w-3" />}
-                        {vis.attendanceType.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {vis.attendanceType === 'in_person' ? (
-                        vis.checkInStatus === 'checked_in' ? (
+                      </td>
+                      <td className="px-6 py-4">
+                        {isBlurred ? (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Lock className="h-3 w-3 text-amber-500" /> Plan Locked
+                          </span>
+                        ) : vis.attendanceType === 'in_person' ? (
+                          vis.checkInStatus === 'checked_in' ? (
+                            <div className="space-y-0.5">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-500">
+                                <CheckCircle className="h-3.5 w-3.5" /> Checked In
+                              </span>
+                              <p className="text-[10px] text-muted-foreground">
+                                {vis.checkInTime ? new Date(vis.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                              </p>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handlePhysicalCheckIn(vis.qrCode)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-500 hover:bg-emerald-500 hover:text-white transition-all duration-200 cursor-pointer"
+                            >
+                              Mark Checked In
+                            </button>
+                          )
+                        ) : vis.virtualJoinStatus === 'checked_in' ? (
                           <div className="space-y-0.5">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-500">
-                              <CheckCircle className="h-3.5 w-3.5" /> Checked In
+                            <span className="inline-flex items-center gap-1 rounded-full bg-pink-500/10 px-2 py-0.5 text-xs font-semibold text-pink-500">
+                              <CheckCircle className="h-3.5 w-3.5" /> Virtual Connected
                             </span>
                             <p className="text-[10px] text-muted-foreground">
-                              {vis.checkInTime ? new Date(vis.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                              {vis.virtualJoinTime ? new Date(vis.virtualJoinTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                             </p>
                           </div>
                         ) : (
                           <button
-                            onClick={() => handlePhysicalCheckIn(vis.qrCode)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-500 hover:bg-emerald-500 hover:text-white transition-all duration-200"
+                            onClick={() => handleVirtualJoin(vis.email)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-pink-500/20 bg-pink-500/10 px-3 py-1.5 text-xs font-semibold text-pink-500 hover:bg-pink-500 hover:text-white transition-all duration-200 cursor-pointer"
                           >
-                            Mark Checked In
-                          </button>
-                        )
-                      ) : vis.virtualJoinStatus === 'checked_in' ? (
-                        <div className="space-y-0.5">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-pink-500/10 px-2 py-0.5 text-xs font-semibold text-pink-500">
-                            <CheckCircle className="h-3.5 w-3.5" /> Virtual Connected
-                          </span>
-                          <p className="text-[10px] text-muted-foreground">
-                            {vis.virtualJoinTime ? new Date(vis.virtualJoinTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                          </p>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => handleVirtualJoin(vis.email)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-pink-500/20 bg-pink-500/10 px-3 py-1.5 text-xs font-semibold text-pink-500 hover:bg-pink-500 hover:text-white transition-all duration-200"
-                        >
-                          Simulate Join
-                        </button>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {vis.attendanceType === 'in_person' ? (
-                          <button
-                            onClick={() => setSelectedQR({ name: vis.name, qrCode: vis.qrCode, company: vis.company })}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-secondary hover:bg-secondary/80 px-2.5 py-1.5 text-xs font-semibold text-foreground border border-border shadow-sm transition-all"
-                          >
-                            <QrCode className="h-4 w-4 text-muted-foreground" /> View Badge
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => copyJoinLink(vis._id)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-secondary hover:bg-secondary/80 px-2.5 py-1.5 text-xs font-semibold text-foreground border border-border shadow-sm transition-all"
-                          >
-                            {copiedId === vis._id ? (
-                              <>
-                                <Check className="h-4 w-4 text-emerald-500" /> Copied
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="h-4 w-4 text-muted-foreground" /> Join Link
-                              </>
-                            )}
+                            Simulate Join
                           </button>
                         )}
-                        <button
-                          onClick={() => handleDeleteVisitor(vis._id)}
-                          className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
-                          title="Remove visitor record"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        {isBlurred ? (
+                          <span className="text-xs text-muted-foreground flex items-center justify-end gap-1">
+                            <Lock className="h-3 w-3 text-amber-500" /> Locked
+                          </span>
+                        ) : (
+                          <div className="flex items-center justify-end gap-2">
+                            {isEnterprisePlan && (
+                              <button
+                                onClick={() => handleConvertVisitorToLead(vis)}
+                                className="inline-flex items-center gap-1 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500 hover:text-white px-2 py-1 text-xs font-bold border border-indigo-500/20 transition-all cursor-pointer"
+                                title="Convert to CRM Buyer Lead"
+                              >
+                                <UserPlus className="h-3.5 w-3.5" /> Convert
+                              </button>
+                            )}
+                            {vis.attendanceType === 'in_person' ? (
+                              <button
+                                onClick={() => setSelectedQR({ name: vis.name, qrCode: vis.qrCode, company: vis.company })}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-secondary hover:bg-secondary/80 px-2.5 py-1.5 text-xs font-semibold text-foreground border border-border shadow-sm transition-all cursor-pointer"
+                              >
+                                <QrCode className="h-4 w-4 text-muted-foreground" /> View Badge
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => copyJoinLink(vis._id)}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-secondary hover:bg-secondary/80 px-2.5 py-1.5 text-xs font-semibold text-foreground border border-border shadow-sm transition-all cursor-pointer"
+                              >
+                                {copiedId === vis._id ? (
+                                  <>
+                                    <Check className="h-4 w-4 text-emerald-500" /> Copied
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="h-4 w-4 text-muted-foreground" /> Join Link
+                                  </>
+                                )}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteVisitor(vis._id)}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                              title="Remove visitor record"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
+
+            {/* Free Plan Upgrade Box for Attendees */}
+            {isFreePlan && filteredVisitors.length > 3 && (
+              <div className="p-6 m-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-background to-amber-500/10 border border-amber-500/30 text-center space-y-3 shadow-lg">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-bold">
+                  <Lock className="h-3.5 w-3.5" /> Free Plan Limit: 3 / {filteredVisitors.length} Attendees Unlocked
+                </div>
+                <h3 className="text-base font-bold text-foreground">
+                  Upgrade to Starter or Enterprise to Unlock All {filteredVisitors.length} Registered Attendees
+                </h3>
+                <p className="text-xs text-muted-foreground max-w-lg mx-auto">
+                  Free plan organizers can view only 3 preview attendees with remaining entries blurred.
+                  Upgrade to <strong>Starter Plan</strong> to view in normal level or <strong>Enterprise Plan</strong> to view in advance level with full buyer intelligence, badge generation &amp; check-in controls.
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+                  <Link
+                    href="/pricing"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs shadow-md transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Zap className="h-4 w-4" /> Upgrade to Starter or Enterprise
+                  </Link>
+                  <Link
+                    href="/pricing"
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    Compare Plans <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         )}
           </>

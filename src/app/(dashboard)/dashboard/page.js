@@ -54,7 +54,9 @@ import {
   Sparkles,
   Check,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Lock,
+  Crown
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -76,8 +78,6 @@ const API_URL =
     ? 'https://api.visitexpo.in/api'
     : 'http://localhost:5000/api');
 
-
-
 export function OrganizerDashboardInner() {
   const { user, accessToken, updateUser } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -97,6 +97,12 @@ export function OrganizerDashboardInner() {
   const [engagementSearch, setEngagementSearch] = useState('');
   const [engagementPage, setEngagementPage] = useState(1);
   const [engagementPageSize, setEngagementPageSize] = useState(10);
+
+  const isSuperAdmin = user?.role === 'super_admin';
+  const rawPlan = (myPlan?.plan || user?.plan || 'free').toLowerCase();
+  const isFreePlan = !isSuperAdmin && (rawPlan === 'free' || !rawPlan);
+  const isStarterPlan = !isSuperAdmin && rawPlan === 'starter';
+  const isEnterprisePlan = isSuperAdmin || rawPlan === 'enterprise' || rawPlan === 'growth';
 
   useEffect(() => {
     if (!user) return;
@@ -724,25 +730,53 @@ export function OrganizerDashboardInner() {
             </thead>
             <tbody className="divide-y divide-border/50 text-foreground">
               {recentVisitors.length > 0 ? (
-                recentVisitors.map((vis) => (
-                  <tr key={vis._id || vis.id} className="hover:bg-muted/10">
-                    <td className="p-3 font-semibold">{vis.name}</td>
-                    <td className="p-3 text-muted-foreground">{vis.email}</td>
-                    <td className="p-3">{vis.company || vis.organization || 'Corporate Delegate'}</td>
-                    <td className="p-3 text-muted-foreground">{vis.createdAt ? new Date(vis.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}</td>
-                    <td className="p-3 text-right">
-                      {vis.checkInStatus === 'checked_in' ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                          <CheckCircle className="h-3 w-3" /> Checked In
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
-                          <Clock className="h-3 w-3" /> Registered
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                recentVisitors.map((vis, index) => {
+                  const isBlurred = isFreePlan && index >= 3;
+
+                  return (
+                    <tr
+                      key={vis._id || vis.id}
+                      className={`transition-colors ${
+                        isBlurred ? 'filter blur-[4px] opacity-40 select-none pointer-events-none' : 'hover:bg-muted/10'
+                      }`}
+                    >
+                      <td className="p-3 font-semibold">
+                        {isBlurred ? `${vis.name?.split(' ')[0] || 'Visitor'} ••••••` : vis.name}
+                        {isEnterprisePlan && !isBlurred && (
+                          <span className="ml-2 inline-flex items-center gap-0.5 text-[9px] font-bold text-indigo-600 bg-indigo-500/10 px-1.5 py-0.2 rounded border border-indigo-500/20">
+                            <Crown className="h-2.5 w-2.5" /> VIP
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3 text-muted-foreground">
+                        {isBlurred ? (vis.email ? vis.email.substring(0, 2) + '••••@••••.com' : '••••@••••.com') : vis.email}
+                      </td>
+                      <td className="p-3">
+                        {isBlurred
+                          ? (vis.company ? `${vis.company.substring(0, 4)}••••` : 'Corporate Delegate')
+                          : (vis.company || vis.organization || 'Corporate Delegate')}
+                      </td>
+                      <td className="p-3 text-muted-foreground">
+                        {vis.createdAt ? new Date(vis.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                      </td>
+                      <td className="p-3 text-right">
+                        {isBlurred ? (
+                          <span className="text-[10px] text-muted-foreground flex items-center justify-end gap-1">
+                            <Lock className="h-3 w-3 text-amber-500" /> Locked
+                          </span>
+                        ) : vis.checkInStatus === 'checked_in' ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                            <CheckCircle className="h-3 w-3" /> Checked In
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
+                            <Clock className="h-3 w-3" /> Registered
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-muted-foreground">
@@ -756,6 +790,23 @@ export function OrganizerDashboardInner() {
               )}
             </tbody>
           </table>
+
+          {isFreePlan && recentVisitors.length > 3 && (
+            <div className="p-3.5 m-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center space-y-2">
+              <p className="text-xs font-bold text-foreground flex items-center justify-center gap-1.5">
+                <Lock className="h-3.5 w-3.5 text-amber-500" /> Free Plan: Showing 3 of {recentVisitors.length} visitor registrations
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Upgrade to Starter for normal access or Enterprise for advance level attendee analytics.
+              </p>
+              <Link
+                href="/pricing"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 text-black text-xs font-extrabold hover:bg-amber-600 transition-all shadow-xs cursor-pointer"
+              >
+                <Zap className="h-3 w-3" /> Upgrade to Starter or Enterprise
+              </Link>
+            </div>
+          )}
         </div>
       </div>
 
@@ -831,56 +882,78 @@ export function OrganizerDashboardInner() {
                   </td>
                 </tr>
               ) : paginatedEngagements.length > 0 ? (
-                paginatedEngagements.map((eng) => (
-                  <tr key={eng._id} className="hover:bg-muted/10 transition-colors">
-                    <td className="p-3">
-                      <div className="flex items-center gap-2.5">
-                        <img
-                          src={eng.userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(eng.userName)}&background=FF2E63&color=fff`}
-                          alt={eng.userName}
-                          className="h-8 w-8 rounded-full object-cover border border-border shrink-0"
-                        />
-                        <div className="min-w-0">
-                          <span className="font-bold text-foreground block truncate">{eng.userName}</span>
-                          <span className="text-[10px] text-muted-foreground block truncate">{eng.userDesignation || 'Trade Delegate'}</span>
+                paginatedEngagements.map((eng, index) => {
+                  const isBlurred = isFreePlan && index >= 3;
+
+                  return (
+                    <tr
+                      key={eng._id}
+                      className={`transition-colors ${
+                        isBlurred ? 'filter blur-[4px] opacity-40 select-none pointer-events-none' : 'hover:bg-muted/10'
+                      }`}
+                    >
+                      <td className="p-3">
+                        <div className="flex items-center gap-2.5">
+                          <img
+                            src={eng.userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(eng.userName)}&background=FF2E63&color=fff`}
+                            alt={eng.userName}
+                            className="h-8 w-8 rounded-full object-cover border border-border shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <span className="font-bold text-foreground block truncate">
+                              {isBlurred ? `${eng.userName?.split(' ')[0] || 'Delegate'} ••••••` : eng.userName}
+                              {isEnterprisePlan && !isBlurred && (
+                                <span className="ml-1 inline-flex items-center gap-0.5 text-[9px] font-bold text-indigo-600 bg-indigo-500/10 px-1.5 py-0.2 rounded border border-indigo-500/20">
+                                  <Crown className="h-2.5 w-2.5" /> VIP Lead
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground block truncate">{eng.userDesignation || 'Trade Delegate'}</span>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <div className="text-xs text-foreground">{eng.userEmail}</div>
-                      <div className="text-[10px] text-muted-foreground">{eng.userPhone || '—'}</div>
-                    </td>
-                    <td className="p-3">
-                      <div className="font-semibold text-foreground truncate max-w-xs">{eng.userCompany || 'Independent Buyer'}</div>
-                      <div className="text-[10px] text-muted-foreground capitalize">{eng.userRole || 'visitor'}</div>
-                    </td>
-                    <td className="p-3">
-                      <Link
-                        href={`/expo/${eng.eventSlug}`}
-                        className="font-bold text-primary hover:underline block truncate max-w-xs"
-                      >
-                        {eng.eventTitle}
-                      </Link>
-                      <span className="text-[10px] text-muted-foreground block">
-                        {eng.eventCity} • {eng.eventDates}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        eng.type === 'both'
-                          ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
-                          : eng.type === 'follower'
-                          ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
-                          : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                      }`}>
-                        {eng.type === 'both' ? 'Interested & Following' : eng.type === 'follower' ? 'Following Event' : 'Marked Interested'}
-                      </span>
-                    </td>
-                    <td className="p-3 text-right text-muted-foreground text-[11px] whitespace-nowrap">
-                      {eng.createdAt ? new Date(eng.createdAt).toLocaleDateString() : 'Recent'}
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="p-3">
+                        <div className="text-xs text-foreground">
+                          {isBlurred ? (eng.userEmail ? eng.userEmail.substring(0, 2) + '••••@••••.com' : '••••@••••.com') : eng.userEmail}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {isBlurred ? (eng.userPhone ? eng.userPhone.substring(0, 4) + ' ••••••••' : '—') : (eng.userPhone || '—')}
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <div className="font-semibold text-foreground truncate max-w-xs">
+                          {isBlurred ? (eng.userCompany ? `${eng.userCompany.substring(0, 4)}••••` : 'Independent Buyer') : (eng.userCompany || 'Independent Buyer')}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground capitalize">{eng.userRole || 'visitor'}</div>
+                      </td>
+                      <td className="p-3">
+                        <Link
+                          href={`/expo/${eng.eventSlug}`}
+                          className="font-bold text-primary hover:underline block truncate max-w-xs"
+                        >
+                          {eng.eventTitle}
+                        </Link>
+                        <span className="text-[10px] text-muted-foreground block">
+                          {eng.eventCity} • {eng.eventDates}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          eng.type === 'both'
+                            ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
+                            : eng.type === 'follower'
+                            ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                            : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                        }`}>
+                          {eng.type === 'both' ? 'Interested & Following' : eng.type === 'follower' ? 'Following Event' : 'Marked Interested'}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right text-muted-foreground text-[11px] whitespace-nowrap">
+                        {eng.createdAt ? new Date(eng.createdAt).toLocaleDateString() : 'Recent'}
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-muted-foreground">
@@ -900,6 +973,23 @@ export function OrganizerDashboardInner() {
               )}
             </tbody>
           </table>
+
+          {isFreePlan && engagements.length > 3 && (
+            <div className="p-3.5 m-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center space-y-2">
+              <p className="text-xs font-bold text-foreground flex items-center justify-center gap-1.5">
+                <Lock className="h-3.5 w-3.5 text-amber-500" /> Free Plan: Showing 3 of {engagements.length} interested people &amp; followers
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Upgrade to Starter for normal access or Enterprise for advance level delegate insights.
+              </p>
+              <Link
+                href="/pricing"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 text-black text-xs font-extrabold hover:bg-amber-600 transition-all shadow-xs cursor-pointer"
+              >
+                <Zap className="h-3 w-3" /> Upgrade to Starter or Enterprise
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Pagination Controls */}
