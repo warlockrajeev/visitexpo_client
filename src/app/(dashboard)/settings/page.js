@@ -65,6 +65,9 @@ export default function SettingsPage() {
 
   const isVisitor = user?.role === 'visitor';
   const isExhibitor = isExhibitorView;
+  const isSuperAdmin = user?.role === 'super_admin';
+  const rawPlan = (user?.plan || 'free').toLowerCase();
+  const isFreePlan = !isSuperAdmin && (rawPlan === 'free' || !rawPlan);
 
   const [activeTab, setActiveTab] = useState('profile'); // profile, security
   const [saveSuccess, setSaveSuccess] = useState('');
@@ -102,6 +105,11 @@ export default function SettingsPage() {
   }, [user]);
 
   const handleSaveChatSettings = async () => {
+    if (isFreePlan) {
+      setErrorMessage('Live Chat Desk is exclusive to Starter and Enterprise plans. Please upgrade your plan.');
+      setTimeout(() => setErrorMessage(''), 4000);
+      return;
+    }
     setSavingChat(true);
     try {
       await axios.patch(`${API_URL}/chat/settings`, chatSettings, { withCredentials: true });
@@ -1601,36 +1609,58 @@ export default function SettingsPage() {
               {/* LIVE CHAT DESK PREFERENCES */}
               {!isExhibitor && (
                 <div className="space-y-4 p-5 border border-primary/20 bg-primary/5 rounded-2xl">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <div className="p-2 rounded-xl bg-primary/10 text-primary">
                         <MessageSquare className="h-5 w-5" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-foreground">
-                          Attendee & Exhibitor Live Chat Desk
-                        </h4>
-                        <p className="text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-bold text-foreground">
+                            Attendee &amp; Exhibitor Live Chat Desk
+                          </h4>
+                          {isFreePlan ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                              <Lock className="h-3 w-3" />
+                              Starter / Enterprise Only
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                              Included in Plan
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           Allow visitors and prospective exhibitors to chat directly with your team on your expo pages.
                         </p>
                       </div>
                     </div>
 
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={chatSettings.isChatEnabled}
-                        onChange={(e) =>
-                          setChatSettings((prev) => ({
-                            ...prev,
-                            isChatEnabled: e.target.checked,
-                            chatStatus: e.target.checked ? 'online' : 'offline'
-                          }))
-                        }
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-zinc-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
-                    </label>
+                    {isFreePlan ? (
+                      <Link
+                        href="/pricing"
+                        className="px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-black text-xs font-bold transition-all shadow-xs shrink-0 inline-flex items-center gap-1"
+                      >
+                        <Lock className="h-3.5 w-3.5" />
+                        <span>Upgrade to Starter / Enterprise</span>
+                      </Link>
+                    ) : (
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={chatSettings.isChatEnabled}
+                          onChange={(e) =>
+                            setChatSettings((prev) => ({
+                              ...prev,
+                              isChatEnabled: e.target.checked,
+                              chatStatus: e.target.checked ? 'online' : 'offline'
+                            }))
+                          }
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-zinc-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
+                      </label>
+                    )}
                   </div>
 
                   {chatSettings.isChatEnabled && (

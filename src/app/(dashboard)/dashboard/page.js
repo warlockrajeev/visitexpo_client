@@ -56,7 +56,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Lock,
-  Crown
+  Crown,
+  Compass,
+  Unlock
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -97,6 +99,9 @@ export function OrganizerDashboardInner() {
   const [engagementSearch, setEngagementSearch] = useState('');
   const [engagementPage, setEngagementPage] = useState(1);
   const [engagementPageSize, setEngagementPageSize] = useState(10);
+  const [feasibilityCity, setFeasibilityCity] = useState('Delhi');
+  const [feasibilityData, setFeasibilityData] = useState(null);
+  const [loadingFeasibility, setLoadingFeasibility] = useState(false);
 
   const isSuperAdmin = user?.role === 'super_admin';
   const rawPlan = (myPlan?.plan || user?.plan || 'free').toLowerCase();
@@ -238,6 +243,29 @@ export function OrganizerDashboardInner() {
       isMounted = false;
     };
   }, [user]);
+
+  // Quick Location Feasibility Explorer data fetch
+  useEffect(() => {
+    let isMounted = true;
+    const fetchQuickFeasibility = async () => {
+      setLoadingFeasibility(true);
+      try {
+        const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+        const res = await axios.get(`${API_URL}/events/market-feasibility?city=${encodeURIComponent(feasibilityCity)}`, { headers });
+        if (isMounted && res.data?.success && res.data.data) {
+          setFeasibilityData(res.data.data);
+        }
+      } catch (e) {
+        // quiet fallback
+      } finally {
+        if (isMounted) setLoadingFeasibility(false);
+      }
+    };
+    fetchQuickFeasibility();
+    return () => {
+      isMounted = false;
+    };
+  }, [feasibilityCity, accessToken]);
 
   // Calculate dynamic check-in trend from visitors
   const dynamicCheckinTrend = React.useMemo(() => {
@@ -596,6 +624,157 @@ export function OrganizerDashboardInner() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Location Feasibility & Event Presence Explorer Widget */}
+      <div className="bg-gradient-to-br from-card via-card to-secondary/30 border border-border rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/80">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-primary/10 border border-primary/30 text-primary">
+              <Compass className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-extrabold text-foreground">
+                  Location Feasibility &amp; Event Presence Explorer
+                </h3>
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30">
+                  Market AI
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Inspect registered buyer demand, existing competitor exhibitions, and Go/No-Go feasibility reports before launching an event.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {isStarterPlan || isEnterprisePlan || isSuperAdmin ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                <span>Included in your {currentPlan.name} (Free)</span>
+              </span>
+            ) : user?.hasUnlockedLocationResearch ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-primary/10 border border-primary/30 text-foreground">
+                <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                <span>Validation Pass Active (₹4,999 Paid)</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400">
+                <Lock className="h-3.5 w-3.5" />
+                <span>Free Plan · Unlock for ₹4,999</span>
+              </span>
+            )}
+
+            <Link
+              href="/location-feasibility"
+              className="px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-black text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 shrink-0"
+            >
+              <span>Explore All Hubs</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Quick Hub Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+          <span className="text-[11px] font-bold text-muted-foreground/70 uppercase mr-1 shrink-0">
+            Select Metro Hub:
+          </span>
+          {['Delhi', 'Mumbai', 'Bengaluru', 'Hyderabad', 'Ahmedabad', 'Pune', 'Kolkata', 'Jaipur', 'Lucknow'].map((city) => (
+            <button
+              key={city}
+              type="button"
+              onClick={() => setFeasibilityCity(city)}
+              className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                feasibilityCity.toLowerCase() === city.toLowerCase()
+                  ? 'bg-primary text-black font-extrabold shadow-sm scale-105'
+                  : 'bg-secondary/70 hover:bg-secondary text-muted-foreground hover:text-foreground border border-border/50'
+              }`}
+            >
+              {city}
+            </button>
+          ))}
+        </div>
+
+        {/* Feasibility Summary Panel */}
+        {loadingFeasibility ? (
+          <div className="flex items-center justify-center py-8 gap-2 text-xs font-semibold text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span>Calculating {feasibilityCity} feasibility metrics and competitor events...</span>
+          </div>
+        ) : feasibilityData ? (
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-center bg-background/50 border border-border/60 rounded-xl p-4">
+            {/* Feasibility Score Ring & Verdict */}
+            <div className="flex items-center gap-4 lg:col-span-2">
+              <div className="flex flex-col items-center justify-center h-20 w-20 rounded-xl bg-secondary/80 border border-border shrink-0">
+                <span className="text-2xl font-black font-mono text-foreground">
+                  {feasibilityData.summary?.feasibilityScore || 85}
+                </span>
+                <span className="text-[9px] uppercase font-bold text-muted-foreground -mt-0.5">
+                  / 100 Score
+                </span>
+              </div>
+              <div className="space-y-1">
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${feasibilityData.summary?.verdictBadge}`}>
+                  <CheckCircle2 className="h-3 w-3" />
+                  {feasibilityData.summary?.verdict}
+                </span>
+                <h4 className="text-xs font-bold text-foreground">
+                  {feasibilityData.summary?.recommendationHeadline}
+                </h4>
+                <p className="text-[11px] text-muted-foreground line-clamp-2">
+                  {feasibilityData.summary?.decisionRationale}
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Metrics */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="p-2.5 rounded-lg bg-card border border-border/70">
+                <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                  Events Present
+                </span>
+                <span className="text-base font-extrabold font-mono text-foreground">
+                  {feasibilityData.summary?.totalEventsPresent} Expos
+                </span>
+                <span className="text-[10px] text-muted-foreground block">
+                  {feasibilityData.summary?.upcomingEventsCount} upcoming
+                </span>
+              </div>
+              <div className="p-2.5 rounded-lg bg-card border border-border/70">
+                <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                  Audience Demand
+                </span>
+                <span className="text-base font-extrabold font-mono text-primary">
+                  {feasibilityData.summary?.audienceInterestVolume?.toLocaleString()}+
+                </span>
+                <span className="text-[10px] text-muted-foreground block">
+                  Trade interest pool
+                </span>
+              </div>
+            </div>
+
+            {/* CTA action */}
+            <div className="flex flex-col gap-2">
+              <Link
+                href="/location-feasibility"
+                className="w-full py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-black text-xs font-bold text-center transition-all shadow-sm flex items-center justify-center gap-1.5"
+              >
+                <span>View Complete Report</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+              {!isStarterPlan && !isEnterprisePlan && !isSuperAdmin && !user?.hasUnlockedLocationResearch && (
+                <Link
+                  href="/location-feasibility"
+                  className="w-full py-1 text-center text-[11px] font-bold text-amber-500 hover:underline"
+                >
+                  Free User: Unlock for ₹4,999
+                </Link>
+              )}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* 10times Style KPIs Grid */}

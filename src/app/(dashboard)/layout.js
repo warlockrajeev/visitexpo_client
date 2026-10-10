@@ -40,7 +40,8 @@ import {
   Bookmark,
   Star,
   Bell,
-  Zap
+  Zap,
+  MapPin
 } from 'lucide-react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
@@ -350,7 +351,7 @@ export default function DashboardLayout({ children }) {
           name: 'Live Chat',
           href: '/chat',
           icon: MessageSquare,
-          badge: user.isChatEnabled ? 'Live' : null
+          badge: (user?.role === 'organizer' && (!user?.plan || user?.plan === 'free')) ? 'Upgrade' : (user?.isChatEnabled ? 'Live' : null)
         },
         { name: 'Saved Bookmarks', href: '/bookmarks', icon: Bookmark },
         { name: 'Interested Events', href: '/interested', icon: Star },
@@ -358,6 +359,7 @@ export default function DashboardLayout({ children }) {
         { name: 'Event Wizard', href: '/events/wizard', icon: Wand2, badge: 'Onboarding' },
         { name: 'Claim Event', href: '/events/claim', icon: ShieldCheck },
         { name: 'Manage Events', href: '/manage-events', icon: Calendar },
+        { name: 'Location Feasibility', href: '/location-feasibility', icon: MapPin, badge: 'Market AI' },
         { name: 'Exhibitors', href: '/exhibitors', icon: Building },
         { name: 'Visitor CRM', href: '/visitors', icon: Users },
         { name: 'Lead CRM', href: '/leads', icon: Target },
@@ -383,6 +385,7 @@ export default function DashboardLayout({ children }) {
     if (path === '/events/wizard') return 'Event Onboarding Wizard';
     if (path === '/events/claim') return 'Claim Existing Event';
     if (path === '/manage-events') return 'Event Management';
+    if (path === '/location-feasibility') return 'Location Feasibility & Event Presence Intelligence';
     if (path === '/campaigns/exhibitor-discovery') return 'Exhibitor Discovery';
     if (path === '/campaigns') return 'Marketing & Campaigns';
     const clean = (path || '').replace('/', '').replace(/-/g, ' ');

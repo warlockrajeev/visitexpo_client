@@ -46,7 +46,12 @@ import {
   Trash2,
   Copy,
   MailCheck,
-  RotateCcw
+  RotateCcw,
+  Lock,
+  Crown,
+  Zap,
+  ArrowRight,
+  Star
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -60,6 +65,12 @@ const API_URL =
 export default function OrganizerChatPage() {
   const { user, accessToken, isExhibitorView } = useAuth();
   const router = useRouter();
+
+  // Plan verification: Live Chat is exclusive to Starter & Enterprise plans
+  const isSuperAdmin = user?.role === 'super_admin';
+  const rawPlan = (user?.plan || 'free').toLowerCase();
+  const isFreePlan = !isSuperAdmin && (rawPlan === 'free' || !rawPlan);
+  const [showPreviewConsole, setShowPreviewConsole] = useState(false);
 
   // Redirect visitors and exhibitors to Organizers directory & live chat
   useEffect(() => {
@@ -236,6 +247,20 @@ export default function OrganizerChatPage() {
 
   // Toggle Live Chat On/Off
   const handleToggleChatEnable = async () => {
+    if (isFreePlan) {
+      showSweetConfirm(
+        'Upgrade Required for Live Chat',
+        'Live Chat Desk is an exclusive feature for Starter and Enterprise plan organizers. Please upgrade your plan to activate live chat with attendees.',
+        'Upgrade Plan',
+        'Maybe Later'
+      ).then((res) => {
+        if (res.isConfirmed) {
+          router.push('/pricing');
+        }
+      });
+      return;
+    }
+
     setIsSavingSettings(true);
     try {
       const newEnabled = !isChatEnabled;
@@ -295,6 +320,20 @@ export default function OrganizerChatPage() {
 
   // Send Message
   const handleSendMessage = async (textToSend) => {
+    if (isFreePlan) {
+      showSweetConfirm(
+        'Upgrade Required',
+        'Replying to attendees via Live Chat is an exclusive feature for Starter and Enterprise plans. Upgrade your plan to unlock messaging.',
+        'Upgrade Plan',
+        'Cancel'
+      ).then((res) => {
+        if (res.isConfirmed) {
+          router.push('/pricing');
+        }
+      });
+      return;
+    }
+
     const content = (textToSend || messageText).trim();
     if (!content || !activeConversation?._id || isSending) return;
 
@@ -529,8 +568,288 @@ export default function OrganizerChatPage() {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
+  if (isFreePlan && !showPreviewConsole) {
+    return (
+      <div className="flex-1 min-h-0 overflow-y-auto bg-background text-foreground p-4 sm:p-6 lg:p-8 flex flex-col items-center justify-start space-y-8 max-w-5xl mx-auto">
+        {/* Header Hero */}
+        <div className="text-center space-y-3 max-w-2xl pt-2 sm:pt-4">
+          <div className="relative inline-flex items-center justify-center h-20 w-20 rounded-3xl bg-gradient-to-br from-amber-500/20 via-primary/20 to-amber-500/5 border border-amber-500/30 shadow-lg mb-2 ring-8 ring-amber-500/5">
+            <MessageSquare className="h-10 w-10 text-primary" />
+            <div className="absolute -bottom-1 -right-1 bg-amber-500 text-black p-1.5 rounded-full shadow-md">
+              <Lock className="h-3.5 w-3.5" />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+              <Lock className="h-3.5 w-3.5" />
+              <span>Free Organizer Plan · Feature Locked</span>
+            </span>
+          </div>
+
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-foreground tracking-tight">
+            Upgrade to Starter or Enterprise Plan for Live Chat
+          </h1>
+
+          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+            Live Chat Desk is an exclusive feature for <strong>Starter</strong> and <strong>Enterprise</strong> plan organizers. Connect directly in real-time with verified trade visitors, registered delegates, and prospective exhibitors to close booth sales and address inquiries instantly.
+          </p>
+        </div>
+
+        {/* Side-by-Side Upgrade Plan Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+          {/* Starter Plan Card */}
+          <div className="relative bg-card border-2 border-primary/50 hover:border-primary rounded-3xl p-6 sm:p-7 shadow-lg flex flex-col justify-between space-y-6 transition-all hover:shadow-xl">
+            <div className="absolute -top-3.5 left-6 bg-primary text-black px-3.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5">
+              <Star className="h-3 w-3 fill-black" />
+              <span>Most Popular · Operational Tier</span>
+            </div>
+
+            <div className="space-y-4 pt-2">
+              <div className="space-y-1">
+                <h2 className="text-xl font-black text-foreground">
+                  Organizer Starter Plan
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Operate validated events, unlock unmasked attendee leads, ticketing &amp; Live Chat Desk.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-secondary/60 border border-border/70 space-y-1">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-3xl font-black font-mono text-foreground">₹14,999</span>
+                  <span className="text-xs font-semibold text-muted-foreground">/ Quarter</span>
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  or <strong>₹49,999 / Year</strong> (Save ₹9,997 annually)
+                </div>
+              </div>
+
+              <div className="space-y-2.5 pt-2">
+                <span className="text-xs font-bold text-foreground uppercase tracking-wider block">
+                  What&apos;s Included:
+                </span>
+                <ul className="space-y-2 text-xs text-foreground/90">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                    <span><strong>Live Chat Desk Active:</strong> 1-on-1 direct messaging with visitors &amp; exhibitors</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                    <span><strong>Real-Time Alerts:</strong> Sound &amp; desktop notifications on new attendee inquiries</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                    <span><strong>Full Unmasked Leads:</strong> Visitor, exhibitor, vendor &amp; partner contact details unlocked</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                    <span><strong>Paid Ticket Selling:</strong> Monetize delegate passes with integrated payment gateway</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                    <span><strong>Operational Lead CRM:</strong> Pipeline tracking, follow-up stages &amp; canned replies</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                    <span><strong>Location Feasibility Reports:</strong> Included free of charge (₹0)</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-border/70 space-y-2">
+              <Link
+                href="/pricing"
+                className="w-full py-3.5 rounded-xl bg-primary hover:bg-primary/90 text-black text-xs font-black transition-all shadow-md flex items-center justify-center gap-2"
+              >
+                <Zap className="h-4 w-4" />
+                <span>Upgrade to Starter Plan</span>
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <span className="text-[10px] text-muted-foreground text-center block">
+                Instant activation · Immediate Live Chat access
+              </span>
+            </div>
+          </div>
+
+          {/* Enterprise Plan Card */}
+          <div className="relative bg-card border-2 border-indigo-500/50 hover:border-indigo-500 rounded-3xl p-6 sm:p-7 shadow-lg flex flex-col justify-between space-y-6 transition-all hover:shadow-xl">
+            <div className="absolute -top-3.5 left-6 bg-indigo-600 text-white px-3.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5">
+              <Crown className="h-3 w-3 fill-white" />
+              <span>Enterprise Scale · Full Capabilities</span>
+            </div>
+
+            <div className="space-y-4 pt-2">
+              <div className="space-y-1">
+                <h2 className="text-xl font-black text-foreground">
+                  Organizer Enterprise Plan
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Multi-expo enterprise capability with custom gateway, full REST API, VIP support &amp; Live Chat Desk.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-secondary/60 border border-border/70 space-y-1">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-3xl font-black font-mono text-foreground">₹89,999</span>
+                  <span className="text-xs font-semibold text-muted-foreground">/ Quarter</span>
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  or <strong>₹2,99,999 / Year</strong> (Save ₹59,997 annually)
+                </div>
+              </div>
+
+              <div className="space-y-2.5 pt-2">
+                <span className="text-xs font-bold text-foreground uppercase tracking-wider block">
+                  What&apos;s Included:
+                </span>
+                <ul className="space-y-2 text-xs text-foreground/90">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
+                    <span><strong>Priority VIP Live Chat:</strong> Multi-agent chat desk with dedicated SLA</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
+                    <span><strong>Custom Auto-Greeting Bot:</strong> 24/7 lead qualification &amp; automatic welcome replies</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
+                    <span><strong>Developer REST API Keys:</strong> Direct database sync with your custom CRM / ERP</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
+                    <span><strong>Unlimited Lead Export:</strong> Zero restriction CSV, Excel &amp; webhook downloads</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
+                    <span><strong>Featured Directory Spotlight:</strong> Top ranking placement across VisitExpo</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
+                    <span><strong>Dedicated Account Director:</strong> Direct phone and WhatsApp escalation</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-border/70 space-y-2">
+              <Link
+                href="/pricing"
+                className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black transition-all shadow-md flex items-center justify-center gap-2"
+              >
+                <Crown className="h-4 w-4" />
+                <span>Upgrade to Enterprise Plan</span>
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <span className="text-[10px] text-muted-foreground text-center block">
+                Enterprise scale · VIP Onboarding &amp; SLA
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Live Chat Value Feature Grid */}
+        <div className="w-full bg-card border border-border rounded-3xl p-6 sm:p-7 shadow-sm space-y-4">
+          <div className="text-center space-y-1">
+            <h3 className="text-base font-extrabold text-foreground">
+              Why Organizers Rely on Live Chat Desk
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Convert high-intent delegates and booth inquiries while their attention is peaked.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+            <div className="p-4 rounded-2xl bg-secondary/40 border border-border/60 space-y-2">
+              <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                <Users className="h-4 w-4" />
+              </div>
+              <h4 className="text-xs font-bold text-foreground">Instant Attendee Engagement</h4>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Answer attendee questions regarding entry passes, speaker schedules, and venue parking in seconds.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-secondary/40 border border-border/60 space-y-2">
+              <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                <Building className="h-4 w-4" />
+              </div>
+              <h4 className="text-xs font-bold text-foreground">Convert Exhibitor Stalls</h4>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Directly chat with brand sponsors and booth decision-makers browsing your expo on the national directory.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-secondary/40 border border-border/60 space-y-2">
+              <div className="h-8 w-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <h4 className="text-xs font-bold text-foreground">24/7 Automated Greeting</h4>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Configure personalized welcome messages and automated inquiry responses even during offline hours.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-secondary/40 border border-border/60 space-y-2">
+              <div className="h-8 w-8 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
+                <ShieldCheck className="h-4 w-4" />
+              </div>
+              <h4 className="text-xs font-bold text-foreground">Integrated Lead CRM</h4>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Every conversation is automatically archived, categorized, and linked to your attendee lead registry.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Actions: Demo preview link & compare plans */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-xs font-semibold text-muted-foreground pt-1 pb-6">
+          <button
+            type="button"
+            onClick={() => setShowPreviewConsole(true)}
+            className="hover:text-foreground underline transition-colors cursor-pointer"
+          >
+            Preview Live Chat Interface Demo &rarr;
+          </button>
+          <span>•</span>
+          <Link
+            href="/pricing"
+            className="text-primary hover:underline font-bold"
+          >
+            Compare All Features &amp; Pricing Details
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full min-h-0 bg-background text-foreground overflow-hidden">
+      {/* Free Plan Preview Notice Bar */}
+      {isFreePlan && (
+        <div className="bg-gradient-to-r from-amber-500/15 via-primary/10 to-amber-500/15 border-b border-amber-500/30 px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs shrink-0">
+          <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-semibold">
+            <Lock className="h-4 w-4 shrink-0 text-amber-500" />
+            <span>Free Organizer Preview Mode — Live Chat sending &amp; messaging is disabled. Upgrade to Starter or Enterprise to activate Live Chat.</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowPreviewConsole(false)}
+              className="text-[11px] font-bold text-muted-foreground hover:text-foreground underline cursor-pointer"
+            >
+              View Upgrade Plans
+            </button>
+            <Link
+              href="/pricing"
+              className="px-3 py-1 rounded-lg bg-primary text-black font-extrabold text-[11px] hover:bg-primary/90 transition-all shadow-sm"
+            >
+              Upgrade Plan
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Top Bar Header & Controls */}
       <div className="shrink-0 bg-card/80 backdrop-blur-md border-b border-border px-4 py-3 sm:px-6 sm:py-3.5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
