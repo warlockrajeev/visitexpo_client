@@ -60,7 +60,10 @@ import {
   Crown,
   ShieldCheck,
   ArrowRight,
-  MessageSquare
+  MessageSquare,
+  ThumbsUp,
+  Bell,
+  Globe
 } from 'lucide-react';
 
 const API_URL =
@@ -130,6 +133,7 @@ export default function LeadsCRMPage() {
   const [searchField, setSearchField] = useState('all'); // 'all' | 'name' | 'email' | 'company' | 'phone'
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'new' | 'contacted' | 'qualified' | 'proposal' | 'won' | 'lost'
+  const [sourceFilter, setSourceFilter] = useState('all'); // 'all' | 'event_click' | 'interested' | 'follower' | 'inquiry' | ...
   const [dateFilter, setDateFilter] = useState('');
 
   // Selection state for batch operations
@@ -328,7 +332,7 @@ export default function LeadsCRMPage() {
     return events.find((e) => e._id === selectedEventId) || null;
   }, [events, selectedEventId]);
 
-  // Filter leads based on Tab, Search, Status, and Date
+  // Filter leads based on Tab, Search, Status, Source, and Date
   const filteredLeads = useMemo(() => {
     return leads.filter((item) => {
       // 1. Tab Intent Filter
@@ -336,9 +340,14 @@ export default function LeadsCRMPage() {
         // High-Intent: Score >= 70 OR status qualified/won
         const isHigh = (item.leadScore || 0) >= 70 || item.status === 'qualified' || item.status === 'won';
         if (!isHigh) return false;
+      } else if (activeTab === 'event_clicks') {
+        if (item.source !== 'event_click') return false;
       } else if (activeTab === 'verified_delegates') {
-        // Verified delegates: Score 40-69 OR contacted/proposal
+        // Verified delegates: Score 40-69 OR interested/follower/visitor_pass
         const isDelegate =
+          item.source === 'interested' ||
+          item.source === 'follower' ||
+          item.source === 'visitor_pass' ||
           ((item.leadScore || 0) >= 40 && (item.leadScore || 0) < 70) ||
           item.status === 'contacted' ||
           item.status === 'proposal';
@@ -346,6 +355,7 @@ export default function LeadsCRMPage() {
       } else if (activeTab === 'stall_inquiries') {
         // Stall/Exhibitor inquiries or Walk-in/Campaign new leads
         const isStall =
+          item.source === 'inquiry' ||
           item.source === 'walk_in' ||
           item.source === 'campaign' ||
           item.status === 'new' ||
@@ -353,12 +363,17 @@ export default function LeadsCRMPage() {
         if (!isStall) return false;
       }
 
-      // 2. Status Filter
+      // 2. Source Filter
+      if (sourceFilter !== 'all' && item.source !== sourceFilter) {
+        return false;
+      }
+
+      // 3. Status Filter
       if (statusFilter !== 'all' && item.status !== statusFilter) {
         return false;
       }
 
-      // 3. Search Filter
+      // 4. Search Filter
       if (searchTerm.trim()) {
         const query = searchTerm.toLowerCase().trim();
         if (searchField === 'name') {
@@ -382,7 +397,7 @@ export default function LeadsCRMPage() {
         }
       }
 
-      // 4. Date Filter
+      // 5. Date Filter
       if (dateFilter) {
         const itemDate = new Date(item.createdAt).toISOString().split('T')[0];
         if (itemDate !== dateFilter) return false;
@@ -390,27 +405,32 @@ export default function LeadsCRMPage() {
 
       return true;
     });
-  }, [leads, activeTab, statusFilter, searchTerm, searchField, dateFilter]);
+  }, [leads, activeTab, sourceFilter, statusFilter, searchTerm, searchField, dateFilter]);
 
   // Tab counts for badges
   const tabCounts = useMemo(() => {
     const high = leads.filter(
       (l) => (l.leadScore || 0) >= 70 || l.status === 'qualified' || l.status === 'won'
     ).length;
+    const clicks = leads.filter((l) => l.source === 'event_click').length;
     const delegates = leads.filter(
       (l) =>
+        l.source === 'interested' ||
+        l.source === 'follower' ||
+        l.source === 'visitor_pass' ||
         ((l.leadScore || 0) >= 40 && (l.leadScore || 0) < 70) ||
         l.status === 'contacted' ||
         l.status === 'proposal'
     ).length;
     const stall = leads.filter(
       (l) =>
+        l.source === 'inquiry' ||
         l.source === 'walk_in' ||
         l.source === 'campaign' ||
         l.status === 'new' ||
         (l.company && l.company.toLowerCase().includes('ltd'))
     ).length;
-    return { high, delegates, stall, all: leads.length };
+    return { high, clicks, delegates, stall, all: leads.length };
   }, [leads]);
 
   // Checkbox multi-select helpers
@@ -442,6 +462,7 @@ export default function LeadsCRMPage() {
     setSearchField('all');
     setSearchTerm('');
     setStatusFilter('all');
+    setSourceFilter('all');
     setDateFilter('');
     setActiveTab('all');
     setSelectedLeadIds(new Set());
@@ -1268,9 +1289,70 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
     searchTerm.trim() ||
     searchField !== 'all' ||
     statusFilter !== 'all' ||
+    sourceFilter !== 'all' ||
     dateFilter ||
     activeTab !== 'all'
   );
+
+  // Badge generator for lead sources
+  const renderSourceBadge = (source) => {
+    switch (source) {
+      case 'event_click':
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20" title="Visitor clicked and explored your event page">
+            <Eye className="h-2.5 w-2.5 text-cyan-500" /> Event Click
+          </span>
+        );
+      case 'interested':
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-pink-500/10 text-pink-700 dark:text-pink-400 border border-pink-500/20" title="Visitor clicked Interested on your event">
+            <ThumbsUp className="h-2.5 w-2.5 text-pink-500" /> Interested
+          </span>
+        );
+      case 'follower':
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20" title="Visitor followed your event">
+            <Bell className="h-2.5 w-2.5 text-violet-500" /> Follower
+          </span>
+        );
+      case 'inquiry':
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20" title="Submitted direct inquiry / stall booking">
+            <MessageSquare className="h-2.5 w-2.5 text-emerald-500" /> Direct Inquiry
+          </span>
+        );
+      case 'ticket_checkout':
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20" title="Purchased or booked ticket">
+            <Ticket className="h-2.5 w-2.5 text-amber-500" /> Ticket Checkout
+          </span>
+        );
+      case 'visitor_pass':
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20" title="Registered for visitor pass badge">
+            <QrCode className="h-2.5 w-2.5 text-indigo-500" /> Visitor Pass
+          </span>
+        );
+      case 'walk_in':
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-500/20" title="Registered on-site at venue">
+            <Building2 className="h-2.5 w-2.5 text-orange-500" /> Walk-In
+          </span>
+        );
+      case 'bulk_upload':
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-zinc-500/10 text-zinc-700 dark:text-zinc-400 border border-zinc-500/20" title="Imported via spreadsheet">
+            <FileSpreadsheet className="h-2.5 w-2.5" /> CSV Import
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary text-muted-foreground border border-border capitalize">
+            <Globe className="h-2.5 w-2.5 text-muted-foreground" /> {source || 'Website'}
+          </span>
+        );
+    }
+  };
 
   return (
     <div className="space-y-6 pb-16 relative">
@@ -1337,7 +1419,8 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
         </div>
       </div>
 
-      {/* 2. SUB-HEADER: INTENT TABS & BATCH ACTION TOOLS ROW */}
+      {/* Helper function to render colorful, distinct source badges */}
+      {(() => null)()}
       <div className="flex flex-col gap-3 border-b border-border/80 pb-3">
         {/* Left: Categorized Intent Navigation Tabs */}
         <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5 max-w-full">
@@ -1382,6 +1465,28 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
               }`}
             >
               {tabCounts.high}
+            </span>
+          </button>
+
+          {/* Tab 3: Event Clicks & Views */}
+          <button
+            onClick={() => setActiveTab('event_clicks')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
+              activeTab === 'event_clicks'
+                ? 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400 border border-cyan-500/30 shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent'
+            }`}
+          >
+            <Eye className="h-3.5 w-3.5 text-cyan-500" />
+            <span>Event Clicks & Views</span>
+            <span
+              className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
+                activeTab === 'event_clicks'
+                  ? 'bg-cyan-500/25 text-cyan-700 dark:text-cyan-400'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {tabCounts.clicks || 0}
             </span>
           </button>
 
@@ -1579,7 +1684,28 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
             </div>
 
             {/* Status & Date Filter Group (2 cols on mobile, inline on sm+) */}
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center shrink-0">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:flex sm:items-center shrink-0">
+              {/* Source Dropdown */}
+              <div className="relative w-full sm:w-[145px] shrink-0">
+                <select
+                  value={sourceFilter}
+                  onChange={(e) => setSourceFilter(e.target.value)}
+                  className="w-full h-9 appearance-none rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground pr-8 focus:outline-none focus:ring-1 focus:ring-primary font-medium cursor-pointer"
+                >
+                  <option value="all">All Sources</option>
+                  <option value="event_click">Event Clicks & Views</option>
+                  <option value="interested">Marked Interested</option>
+                  <option value="follower">Followed Expo</option>
+                  <option value="inquiry">Direct Inquiries</option>
+                  <option value="ticket_checkout">Ticket Checkout</option>
+                  <option value="visitor_pass">Visitor Pass Badges</option>
+                  <option value="walk_in">On-site Walk-In</option>
+                  <option value="bulk_upload">CSV / Bulk Import</option>
+                  <option value="website">Website Form</option>
+                </select>
+                <ChevronDown className="h-3 w-3 text-muted-foreground absolute right-2.5 top-3 pointer-events-none" />
+              </div>
+
               {/* Status Dropdown */}
               <div className="relative w-full sm:w-[130px] shrink-0">
                 <select
@@ -1868,7 +1994,7 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                       {/* Buyer Intent & Score */}
                       <td className="px-4 py-3.5">
                         <div className="space-y-1.5">
-                          <div className="flex items-center justify-between text-[11px]">
+                          <div className="flex items-center justify-between text-[11px] gap-1 flex-wrap">
                             <span
                               className={`font-mono font-bold flex items-center gap-1 ${
                                 (item.leadScore || 0) >= 70
@@ -1881,15 +2007,14 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                               <TrendingUp className="h-3 w-3" />
                               {item.leadScore || 0}% Score
                             </span>
-                            {isEnterprisePlan && (item.leadScore || 0) >= 60 && !isBlurred ? (
-                              <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-0.5">
-                                <Flame className="h-2.5 w-2.5 text-amber-500" /> Hot Buyer
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground capitalize">
-                                {item.source || 'website'}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-1">
+                              {renderSourceBadge(item.source)}
+                              {isEnterprisePlan && (item.leadScore || 0) >= 70 && !isBlurred && (
+                                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-0.5">
+                                  <Flame className="h-2.5 w-2.5 text-amber-500" /> Hot
+                                </span>
+                              )}
+                            </div>
                           </div>
                           {/* Mini Progress Bar */}
                           <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
@@ -2120,9 +2245,12 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                 <Phone className="h-4 w-4 text-primary shrink-0" />
                 <span className="truncate">{drawerLead.phone || 'No phone recorded'}</span>
               </div>
-              <div className="flex items-center gap-2 text-muted-foreground col-span-2">
+              <div className="flex items-center gap-2 text-muted-foreground col-span-2 flex-wrap">
                 <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span>{drawerLead.country || 'India'} | Lead Source: <strong className="text-foreground capitalize">{drawerLead.source || 'Website'}</strong></span>
+                <span>{drawerLead.country || 'India'}</span>
+                <span>•</span>
+                <span>Lead Source:</span>
+                {renderSourceBadge(drawerLead.source)}
               </div>
             </div>
 
@@ -2929,7 +3057,7 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
                     Designation / Role
@@ -2941,6 +3069,29 @@ Priya Sharma, priya@apexglobal.in, +91 98110 54321, Apex Global, VP Operations"
                     onChange={(e) => setLeadForm({ ...leadForm, designation: e.target.value })}
                     className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
+                    Lead Source
+                  </label>
+                  <select
+                    value={leadForm.source}
+                    onChange={(e) => setLeadForm({ ...leadForm, source: e.target.value })}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="event_click">Event Click & View</option>
+                    <option value="interested">Marked Interested</option>
+                    <option value="follower">Followed Expo</option>
+                    <option value="inquiry">Stall & Direct Inquiry</option>
+                    <option value="ticket_checkout">Ticket Checkout</option>
+                    <option value="visitor_pass">Visitor Pass Badge</option>
+                    <option value="walk_in">On-site Walk-In</option>
+                    <option value="bulk_upload">CSV / Bulk Upload</option>
+                    <option value="website">Website Form</option>
+                    <option value="campaign">Marketing Campaign</option>
+                    <option value="cold_call">Cold Call</option>
+                    <option value="referral">Referral</option>
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">

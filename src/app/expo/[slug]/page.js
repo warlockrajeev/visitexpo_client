@@ -319,6 +319,21 @@ export default function ExpoDetailsPage() {
   const [boothChatModal, setBoothChatModal] = useState(null);
   const [boothChatMessage, setBoothChatMessage] = useState('');
   const [boothChatSent, setBoothChatSent] = useState(false);
+
+  // Direct Inquiry & Lead Capture Modal State
+  const [showInquiryModal, setShowInquiryModal] = useState(false);
+  const [inquiryType, setInquiryType] = useState('stall'); // 'stall' | 'visitor_pass' | 'general'
+  const [inquiryForm, setInquiryForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    company: '',
+    designation: '',
+    message: ''
+  });
+  const [inquirySubmitting, setInquirySubmitting] = useState(false);
+  const [inquirySuccess, setInquirySuccess] = useState(false);
+
   const [virtualCheckedIn, setVirtualCheckedIn] = useState(false);
   const [checkedInSessions, setCheckedInSessions] = useState({});
   const [checkInModalOpen, setCheckInModalOpen] = useState(false);
@@ -601,11 +616,31 @@ export default function ExpoDetailsPage() {
     }
   };
 
-  // Handle sending inquiry message to virtual booth representative
-  const handleSendBoothMessage = (e) => {
+  // Handle sending inquiry message to virtual booth representative & sync as CRM lead
+  const handleSendBoothMessage = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!boothChatMessage.trim()) return;
     setBoothChatSent(true);
+
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('visitexpo_token') : null;
+      await axios.post(
+        `${API_URL}/leads/inquire`,
+        {
+          eventId: event?._id || event?.id,
+          eventSlug: slug,
+          name: user?.name || 'Virtual Visitor',
+          email: user?.email || '',
+          phone: user?.phone || '',
+          company: user?.company || '',
+          designation: user?.designation || 'Virtual Attendee',
+          message: boothChatMessage,
+          inquiryType: `Virtual Booth: ${boothChatModal?.exhibitorName || 'Booth Rep'}`
+        },
+        token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+      );
+    } catch (_) {}
+
     showToast(`✓ Direct inquiry delivered to ${boothChatModal?.exhibitorName}. Live representative notified!`);
     setTimeout(() => {
       setBoothChatMessage('');
@@ -836,6 +871,58 @@ export default function ExpoDetailsPage() {
     };
     if (slug) fetchSocialData();
   }, [slug, user]);
+
+  // Auto-track event click / view as a CRM lead for the organizer
+  useEffect(() => {
+    if (!slug) return;
+    const trackVisitorLead = async () => {
+      try {
+        const sessionKey = `visitexpo_lead_click_tracked_${slug}`;
+        if (typeof window !== 'undefined' && sessionStorage.getItem(sessionKey)) {
+          return; // Avoid spamming within the same browsing session
+        }
+
+        const token = typeof window !== 'undefined' ? localStorage.getItem('visitexpo_token') : null;
+        let currentUser = user;
+        if (!currentUser && typeof window !== 'undefined') {
+          const raw = localStorage.getItem('visitexpo_user');
+          if (raw) {
+            try { currentUser = JSON.parse(raw); } catch (_) {}
+          }
+        }
+
+        // Only track if user has identity (email/phone)
+        if (currentUser?.email || currentUser?.phone) {
+          const res = await axios.post(
+            `${API_URL}/leads/track-click`,
+            {
+              eventSlug: slug,
+              eventId: event?._id || event?.id,
+              user: {
+                id: currentUser.id || currentUser._id,
+                name: currentUser.name,
+                email: currentUser.email,
+                phone: currentUser.phone || '',
+                company: currentUser.company || currentUser.organization?.name || '',
+                designation: currentUser.designation || '',
+                country: currentUser.country || ''
+              }
+            },
+            token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+          );
+          if (res.data?.success && typeof window !== 'undefined') {
+            sessionStorage.setItem(sessionKey, 'true');
+          }
+        }
+      } catch (_) {
+        // Non-blocking
+      }
+    };
+
+    if (event || slug) {
+      trackVisitorLead();
+    }
+  }, [slug, user, event?._id]);
 
   // Gallery Photos Pool
   const mediaGallery = useMemo(() => {
@@ -1154,8 +1241,59 @@ export default function ExpoDetailsPage() {
     }
   };
 
-  const handleRequestBooth = () => {
-    router.push(`/onboarding/exhibitor?wp_slug=${encodeURIComponent(event?.slug || '')}&wp_post_id=${event?.wpPostId || event?.id || ''}`);
+  const handleRequestBooth = (type = 'stall') => {
+    setInquiryType(type);
+    if (user) {
+      setInquiryForm((prev) => ({
+        ...prev,
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        company: user.company || user.organization?.name || '',
+        designation: user.designation || ''
+      }));
+    }
+    setShowInquiryModal(true);
+  };
+
+  const handleInquirySubmit = async (e) => {
+    e.preventDefault();
+    if (!inquiryForm.email.trim()) return;
+    setInquirySubmitting(true);
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('visitexpo_token') : null;
+      await axios.post(
+        `${API_URL}/leads/inquire`,
+        {
+          eventId: event?._id || event?.id,
+          eventSlug: slug,
+          name: inquiryForm.name || user?.name,
+          email: inquiryForm.email || user?.email,
+          phone: inquiryForm.phone || user?.phone,
+          company: inquiryForm.company || user?.company,
+          designation: inquiryForm.designation || user?.designation,
+          message: inquiryForm.message,
+          inquiryType:
+            inquiryType === 'stall'
+              ? 'Stall Space Booking'
+              : inquiryType === 'visitor_pass'
+              ? 'Visitor Entry Badge'
+              : 'General Inquiry'
+        },
+        token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+      );
+      setInquirySuccess(true);
+      showToast('✓ Your inquiry was sent directly to the event organizer!');
+      setTimeout(() => {
+        setShowInquiryModal(false);
+        setInquirySuccess(false);
+        setInquiryForm({ name: '', email: '', phone: '', company: '', designation: '', message: '' });
+      }, 1800);
+    } catch (err) {
+      showToast('Failed to submit inquiry: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setInquirySubmitting(false);
+    }
   };
 
   const showToast = (msg) => {
@@ -4341,6 +4479,199 @@ export default function ExpoDetailsPage() {
                 >
                   Confirm Pass &amp; Check In
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Direct Organizer Inquiry & Stall Reservation Lead Modal */}
+      {showInquiryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-zinc-200 overflow-hidden">
+            {/* Header */}
+            <div className="p-5 bg-gradient-to-r from-zinc-950 to-zinc-900 text-white flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
+                  Direct Organizer Connect
+                </span>
+                <h3 className="text-base font-black text-white mt-1">
+                  {inquiryType === 'stall'
+                    ? 'Request Stall Space & Pricing'
+                    : inquiryType === 'visitor_pass'
+                    ? 'Get Free Visitor Entry Badge'
+                    : 'Connect with Event Organizer'}
+                </h3>
+                <p className="text-xs text-zinc-400 truncate max-w-sm">
+                  {event?.title || 'Exhibition'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowInquiryModal(false)}
+                className="text-zinc-400 hover:text-white font-bold p-1 cursor-pointer transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Quick Inquiry Type Selector Tabs */}
+            <div className="grid grid-cols-3 bg-zinc-100 p-1 border-b border-zinc-200 text-xs font-bold text-center">
+              <button
+                type="button"
+                onClick={() => setInquiryType('stall')}
+                className={`py-2 px-1 rounded-xl transition-all cursor-pointer ${
+                  inquiryType === 'stall'
+                    ? 'bg-white text-zinc-950 shadow-xs'
+                    : 'text-zinc-600 hover:text-zinc-900'
+                }`}
+              >
+                Book Stall Space
+              </button>
+              <button
+                type="button"
+                onClick={() => setInquiryType('visitor_pass')}
+                className={`py-2 px-1 rounded-xl transition-all cursor-pointer ${
+                  inquiryType === 'visitor_pass'
+                    ? 'bg-white text-zinc-950 shadow-xs'
+                    : 'text-zinc-600 hover:text-zinc-900'
+                }`}
+              >
+                Visitor Entry Pass
+              </button>
+              <button
+                type="button"
+                onClick={() => setInquiryType('general')}
+                className={`py-2 px-1 rounded-xl transition-all cursor-pointer ${
+                  inquiryType === 'general'
+                    ? 'bg-white text-zinc-950 shadow-xs'
+                    : 'text-zinc-600 hover:text-zinc-900'
+                }`}
+              >
+                General Inquiry
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleInquirySubmit} className="p-5 space-y-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-700">Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={inquiryForm.name}
+                    onChange={(e) => setInquiryForm((prev) => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g. David Miller"
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-700">Work Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={inquiryForm.email}
+                    onChange={(e) => setInquiryForm((prev) => ({ ...prev, email: e.target.value }))}
+                    placeholder="name@company.com"
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-700">Phone / WhatsApp</label>
+                  <input
+                    type="tel"
+                    value={inquiryForm.phone}
+                    onChange={(e) => setInquiryForm((prev) => ({ ...prev, phone: e.target.value }))}
+                    placeholder="+91 98765 43210"
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-700">Company / Organization</label>
+                  <input
+                    type="text"
+                    value={inquiryForm.company}
+                    onChange={(e) => setInquiryForm((prev) => ({ ...prev, company: e.target.value }))}
+                    placeholder="e.g. Apex Confectionery"
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-zinc-700">Designation / Role</label>
+                <input
+                  type="text"
+                  value={inquiryForm.designation}
+                  onChange={(e) => setInquiryForm((prev) => ({ ...prev, designation: e.target.value }))}
+                  placeholder="e.g. VP of Procurement / Marketing Director"
+                  className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-zinc-700">Requirements / Message</label>
+                <textarea
+                  rows={3}
+                  value={inquiryForm.message}
+                  onChange={(e) => setInquiryForm((prev) => ({ ...prev, message: e.target.value }))}
+                  placeholder={
+                    inquiryType === 'stall'
+                      ? 'Looking for a 18-36 sqm stall near main entrance, shell scheme...'
+                      : inquiryType === 'visitor_pass'
+                      ? 'Registering delegation of 3 buyers for technology sourcing...'
+                      : 'Need information regarding sponsorship packages...'
+                  }
+                  className="w-full bg-zinc-50 border border-zinc-200 rounded-xl p-3 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 resize-none"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-between border-t border-zinc-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowInquiryModal(false);
+                    router.push(`/onboarding/exhibitor?wp_slug=${encodeURIComponent(event?.slug || '')}&wp_post_id=${event?.wpPostId || event?.id || ''}`);
+                  }}
+                  className="text-[11px] font-bold text-zinc-500 hover:text-zinc-800 transition-colors underline cursor-pointer"
+                >
+                  Full Exhibitor Onboarding →
+                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowInquiryModal(false)}
+                    className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs cursor-pointer transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={inquirySubmitting || !inquiryForm.email.trim()}
+                    className="px-5 py-2 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] disabled:opacity-50 text-zinc-950 font-black text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    {inquirySubmitting ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>Sending...</span>
+                      </>
+                    ) : inquirySuccess ? (
+                      <>
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-700" />
+                        <span>Delivered ✓</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-3.5 w-3.5" />
+                        <span>Submit Direct to Organizer</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
