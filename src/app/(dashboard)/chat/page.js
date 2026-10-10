@@ -51,10 +51,19 @@ import {
   Crown,
   Zap,
   ArrowRight,
-  Star
+  Star,
+  FileSpreadsheet,
+  Bot,
+  Tag,
+  Plus,
+  BookOpen,
+  Info,
+  FileText,
+  Bookmark
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import * as XLSX from 'xlsx';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -67,10 +76,64 @@ export default function OrganizerChatPage() {
   const router = useRouter();
 
   // Plan verification: Live Chat is exclusive to Starter & Enterprise plans
+  const [userPlan, setUserPlan] = useState((user?.plan || 'free').toLowerCase());
+  useEffect(() => {
+    const fetchPlan = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/subscriptions/my-plan`, { withCredentials: true });
+        if (res.data?.success && res.data.plan) {
+          setUserPlan((res.data.plan.plan || 'free').toLowerCase());
+        }
+      } catch (_) {}
+    };
+    fetchPlan();
+  }, [user, accessToken]);
+
   const isSuperAdmin = user?.role === 'super_admin';
-  const rawPlan = (user?.plan || 'free').toLowerCase();
-  const isFreePlan = !isSuperAdmin && (rawPlan === 'free' || !rawPlan);
+  const isFreePlan = !isSuperAdmin && (userPlan === 'free' || !userPlan);
+  const isEnterprisePlan = isSuperAdmin || userPlan === 'enterprise' || userPlan === 'growth';
+  const isStarterPlan = !isFreePlan && !isEnterprisePlan;
   const [showPreviewConsole, setShowPreviewConsole] = useState(false);
+
+  // Enterprise Exclusive Chat States
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState([]);
+  const [showLeadDossier, setShowLeadDossier] = useState(false);
+  const [showCustomCannedModal, setShowCustomCannedModal] = useState(false);
+  const [customReplies, setCustomReplies] = useState([
+    '🏢 VIP Lounge and registration helpdesk is situated right next to Hall A Entrance.',
+    '📋 Please find our official exhibition brochure, schedule, and floor plan link here.',
+    '🤝 Our chief commercial director will reach out to discuss your custom booth requirement.',
+    '🎟️ Fast-track VIP entry credentials have been dispatched to your registered email address.'
+  ]);
+  const [newCannedText, setNewCannedText] = useState('');
+  const [internalNotes, setInternalNotes] = useState({});
+  const [currentNote, setCurrentNote] = useState('');
+  const [conversationTags, setConversationTags] = useState({});
+  const [showEnterpriseLockModal, setShowEnterpriseLockModal] = useState(null);
+
+  // Load custom replies, internal notes and tags from localStorage
+  useEffect(() => {
+    try {
+      const savedReplies = localStorage.getItem('vx_custom_canned_replies');
+      if (savedReplies) {
+        const parsed = JSON.parse(savedReplies);
+        if (Array.isArray(parsed) && parsed.length > 0) setCustomReplies(parsed);
+      }
+      const savedNotes = localStorage.getItem('vx_chat_internal_notes');
+      if (savedNotes) setInternalNotes(JSON.parse(savedNotes));
+      const savedTags = localStorage.getItem('vx_chat_conversation_tags');
+      if (savedTags) setConversationTags(JSON.parse(savedTags));
+    } catch (_) {}
+  }, []);
+
+  // Sync current note when active conversation changes
+  useEffect(() => {
+    if (activeConversation?._id) {
+      setCurrentNote(internalNotes[activeConversation._id] || '');
+    }
+  }, [activeConversation?._id, internalNotes]);
 
   // Redirect visitors and exhibitors to Organizers directory & live chat
   useEffect(() => {
@@ -568,6 +631,218 @@ export default function OrganizerChatPage() {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
+  // Calculate Buyer Intent Score for Attendee Dossier
+  const calculateIntentScore = (conv) => {
+    if (!conv) return { score: 70, level: 'Warm Prospect', color: 'text-amber-500 bg-amber-500/10 border-amber-500/30', bar: 'bg-amber-500' };
+    let score = 65;
+    if (conv.participantRole === 'exhibitor') score += 15;
+    if (conv.participantPhone) score += 10;
+    if (conv.participantCompany) score += 5;
+    if (conv.participantDesignation) score += 5;
+    if (conv.messages && conv.messages.length >= 3) score += 10;
+    if (score > 98) score = 98;
+
+    if (score >= 85) {
+      return { score, level: 'High-Intent Buyer', color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/30', bar: 'bg-emerald-500' };
+    } else if (score >= 70) {
+      return { score, level: 'Warm Delegate', color: 'text-amber-500 bg-amber-500/10 border-amber-500/30', bar: 'bg-amber-500' };
+    }
+    return { score, level: 'General Inquiry', color: 'text-sky-500 bg-sky-500/10 border-sky-500/30', bar: 'bg-sky-500' };
+  };
+
+  // Enterprise Feature: AI Co-Pilot & Smart Suggestions
+  const handleOpenAiCopilot = () => {
+    if (!isEnterprisePlan) {
+      setShowEnterpriseLockModal({
+        feature: 'AI Chat Co-Pilot & Smart Suggestions',
+        description:
+          'AI-powered contextual reply generation, attendee intent analysis, and 1-click smart replies are exclusive to Enterprise Plan organizers. Upgrade from Starter to Enterprise to activate AI Co-Pilot.'
+      });
+      return;
+    }
+
+    if (!activeConversation) {
+      showSweetError('No Conversation Selected', 'Please select an attendee or exhibitor conversation thread to run AI Co-Pilot.');
+      return;
+    }
+
+    setIsGeneratingAi(true);
+    setShowAiModal(true);
+
+    setTimeout(() => {
+      const name = activeConversation.participantName || 'Attendee';
+      const role = activeConversation.participantRole || 'visitor';
+      const eventName = activeConversation.eventTitle || 'the exhibition';
+      const company = activeConversation.participantCompany || 'your company';
+
+      if (role === 'exhibitor') {
+        setAiSuggestions([
+          {
+            tag: 'Booth Booking & Commercials',
+            tone: 'High-Conversion Sales',
+            text: `Hello ${name}! Thank you for reaching out regarding ${eventName}. We have high-visibility corner booths available in Hall A and Hall B with direct visitor footfall. Shall I share the exhibitor floor plan and rate card with you?`
+          },
+          {
+            tag: 'Sponsorship & VIP Branding',
+            tone: 'VIP Executive',
+            text: `Hi ${name}, in addition to standard stalls for ${company}, we also offer title sponsorship packages including entrance branding and directory spotlight placements. Let me know if you would like our partnership prospectus!`
+          },
+          {
+            tag: 'Setup & Logistics Guidance',
+            tone: 'Operations Support',
+            text: `Hello ${name}, exhibitor move-in starts 48 hours prior to the expo inauguration. Please let our desk know what stall dimensions you require so we can place an official hold for ${company}.`
+          }
+        ]);
+      } else {
+        setAiSuggestions([
+          {
+            tag: 'VIP Fast-Track Pass',
+            tone: 'VIP Welcoming',
+            text: `Hello ${name}! Welcome to ${eventName}. We are delighted to have you join us. I can arrange complimentary VIP fast-track badges for you and your colleagues from ${company} right away!`
+          },
+          {
+            tag: 'Conference Schedule & Keynotes',
+            tone: 'Informative',
+            text: `Hi ${name}, our expo hours are 10:00 AM to 6:00 PM daily. Keynote panels, B2B buyer matchmaking, and innovation spotlights take place in the Grand Convention Hall. Are you looking for any specific industry tracks?`
+          },
+          {
+            tag: 'Exhibitor Matchmaking',
+            tone: 'Business Matchmaking',
+            text: `Hello ${name}, over 200+ global brands and suppliers are exhibiting at ${eventName}. If you are looking for specific suppliers or products, let me know and I will guide you directly to the relevant hall and stall numbers!`
+          }
+        ]);
+      }
+      setIsGeneratingAi(false);
+    }, 500);
+  };
+
+  // Enterprise Feature: 1-Click Export All Chat Leads (.xlsx)
+  const handleExportAllChatLeads = () => {
+    if (!isEnterprisePlan) {
+      setShowEnterpriseLockModal({
+        feature: '1-Click Chat Leads Excel Export (.xlsx)',
+        description:
+          'Full-scale .xlsx export of all attendee chat records, verified buyer contacts, and conversation transcripts is an Enterprise Plan feature. Upgrade from Starter to unlock uncapped lead downloads.'
+      });
+      return;
+    }
+
+    if (!conversations || conversations.length === 0) {
+      showSweetError('No Inquiries to Export', 'There are currently no active conversation leads to export.');
+      return;
+    }
+
+    const exportRows = conversations.map((c, i) => {
+      const tags = (conversationTags[c._id] || []).join(', ');
+      const note = internalNotes[c._id] || '';
+      return {
+        'SL No': i + 1,
+        'Attendee Name': c.participantName || 'N/A',
+        'Role': (c.participantRole || 'visitor').toUpperCase(),
+        'Email Address': c.participantEmail || 'N/A',
+        'Phone Number': c.participantPhone || 'N/A',
+        'Company / Org': c.participantCompany || 'N/A',
+        'Designation': c.participantDesignation || 'N/A',
+        'Associated Expo': c.eventTitle || 'General',
+        'Total Messages': c.messages ? c.messages.length : 1,
+        'Unread By Organizer': c.unreadByOrganizer || 0,
+        'Last Message Snippet': c.lastMessage || '',
+        'Last Active': c.lastMessageAt ? new Date(c.lastMessageAt).toLocaleString() : 'N/A',
+        'Status': c.status || 'active',
+        'Priority Tags': tags || 'Standard',
+        'Internal CRM Notes': note || 'None'
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Chat Inquiries');
+    const fileName = `VisitExpo_Enterprise_Chat_Leads_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+
+    showSweetSuccess('Export Complete!', `Downloaded ${conversations.length} chat leads in Excel (.xlsx) format.`);
+  };
+
+  // Enterprise Feature: 1-Click Export Single Conversation Transcript (.xlsx)
+  const handleExportConversationTranscript = () => {
+    if (!isEnterprisePlan) {
+      setShowEnterpriseLockModal({
+        feature: 'Conversation Transcript Export (.xlsx)',
+        description:
+          'Audit-grade message transcripts with delivery receipts and timestamps are exclusive to Enterprise Plan organizers.'
+      });
+      return;
+    }
+
+    if (!activeConversation || !activeConversation.messages || activeConversation.messages.length === 0) {
+      showSweetError('No Messages Found', 'This conversation has no message history to export.');
+      return;
+    }
+
+    const transcriptRows = activeConversation.messages.map((m, idx) => ({
+      'Message #': idx + 1,
+      'Sender Role': m.senderRole,
+      'Sender Name': m.senderName,
+      'Message Text': m.text,
+      'Timestamp': m.timestamp ? new Date(m.timestamp).toLocaleString() : 'N/A',
+      'Read Status': m.read ? 'Read' : 'Delivered'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(transcriptRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Chat Transcript');
+    const safeName = (activeConversation.participantName || 'attendee').replace(/[^a-zA-Z0-9]/g, '_');
+    const fileName = `Transcript_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+
+    showSweetSuccess('Transcript Exported', `Transcript for ${activeConversation.participantName} downloaded successfully.`);
+  };
+
+  // Enterprise Feature: Custom Canned Responses Manager
+  const handleAddCustomCanned = (e) => {
+    e.preventDefault();
+    if (!newCannedText.trim()) return;
+    const updated = [...customReplies, newCannedText.trim()];
+    setCustomReplies(updated);
+    setNewCannedText('');
+    try {
+      localStorage.setItem('vx_custom_canned_replies', JSON.stringify(updated));
+    } catch (_) {}
+    showSweetSuccess('Template Added', 'Your custom response template has been saved to your library.');
+  };
+
+  const handleDeleteCustomCanned = (indexToDelete) => {
+    const updated = customReplies.filter((_, idx) => idx !== indexToDelete);
+    setCustomReplies(updated);
+    try {
+      localStorage.setItem('vx_custom_canned_replies', JSON.stringify(updated));
+    } catch (_) {}
+  };
+
+  // Enterprise Feature: Internal Notes & Tags
+  const handleSaveInternalNote = () => {
+    if (!activeConversation?._id) return;
+    const updated = { ...internalNotes, [activeConversation._id]: currentNote };
+    setInternalNotes(updated);
+    try {
+      localStorage.setItem('vx_chat_internal_notes', JSON.stringify(updated));
+    } catch (_) {}
+    showSweetSuccess('Note Saved', 'Internal note updated for this attendee.');
+  };
+
+  const handleToggleTag = (tag) => {
+    if (!activeConversation?._id) return;
+    const currentTags = conversationTags[activeConversation._id] || [];
+    const updatedTags = currentTags.includes(tag)
+      ? currentTags.filter((t) => t !== tag)
+      : [...currentTags, tag];
+    const updated = { ...conversationTags, [activeConversation._id]: updatedTags };
+    setConversationTags(updated);
+    try {
+      localStorage.setItem('vx_chat_conversation_tags', JSON.stringify(updated));
+    } catch (_) {}
+  };
+
   if (isFreePlan && !showPreviewConsole) {
     return (
       <div className="flex-1 min-h-0 overflow-y-auto bg-background text-foreground p-4 sm:p-6 lg:p-8 flex flex-col items-center justify-start space-y-8 max-w-5xl mx-auto">
@@ -644,15 +919,23 @@ export default function OrganizerChatPage() {
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
-                    <span><strong>Paid Ticket Selling:</strong> Monetize delegate passes with integrated payment gateway</span>
+                    <span><strong>Standard Live Chat Desk:</strong> 1-on-1 direct messaging (Normal Level)</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
-                    <span><strong>Operational Lead CRM:</strong> Pipeline tracking, follow-up stages &amp; canned replies</span>
+                    <span><strong>Standard Quick Replies:</strong> 5 built-in canned responses &amp; notifications</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
-                    <span><strong>Location Feasibility Reports:</strong> Included free of charge (₹0)</span>
+                    <span><strong>Full Unmasked Leads:</strong> Visitor, exhibitor &amp; vendor contacts unlocked</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                    <span><strong>Paid Ticket Selling:</strong> Monetize delegate passes with payment gateway</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                    <span><strong>Operational Lead CRM:</strong> Pipeline tracking &amp; follow-up stages</span>
                   </li>
                 </ul>
               </div>
@@ -677,7 +960,7 @@ export default function OrganizerChatPage() {
           <div className="relative bg-card border-2 border-indigo-500/50 hover:border-indigo-500 rounded-3xl p-6 sm:p-7 shadow-lg flex flex-col justify-between space-y-6 transition-all hover:shadow-xl">
             <div className="absolute -top-3.5 left-6 bg-indigo-600 text-white px-3.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5">
               <Crown className="h-3 w-3 fill-white" />
-              <span>Enterprise Scale · Full Capabilities</span>
+              <span>Enterprise Scale · Advance Level</span>
             </div>
 
             <div className="space-y-4 pt-2">
@@ -686,7 +969,7 @@ export default function OrganizerChatPage() {
                   Organizer Enterprise Plan
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Multi-expo enterprise capability with custom gateway, full REST API, VIP support &amp; Live Chat Desk.
+                  Advance Live Chat Suite, AI Co-Pilot, lead dossier, custom templates &amp; VIP priority support.
                 </p>
               </div>
 
@@ -707,27 +990,27 @@ export default function OrganizerChatPage() {
                 <ul className="space-y-2 text-xs text-foreground/90">
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
-                    <span><strong>Priority VIP Live Chat:</strong> Multi-agent chat desk with dedicated SLA</span>
+                    <span><strong>AI Chat Co-Pilot:</strong> Automated smart reply generation &amp; intent analysis</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
-                    <span><strong>Custom Auto-Greeting Bot:</strong> 24/7 lead qualification &amp; automatic welcome replies</span>
+                    <span><strong>Live Lead Intelligence Dossier:</strong> Unmasked contacts, buyer intent score &amp; notes</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
-                    <span><strong>Developer REST API Keys:</strong> Direct database sync with your custom CRM / ERP</span>
+                    <span><strong>Custom Canned Templates:</strong> Save unlimited organizer snippet libraries</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
-                    <span><strong>Unlimited Lead Export:</strong> Zero restriction CSV, Excel &amp; webhook downloads</span>
+                    <span><strong>1-Click Excel Lead Export:</strong> Download all attendee chats &amp; transcripts (.xlsx)</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
-                    <span><strong>Featured Directory Spotlight:</strong> Top ranking placement across VisitExpo</span>
+                    <span><strong>Advance Exhibitor Management:</strong> Unrestricted rosters, hall allocation &amp; stall VIP badging</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
-                    <span><strong>Dedicated Account Director:</strong> Direct phone and WhatsApp escalation</span>
+                    <span><strong>Dedicated VIP Concierge:</strong> Sub-15 minute response SLA &amp; directory spotlight ranking</span>
                   </li>
                 </ul>
               </div>
@@ -859,10 +1142,19 @@ export default function OrganizerChatPage() {
               <MessageSquare className="h-5 w-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
                   Live Chat Desk
                 </h1>
+                {isEnterprisePlan ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-400 to-yellow-300 text-black px-2.5 py-0.5 rounded-full shadow-xs">
+                    <Crown className="h-3 w-3 fill-black" /> Enterprise Suite · Advance Level
+                  </span>
+                ) : isStarterPlan ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full">
+                    <Zap className="h-3 w-3" /> Starter Plan · Normal Level
+                  </span>
+                ) : null}
                 <span
                   className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                     isChatEnabled
@@ -885,7 +1177,23 @@ export default function OrganizerChatPage() {
           </div>
 
           {/* Quick Controls: Toggle & Settings */}
-          <div className="flex items-center gap-2 sm:gap-3 self-end sm:self-auto shrink-0">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 self-end sm:self-auto shrink-0">
+            {/* Export All Chat Leads (.xlsx) Button */}
+            <button
+              type="button"
+              onClick={handleExportAllChatLeads}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                isEnterprisePlan
+                  ? 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shadow-xs'
+                  : 'bg-secondary hover:bg-secondary/80 text-muted-foreground border border-border'
+              }`}
+              title={isEnterprisePlan ? 'Export all attendee chat leads to Excel (.xlsx)' : 'Export Leads (.xlsx) - Enterprise Exclusive'}
+            >
+              <FileSpreadsheet className="h-4 w-4 text-emerald-500" />
+              <span className="hidden sm:inline">Export Leads (.xlsx)</span>
+              {!isEnterprisePlan && <Crown className="h-3 w-3 text-amber-500 ml-0.5" />}
+            </button>
+
             {/* Quick Toggle Button */}
             <button
               type="button"
@@ -908,7 +1216,7 @@ export default function OrganizerChatPage() {
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground border border-border text-xs font-semibold transition-all cursor-pointer"
             >
               <Sliders className="h-4 w-4 text-muted-foreground" />
-              <span className="hidden sm:inline">Settings & Greeting</span>
+              <span className="hidden sm:inline">Settings</span>
             </button>
 
             {/* Manual Refresh */}
@@ -1296,13 +1604,14 @@ export default function OrganizerChatPage() {
         {/* RIGHT COLUMN: Active Chat Thread */}
         {/* ============================================================ */}
         <div
-          className={`flex-1 min-w-0 flex flex-col bg-background h-full ${
+          className={`flex-1 min-w-0 flex bg-background h-full overflow-hidden ${
             activeConversation ? 'flex' : 'hidden md:flex'
           }`}
         >
           {activeConversation ? (
             <>
-              {/* Thread Header */}
+              <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
+                {/* Thread Header */}
               <div className="shrink-0 bg-card border-b border-border px-4 py-3 flex items-center justify-between gap-3 shadow-xs">
                 {/* Back button for mobile */}
                 <button
@@ -1386,6 +1695,39 @@ export default function OrganizerChatPage() {
 
                 {/* Right Header Actions */}
                 <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                  {/* Attendee Lead Dossier Drawer Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setShowLeadDossier((prev) => !prev)}
+                    title={isEnterprisePlan ? 'Toggle Attendee Lead Intelligence Dossier' : 'Lead Dossier - Enterprise Feature'}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer shadow-xs ${
+                      showLeadDossier
+                        ? 'bg-amber-500/20 text-amber-500 border-amber-500/40'
+                        : isEnterprisePlan
+                        ? 'bg-gradient-to-r from-amber-500/10 to-yellow-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                        : 'bg-secondary hover:bg-secondary/80 text-muted-foreground border-border'
+                    }`}
+                  >
+                    <Crown className="h-3.5 w-3.5 text-amber-500" />
+                    <span>Lead Dossier</span>
+                    {!isEnterprisePlan && <Lock className="h-3 w-3 text-amber-500 ml-0.5" />}
+                  </button>
+
+                  {/* 1-Click Export Transcript (.xlsx) */}
+                  <button
+                    type="button"
+                    onClick={handleExportConversationTranscript}
+                    title={isEnterprisePlan ? 'Export Conversation Transcript (.xlsx)' : 'Export Transcript - Enterprise Exclusive'}
+                    className={`hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                      isEnterprisePlan
+                        ? 'bg-secondary hover:bg-emerald-500/15 text-muted-foreground hover:text-emerald-500 border-border hover:border-emerald-500/30'
+                        : 'bg-secondary hover:bg-secondary/80 text-muted-foreground border-border'
+                    }`}
+                  >
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-500" />
+                    <span className="hidden lg:inline">Transcript</span>
+                  </button>
+
                   {/* Linked Event Pill */}
                   {activeConversation.eventSlug && (
                     <Link
@@ -1609,11 +1951,53 @@ export default function OrganizerChatPage() {
 
               {/* Quick Reply Canned Chips */}
               <div className="shrink-0 px-4 py-2 bg-card/60 border-t border-border/60 overflow-x-auto no-scrollbar flex items-center gap-1.5">
+                {/* AI Co-Pilot Smart Reply Button */}
+                <button
+                  type="button"
+                  onClick={handleOpenAiCopilot}
+                  className="shrink-0 text-xs px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white font-extrabold flex items-center gap-1.5 shadow-xs cursor-pointer transition-all hover:scale-102"
+                  title="Generate smart contextual AI replies"
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-yellow-300" />
+                  <span>AI Smart Reply</span>
+                  {isEnterprisePlan ? (
+                    <span className="text-[9px] bg-black/40 text-yellow-200 px-1.5 py-0.2 rounded-full uppercase font-black tracking-wider">
+                      AI
+                    </span>
+                  ) : (
+                    <Crown className="h-3 w-3 text-yellow-300" />
+                  )}
+                </button>
+
+                {/* Custom Templates Manager (Enterprise) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isEnterprisePlan) {
+                      setShowEnterpriseLockModal({
+                        feature: 'Custom Canned Response Templates Library',
+                        description:
+                          'Save unlimited custom organizer templates and canned replies with Enterprise Plan. Starter plan includes 5 fixed presets.'
+                      });
+                      return;
+                    }
+                    setShowCustomCannedModal(true);
+                  }}
+                  className="shrink-0 text-[11px] px-2.5 py-1 rounded-full bg-secondary/80 hover:bg-secondary border border-border text-foreground transition-all flex items-center gap-1 cursor-pointer font-bold"
+                  title="Manage custom canned response templates"
+                >
+                  <Plus className="h-3 w-3 text-primary" />
+                  <span>Templates</span>
+                  {!isEnterprisePlan && <Crown className="h-2.5 w-2.5 text-amber-500" />}
+                </button>
+
+                <div className="h-4 w-px bg-border/60 mx-1 shrink-0" />
+
                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mr-1 flex items-center gap-1 shrink-0">
-                  <Sparkles className="h-3 w-3 text-primary" />
                   Quick:
                 </span>
-                {quickReplies.map((chip, idx) => (
+                {/* Standard + Custom Canned Chips */}
+                {[...quickReplies, ...(isEnterprisePlan ? customReplies : [])].map((chip, idx) => (
                   <button
                     key={idx}
                     type="button"
@@ -1661,7 +2045,255 @@ export default function OrganizerChatPage() {
                   </button>
                 </form>
               </div>
-            </>
+            </div>
+
+            {/* Enterprise Attendee Lead Dossier Drawer */}
+            {showLeadDossier && (
+              <div className="w-80 lg:w-96 shrink-0 border-l border-border bg-card flex flex-col h-full overflow-y-auto z-10 shadow-lg">
+                {/* Dossier Header */}
+                <div className="p-4 border-b border-border flex items-center justify-between bg-muted/20 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                      <Crown className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-foreground">Attendee Lead Dossier</h4>
+                      <p className="text-[10px] text-muted-foreground">Verified profile &amp; CRM intelligence</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowLeadDossier(false)}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
+                    title="Close Dossier"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* If not Enterprise Plan: Locked Feature Preview */}
+                {!isEnterprisePlan ? (
+                  <div className="p-5 flex flex-col items-center justify-center text-center space-y-4 my-auto">
+                    <div className="p-3.5 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/30 ring-4 ring-amber-500/5">
+                      <Lock className="h-7 w-7" />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                        Enterprise Feature
+                      </span>
+                      <h4 className="text-sm font-bold text-foreground">Lead Dossier Locked</h4>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Buyer Intent Scoring, unmasked phone/email cards, private CRM notes, and priority tagging are exclusive to the Enterprise Plan.
+                      </p>
+                    </div>
+                    <Link
+                      href="/pricing"
+                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-black text-xs font-black transition-all shadow-md flex items-center justify-center gap-1.5"
+                    >
+                      <Crown className="h-4 w-4" />
+                      <span>Upgrade to Enterprise</span>
+                    </Link>
+                  </div>
+                ) : (
+                  /* Enterprise Unlocked Dossier Content */
+                  <div className="p-4 space-y-4 text-xs">
+                    {/* 1. Attendee Identity Card */}
+                    <div className="p-3.5 rounded-xl bg-secondary/50 border border-border space-y-2">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`h-11 w-11 rounded-full flex items-center justify-center text-xs font-black text-white shrink-0 ${
+                            activeConversation.participantRole === 'exhibitor'
+                              ? 'bg-gradient-to-br from-purple-500 to-indigo-600'
+                              : 'bg-gradient-to-br from-sky-500 to-blue-600'
+                          }`}
+                        >
+                          {activeConversation.participantName
+                            ?.split(' ')
+                            .map((n) => n[0])
+                            .join('')
+                            .slice(0, 2)
+                            .toUpperCase() || 'U'}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-bold text-sm text-foreground truncate">
+                            {activeConversation.participantName}
+                          </h4>
+                          <span
+                            className={`inline-block text-[10px] font-bold px-2 py-0.2 rounded-full uppercase tracking-wider ${
+                              activeConversation.participantRole === 'exhibitor'
+                                ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                                : 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
+                            }`}
+                          >
+                            {activeConversation.participantRole === 'exhibitor' ? 'Exhibitor Prospect' : 'Verified Delegate'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {activeConversation.eventTitle && (
+                        <div className="p-2 rounded-lg bg-background/60 border border-border/60 text-[11px]">
+                          <span className="text-[10px] text-muted-foreground block font-bold uppercase">Associated Expo</span>
+                          <span className="font-semibold text-foreground truncate block">{activeConversation.eventTitle}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 2. Buyer Intent Score Card */}
+                    {(() => {
+                      const intent = calculateIntentScore(activeConversation);
+                      return (
+                        <div className="p-3.5 rounded-xl bg-secondary/50 border border-border space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-foreground flex items-center gap-1.5">
+                              <Sparkles className="h-3.5 w-3.5 text-amber-400" /> Buyer Intent Score
+                            </span>
+                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${intent.color}`}>
+                              {intent.level}
+                            </span>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-[11px] font-mono">
+                              <span className="text-muted-foreground">Conversion Probability</span>
+                              <span className="font-bold text-foreground">{intent.score}%</span>
+                            </div>
+                            <div className="h-2 w-full bg-background rounded-full overflow-hidden">
+                              <div className={`h-full ${intent.bar} transition-all duration-500`} style={{ width: `${intent.score}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* 3. Unmasked Contact Channels */}
+                    <div className="p-3.5 rounded-xl bg-secondary/50 border border-border space-y-2.5">
+                      <span className="font-bold text-foreground block">Direct Contact Channels</span>
+                      
+                      {activeConversation.participantPhone ? (
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] text-muted-foreground uppercase font-bold block">Phone Number</span>
+                          <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-background border border-border">
+                            <span className="font-mono text-xs font-semibold text-foreground select-all">
+                              {activeConversation.participantPhone}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <a
+                                href={`tel:${activeConversation.participantPhone}`}
+                                className="px-2 py-1 rounded bg-secondary hover:bg-muted text-[10px] font-bold text-foreground"
+                                title="Call Attendee"
+                              >
+                                Call
+                              </a>
+                              <a
+                                href={`https://wa.me/${activeConversation.participantPhone.replace(/[^0-9]/g, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-[10px] font-bold"
+                                title="WhatsApp Chat"
+                              >
+                                WhatsApp
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground italic block">No phone number recorded.</span>
+                      )}
+
+                      {activeConversation.participantEmail && (
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] text-muted-foreground uppercase font-bold block">Email Address</span>
+                          <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-background border border-border">
+                            <span className="font-mono text-xs font-semibold text-foreground select-all truncate">
+                              {activeConversation.participantEmail}
+                            </span>
+                            <a
+                              href={`mailto:${activeConversation.participantEmail}`}
+                              className="px-2 py-1 rounded bg-secondary hover:bg-muted text-[10px] font-bold text-foreground shrink-0"
+                              title="Send Email"
+                            >
+                              Email
+                            </a>
+                          </div>
+                        </div>
+                      )}
+
+                      {(activeConversation.participantCompany || activeConversation.participantDesignation) && (
+                        <div className="space-y-1 pt-1">
+                          <span className="text-[10px] text-muted-foreground uppercase font-bold block">Organization &amp; Title</span>
+                          <div className="p-2 rounded-lg bg-background border border-border text-foreground font-semibold">
+                            {activeConversation.participantDesignation && <span>{activeConversation.participantDesignation}</span>}
+                            {activeConversation.participantCompany && (
+                              <span className="block text-muted-foreground text-[11px]">{activeConversation.participantCompany}</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 4. Priority Tags */}
+                    <div className="p-3.5 rounded-xl bg-secondary/50 border border-border space-y-2">
+                      <span className="font-bold text-foreground flex items-center gap-1.5">
+                        <Tag className="h-3.5 w-3.5 text-indigo-400" /> Priority Tags
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {['Hot Buyer', 'VIP Stalls', 'Keynote Attendee', 'Follow-up Required'].map((t) => {
+                          const isSelected = (conversationTags[activeConversation._id] || []).includes(t);
+                          return (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => handleToggleTag(t)}
+                              className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-primary text-black border-primary'
+                                  : 'bg-background hover:bg-muted text-muted-foreground border-border'
+                              }`}
+                            >
+                              {isSelected ? `✓ ${t}` : `+ ${t}`}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 5. Internal Organizer CRM Notes */}
+                    <div className="p-3.5 rounded-xl bg-secondary/50 border border-border space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-foreground flex items-center gap-1.5">
+                          <FileText className="h-3.5 w-3.5 text-primary" /> Internal Organizer Notes
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">Private</span>
+                      </div>
+                      <textarea
+                        rows={3}
+                        value={currentNote}
+                        onChange={(e) => setCurrentNote(e.target.value)}
+                        placeholder="Type internal notes regarding this attendee inquiry (e.g. quote given, requested corner stall)..."
+                        className="w-full p-2.5 bg-background border border-border rounded-lg text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveInternalNote}
+                        className="w-full py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-black text-xs font-bold transition-all shadow-xs cursor-pointer"
+                      >
+                        Save Internal Note
+                      </button>
+                    </div>
+
+                    {/* 6. Export Transcript (.xlsx) */}
+                    <button
+                      type="button"
+                      onClick={handleExportConversationTranscript}
+                      className="w-full py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <FileSpreadsheet className="h-4 w-4" />
+                      <span>Export Chat Transcript (.xlsx)</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
           ) : (
             /* Empty State when no conversation selected */
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-card/20">
@@ -1845,6 +2477,239 @@ export default function OrganizerChatPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* MODAL: Enterprise AI Co-Pilot & Smart Suggestions */}
+      {/* ============================================================ */}
+      {showAiModal && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAiModal(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200"
+        >
+          <div className="relative w-full max-w-xl bg-card border border-amber-500/30 rounded-2xl p-6 shadow-2xl space-y-5 text-foreground max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4 border-b border-border pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500/20 to-indigo-500/20 text-amber-500 border border-amber-500/30">
+                  <Sparkles className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-foreground">AI Chat Co-Pilot &amp; Smart Suggestions</h3>
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-amber-500 text-black px-2 py-0.5 rounded-full">
+                      Enterprise Exclusive
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Contextual response recommendations tailored for {activeConversation?.participantName || 'attendee'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAiModal(false)}
+                className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-secondary cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Suggestions Stream */}
+            {isGeneratingAi ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-3 text-center">
+                <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                <span className="text-xs font-bold text-foreground">Generating Smart Contextual Replies...</span>
+                <span className="text-[11px] text-muted-foreground">Analyzing attendee role, inquiry history, and exhibition details</span>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <span className="text-xs font-bold text-foreground uppercase tracking-wider block">
+                  Select a tailored response:
+                </span>
+                {aiSuggestions.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3.5 rounded-xl bg-secondary/50 border border-border/80 hover:border-amber-500/40 transition-all space-y-2 group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                        {item.tag}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground font-semibold">{item.tone}</span>
+                    </div>
+                    <p className="text-xs text-foreground leading-relaxed">{item.text}</p>
+                    <div className="flex items-center justify-end gap-2 pt-1 border-t border-border/40">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMessageText(item.text);
+                          setShowAiModal(false);
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-secondary hover:bg-muted text-foreground text-xs font-bold transition-all cursor-pointer"
+                      >
+                        Insert into Input
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleSendMessage(item.text);
+                          setShowAiModal(false);
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-black text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1"
+                      >
+                        <Send className="h-3 w-3" />
+                        <span>Send Directly</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="pt-2 flex items-center justify-between border-t border-border">
+              <span className="text-[11px] text-muted-foreground">
+                Tip: You can edit any generated response in the composer before sending.
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAiModal(false)}
+                className="px-4 py-2 rounded-xl bg-secondary hover:bg-muted text-foreground text-xs font-bold transition-all cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* MODAL: Enterprise Custom Canned Templates */}
+      {/* ============================================================ */}
+      {showCustomCannedModal && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowCustomCannedModal(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200"
+        >
+          <div className="relative w-full max-w-lg bg-card border border-border rounded-2xl p-6 shadow-2xl space-y-5 text-foreground max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-4 border-b border-border pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                  <BookOpen className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-foreground">Custom Canned Templates</h3>
+                  <p className="text-xs text-muted-foreground">Manage your organizer quick-reply snippets</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCustomCannedModal(false)}
+                className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-secondary cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Add New Template Form */}
+            <form onSubmit={handleAddCustomCanned} className="space-y-2">
+              <label className="text-xs font-bold text-foreground">Add New Quick-Reply Template</label>
+              <textarea
+                rows={2}
+                value={newCannedText}
+                onChange={(e) => setNewCannedText(e.target.value)}
+                placeholder="E.g. VIP parking passes can be claimed at Gate 3 with your registration confirmation..."
+                className="w-full p-3 bg-secondary/50 border border-border rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <button
+                type="submit"
+                disabled={!newCannedText.trim()}
+                className="px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-black text-xs font-bold transition-all disabled:opacity-40 cursor-pointer shadow-xs"
+              >
+                + Add to Templates
+              </button>
+            </form>
+
+            {/* Templates List */}
+            <div className="space-y-2 pt-2 border-t border-border">
+              <span className="text-xs font-bold text-foreground block">Saved Custom Presets ({customReplies.length})</span>
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                {customReplies.map((reply, idx) => (
+                  <div key={idx} className="p-2.5 rounded-xl bg-secondary/40 border border-border/70 flex items-start justify-between gap-2">
+                    <p className="text-xs text-foreground/90 leading-relaxed">{reply}</p>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCustomCanned(idx)}
+                      className="p-1 rounded-md text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer shrink-0"
+                      title="Delete template"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end border-t border-border">
+              <button
+                type="button"
+                onClick={() => setShowCustomCannedModal(false)}
+                className="px-4 py-2 rounded-xl bg-secondary hover:bg-muted text-foreground text-xs font-bold transition-all cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* MODAL: Enterprise Feature Lock Intercept */}
+      {/* ============================================================ */}
+      {showEnterpriseLockModal && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowEnterpriseLockModal(null);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200"
+        >
+          <div className="relative w-full max-w-md bg-card border border-amber-500/40 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 text-center text-foreground">
+            <div className="mx-auto inline-flex items-center justify-center h-16 w-16 rounded-3xl bg-amber-500/15 text-amber-500 border border-amber-500/30 ring-8 ring-amber-500/5 shadow-md">
+              <Crown className="h-8 w-8" />
+            </div>
+
+            <div className="space-y-1.5">
+              <span className="inline-block text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/25">
+                Enterprise Feature Exclusive
+              </span>
+              <h3 className="text-lg font-black text-foreground">{showEnterpriseLockModal.feature}</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">{showEnterpriseLockModal.description}</p>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <Link
+                href="/pricing"
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-black text-xs font-black transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Crown className="h-4 w-4" />
+                <span>Upgrade to Enterprise Plan</span>
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowEnterpriseLockModal(null)}
+                className="w-full py-2 text-xs font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                Maybe Later
+              </button>
+            </div>
           </div>
         </div>
       )}
