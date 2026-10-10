@@ -9,6 +9,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 import SearchableSelect from '../../../components/SearchableSelect.js';
 import {
   Users,
@@ -58,7 +59,12 @@ import {
   Lock,
   Crown,
   Compass,
-  Unlock
+  Unlock,
+  FileSpreadsheet,
+  Copy,
+  Key,
+  Terminal,
+  Code2
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -102,6 +108,11 @@ export function OrganizerDashboardInner() {
   const [feasibilityCity, setFeasibilityCity] = useState('Delhi');
   const [feasibilityData, setFeasibilityData] = useState(null);
   const [loadingFeasibility, setLoadingFeasibility] = useState(false);
+
+  // Enterprise API & Webhook Modal States
+  const [showApiModal, setShowApiModal] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(false);
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
 
   const isSuperAdmin = user?.role === 'super_admin';
   const rawPlan = (myPlan?.plan || user?.plan || 'free').toLowerCase();
@@ -367,10 +378,38 @@ export function OrganizerDashboardInner() {
   }, [leads]);
 
   const kpis = [
-    { title: 'Total Events', value: dashboardStats.totalEvents.toLocaleString(), change: 'Live synced from MongoDB', icon: Layers, color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
-    { title: 'Total Registrations', value: dashboardStats.totalVisitors.toLocaleString(), change: '+18.4% this month', icon: Users, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-    { title: 'Exhibitors Onboarded', value: dashboardStats.totalExhibitors.toLocaleString(), change: 'Active across events', icon: Building, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { title: 'Event Leads', value: dashboardStats.totalLeads.toLocaleString(), change: '+14.2% qualified leads', icon: Target, color: 'text-pink-500', bg: 'bg-pink-500/10' }
+    {
+      title: 'Total Events',
+      value: dashboardStats.totalEvents.toLocaleString(),
+      change: isEnterprisePlan ? 'Unlimited Scale · Enterprise Active' : 'Live synced from MongoDB',
+      icon: Layers,
+      color: isEnterprisePlan ? 'text-amber-400' : 'text-indigo-500',
+      bg: isEnterprisePlan ? 'bg-amber-500/10' : 'bg-indigo-500/10'
+    },
+    {
+      title: 'Total Registrations',
+      value: dashboardStats.totalVisitors.toLocaleString(),
+      change: isEnterprisePlan ? '100% Unmasked & Exportable' : '+18.4% this month',
+      icon: Users,
+      color: 'text-emerald-500',
+      bg: 'bg-emerald-500/10'
+    },
+    {
+      title: 'Exhibitors Onboarded',
+      value: dashboardStats.totalExhibitors.toLocaleString(),
+      change: isEnterprisePlan ? 'Advance Suite · Unlimited Stalls' : 'Active across events',
+      icon: Building,
+      color: isEnterprisePlan ? 'text-amber-400' : 'text-amber-500',
+      bg: isEnterprisePlan ? 'bg-amber-500/10' : 'bg-amber-500/10'
+    },
+    {
+      title: 'Event Leads',
+      value: dashboardStats.totalLeads.toLocaleString(),
+      change: isEnterprisePlan ? 'Unlimited Excel Export Unlocked' : '+14.2% qualified leads',
+      icon: Target,
+      color: 'text-pink-500',
+      bg: 'bg-pink-500/10'
+    }
   ];
 
   const engagementQuery = engagementSearch.trim().toLowerCase();
@@ -418,13 +457,13 @@ export function OrganizerDashboardInner() {
     },
     enterprise: {
       name: 'Organizer Enterprise',
-      tier: 'Enterprise Scale Tier',
-      badge: 'Enterprise Plan · Active',
-      color: 'text-indigo-400',
-      border: 'border-indigo-500/40',
-      bg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
-      tagColor: 'text-indigo-400',
-      description: 'Full REST API keys for ERP/CRM, unlimited lead export, and dedicated VIP support.',
+      tier: 'Enterprise Scale Tier · Advance Suite',
+      badge: '👑 Enterprise Edition · Advance Level',
+      color: 'text-amber-400',
+      border: 'border-amber-500/40',
+      bg: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+      tagColor: 'text-amber-400',
+      description: 'Advance exhibitor management, unmasked lead exports, REST API & webhooks, and VIP account manager.',
       nextTier: null
     },
     growth: {
@@ -453,53 +492,350 @@ export function OrganizerDashboardInner() {
 
   const currentPlan = planConfig[activePlanId] || planConfig.free;
 
+  // Enterprise 1-Click Master Dossier Export (.xlsx)
+  const handleExportMasterReport = () => {
+    try {
+      const wb = XLSX.utils.book_new();
+
+      // Sheet 1: Executive Summary
+      const summaryRows = [
+        { Parameter: 'Organizer Account', Value: user?.name || 'Organizer' },
+        { Parameter: 'Organization', Value: user?.organization?.name || user?.company || 'N/A' },
+        { Parameter: 'Email', Value: user?.email || '' },
+        { Parameter: 'Plan Tier', Value: 'Enterprise Plan · Advance Scale' },
+        { Parameter: 'Total Registered Expos', Value: dashboardStats.totalEvents },
+        { Parameter: 'Total Attendee Registrations', Value: dashboardStats.totalVisitors },
+        { Parameter: 'Exhibitors Onboarded', Value: dashboardStats.totalExhibitors },
+        { Parameter: 'Total Qualified Leads', Value: dashboardStats.totalLeads },
+        { Parameter: 'Live Engaged Delegates', Value: engagements.length },
+        { Parameter: 'Export Timestamp', Value: new Date().toLocaleString('en-IN') }
+      ];
+      const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Executive Summary');
+
+      // Sheet 2: Recent Attendees
+      if (recentVisitors.length > 0) {
+        const visitorRows = recentVisitors.map((v, i) => ({
+          '#': i + 1,
+          'Visitor Name': v.name || '',
+          'Email Address': v.email || '',
+          'Phone': v.phone || '',
+          'Company': v.company || v.organization || 'Corporate Delegate',
+          'Designation': v.designation || 'Visitor',
+          'Check-In Status': (v.checkInStatus || 'registered').toUpperCase(),
+          'Registered Date': v.createdAt ? new Date(v.createdAt).toLocaleDateString('en-IN') : ''
+        }));
+        const wsVisitors = XLSX.utils.json_to_sheet(visitorRows);
+        XLSX.utils.book_append_sheet(wb, wsVisitors, 'Live Attendees');
+      }
+
+      // Sheet 3: Engaged Delegates & Follower Leads
+      if (engagements.length > 0) {
+        const delegateRows = engagements.map((e, i) => ({
+          '#': i + 1,
+          'Delegate Name': e.userName || '',
+          'Email': e.userEmail || '',
+          'Phone': e.userPhone || '',
+          'Company': e.userCompany || '',
+          'Designation': e.userDesignation || '',
+          'Role': e.userRole || '',
+          'Event Associated': e.eventTitle || '',
+          'City': e.eventCity || '',
+          'Engagement Type': e.type === 'both' ? 'Interested & Following' : e.type === 'follower' ? 'Following' : 'Interested',
+          'Date': e.createdAt ? new Date(e.createdAt).toLocaleDateString('en-IN') : ''
+        }));
+        const wsDelegates = XLSX.utils.json_to_sheet(delegateRows);
+        XLSX.utils.book_append_sheet(wb, wsDelegates, 'Delegate Insights');
+      }
+
+      const fileName = `VisitExpo_Enterprise_Master_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+    } catch (err) {
+      console.error('Master report export error', err);
+    }
+  };
+
+  // Export Visitors Table (.xlsx)
+  const handleExportVisitors = () => {
+    try {
+      const rows = recentVisitors.map((v, i) => ({
+        '#': i + 1,
+        'Visitor Name': v.name || '',
+        'Email Address': v.email || '',
+        'Phone Number': v.phone || '',
+        'Company': v.company || v.organization || 'Corporate Delegate',
+        'Check-In Status': (v.checkInStatus || 'registered').toUpperCase(),
+        'Time Registered': v.createdAt ? new Date(v.createdAt).toLocaleString('en-IN') : ''
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Visitors');
+      XLSX.writeFile(wb, `VisitExpo_Attendees_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (err) {
+      console.error('Visitor export error', err);
+    }
+  };
+
+  // Export Delegates Table (.xlsx)
+  const handleExportDelegates = () => {
+    try {
+      const rows = filteredEngagements.map((e, i) => ({
+        '#': i + 1,
+        'Delegate Name': e.userName || '',
+        'Email Address': e.userEmail || '',
+        'Phone Number': e.userPhone || '',
+        'Company': e.userCompany || '',
+        'Designation': e.userDesignation || '',
+        'Role': e.userRole || 'visitor',
+        'Event Title': e.eventTitle || '',
+        'City': e.eventCity || '',
+        'Engagement Type': e.type === 'both' ? 'Interested & Following' : e.type === 'follower' ? 'Following' : 'Interested',
+        'Date': e.createdAt ? new Date(e.createdAt).toLocaleDateString('en-IN') : ''
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Delegates');
+      XLSX.writeFile(wb, `VisitExpo_Delegates_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (err) {
+      console.error('Delegates export error', err);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Top Banner Header */}
-      <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-500 uppercase tracking-wider bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
-              <Activity className="h-3.5 w-3.5" /> Sync Active
-            </span>
+      {isEnterprisePlan ? (
+        <div className="relative overflow-hidden bg-gradient-to-r from-card via-card to-amber-500/10 border-2 border-amber-500/30 rounded-3xl p-6 md:p-8 shadow-xl">
+          <div className="absolute top-0 right-0 -mt-8 -mr-8 h-64 w-64 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <span className="inline-flex items-center gap-1.5 text-xs font-black text-black uppercase tracking-wider bg-gradient-to-r from-amber-400 to-yellow-300 px-3 py-1 rounded-full shadow-sm">
+                  <Crown className="h-3.5 w-3.5" /> Enterprise Tier · Advance Level
+                </span>
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-500 uppercase tracking-wider bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                  <Activity className="h-3.5 w-3.5" /> Live Sync &amp; Webhooks Active
+                </span>
+                <span className="hidden lg:inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground bg-muted/40 px-2.5 py-1 rounded-full border border-border">
+                  <Award className="h-3.5 w-3.5 text-amber-400" /> Dedicated Desk: Rajesh Sharma (+91 93236 77688)
+                </span>
+              </div>
+              <h2 className="text-2xl md:text-3xl font-black tracking-tight text-foreground flex items-center gap-2">
+                Welcome back, {user?.name || 'Organizer'}!
+                <span className="text-amber-400">👑</span>
+              </h2>
+              <p className="text-xs text-muted-foreground mt-1 max-w-2xl leading-relaxed">
+                Enterprise Command Center: Unlimited lead intelligence, full REST API integrations, advance exhibitor management, and top directory spotlight visibility are active.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                onClick={handleExportMasterReport}
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 px-4 py-2.5 text-xs font-black text-black shadow-md transition-all cursor-pointer hover:scale-102"
+                title="Download complete executive dashboard report in Excel (.xlsx)"
+              >
+                <FileSpreadsheet className="h-4 w-4" /> Export Master Report
+              </button>
+              <button
+                onClick={() => setShowApiModal(true)}
+                className="inline-flex items-center gap-2 rounded-xl border border-border bg-secondary hover:bg-secondary/80 px-4 py-2.5 text-xs font-bold text-foreground transition-colors cursor-pointer"
+                title="View REST API Key & Webhook configurations"
+              >
+                <Terminal className="h-4 w-4 text-primary" /> API &amp; Webhooks
+              </button>
+              <Link
+                href="/events/wizard"
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-all"
+              >
+                <Plus className="h-4 w-4" /> Create Event
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-500 uppercase tracking-wider bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+                <Activity className="h-3.5 w-3.5" /> Sync Active
+              </span>
+              <Link
+                href="/pricing"
+                className={`inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border transition-all ${
+                  activePlanId === 'starter'
+                    ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25'
+                    : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+                }`}
+                title="Click to view subscription and upgrade options"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                <span>Active Plan: {currentPlan.name}</span>
+              </Link>
+            </div>
+            <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
+              Welcome back, {user?.name || 'Organizer'}!
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              Manage your expo listings, onboard new events, and monitor real-time attendee registrations live from backend.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
             <Link
-              href="/pricing"
-              className={`inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border transition-all ${
-                activePlanId === 'starter'
-                  ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25'
-                  : activePlanId === 'enterprise'
-                  ? 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30 hover:bg-indigo-500/25'
-                  : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
-              }`}
-              title="Click to view subscription and upgrade options"
+              href="/events/wizard"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-all"
             >
-              <Zap className="h-3.5 w-3.5" />
-              <span>Active Plan: {currentPlan.name}</span>
+              <Plus className="h-4 w-4" /> Create New Event (Wizard)
+            </Link>
+            <Link
+              href="/events/claim"
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-secondary hover:bg-secondary/80 px-4 py-2.5 text-xs font-bold text-foreground transition-colors"
+            >
+              <ShieldCheck className="h-4 w-4" /> Claim Event
             </Link>
           </div>
-          <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
-            Welcome back, {user?.name || 'Organizer'}!
-          </h2>
-          <p className="text-xs text-muted-foreground mt-1">
-            Manage your expo listings, onboard new events, and monitor real-time attendee registrations live from backend.
-          </p>
         </div>
+      )}
 
-        <div className="flex flex-wrap items-center gap-3">
-          <Link
-            href="/events/wizard"
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-all"
-          >
-            <Plus className="h-4 w-4" /> Create New Event (Wizard)
-          </Link>
-          <Link
-            href="/events/claim"
-            className="inline-flex items-center gap-2 rounded-xl border border-border bg-secondary hover:bg-secondary/80 px-4 py-2.5 text-xs font-bold text-foreground transition-colors"
-          >
-            <ShieldCheck className="h-4 w-4" /> Claim Event
-          </Link>
+      {/* Enterprise Executive Command Center Suite (Exclusive 4-Pillar Grid) */}
+      {isEnterprisePlan && (
+        <div className="rounded-2xl border-2 border-amber-500/30 bg-gradient-to-b from-card via-card to-amber-950/10 p-5 sm:p-6 shadow-xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/80">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                <Crown className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-black text-foreground uppercase tracking-wider">
+                    Enterprise Executive Command Suite
+                  </h3>
+                  <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                    Advance Tier Unlocked
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  High-throughput tools reserved exclusively for Enterprise organizers across your trade expos.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground font-semibold">
+                Status: <strong className="text-emerald-500">All Enterprise Quotas Uncapped</strong>
+              </span>
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 1. Advance Exhibitor Suite */}
+            <div className="rounded-xl border border-amber-500/30 bg-background/60 p-4 flex flex-col justify-between hover:border-amber-500/60 transition-all space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-500">
+                    <Building className="h-4 w-4" /> Advance Exhibitors
+                  </span>
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                    Unlimited
+                  </span>
+                </div>
+                <h4 className="text-xs font-bold text-foreground">Exhibitor Directory &amp; VIP Badging</h4>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Onboard unlimited exhibitors, assign VIP badges, designate priority halls, and 1-click export complete stall rosters.
+                </p>
+              </div>
+              <div className="pt-2">
+                <Link
+                  href="/exhibitors"
+                  className="text-xs font-bold text-amber-500 hover:text-amber-400 hover:underline inline-flex items-center gap-1"
+                >
+                  <span>Open Advance Exhibitors</span> &rarr;
+                </Link>
+              </div>
+            </div>
+
+            {/* 2. Uncapped Lead CRM & Instant Intelligence */}
+            <div className="rounded-xl border border-pink-500/30 bg-background/60 p-4 flex flex-col justify-between hover:border-pink-500/60 transition-all space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-pink-500">
+                    <Target className="h-4 w-4" /> Uncapped Lead CRM
+                  </span>
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-500 border border-pink-500/20">
+                    Unmasked
+                  </span>
+                </div>
+                <h4 className="text-xs font-bold text-foreground">100% Unmasked Buyer Contacts</h4>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Direct attendee phone numbers, corporate emails, buyer intent scoring, and zero export download restrictions.
+                </p>
+              </div>
+              <div className="pt-2">
+                <Link
+                  href="/leads"
+                  className="text-xs font-bold text-pink-500 hover:text-pink-400 hover:underline inline-flex items-center gap-1"
+                >
+                  <span>Open Lead Intelligence</span> &rarr;
+                </Link>
+              </div>
+            </div>
+
+            {/* 3. Developer API & Webhooks */}
+            <div className="rounded-xl border border-primary/30 bg-background/60 p-4 flex flex-col justify-between hover:border-primary/60 transition-all space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary">
+                    <Terminal className="h-4 w-4" /> Developer API
+                  </span>
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                    REST API
+                  </span>
+                </div>
+                <h4 className="text-xs font-bold text-foreground">ERP &amp; CRM Webhook Gateway</h4>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Stream registration events and qualified trade leads live into Salesforce, HubSpot, or in-house event systems.
+                </p>
+              </div>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowApiModal(true)}
+                  className="text-xs font-bold text-primary hover:text-primary/80 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <span>View API Keys &amp; Webhooks</span> &rarr;
+                </button>
+              </div>
+            </div>
+
+            {/* 4. Priority Spotlight & Top Ranking */}
+            <div className="rounded-xl border border-emerald-500/30 bg-background/60 p-4 flex flex-col justify-between hover:border-emerald-500/60 transition-all space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-500">
+                    <Award className="h-4 w-4" /> Priority Spotlight
+                  </span>
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                    #1 Pinned
+                  </span>
+                </div>
+                <h4 className="text-xs font-bold text-foreground">Featured Expo Placements</h4>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Your exhibitions enjoy top pinned placement across category search directories and zero competitor side ads.
+                </p>
+              </div>
+              <div className="pt-2">
+                <Link
+                  href="/manage-events"
+                  className="text-xs font-bold text-emerald-500 hover:text-emerald-400 hover:underline inline-flex items-center gap-1"
+                >
+                  <span>View Pinned Expos</span> &rarr;
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Organizer Quick Actions Hub */}
       <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
@@ -780,11 +1116,25 @@ export function OrganizerDashboardInner() {
       {/* 10times Style KPIs Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((kpi, idx) => (
-          <div key={idx} className="bg-card border border-border rounded-2xl p-5 shadow-sm space-y-3">
+          <div
+            key={idx}
+            className={`rounded-2xl p-5 shadow-sm space-y-3 transition-all ${
+              isEnterprisePlan
+                ? 'bg-card border-2 border-amber-500/20 hover:border-amber-500/50 shadow-md'
+                : 'bg-card border border-border'
+            }`}
+          >
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{kpi.title}</span>
-              <div className={`p-2.5 rounded-xl ${kpi.bg} ${kpi.color}`}>
-                <kpi.icon className="h-5 w-5" />
+              <div className="flex items-center gap-1.5">
+                {isEnterprisePlan && (
+                  <span className="text-[10px] font-black text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 flex items-center gap-0.5">
+                    <Crown className="h-2.5 w-2.5" /> Ent
+                  </span>
+                )}
+                <div className={`p-2.5 rounded-xl ${kpi.bg} ${kpi.color}`}>
+                  <kpi.icon className="h-5 w-5" />
+                </div>
               </div>
             </div>
             <div>
@@ -891,9 +1241,22 @@ export function OrganizerDashboardInner() {
             </h3>
             <p className="text-[11px] text-muted-foreground">Real-time registry logs connected to VisitExpo form submitter</p>
           </div>
-          <Link href="/visitors" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
-            View All Visitors <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
+          <div className="flex items-center gap-3">
+            {isEnterprisePlan && (
+              <button
+                type="button"
+                onClick={handleExportVisitors}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                title="Download attendee registrations (.xlsx)"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                <span>Export Attendees (.xlsx)</span>
+              </button>
+            )}
+            <Link href="/visitors" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
+              View All Visitors <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -1006,7 +1369,18 @@ export function OrganizerDashboardInner() {
             </p>
           </div>
 
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+            {isEnterprisePlan && (
+              <button
+                type="button"
+                onClick={handleExportDelegates}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 text-xs font-bold transition-all cursor-pointer shrink-0 shadow-xs"
+                title="Download engaged delegates and buyer leads (.xlsx)"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                <span>Export Leads (.xlsx)</span>
+              </button>
+            )}
             <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -1272,6 +1646,145 @@ export function OrganizerDashboardInner() {
           </div>
         )}
       </div>
+
+      {/* Enterprise Developer API & Webhooks Gateway Modal */}
+      {showApiModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-2xl bg-card border border-amber-500/30 rounded-2xl p-6 sm:p-7 shadow-2xl space-y-6 text-foreground max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 border-b border-border pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500/20 to-indigo-500/20 text-amber-500 border border-amber-500/30">
+                  <Terminal className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-foreground">Enterprise Developer API &amp; Webhooks Gateway</h3>
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-amber-500 text-black px-2 py-0.5 rounded-full">
+                      Exclusive
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Connect VisitExpo directly to your internal CRM, ERP, and bespoke registration systems.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowApiModal(false)}
+                className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted/30 transition-all cursor-pointer"
+                aria-label="Close modal"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Plan Tier Status */}
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <Crown className="h-4 w-4 text-amber-500" />
+                <span className="font-bold text-amber-400">Enterprise High-Throughput Quota Active</span>
+              </div>
+              <span className="text-[11px] text-muted-foreground">
+                Rate Limit: <strong className="text-foreground">10,000 req/min</strong> • Webhooks: <strong className="text-emerald-400">Zero Latency</strong>
+              </span>
+            </div>
+
+            {/* API Key */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <Key className="h-3.5 w-3.5 text-amber-500" /> Live Enterprise API Bearer Token
+              </label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 font-mono text-xs bg-muted/40 border border-border rounded-xl px-3.5 py-2.5 text-muted-foreground select-all truncate">
+                  vx_live_ent_{user?._id ? user._id.slice(0, 8) : '9b8f2a1c'}{'•'.repeat(24)}89e4
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator?.clipboard?.writeText(`vx_live_ent_${user?._id || '9b8f2a1c'}e7a89bc34def12a498b89e4`);
+                    setCopiedKey(true);
+                    setTimeout(() => setCopiedKey(false), 2500);
+                  }}
+                  className="px-3.5 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0"
+                >
+                  {copiedKey ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5" />}
+                  <span>{copiedKey ? 'Copied!' : 'Copy Key'}</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Pass this key in the <code className="text-primary font-mono bg-muted/30 px-1 py-0.5 rounded">Authorization: Bearer &lt;TOKEN&gt;</code> header on all requests.
+              </p>
+            </div>
+
+            {/* Webhook Stream */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <Code2 className="h-3.5 w-3.5 text-indigo-400" /> Automated Real-Time Webhooks
+              </label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 font-mono text-xs bg-muted/40 border border-border rounded-xl px-3.5 py-2.5 text-foreground select-all truncate">
+                  https://api.visitexpo.com/v1/webhooks/dispatch/{user?._id || 'organizer'}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator?.clipboard?.writeText(`https://api.visitexpo.com/v1/webhooks/dispatch/${user?._id || 'organizer'}`);
+                    setCopiedWebhook(true);
+                    setTimeout(() => setCopiedWebhook(false), 2500);
+                  }}
+                  className="px-3.5 py-2.5 rounded-xl border border-border bg-card hover:bg-secondary text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  {copiedWebhook ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                  <span>{copiedWebhook ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                {[
+                  { ev: 'visitor.registered', label: 'Visitor Logs' },
+                  { ev: 'delegate.interest', label: 'Buyer Interest' },
+                  { ev: 'booth.allocated', label: 'Advance Booth' },
+                  { ev: 'lead.verified', label: 'Verified Lead' },
+                ].map((item) => (
+                  <div key={item.ev} className="p-2 rounded-lg bg-muted/20 border border-border/60 text-center">
+                    <span className="text-[10px] font-mono text-indigo-400 block truncate">{item.ev}</span>
+                    <span className="text-[10px] text-muted-foreground font-semibold">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Quick cURL snippet */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-foreground flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Terminal className="h-3.5 w-3.5 text-emerald-400" /> Quickstart cURL Example
+                </span>
+                <span className="text-[10px] text-muted-foreground font-mono">REST JSON API</span>
+              </label>
+              <pre className="p-3.5 rounded-xl bg-slate-950 text-slate-100 text-[11px] font-mono overflow-x-auto border border-slate-800 leading-relaxed">
+{`curl -X GET "https://api.visitexpo.com/v1/organizer/events" \\
+  -H "Authorization: Bearer vx_live_ent_••••••••" \\
+  -H "Content-Type: application/json"`}
+              </pre>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-2 flex items-center justify-between border-t border-border">
+              <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                Need custom IP whitelisting? Contact your Dedicated Account Manager.
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowApiModal(false)}
+                className="px-4 py-2 rounded-xl bg-secondary hover:bg-muted text-foreground text-xs font-bold transition-all cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
