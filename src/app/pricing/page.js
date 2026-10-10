@@ -572,11 +572,11 @@ export default function PricingPage() {
         },
         {
           label: 'Exhibitor Management Hub',
-          free: 'Basic listing',
-          freeStatus: 'limited',
-          starter: 'Basic Hub',
+          free: 'Not Available',
+          freeStatus: 'no',
+          starter: 'Normal Level (Directory, Booth & Staff Management)',
           starterStatus: 'ok',
-          enterprise: 'Advance Portal & Space Allocation',
+          enterprise: 'Advance Level (Unlimited, VIP Badging, Directory Export & Space Analytics)',
           enterpriseStatus: 'adv'
         },
         {

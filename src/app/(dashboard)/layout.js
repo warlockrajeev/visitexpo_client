@@ -360,7 +360,12 @@ export default function DashboardLayout({ children }) {
         { name: 'Claim Event', href: '/events/claim', icon: ShieldCheck },
         { name: 'Manage Events', href: '/manage-events', icon: Calendar },
         { name: 'Location Feasibility', href: '/location-feasibility', icon: MapPin, badge: 'Market AI' },
-        { name: 'Exhibitors', href: '/exhibitors', icon: Building },
+        {
+          name: 'Exhibitors',
+          href: '/exhibitors',
+          icon: Building,
+          badge: (user?.role === 'organizer' && (!user?.plan || user?.plan === 'free')) ? 'Starter+' : (user?.plan === 'enterprise' ? 'Advance' : null)
+        },
         { name: 'Visitor CRM', href: '/visitors', icon: Users },
         { name: 'Lead CRM', href: '/leads', icon: Target },
         { name: 'Marketing & Campaigns', href: '/campaigns', icon: Mail },

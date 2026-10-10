@@ -3217,8 +3217,8 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
               {renderSectionResetButton(3)}
             </div>
 
-            <div className="grid gap-6 sm:grid-cols-3">
-              <div>
+            <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 xl:grid-cols-12">
+              <div className="sm:col-span-1 xl:col-span-3">
                 <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
                   Start Date *
                 </label>
@@ -3237,7 +3237,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                     }
                   }}
                   onBlur={handleBlur}
-                  className={`w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none transition-all dark:[color-scheme:dark] ${
+                  className={`w-full rounded-lg border bg-background px-3 py-2 text-xs text-foreground focus:outline-none transition-all dark:[color-scheme:dark] ${
                     errors.startDate
                       ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500'
                       : 'border-border focus:ring-2 focus:ring-primary'
@@ -3251,7 +3251,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 )}
               </div>
 
-              <div>
+              <div className="sm:col-span-1 xl:col-span-3">
                 <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
                   End Date *
                 </label>
@@ -3261,7 +3261,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                   value={formData.endDate}
                   onChange={handleChange}
                   onBlur={handleBlur}
-                  className={`w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none transition-all dark:[color-scheme:dark] ${
+                  className={`w-full rounded-lg border bg-background px-3 py-2 text-xs text-foreground focus:outline-none transition-all dark:[color-scheme:dark] ${
                     errors.endDate
                       ? 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-500/5 focus:ring-rose-500'
                       : 'border-border focus:ring-2 focus:ring-primary'
@@ -3275,30 +3275,34 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 )}
               </div>
 
-              <div>
+              <div className="sm:col-span-2 xl:col-span-6">
                 <label className="block text-xs font-bold text-muted-foreground uppercase mb-1">
                   Daily Visitor Timings
                 </label>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="time"
-                    value={getTimingParts(formData.timings).start}
-                    onChange={(e) => {
-                      const { end } = getTimingParts(formData.timings);
-                      handleTimingChange(e.target.value, end);
-                    }}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary dark:[color-scheme:dark]"
-                  />
-                  <span className="text-xs font-semibold text-muted-foreground">to</span>
-                  <input
-                    type="time"
-                    value={getTimingParts(formData.timings).end}
-                    onChange={(e) => {
-                      const { start } = getTimingParts(formData.timings);
-                      handleTimingChange(start, e.target.value);
-                    }}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary dark:[color-scheme:dark]"
-                  />
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="relative flex-1 min-w-0">
+                    <input
+                      type="time"
+                      value={getTimingParts(formData.timings).start}
+                      onChange={(e) => {
+                        const { end } = getTimingParts(formData.timings);
+                        handleTimingChange(e.target.value, end);
+                      }}
+                      className="w-full rounded-lg border border-border bg-background px-2.5 sm:px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary dark:[color-scheme:dark]"
+                    />
+                  </div>
+                  <span className="text-xs font-bold text-muted-foreground shrink-0 uppercase tracking-wide px-0.5">to</span>
+                  <div className="relative flex-1 min-w-0">
+                    <input
+                      type="time"
+                      value={getTimingParts(formData.timings).end}
+                      onChange={(e) => {
+                        const { start } = getTimingParts(formData.timings);
+                        handleTimingChange(start, e.target.value);
+                      }}
+                      className="w-full rounded-lg border border-border bg-background px-2.5 sm:px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary dark:[color-scheme:dark]"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -3955,7 +3959,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 <p className="text-xs text-muted-foreground">Add sponsors, co-sponsors, and media partners for the event banner logos.</p>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-4 items-end bg-card p-4 rounded-xl border border-border">
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 items-end bg-card p-4 rounded-xl border border-border">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase">Sponsor Name</label>
                   <input
@@ -4281,8 +4285,8 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                 <p className="text-xs text-muted-foreground">Add specific event days or session timelines (e.g. "Event Day" or "Day 1", Date: "13 Nov 2026").</p>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3 items-end bg-card p-4 rounded-xl border border-border">
-                <div className="space-y-1">
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-12 items-end bg-card p-4 rounded-xl border border-border">
+                <div className="sm:col-span-5 space-y-1">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase">Day / Session Label</label>
                   <input
                     type="text"
@@ -4301,7 +4305,7 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                     </p>
                   )}
                 </div>
-                <div className="space-y-1">
+                <div className="sm:col-span-4 space-y-1">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase">Date Value</label>
                   <input
                     type="date"
@@ -4310,13 +4314,15 @@ Do not return any markdown code block wrapper around the JSON object. Just retur
                     className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary dark:[color-scheme:dark]"
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={addSchedule}
-                  className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/95 text-white font-bold text-xs h-[32px]"
-                >
-                  Add Day
-                </button>
+                <div className="sm:col-span-3">
+                  <button
+                    type="button"
+                    onClick={addSchedule}
+                    className="w-full px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/95 text-white font-bold text-xs h-[32px] cursor-pointer"
+                  >
+                    Add Day
+                  </button>
+                </div>
               </div>
 
               {formData.schedules && formData.schedules.length > 0 && (
