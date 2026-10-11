@@ -416,9 +416,10 @@ export default function FeaturedOrganizers({ onSelectOrganizer, activeOrganizer 
     let isMounted = true;
     async function loadBackendOrganizers() {
       try {
-        const [res, delRes] = await Promise.all([
+        const [res, delRes, featRes] = await Promise.all([
           fetch('/api/organizers'),
-          fetch(`${API_URL}/events/deleted-organizers`, { cache: 'no-store' }).catch(() => null)
+          fetch(`${API_URL}/events/deleted-organizers`, { cache: 'no-store' }).catch(() => null),
+          fetch(`${API_URL}/featured-organizers`, { cache: 'no-store' }).catch(() => null)
         ]);
 
         let deletedNames = new Set();
@@ -428,6 +429,14 @@ export default function FeaturedOrganizers({ onSelectOrganizer, activeOrganizer 
           const list = delJson.data || [];
           deletedNames = new Set(list.map((d) => (d.name || '').toLowerCase().trim()));
           deletedSlugIds = new Set(list.map((d) => (d.slugId || '').toLowerCase().trim()));
+        }
+
+        let dbFeaturedList = [];
+        if (featRes && featRes.ok) {
+          const featJson = await featRes.json().catch(() => ({}));
+          if (Array.isArray(featJson?.data) && featJson.data.length > 0) {
+            dbFeaturedList = featJson.data;
+          }
         }
 
         const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -459,24 +468,72 @@ export default function FeaturedOrganizers({ onSelectOrganizer, activeOrganizer 
           return false;
         };
 
-        if (!res.ok) return;
-        const json = await res.json();
-        if (json?.success && Array.isArray(json.data?.organizers) && json.data.organizers.length > 0) {
-          if (!isMounted) return;
-
-          // Merge live backend data with existing custom branding elements
-          const merged = json.data.organizers
-            .filter((backendOrg) => !isDeletedOrg(backendOrg))
-            .map((backendOrg) => {
-              const baseline = BASELINE_ORGANIZERS.find((b) => b.id === backendOrg.id);
-              return {
-                ...backendOrg,
-                customLogo: baseline?.customLogo || null
-              };
-            });
-
-          setOrganizers(merged);
+        let baseList = [];
+        if (res && res.ok) {
+          const json = await res.json();
+          if (json?.success && Array.isArray(json.data?.organizers)) {
+            baseList = json.data.organizers;
+          }
         }
+
+        if (baseList.length === 0) {
+          baseList = BASELINE_ORGANIZERS;
+        }
+
+        if (!isMounted) return;
+
+        // Merge live backend data with existing custom branding elements
+        let merged = baseList
+          .filter((backendOrg) => !isDeletedOrg(backendOrg))
+          .map((backendOrg) => {
+            const baseline = BASELINE_ORGANIZERS.find((b) => b.id === backendOrg.id);
+            return {
+              ...backendOrg,
+              customLogo: baseline?.customLogo || null
+            };
+          });
+
+        // Merge any newly added or updated featured organizers from MongoDB backend
+        if (dbFeaturedList.length > 0) {
+          const seenIds = new Set();
+          const customCombined = [];
+
+          dbFeaturedList.forEach((dbOrg) => {
+            const orgId = dbOrg.slug || (dbOrg.shortName || dbOrg.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            seenIds.add(orgId);
+            seenIds.add((dbOrg.name || '').toLowerCase());
+            const baseline = BASELINE_ORGANIZERS.find((b) => b.id === orgId || b.name.toLowerCase() === (dbOrg.name || '').toLowerCase());
+
+            customCombined.push({
+              id: orgId,
+              name: dbOrg.name,
+              shortName: dbOrg.shortName || dbOrg.name,
+              searchTerm: dbOrg.shortName || dbOrg.name,
+              brandColor: dbOrg.brandColor || baseline?.brandColor || '#0284C7',
+              accentColor: dbOrg.accentColor || baseline?.accentColor || '#38BDF8',
+              website: dbOrg.website || baseline?.website || '',
+              logoUrl: dbOrg.logoUrl || baseline?.logoUrl || null,
+              badge: dbOrg.badge || baseline?.badge || 'Featured Partner',
+              count: dbOrg.eventsCount !== undefined ? dbOrg.eventsCount : (baseline?.count || 0),
+              countFormatted: `${dbOrg.eventsCount !== undefined ? dbOrg.eventsCount : (baseline?.count || 0)} Events`,
+              displayOrder: dbOrg.displayOrder !== undefined ? dbOrg.displayOrder : 99,
+              customLogo: baseline?.customLogo || null
+            });
+          });
+
+          // Add any remaining organizers that weren't in dbFeaturedList
+          merged.forEach((item) => {
+            const orgId = (item.id || '').toLowerCase();
+            const orgName = (item.name || '').toLowerCase();
+            if (!seenIds.has(orgId) && !seenIds.has(orgName)) {
+              customCombined.push(item);
+            }
+          });
+
+          merged = customCombined;
+        }
+
+        setOrganizers(merged);
       } catch (err) {
         console.warn('FeaturedOrganizers live fetch note:', err.message);
       }

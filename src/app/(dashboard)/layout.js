@@ -41,7 +41,8 @@ import {
   Star,
   Bell,
   Zap,
-  MapPin
+  MapPin,
+  Award
 } from 'lucide-react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
@@ -371,6 +372,12 @@ export default function DashboardLayout({ children }) {
         { name: 'Marketing & Campaigns', href: '/campaigns', icon: Mail },
         { name: 'Exhibitor Discovery', href: '/campaigns/exhibitor-discovery', icon: Compass },
         { name: 'Ticketing', href: '/tickets', icon: Ticket },
+        {
+          name: 'Featured Organizer',
+          href: '/featured-organizer',
+          icon: Award,
+          badge: (user?.plan === 'enterprise' || user?.plan === 'growth') ? 'Enterprise' : 'Upgrade'
+        },
         { name: 'Plans & Pricing', href: '/pricing', icon: CreditCard, badge: 'Upgrade' },
         { name: 'Settings', href: '/settings', icon: Settings },
       ];
@@ -391,6 +398,7 @@ export default function DashboardLayout({ children }) {
     if (path === '/events/claim') return 'Claim Existing Event';
     if (path === '/manage-events') return 'Event Management';
     if (path === '/location-feasibility') return 'Location Feasibility & Event Presence Intelligence';
+    if (path === '/featured-organizer') return 'Featured Organizer Showcase Application';
     if (path === '/campaigns/exhibitor-discovery') return 'Exhibitor Discovery';
     if (path === '/campaigns') return 'Marketing & Campaigns';
     const clean = (path || '').replace('/', '').replace(/-/g, ' ');
