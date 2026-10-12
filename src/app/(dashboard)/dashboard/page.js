@@ -52,7 +52,7 @@ import {
   Zap,
   Award,
   CreditCard,
-  Sparkles,
+  Radio,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -115,10 +115,10 @@ export function OrganizerDashboardInner() {
   const [copiedWebhook, setCopiedWebhook] = useState(false);
 
   const isSuperAdmin = user?.role === 'super_admin';
-  const rawPlan = (myPlan?.plan || user?.plan || 'free').toLowerCase();
+  const rawPlan = ((myPlan?.basePlan || myPlan?.plan || user?.basePlan || user?.plan || 'free') === 'growth' ? 'enterprise' : (myPlan?.basePlan || myPlan?.plan || user?.basePlan || user?.plan || 'free')).toLowerCase();
   const isFreePlan = !isSuperAdmin && (rawPlan === 'free' || !rawPlan);
   const isStarterPlan = !isSuperAdmin && rawPlan === 'starter';
-  const isEnterprisePlan = isSuperAdmin || rawPlan === 'enterprise' || rawPlan === 'growth';
+  const isEnterprisePlan = isSuperAdmin || rawPlan === 'enterprise';
 
   useEffect(() => {
     if (!user) return;
@@ -441,7 +441,8 @@ export function OrganizerDashboardInner() {
     safeEngagementPage * engagementPageSize
   );
 
-  const activePlanId = (myPlan?.subscription?.plan || myPlan?.plan || user?.plan || 'free').toLowerCase();
+  const activePlanId = ((myPlan?.basePlan || myPlan?.subscription?.plan || myPlan?.plan || user?.basePlan || user?.plan || 'free') === 'growth' ? 'enterprise' : (myPlan?.basePlan || myPlan?.subscription?.plan || myPlan?.plan || user?.basePlan || user?.plan || 'free')).toLowerCase();
+  const hasGrowthAddon = Boolean(user?.hasGrowthPlan || myPlan?.hasGrowthPlan);
 
   const planConfig = {
     starter: {
@@ -855,6 +856,14 @@ export function OrganizerDashboardInner() {
             <span className="inline-flex items-center gap-1 text-emerald-500 font-bold">
               <CheckCircle2 className="h-3.5 w-3.5" /> {currentPlan.name} (Active)
             </span>
+            {hasGrowthAddon && (
+              <>
+                <span>•</span>
+                <span className="inline-flex items-center gap-1 text-emerald-400 font-bold">
+                  <Radio className="h-3.5 w-3.5" /> Growth Add-on (Active)
+                </span>
+              </>
+            )}
             <span>•</span>
             <Link href="/pricing" className="text-primary hover:underline font-bold">
               Manage / Upgrade &rarr;

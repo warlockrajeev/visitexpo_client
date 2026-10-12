@@ -619,7 +619,7 @@ export default function ExhibitorsPage() {
             <div>
               <div className="flex items-center gap-1.5 mb-4">
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-                  <Sparkles className="h-3.5 w-3.5" /> Enterprise Plan
+                  <Crown className="h-3.5 w-3.5" /> Enterprise Plan
                 </span>
               </div>
               <h3 className="text-xl font-bold text-foreground flex items-center gap-2">

@@ -1065,6 +1065,16 @@ export default function ExpoDetailsPage() {
       if (res.data?.data?.isInterested !== undefined) {
         setIsInterested(res.data.data.isInterested);
       }
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('visitexpo_last_engagement_trigger', String(Date.now()));
+          if ('BroadcastChannel' in window) {
+            const bc = new BroadcastChannel('visitexpo_notification_channel');
+            bc.postMessage({ type: 'ACTIVITY_UPDATE', action: 'interested', slug });
+            bc.close();
+          }
+        } catch (_) {}
+      }
       // Re-fetch social directory to display updated real attendee list
       const queryParams = new URLSearchParams();
       if (user?.email) queryParams.set('email', user.email);
@@ -1121,6 +1131,16 @@ export default function ExpoDetailsPage() {
       });
       if (res.data?.data?.isFollower !== undefined) {
         setIsFollowingExpo(res.data.data.isFollower);
+      }
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('visitexpo_last_engagement_trigger', String(Date.now()));
+          if ('BroadcastChannel' in window) {
+            const bc = new BroadcastChannel('visitexpo_notification_channel');
+            bc.postMessage({ type: 'ACTIVITY_UPDATE', action: 'follower', slug });
+            bc.close();
+          }
+        } catch (_) {}
       }
       // Re-fetch social directory to display updated real attendee list
       const queryParams = new URLSearchParams();

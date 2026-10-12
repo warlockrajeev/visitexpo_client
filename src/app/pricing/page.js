@@ -130,7 +130,8 @@ export default function PricingPage() {
     }
   }, [user, updateUser]);
 
-  const activePlanId = (myPlan?.subscription?.plan || myPlan?.plan || user?.plan || 'free').toLowerCase();
+  const activePlanId = ((myPlan?.basePlan || myPlan?.subscription?.plan || myPlan?.plan || user?.basePlan || user?.plan || 'free') === 'growth' ? 'enterprise' : (myPlan?.basePlan || myPlan?.subscription?.plan || myPlan?.plan || user?.basePlan || user?.plan || 'free')).toLowerCase();
+  const hasGrowthAddon = Boolean(user?.hasGrowthPlan || myPlan?.hasGrowthPlan);
   const isPlanActive = Boolean(myPlan?.isPlanActive ?? (user?.isPlanActive && user?.isVerified));
   const generalEmailPrice = myPlan?.generalEmailPrice ?? publicFreePlan?.pricing?.generalEmailPrice ?? 1499;
   const isGeneralFree = Number(generalEmailPrice) === 0;
@@ -230,6 +231,40 @@ export default function PricingPage() {
 
   // Open modal with specific plan
   const handleSelectPlan = (planId, planName, serviceName = null) => {
+    const rawPlan = (user?.plan || 'free').toLowerCase();
+
+    // Restriction: Growth plan is an add-on available ONLY to Starter or Enterprise organizers
+    if (planId === 'growth' || (planName && planName.toLowerCase().includes('growth'))) {
+      if (user && rawPlan === 'free') {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Base Plan Upgrade Required',
+          html: `
+            <div style="text-align: left; font-size: 13px; line-height: 1.6; color: #4b5563;">
+              <p style="margin-bottom: 10px;">The <strong>Organizer Growth Plan</strong> (including Web Push Notifications and all 13 marketing channels) is an exclusive add-on available only to organizers on the <strong>Starter</strong> or <strong>Enterprise</strong> plan.</p>
+              <p style="margin-bottom: 10px; font-weight: 600; color: #111827;">Organizers on the Free Plan cannot take or purchase the Growth Plan directly.</p>
+              <p style="color: #6b7280; font-size: 12px;">Please upgrade your base organizer plan to Starter or Enterprise to unlock Growth channels.</p>
+            </div>
+          `,
+          showCancelButton: true,
+          confirmButtonColor: '#FF2E63',
+          cancelButtonColor: '#6B7280',
+          confirmButtonText: 'View Starter & Enterprise Plans',
+          cancelButtonText: 'Cancel'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            const el = document.getElementById('official-plans');
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth' });
+            } else {
+              window.scrollTo({ top: 350, behavior: 'smooth' });
+            }
+          }
+        });
+        return;
+      }
+    }
+
     setSelectedPlanForModal({
       id: planId,
       name: planName,
@@ -621,12 +656,21 @@ export default function PricingPage() {
           enterpriseStatus: 'adv'
         },
         {
-          label: 'Marketing Campaigns',
-          free: 'Growth Plan (Paid separately)',
-          freeStatus: 'paid',
-          starter: 'Growth Plan (Paid separately)',
+          label: 'Marketing Campaigns (Growth Add-on)',
+          free: 'Not Available (Requires Starter or Enterprise)',
+          freeStatus: 'no',
+          starter: 'Growth Plan Add-on (Paid separately)',
           starterStatus: 'paid',
-          enterprise: 'Growth Plan (Paid separately)',
+          enterprise: 'Growth Plan Add-on (Paid separately)',
+          enterpriseStatus: 'paid'
+        },
+        {
+          label: 'VisitExpo Web Push Notifications',
+          free: 'Not Available',
+          freeStatus: 'no',
+          starter: 'Available via Growth Plan Add-on',
+          starterStatus: 'paid',
+          enterprise: 'Available via Growth Plan Add-on',
           enterpriseStatus: 'paid'
         },
         {
@@ -759,20 +803,23 @@ export default function PricingPage() {
                   <Award className="h-6 w-6" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs text-zinc-600 font-medium">Your Active Plan:</span>
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#FFCC00] text-black uppercase tracking-wider">
                       {activePlanId === 'starter'
                         ? 'Organizer Starter'
                         : activePlanId === 'enterprise'
                         ? 'Organizer Enterprise'
-                        : activePlanId === 'growth'
-                        ? 'Organizer Growth'
                         : 'Free Organizer'}
                     </span>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
                       ✓ Active
                     </span>
+                    {hasGrowthAddon && (
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 uppercase tracking-wider inline-flex items-center gap-1">
+                        <Zap className="h-3 w-3 text-emerald-600" /> + Growth Add-on Active
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-zinc-500 mt-0.5">
                     Signed in as <strong>{user?.email}</strong> •{' '}
@@ -781,6 +828,7 @@ export default function PricingPage() {
                       : activePlanId === 'enterprise'
                       ? 'Enterprise scale unlocked · Unlimited CRM & API exports · Dedicated VIP account director'
                       : 'Free organizer tier active · Upgrade below to unlock full ticketing & unmasked leads.'}
+                    {hasGrowthAddon && ' • Growth Top-Up Engine & Web Push active.'}
                   </p>
                 </div>
               </div>
@@ -1281,7 +1329,7 @@ export default function PricingPage() {
                 {/* Top Badge */}
                 <div>
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                    Marketing Engine
+                    Add-on Engine (Starter / Enterprise)
                   </span>
                 </div>
 
@@ -1359,8 +1407,13 @@ export default function PricingPage() {
                     href="#growth-catalog"
                     className="w-full py-2.5 px-4 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
                   >
-                    Explore Promotion Packs
+                    {hasGrowthAddon ? 'Manage Growth Top-ups' : 'Explore Promotion Packs'}
                   </a>
+                  {hasGrowthAddon && (
+                    <div className="mt-1.5 text-center text-[10px] font-bold text-emerald-800 bg-emerald-50 py-1 px-2 rounded-lg border border-emerald-200">
+                      ✓ Active as Add-On to Your {activePlanId.toUpperCase()} Plan
+                    </div>
+                  )}
                 </div>
 
                 {/* Section 1: Best for you if: */}

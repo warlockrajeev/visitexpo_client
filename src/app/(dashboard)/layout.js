@@ -26,7 +26,6 @@ import {
   Sun,
   Moon,
   Building,
-  Wand2,
   ShieldCheck,
   Compass,
   Globe,
@@ -42,7 +41,11 @@ import {
   Bell,
   Zap,
   MapPin,
-  Award
+  Award,
+  Crown,
+  Radio,
+  Plus,
+  PlusCircle
 } from 'lucide-react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
@@ -50,6 +53,8 @@ import { isCorporateEmail } from '../../utils/emailValidator.js';
 
 import { initSweetAlertInterceptors } from '../../utils/sweetalert.js';
 import OrganizerSupportWidget from '../../components/OrganizerSupportWidget.js';
+import OneSignalManager from '../../components/OneSignalManager.js';
+import NotificationBell from '../../components/NotificationBell.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -93,20 +98,33 @@ export default function DashboardLayout({ children }) {
     let isMounted = true;
     const syncOrganizerPlan = async () => {
       try {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('visitexpo_token') : null;
+        const token =
+          typeof window !== 'undefined'
+            ? localStorage.getItem('visitexpo_access_token') || localStorage.getItem('visitexpo_token')
+            : null;
         if (!token) return;
         const res = await axios.get(`${API_URL}/plans/my-plan`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (isMounted && res.data?.success && res.data.plan) {
           const freshPlan = res.data.plan;
-          const freshActive = res.data.isPlanActive ?? true;
-          if (freshPlan !== user.plan || (freshActive && !user.isPlanActive)) {
+          const isPaidTier = freshPlan === 'enterprise' || freshPlan === 'starter';
+          const freshActive = isPaidTier ? true : (res.data.isPlanActive ?? true);
+          const freshVerified = isPaidTier ? true : (res.data.user?.isVerified ?? true);
+          if (
+            freshPlan !== user.plan ||
+            (freshActive && !user.isPlanActive) ||
+            (freshVerified && !user.isVerified) ||
+            (res.data.hasGrowthPlan !== undefined && res.data.hasGrowthPlan !== user.hasGrowthPlan)
+          ) {
             if (updateUser) {
               updateUser({
                 ...user,
                 plan: freshPlan,
-                isPlanActive: freshActive
+                basePlan: freshPlan,
+                isPlanActive: freshActive,
+                isVerified: freshVerified,
+                hasGrowthPlan: res.data.hasGrowthPlan ?? user.hasGrowthPlan
               });
             }
           }
@@ -149,6 +167,18 @@ export default function DashboardLayout({ children }) {
 
   // Handle Free Organizer Plan activation (₹0 corporate, ₹1,499 general)
   const handleActivateFreePlan = async () => {
+    const currentPlan = String(user?.basePlan || user?.plan || 'free').toLowerCase();
+    if (currentPlan === 'enterprise' || currentPlan === 'starter') {
+      if (updateUser) {
+        updateUser({
+          ...user,
+          isVerified: true,
+          isPlanActive: true
+        });
+      }
+      return;
+    }
+
     setActivatingPlan(true);
     try {
       const res = await axios.post(`${API_URL}/plans/activate-free-plan`, {
@@ -177,8 +207,12 @@ export default function DashboardLayout({ children }) {
     }
   };
 
-  // Lock dashboard if organizer account has not yet activated their plan
-  if (user.role === 'organizer' && (!user.isVerified || !user.isPlanActive)) {
+  // Lock dashboard ONLY if organizer is on Free plan and has not yet activated their plan
+  const userPlan = String(user?.basePlan || user?.plan || 'free').toLowerCase();
+  const isPaidPlan = userPlan === 'enterprise' || userPlan === 'starter';
+  const isPlanUnlocked = isPaidPlan || (Boolean(user.isVerified) && user.isPlanActive !== false);
+
+  if (user.role === 'organizer' && !isPlanUnlocked) {
     const isCorporate = user?.emailType === 'corporate' || isCorporateEmail(user?.email);
 
     return (
@@ -357,7 +391,7 @@ export default function DashboardLayout({ children }) {
         { name: 'Saved Bookmarks', href: '/bookmarks', icon: Bookmark },
         { name: 'Interested Events', href: '/interested', icon: Star },
         { name: 'Followed Expos', href: '/following', icon: Bell },
-        { name: 'Event Wizard', href: '/events/wizard', icon: Wand2, badge: 'Onboarding' },
+        { name: 'Event Wizard', href: '/events/wizard', icon: PlusCircle, badge: 'Onboarding' },
         { name: 'Claim Event', href: '/events/claim', icon: ShieldCheck },
         { name: 'Manage Events', href: '/manage-events', icon: Calendar },
         { name: 'Location Feasibility', href: '/location-feasibility', icon: MapPin, badge: 'Market AI' },
@@ -518,8 +552,13 @@ export default function DashboardLayout({ children }) {
                       <Building className="h-3 w-3 text-primary" /> Organizer
                     </span>
                     <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 font-extrabold uppercase text-[9px] border border-amber-500/30">
-                      {user?.plan || 'Free'}
+                      {(user?.basePlan || (user?.plan !== 'growth' ? user?.plan : 'Enterprise') || 'Free')}
                     </span>
+                    {user?.hasGrowthPlan && (
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-extrabold uppercase text-[8px] border border-emerald-500/30">
+                        + Growth
+                      </span>
+                    )}
                   </>
                 )}
               </span>
@@ -538,7 +577,7 @@ export default function DashboardLayout({ children }) {
       {/* Main Content Pane */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top Navbar */}
-        <header className="flex h-16 items-center justify-between border-b border-border bg-card/50 backdrop-blur-md px-6">
+        <header className="relative z-40 flex h-16 items-center justify-between border-b border-border bg-card/95 backdrop-blur-md px-6">
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -562,19 +601,47 @@ export default function DashboardLayout({ children }) {
               <span>Explore Events</span>
             </Link>
 
-            {/* Active Plan Pill for Organizer */}
+            {/* Active Base Plan Pill & Growth Add-on Pill for Organizer */}
+            {user?.role === 'organizer' && !isExhibitorView && (() => {
+              const basePlan = (user?.basePlan || (user?.plan !== 'growth' ? user?.plan : 'enterprise') || 'free').toLowerCase();
+              return (
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/pricing"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 text-xs font-bold text-amber-500 transition-all shadow-2xs cursor-pointer btn-press active:scale-95"
+                    title="View active base plan details and pricing"
+                  >
+                    {basePlan === 'enterprise' ? (
+                      <Crown className="h-3.5 w-3.5 text-amber-400" />
+                    ) : (
+                      <Zap className="h-3.5 w-3.5 text-amber-500" />
+                    )}
+                    <span className="capitalize">{basePlan ? `${basePlan} Plan` : 'Free Plan'}</span>
+                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      Active
+                    </span>
+                  </Link>
+
+                  {user?.hasGrowthPlan && (
+                    <Link
+                      href="/pricing#growth-catalog"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 px-2.5 py-1.5 text-xs font-bold text-emerald-400 transition-all shadow-2xs cursor-pointer btn-press active:scale-95"
+                      title="Organizer Growth Engine & Push Notification add-on is active"
+                    >
+                      <Radio className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>+ Growth Add-on</span>
+                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        Active
+                      </span>
+                    </Link>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Real-time Push Notification Bell for Organizers */}
             {user?.role === 'organizer' && !isExhibitorView && (
-              <Link
-                href="/pricing"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 text-xs font-bold text-amber-500 transition-all shadow-2xs cursor-pointer btn-press active:scale-95"
-                title="View active plan details and pricing"
-              >
-                <Zap className="h-3.5 w-3.5 text-amber-500" />
-                <span className="capitalize">{user?.plan ? `${user.plan} Plan` : 'Free Plan'}</span>
-                <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  Active
-                </span>
-              </Link>
+              <NotificationBell />
             )}
 
             {user?.role === 'visitor' ? (
@@ -618,7 +685,7 @@ export default function DashboardLayout({ children }) {
                     href="/events/wizard"
                     className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all cursor-pointer btn-press active:scale-95"
                   >
-                    <Wand2 className="h-3.5 w-3.5" /> Start Onboarding
+                    <Plus className="h-3.5 w-3.5" /> Start Onboarding
                   </Link>
                 )}
               </>
@@ -632,6 +699,7 @@ export default function DashboardLayout({ children }) {
         </main>
       </div>
       {user?.role === 'organizer' && !isExhibitorView && pathname !== '/chat' && <OrganizerSupportWidget />}
+      {user?.role === 'organizer' && <OneSignalManager />}
     </div>
   );
 }
