@@ -978,11 +978,11 @@ export default function OrganizerChatPage() {
 
               <div className="p-4 rounded-2xl bg-secondary/60 border border-border/70 space-y-1">
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-3xl font-black font-mono text-foreground">₹89,999</span>
+                  <span className="text-3xl font-black font-mono text-foreground">₹39,999</span>
                   <span className="text-xs font-semibold text-muted-foreground">/ Quarter</span>
                 </div>
                 <div className="text-[11px] text-muted-foreground">
-                  or <strong>₹2,99,999 / Year</strong> (Save ₹59,997 annually)
+                  or <strong>₹89,999 / Year</strong> (Save ₹69,997 annually · 44% off)
                 </div>
               </div>
 

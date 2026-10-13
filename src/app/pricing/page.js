@@ -50,6 +50,7 @@ import {
   Info
 } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { calculateAnnualDiscountPercent } from '../../utils/pricing.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -136,6 +137,16 @@ export default function PricingPage() {
   const starterPlan = allPlans.find((p) => p.planId === 'starter');
   const enterprisePlan = allPlans.find((p) => p.planId === 'enterprise');
   const growthPlan = allPlans.find((p) => p.planId === 'growth');
+
+  const starterQPrice = starterPlan?.pricing?.quarterlyPrice ?? 14999;
+  const starterYPrice = starterPlan?.pricing?.yearlyPrice ?? 49999;
+  const starterDiscount = calculateAnnualDiscountPercent(starterQPrice, starterYPrice);
+
+  const enterpriseQPrice = enterprisePlan?.pricing?.quarterlyPrice ?? 39999;
+  const enterpriseYPrice = enterprisePlan?.pricing?.yearlyPrice ?? 89999;
+  const enterpriseDiscount = calculateAnnualDiscountPercent(enterpriseQPrice, enterpriseYPrice);
+
+  const maxDiscount = Math.max(starterDiscount, enterpriseDiscount);
 
   const activePlanId = ((myPlan?.basePlan || myPlan?.subscription?.plan || myPlan?.plan || user?.basePlan || user?.plan || 'free') === 'growth' ? 'enterprise' : (myPlan?.basePlan || myPlan?.subscription?.plan || myPlan?.plan || user?.basePlan || user?.plan || 'free')).toLowerCase();
   const hasGrowthAddon = Boolean(user?.hasGrowthPlan || myPlan?.hasGrowthPlan);
@@ -785,15 +796,17 @@ export default function PricingPage() {
               }`}
             >
               <span>Annual Billing</span>
-              <span
-                className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                  billingCycle === 'yearly'
-                    ? 'bg-black text-[#FFCC00]'
-                    : 'bg-emerald-100 text-emerald-800'
-                }`}
-              >
-                Save 17%
-              </span>
+              {maxDiscount > 0 && (
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                    billingCycle === 'yearly'
+                      ? 'bg-black text-[#FFCC00]'
+                      : 'bg-emerald-100 text-emerald-800'
+                  }`}
+                >
+                  Save {starterDiscount === enterpriseDiscount ? `${maxDiscount}%` : `up to ${maxDiscount}%`}
+                </span>
+              )}
             </button>
           </div>
         </section>
@@ -1050,16 +1063,18 @@ export default function PricingPage() {
                 {/* Price Block */}
                 <div className="pt-1">
                   <div className="text-3xl font-black text-zinc-950 font-sans tracking-tight">
-                    ₹{(starterPlan?.pricing?.quarterlyPrice ?? 14999).toLocaleString('en-IN')}
+                    ₹{Number(starterQPrice).toLocaleString('en-IN')}
                   </div>
                   <div className="text-xs font-medium text-zinc-600 mt-0.5">per quarter</div>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-xs font-semibold text-zinc-600">
-                      ₹{(starterPlan?.pricing?.yearlyPrice ?? 49999).toLocaleString('en-IN')} per year
+                      ₹{Number(starterYPrice).toLocaleString('en-IN')} per year
                     </span>
-                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                      Save 17%
-                    </span>
+                    {starterDiscount > 0 && (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                        Save {starterDiscount}%
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -1182,16 +1197,18 @@ export default function PricingPage() {
                 {/* Price Block */}
                 <div className="pt-1">
                   <div className="text-3xl font-black text-zinc-950 font-sans tracking-tight">
-                    ₹{(enterprisePlan?.pricing?.quarterlyPrice ?? 89999).toLocaleString('en-IN')}
+                    ₹{Number(enterpriseQPrice).toLocaleString('en-IN')}
                   </div>
                   <div className="text-xs font-medium text-zinc-600 mt-0.5">per quarter</div>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-xs font-semibold text-zinc-600">
-                      ₹{(enterprisePlan?.pricing?.yearlyPrice ?? 299999).toLocaleString('en-IN')} per year
+                      ₹{Number(enterpriseYPrice).toLocaleString('en-IN')} per year
                     </span>
-                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                      Save 17%
-                    </span>
+                    {enterpriseDiscount > 0 && (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                        Save {enterpriseDiscount}%
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -1907,7 +1924,15 @@ export default function PricingPage() {
                 <p className="text-xs text-zinc-500 mt-0.5">
                   {selectedGrowthService
                     ? `Request service: ${selectedGrowthService}`
-                    : `Selected cycle: ${selectedPlanForModal.cycle === 'yearly' ? 'Annual (Save 17%)' : 'Quarterly'}`}
+                    : `Selected cycle: ${
+                        selectedPlanForModal.cycle === 'yearly'
+                          ? `Annual${
+                              (selectedPlanForModal.id === 'enterprise' ? enterpriseDiscount : starterDiscount) > 0
+                                ? ` (Save ${selectedPlanForModal.id === 'enterprise' ? enterpriseDiscount : starterDiscount}%)`
+                                : ''
+                            }`
+                          : 'Quarterly'
+                      }`}
                 </p>
               </div>
 

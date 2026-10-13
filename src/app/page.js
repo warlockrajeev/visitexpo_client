@@ -2068,7 +2068,7 @@ export default function LandingPage() {
                 </div>
                 <div className="p-3 rounded-xl bg-zinc-800/60 border border-zinc-700/60">
                   <span className="text-[10px] text-zinc-400 uppercase font-bold">Enterprise</span>
-                  <div className="text-base font-extrabold text-white mt-0.5 font-mono">₹89,999</div>
+                  <div className="text-base font-extrabold text-white mt-0.5 font-mono">₹39,999</div>
                   <span className="text-[10px] text-indigo-400">Per Quarter</span>
                 </div>
                 <div className="p-3 rounded-xl bg-zinc-800/60 border border-zinc-700/60">
