@@ -45,7 +45,8 @@ import {
   Crown,
   Radio,
   Plus,
-  PlusCircle
+  PlusCircle,
+  Send
 } from 'lucide-react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
@@ -404,6 +405,12 @@ export default function DashboardLayout({ children }) {
         { name: 'Visitor CRM', href: '/visitors', icon: Users },
         { name: 'Lead CRM', href: '/leads', icon: Target },
         { name: 'Marketing & Campaigns', href: '/campaigns', icon: Mail },
+        {
+          name: 'Email Promotions',
+          href: '/campaigns/email-promotions',
+          icon: Send,
+          badge: (user?.hasGrowthPlan || user?.plan === 'growth') ? 'Active' : 'Growth Plan'
+        },
         { name: 'Exhibitor Discovery', href: '/campaigns/exhibitor-discovery', icon: Compass },
         { name: 'Ticketing', href: '/tickets', icon: Ticket },
         {

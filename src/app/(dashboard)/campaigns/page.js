@@ -234,18 +234,56 @@ export default function CampaignsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Sub-Navigation Tabs: Marketing Campaigns & Exhibitor Discovery */}
+      {/* Sub-Navigation Tabs: Marketing Campaigns, Email Promotions & Exhibitor Discovery */}
       <div className="flex items-center gap-2 border-b border-border pb-1">
         <div className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-primary border-b-2 border-primary -mb-1.5">
           <Mail className="h-4 w-4" />
-          <span>Marketing &amp; Broadcast Campaigns</span>
+          <span>Broadcast Simulator &amp; Channels</span>
         </div>
+        <Link
+          href="/campaigns/email-promotions"
+          className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground rounded-lg transition-colors group"
+        >
+          <Send className="h-4 w-4 text-indigo-400 group-hover:scale-110 transition-transform" />
+          <span>Email Promotions</span>
+          <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            Growth
+          </span>
+        </Link>
         <Link
           href="/campaigns/exhibitor-discovery"
           className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground rounded-lg transition-colors group"
         >
           <Compass className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" />
           <span>Exhibitor Discovery</span>
+        </Link>
+      </div>
+
+      {/* Organizer Email Promotion Growth Spotlight Banner */}
+      <div className="rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 via-purple-950/20 to-card p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300">
+              New Growth Plan Feature
+            </span>
+            <span className="text-xs font-mono text-muted-foreground">
+              promotion@client.visitexpo.in
+            </span>
+          </div>
+          <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+            <Send className="h-4 w-4 text-indigo-400" />
+            Promotional Email Broadcasting to Leads, Visitors &amp; Followers
+          </h3>
+          <p className="text-xs text-muted-foreground max-w-2xl">
+            Dispatch authenticated, high-deliverability promotional emails to your CRM leads, registered trade visitors, event followers, and interested attendees directly using VisitExpo&apos;s verified cPanel relay.
+          </p>
+        </div>
+        <Link
+          href="/campaigns/email-promotions"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 text-xs font-bold shadow-md shadow-indigo-600/30 transition-all shrink-0 cursor-pointer"
+        >
+          <span>Launch Email Promotion</span>
+          <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
 
