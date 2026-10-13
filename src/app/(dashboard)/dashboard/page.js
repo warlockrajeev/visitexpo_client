@@ -612,7 +612,7 @@ export function OrganizerDashboardInner() {
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 <span className="inline-flex items-center gap-1.5 text-xs font-black text-black uppercase tracking-wider bg-gradient-to-r from-amber-400 to-yellow-300 px-3 py-1 rounded-full shadow-sm">
-                  <Crown className="h-3.5 w-3.5" /> Enterprise Tier · Advance Level
+                  <Crown className="h-3.5 w-3.5" /> {myPlan?.planName || 'Enterprise Tier · Advance Level'}
                 </span>
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-500 uppercase tracking-wider bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
                   <Activity className="h-3.5 w-3.5" /> Live Sync Active
@@ -673,7 +673,7 @@ export function OrganizerDashboardInner() {
                 title="Click to view subscription and upgrade options"
               >
                 <Zap className="h-3.5 w-3.5" />
-                <span>Active Plan: {currentPlan.name}</span>
+                <span>Active Plan: {myPlan?.planName || currentPlan.name}</span>
               </Link>
             </div>
             <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">

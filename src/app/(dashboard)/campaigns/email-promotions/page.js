@@ -855,7 +855,7 @@ export default function EmailPromotionsPage() {
                     Growth Plan Email Promotion
                   </span>
                   <span className="text-[11px] font-mono text-muted-foreground">
-                    Sender: promotion@client.visitexpo.in
+                    Sender: &quot;VisitExpo Promotions&quot; &lt;promotion@client.visitexpo.in&gt;
                   </span>
                 </div>
                 <h2 className="text-lg font-black text-foreground">
@@ -1262,7 +1262,7 @@ export default function EmailPromotionsPage() {
                 /* LIVE HTML PREVIEW TAB */
                 <div className="space-y-4">
                   <div className="text-center text-muted-foreground text-[11px]">
-                    Viewing responsive email preview sent from <strong>promotion@client.visitexpo.in</strong>
+                    Viewing responsive email preview sent from <strong>&quot;VisitExpo Promotions&quot; &lt;promotion@client.visitexpo.in&gt;</strong>
                   </div>
 
                   <div className={`mx-auto bg-card border border-border rounded-3xl overflow-hidden shadow-2xl transition-all ${

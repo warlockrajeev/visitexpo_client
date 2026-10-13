@@ -68,6 +68,7 @@ export default function PricingPage() {
   const [emailCheckResult, setEmailCheckResult] = useState(null);
 
   // My current plan & Free plan activation state
+  const [allPlans, setAllPlans] = useState([]);
   const [myPlan, setMyPlan] = useState(null);
   const [publicFreePlan, setPublicFreePlan] = useState(null);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
@@ -104,6 +105,7 @@ export default function PricingPage() {
       .get(`${API_URL}/plans`)
       .then((res) => {
         if (res.data?.success && Array.isArray(res.data.data)) {
+          setAllPlans(res.data.data);
           const free = res.data.data.find((p) => p.planId === 'free');
           if (free) setPublicFreePlan(free);
         }
@@ -130,10 +132,15 @@ export default function PricingPage() {
     }
   }, [user, updateUser]);
 
+  const freePlan = allPlans.find((p) => p.planId === 'free') || publicFreePlan;
+  const starterPlan = allPlans.find((p) => p.planId === 'starter');
+  const enterprisePlan = allPlans.find((p) => p.planId === 'enterprise');
+  const growthPlan = allPlans.find((p) => p.planId === 'growth');
+
   const activePlanId = ((myPlan?.basePlan || myPlan?.subscription?.plan || myPlan?.plan || user?.basePlan || user?.plan || 'free') === 'growth' ? 'enterprise' : (myPlan?.basePlan || myPlan?.subscription?.plan || myPlan?.plan || user?.basePlan || user?.plan || 'free')).toLowerCase();
   const hasGrowthAddon = Boolean(user?.hasGrowthPlan || myPlan?.hasGrowthPlan);
   const isPlanActive = Boolean(myPlan?.isPlanActive ?? (user?.isPlanActive && user?.isVerified));
-  const generalEmailPrice = myPlan?.generalEmailPrice ?? publicFreePlan?.pricing?.generalEmailPrice ?? 1499;
+  const generalEmailPrice = myPlan?.generalEmailPrice ?? freePlan?.pricing?.generalEmailPrice ?? 1499;
   const isGeneralFree = Number(generalEmailPrice) === 0;
 
   const isUserCorporate =
@@ -806,11 +813,11 @@ export default function PricingPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs text-zinc-600 font-medium">Your Active Plan:</span>
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#FFCC00] text-black uppercase tracking-wider">
-                      {activePlanId === 'starter'
-                        ? 'Organizer Starter'
+                      {myPlan?.planName || (activePlanId === 'starter'
+                        ? (starterPlan?.name || 'Organizer Starter')
                         : activePlanId === 'enterprise'
-                        ? 'Organizer Enterprise'
-                        : 'Free Organizer'}
+                        ? (enterprisePlan?.name || 'Organizer Enterprise')
+                        : (freePlan?.name || 'Free Organizer'))}
                     </span>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
                       ✓ Active
@@ -850,15 +857,15 @@ export default function PricingPage() {
                 {/* Top Badge */}
                 <div>
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200/80">
-                    Get Started
+                    {freePlan?.badge || 'Get Started'}
                   </span>
                 </div>
 
                 {/* Title & Simple Description */}
                 <div>
-                  <h3 className="text-xl font-bold text-zinc-950">Free Organizer</h3>
+                  <h3 className="text-xl font-bold text-zinc-950">{freePlan?.name || 'Free Organizer'}</h3>
                   <p className="text-xs text-zinc-600 mt-1 min-h-[34px] leading-relaxed">
-                    Start listing your events and build your presence on VisitExpo.
+                    {freePlan?.tagline || freePlan?.description || 'Start listing your events and build your presence on VisitExpo.'}
                   </p>
                 </div>
 
@@ -951,24 +958,18 @@ export default function PricingPage() {
                 <div className="pt-2 border-t border-zinc-100 space-y-2">
                   <p className="font-bold text-xs text-zinc-900">Best for you if:</p>
                   <ul className="space-y-2 text-xs text-zinc-600">
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>You are new to VisitExpo</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Want to list your first event</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Want basic visibility on platform</span>
-                    </li>
+                    {(freePlan?.bestFor?.length ? freePlan.bestFor : [
+                      'You are new to VisitExpo',
+                      'Want to list your first event',
+                      'Want basic visibility on platform'
+                    ]).map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                          <Check className="h-2.5 w-2.5 stroke-[3]" />
+                        </div>
+                        <span>{item}</span>
+                      </li>
+                    ))}
                   </ul>
                 </div>
 
@@ -981,35 +982,19 @@ export default function PricingPage() {
                     </span>
                   </div>
                   <ul className="space-y-2 text-xs text-zinc-600">
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Free registration (corporate email)</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span className="flex items-center gap-1 flex-wrap">
-                        <span>Paid registration for general email (₹1,499)</span>
-                        <span title="Corporate emails (@yourcompany.com) are ₹0 Free. Personal email domains pay a one-time verification fee." className="cursor-pointer">
-                          <Info className="h-3 w-3 text-zinc-400 hover:text-zinc-600" />
-                        </span>
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Limited event claiming</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Create &amp; publish events</span>
-                    </li>
+                    {(freePlan?.keyInclusions?.length ? freePlan.keyInclusions : [
+                      'Free registration (corporate email)',
+                      isGeneralFree ? 'Free registration (general email) - No Charge' : `Paid registration for general email (₹${generalEmailPrice.toLocaleString()})`,
+                      'Limited event claiming',
+                      'Create & publish events'
+                    ]).map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                          <Check className="h-2.5 w-2.5 stroke-[3]" />
+                        </div>
+                        <span>{item}</span>
+                      </li>
+                    ))}
                   </ul>
                 </div>
               </div>
@@ -1021,15 +1006,15 @@ export default function PricingPage() {
                 {/* Top Badge: Most Popular with VisitExpo signature styling */}
                 <div>
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black bg-[#FFCC00] text-black border border-amber-300 shadow-xs">
-                    👑 Most Popular →
+                    {starterPlan?.badge || '👑 Most Popular →'}
                   </span>
                 </div>
 
                 {/* Title & Simple Description */}
                 <div>
-                  <h3 className="text-xl font-bold text-zinc-950">Organizer Starter</h3>
+                  <h3 className="text-xl font-bold text-zinc-950">{starterPlan?.name || 'Organizer Starter'}</h3>
                   <p className="text-xs text-zinc-600 mt-1 min-h-[34px] leading-relaxed">
-                    Get more leads and unlock valuable organizer tools.
+                    {starterPlan?.tagline || starterPlan?.description || 'Get more leads and unlock valuable organizer tools.'}
                   </p>
                 </div>
 
@@ -1064,10 +1049,14 @@ export default function PricingPage() {
 
                 {/* Price Block */}
                 <div className="pt-1">
-                  <div className="text-3xl font-black text-zinc-950 font-sans tracking-tight">₹14,999</div>
+                  <div className="text-3xl font-black text-zinc-950 font-sans tracking-tight">
+                    ₹{(starterPlan?.pricing?.quarterlyPrice ?? 14999).toLocaleString('en-IN')}
+                  </div>
                   <div className="text-xs font-medium text-zinc-600 mt-0.5">per quarter</div>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs font-semibold text-zinc-600">₹49,999 per year</span>
+                    <span className="text-xs font-semibold text-zinc-600">
+                      ₹{(starterPlan?.pricing?.yearlyPrice ?? 49999).toLocaleString('en-IN')} per year
+                    </span>
                     <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
                       Save 17%
                     </span>
@@ -1085,10 +1074,10 @@ export default function PricingPage() {
                     </Link>
                   ) : (
                     <button
-                      onClick={() => handleSelectPlan('starter', 'Organizer Starter')}
+                      onClick={() => handleSelectPlan('starter', starterPlan?.name || 'Organizer Starter')}
                       className="w-full py-2.5 px-4 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-black text-xs font-black transition-all text-center flex items-center justify-center gap-1.5 shadow-md shadow-amber-400/25 active:scale-[0.99] cursor-pointer"
                     >
-                      <span>Choose Starter Plan</span>
+                      <span>Choose {starterPlan?.name || 'Starter Plan'}</span>
                     </button>
                   )}
                 </div>
@@ -1097,24 +1086,18 @@ export default function PricingPage() {
                 <div className="pt-2 border-t border-zinc-100 space-y-2">
                   <p className="font-bold text-xs text-zinc-900">Best for you if:</p>
                   <ul className="space-y-2 text-xs text-zinc-600">
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>You organize one or a few events</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Want genuine leads and contacts</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Need tools to manage your events</span>
-                    </li>
+                    {(starterPlan?.bestFor?.length ? starterPlan.bestFor : [
+                      'You organize one or a few events',
+                      'Want genuine leads and contacts',
+                      'Need tools to manage your events'
+                    ]).map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                          <Check className="h-2.5 w-2.5 stroke-[3]" />
+                        </div>
+                        <span>{item}</span>
+                      </li>
+                    ))}
                   </ul>
                 </div>
 
@@ -1127,42 +1110,21 @@ export default function PricingPage() {
                     </span>
                   </div>
                   <ul className="space-y-2 text-xs text-zinc-600">
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Everything in Free plan</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Detailed lead access</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Basic lead management (CRM)</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Advanced event search</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Visitor, exhibitor &amp; vendor leads</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>In-dashboard lead CRM &amp; pipeline</span>
-                    </li>
+                    {(starterPlan?.keyInclusions?.length ? starterPlan.keyInclusions : [
+                      'Everything in Free plan',
+                      'Detailed lead access',
+                      'Basic lead management (CRM)',
+                      'Advanced event search',
+                      'Visitor, exhibitor & vendor leads',
+                      'In-dashboard lead CRM & pipeline'
+                    ]).map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                          <Check className="h-2.5 w-2.5 stroke-[3]" />
+                        </div>
+                        <span>{item}</span>
+                      </li>
+                    ))}
                   </ul>
                 </div>
               </div>
@@ -1174,15 +1136,15 @@ export default function PricingPage() {
                 {/* Top Badge */}
                 <div>
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-zinc-100 text-zinc-800 border border-zinc-200">
-                    For Large Organizers
+                    {enterprisePlan?.badge || 'For Large Organizers'}
                   </span>
                 </div>
 
                 {/* Title & Simple Description */}
                 <div>
-                  <h3 className="text-xl font-bold text-zinc-950">Organizer Enterprise</h3>
+                  <h3 className="text-xl font-bold text-zinc-950">{enterprisePlan?.name || 'Organizer Enterprise'}</h3>
                   <p className="text-xs text-zinc-600 mt-1 min-h-[34px] leading-relaxed">
-                    Advanced tools for multiple expos and enterprise operations.
+                    {enterprisePlan?.tagline || enterprisePlan?.description || 'Advanced tools for multiple expos and enterprise operations.'}
                   </p>
                 </div>
 
@@ -1219,10 +1181,14 @@ export default function PricingPage() {
 
                 {/* Price Block */}
                 <div className="pt-1">
-                  <div className="text-3xl font-black text-zinc-950 font-sans tracking-tight">₹89,999</div>
+                  <div className="text-3xl font-black text-zinc-950 font-sans tracking-tight">
+                    ₹{(enterprisePlan?.pricing?.quarterlyPrice ?? 89999).toLocaleString('en-IN')}
+                  </div>
                   <div className="text-xs font-medium text-zinc-600 mt-0.5">per quarter</div>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs font-semibold text-zinc-600">₹2,99,999 per year</span>
+                    <span className="text-xs font-semibold text-zinc-600">
+                      ₹{(enterprisePlan?.pricing?.yearlyPrice ?? 299999).toLocaleString('en-IN')} per year
+                    </span>
                     <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
                       Save 17%
                     </span>
@@ -1240,10 +1206,10 @@ export default function PricingPage() {
                     </Link>
                   ) : (
                     <button
-                      onClick={() => handleSelectPlan('enterprise', 'Organizer Enterprise')}
+                      onClick={() => handleSelectPlan('enterprise', enterprisePlan?.name || 'Organizer Enterprise')}
                       className="w-full py-2.5 px-4 rounded-xl border-2 border-zinc-950 text-zinc-950 hover:bg-zinc-950 hover:text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
                     >
-                      <span>Choose Enterprise Plan</span>
+                      <span>Choose {enterprisePlan?.name || 'Enterprise Plan'}</span>
                     </button>
                   )}
                 </div>
@@ -1252,24 +1218,18 @@ export default function PricingPage() {
                 <div className="pt-2 border-t border-zinc-100 space-y-2">
                   <p className="font-bold text-xs text-zinc-900">Best for you if:</p>
                   <ul className="space-y-2 text-xs text-zinc-600">
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>You manage multiple expos</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Need advanced analytics &amp; tools</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Require API and bulk export options</span>
-                    </li>
+                    {(enterprisePlan?.bestFor?.length ? enterprisePlan.bestFor : [
+                      'You manage multiple expos',
+                      'Need advanced analytics & tools',
+                      'Require API and bulk export options'
+                    ]).map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                          <Check className="h-2.5 w-2.5 stroke-[3]" />
+                        </div>
+                        <span>{item}</span>
+                      </li>
+                    ))}
                   </ul>
                 </div>
 
@@ -1282,42 +1242,21 @@ export default function PricingPage() {
                     </span>
                   </div>
                   <ul className="space-y-2 text-xs text-zinc-600">
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Everything in Starter plan</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Advanced CRM &amp; analytics</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Multiple expos management</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Developer API &amp; webhooks</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Unlimited lead report export (CSV &amp; Excel)</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Advanced search &amp; filtering</span>
-                    </li>
+                    {(enterprisePlan?.keyInclusions?.length ? enterprisePlan.keyInclusions : [
+                      'Everything in Starter plan',
+                      'Advanced CRM & analytics',
+                      'Multiple expos management',
+                      'Developer API & webhooks',
+                      'Unlimited lead report export (CSV & Excel)',
+                      'Advanced search & filtering'
+                    ]).map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                          <Check className="h-2.5 w-2.5 stroke-[3]" />
+                        </div>
+                        <span>{item}</span>
+                      </li>
+                    ))}
                   </ul>
                 </div>
               </div>
@@ -1329,15 +1268,15 @@ export default function PricingPage() {
                 {/* Top Badge */}
                 <div>
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                    Add-on Engine (Starter / Enterprise)
+                    {growthPlan?.badge || 'Add-on Engine (Starter / Enterprise)'}
                   </span>
                 </div>
 
                 {/* Title & Simple Description */}
                 <div>
-                  <h3 className="text-xl font-bold text-zinc-950">Organizer Growth</h3>
+                  <h3 className="text-xl font-bold text-zinc-950">{growthPlan?.name || 'Organizer Growth'}</h3>
                   <p className="text-xs text-zinc-600 mt-1 min-h-[34px] leading-relaxed">
-                    Boost your event visibility with our promotion services.
+                    {growthPlan?.tagline || growthPlan?.description || 'Boost your event visibility with our promotion services.'}
                   </p>
                 </div>
 
@@ -1397,7 +1336,9 @@ export default function PricingPage() {
 
                 {/* Price Block */}
                 <div className="pt-1">
-                  <div className="text-3xl font-black text-zinc-950 font-sans tracking-tight">From ₹1,000</div>
+                  <div className="text-3xl font-black text-zinc-950 font-sans tracking-tight">
+                    {growthPlan?.pricing?.billingNote || 'From ₹1,000'}
+                  </div>
                   <div className="text-xs font-medium text-zinc-600 mt-0.5">per top-up pack</div>
                 </div>
 
@@ -1420,24 +1361,18 @@ export default function PricingPage() {
                 <div className="pt-2 border-t border-zinc-100 space-y-2">
                   <p className="font-bold text-xs text-zinc-900">Best for you if:</p>
                   <ul className="space-y-2 text-xs text-zinc-600">
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>You want more visibility &amp; reach</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Need targeted promotion for events</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Want flexible, pay-as-you-go options</span>
-                    </li>
+                    {(growthPlan?.bestFor?.length ? growthPlan.bestFor : [
+                      'You want more visibility & reach',
+                      'Need targeted promotion for events',
+                      'Want flexible, pay-as-you-go options'
+                    ]).map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                          <Check className="h-2.5 w-2.5 stroke-[3]" />
+                        </div>
+                        <span>{item}</span>
+                      </li>
+                    ))}
                   </ul>
                 </div>
 
@@ -1450,46 +1385,24 @@ export default function PricingPage() {
                     </span>
                   </div>
                   <ul className="space-y-2 text-xs text-zinc-600">
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Top-up packs from ₹1,000</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Use across 13 promotion channels</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Flexible point-wise pricing</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Google listing &amp; search visibility</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Social media optimization (SMO)</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <Check className="h-2.5 w-2.5 stroke-[3]" />
-                      </div>
-                      <span>Paid lead generation options</span>
-                    </li>
+                    {(growthPlan?.keyInclusions?.length ? growthPlan.keyInclusions : [
+                      'Top-up packs from ₹1,000',
+                      'Use across 13 promotion channels',
+                      'Flexible point-wise pricing',
+                      'Google listing & search visibility',
+                      'WhatsApp broadcast & direct SMS'
+                    ]).map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                          <Check className="h-2.5 w-2.5 stroke-[3]" />
+                        </div>
+                        <span>{item}</span>
+                      </li>
+                    ))}
                   </ul>
-                </div>
               </div>
             </div>
+          </div>
           </div>
         </section>
 
@@ -1641,12 +1554,12 @@ export default function PricingPage() {
                 <thead>
                   <tr className="border-b border-zinc-200 bg-zinc-50 sticky top-0">
                     <th className="px-6 py-4 font-bold text-zinc-900 w-2/5">Capabilities &amp; Features</th>
-                    <th className="px-5 py-4 font-bold text-zinc-900 w-1/5 text-center">Free Organizer</th>
+                    <th className="px-5 py-4 font-bold text-zinc-900 w-1/5 text-center">{freePlan?.name || 'Free Organizer'}</th>
                     <th className="px-5 py-4 font-bold text-amber-900 w-1/5 text-center bg-amber-50/50">
-                      Starter Plan
+                      {starterPlan?.name || 'Starter Plan'}
                     </th>
                     <th className="px-5 py-4 font-bold text-indigo-900 w-1/5 text-center">
-                      Enterprise Plan
+                      {enterprisePlan?.name || 'Enterprise Plan'}
                     </th>
                   </tr>
                 </thead>

@@ -61,6 +61,7 @@ import ActionDiscoveryBanner from '../components/ActionDiscoveryBanner.js';
 import AdvertiseModal from '../components/AdvertiseModal.js';
 import BrowseByCategory from '../components/BrowseByCategory.js';
 import TopRatedExhibitions from '../components/TopRatedExhibitions.js';
+import BannerSlider from '../components/BannerSlider.js';
 
 // Lazy load components below the fold for faster initial render
 const RecommendationEngineSection = lazy(() => import('../components/RecommendationEngineSection.js'));
@@ -745,6 +746,11 @@ export default function LandingPage() {
       {/* 2.5 ACTION DISCOVERY BANNER (Find What Matters & Time to Act)             */}
       {/* ========================================================================= */}
       <ActionDiscoveryBanner onKeywordClick={handleBannerKeywordClick} />
+
+      {/* ========================================================================= */}
+      {/* 2.8 LANDING PAGE BANNER SLIDER (Approved Growth Plan Spotlight Banners)    */}
+      {/* ========================================================================= */}
+      <BannerSlider />
 
       {/* ========================================================================= */}
       {/* TOP 10 RATED EXHIBITIONS SHOWCASE                                         */}

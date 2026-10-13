@@ -46,7 +46,8 @@ import {
   Radio,
   Plus,
   PlusCircle,
-  Send
+  Send,
+  Sparkles
 } from 'lucide-react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
@@ -410,6 +411,12 @@ export default function DashboardLayout({ children }) {
           href: '/campaigns/email-promotions',
           icon: Send,
           badge: (user?.hasGrowthPlan || user?.plan === 'growth') ? 'Active' : 'Growth Plan'
+        },
+        {
+          name: 'Banner Spotlight',
+          href: '/banner-spotlight',
+          icon: Award,
+          badge: (user?.hasGrowthPlan || user?.plan === 'growth') ? 'Growth' : 'Growth Plan'
         },
         { name: 'Exhibitor Discovery', href: '/campaigns/exhibitor-discovery', icon: Compass },
         { name: 'Ticketing', href: '/tickets', icon: Ticket },
