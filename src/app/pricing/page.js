@@ -87,7 +87,7 @@ export default function PricingPage() {
   });
   const [selectedGrowthService, setSelectedGrowthService] = useState(null);
 
-  // Form State
+  // Form State & Validation
   const [formName, setFormName] = useState(user?.name || '');
   const [formOrg, setFormOrg] = useState(user?.organization?.name || '');
   const [formEmail, setFormEmail] = useState(user?.email || '');
@@ -95,6 +95,8 @@ export default function PricingPage() {
   const [formCity, setFormCity] = useState('');
   const [formEventType, setFormEventType] = useState('Trade Show / B2B');
   const [formMessage, setFormMessage] = useState('');
+  const [formErrors, setFormErrors] = useState({});
+  const [formTouched, setFormTouched] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // FAQ Accordion State
@@ -293,17 +295,143 @@ export default function PricingPage() {
     if (!formEmail && user?.email) setFormEmail(user.email);
     if (!formPhone && user?.phone) setFormPhone(user.phone);
     if (!formOrg && user?.organization?.name) setFormOrg(user.organization.name);
+    setFormErrors({});
+    setFormTouched({});
     setIsModalOpen(true);
   };
 
-  // Submit Inquiry Form
+  // Field-level Validator
+  const validateField = (field, value) => {
+    let error = '';
+    const trimmed = (value || '').trim();
+
+    switch (field) {
+      case 'name':
+        if (!trimmed) {
+          error = 'Full Name is required.';
+        } else if (trimmed.length < 2) {
+          error = 'Full Name must be at least 2 characters.';
+        } else if (!/^[a-zA-Z\s\.\'\-]{2,60}$/.test(trimmed)) {
+          error = 'Please enter a valid full name (letters only).';
+        }
+        break;
+
+      case 'email':
+        if (!trimmed) {
+          error = 'Email Address is required.';
+        } else if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(trimmed)) {
+          error = 'Please enter a valid email address (e.g. name@company.com).';
+        }
+        break;
+
+      case 'phone': {
+        if (!trimmed) {
+          error = 'Phone / WhatsApp number is required.';
+        } else if (/[a-zA-Z]/.test(value)) {
+          error = 'Phone number cannot contain letters or alphabets.';
+        } else {
+          const digits = trimmed.replace(/\D/g, '');
+          if (digits.length < 10) {
+            error = 'Phone number must have at least 10 digits.';
+          } else if (digits.length > 15) {
+            error = 'Phone number cannot exceed 15 digits.';
+          } else if (!/^\+?[0-9\s\-()]{10,20}$/.test(trimmed)) {
+            error = 'Please enter a valid phone number format.';
+          }
+        }
+        break;
+      }
+
+      case 'org':
+        if (trimmed && trimmed.length < 2) {
+          error = 'Organization name must be at least 2 characters.';
+        } else if (trimmed && trimmed.length > 100) {
+          error = 'Organization name cannot exceed 100 characters.';
+        }
+        break;
+
+      case 'city':
+        if (trimmed && trimmed.length < 2) {
+          error = 'City / Region must be at least 2 characters.';
+        } else if (trimmed && !/^[a-zA-Z\s\,\.\-]{2,60}$/.test(trimmed)) {
+          error = 'Please enter a valid city or region (letters only).';
+        }
+        break;
+
+      case 'message':
+        if (trimmed && trimmed.length > 1000) {
+          error = 'Additional notes cannot exceed 1000 characters.';
+        }
+        break;
+
+      default:
+        break;
+    }
+    return error;
+  };
+
+  // Validate entire form
+  const validateAll = () => {
+    const errs = {
+      name: validateField('name', formName),
+      email: validateField('email', formEmail),
+      phone: validateField('phone', formPhone),
+      org: validateField('org', formOrg),
+      city: validateField('city', formCity),
+      message: validateField('message', formMessage)
+    };
+    Object.keys(errs).forEach((key) => {
+      if (!errs[key]) delete errs[key];
+    });
+    return errs;
+  };
+
+  // Dedicated phone input sanitizer
+  const handlePhoneChange = (e) => {
+    const val = e.target.value;
+    // Strip letters and disallowed characters in real time
+    const sanitized = val.replace(/[^0-9+\s\-()]/g, '');
+    setFormPhone(sanitized);
+    if (formTouched.phone) {
+      setFormErrors((prev) => ({
+        ...prev,
+        phone: validateField('phone', sanitized)
+      }));
+    }
+  };
+
+  // Submit Inquiry Form with full validation
   const handleSubmitInquiry = async (e) => {
     e.preventDefault();
-    if (!formName || !formEmail || !formPhone) {
+
+    // Mark all fields touched
+    setFormTouched({
+      name: true,
+      email: true,
+      phone: true,
+      org: true,
+      city: true,
+      message: true
+    });
+
+    const errors = validateAll();
+    setFormErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      const errorMessages = Object.values(errors);
       Swal.fire({
         icon: 'warning',
-        title: 'Missing Details',
-        text: 'Please enter your Name, Email, and Phone number.'
+        title: 'Please Check Your Details',
+        html: `
+          <div style="text-align: left; font-size: 13px; color: #374151;">
+            <p style="margin-bottom: 8px; font-weight: 600;">Please resolve the following before submitting:</p>
+            <ul style="list-style-type: disc; padding-left: 20px; line-height: 1.6;">
+              ${errorMessages.map((msg) => `<li>${msg}</li>`).join('')}
+            </ul>
+          </div>
+        `,
+        confirmButtonColor: '#FFCC00',
+        confirmButtonText: '<span style="color: #000; font-weight: bold;">Review Details</span>'
       });
       return;
     }
@@ -314,24 +442,26 @@ export default function PricingPage() {
         planId: selectedPlanForModal.id,
         planName: selectedPlanForModal.name,
         billingCycle: selectedPlanForModal.cycle,
-        organizerName: formName,
-        organizationName: formOrg || 'Individual Organizer',
-        email: formEmail,
-        phone: formPhone,
-        city: formCity,
+        organizerName: formName.trim(),
+        organizationName: formOrg.trim() || 'Individual Organizer',
+        email: formEmail.trim().toLowerCase(),
+        phone: formPhone.trim(),
+        city: formCity.trim(),
         eventType: formEventType,
         selectedGrowthServices: selectedGrowthService ? [selectedGrowthService] : [],
-        message: formMessage
+        message: formMessage.trim()
       };
 
       const res = await axios.post(`${API_URL}/plans/inquire`, payload);
 
       if (res.data?.success) {
         setIsModalOpen(false);
+        setFormErrors({});
+        setFormTouched({});
         Swal.fire({
           icon: 'success',
           title: 'Inquiry Received!',
-          html: `<p class="text-sm text-zinc-700">Thank you, <strong>${formName}</strong>. Our exhibition partnership desk has received your request for <strong>${selectedPlanForModal.name}</strong>.</p><p class="text-xs text-zinc-500 mt-2">A dedicated organizer manager will reach out within 4 business hours.</p>`,
+          html: `<p class="text-sm text-zinc-700">Thank you, <strong>${formName.trim()}</strong>. Our exhibition partnership desk has received your request for <strong>${selectedPlanForModal.name}</strong>.</p><p class="text-xs text-zinc-500 mt-2">A dedicated organizer manager will reach out within 4 business hours.</p>`,
           confirmButtonColor: '#FFCC00',
           confirmButtonText: '<span style="color: #000; font-weight: bold;">Great, Thank You</span>'
         });
@@ -1960,7 +2090,7 @@ export default function PricingPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmitInquiry} className="space-y-4 text-xs">
+            <form onSubmit={handleSubmitInquiry} noValidate className="space-y-4 text-xs">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block font-semibold text-zinc-800 mb-1">Your Full Name *</label>
@@ -1969,9 +2099,28 @@ export default function PricingPage() {
                     required
                     placeholder="e.g. Rajesh Sharma"
                     value={formName}
-                    onChange={(e) => setFormName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border border-zinc-300 text-zinc-900 focus:bg-white focus:outline-none focus:border-[#FFCC00]"
+                    onChange={(e) => {
+                      setFormName(e.target.value);
+                      if (formTouched.name) {
+                        setFormErrors((prev) => ({ ...prev, name: validateField('name', e.target.value) }));
+                      }
+                    }}
+                    onBlur={() => {
+                      setFormTouched((prev) => ({ ...prev, name: true }));
+                      setFormErrors((prev) => ({ ...prev, name: validateField('name', formName) }));
+                    }}
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border text-zinc-900 focus:bg-white focus:outline-none transition-colors ${
+                      formErrors.name
+                        ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/20'
+                        : 'border-zinc-300 focus:border-[#FFCC00]'
+                    }`}
                   />
+                  {formErrors.name && (
+                    <p className="text-[11px] font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      <span>{formErrors.name}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -1980,9 +2129,28 @@ export default function PricingPage() {
                     type="text"
                     placeholder="e.g. Acme Trade Fairs Pvt Ltd"
                     value={formOrg}
-                    onChange={(e) => setFormOrg(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border border-zinc-300 text-zinc-900 focus:bg-white focus:outline-none focus:border-[#FFCC00]"
+                    onChange={(e) => {
+                      setFormOrg(e.target.value);
+                      if (formTouched.org) {
+                        setFormErrors((prev) => ({ ...prev, org: validateField('org', e.target.value) }));
+                      }
+                    }}
+                    onBlur={() => {
+                      setFormTouched((prev) => ({ ...prev, org: true }));
+                      setFormErrors((prev) => ({ ...prev, org: validateField('org', formOrg) }));
+                    }}
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border text-zinc-900 focus:bg-white focus:outline-none transition-colors ${
+                      formErrors.org
+                        ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/20'
+                        : 'border-zinc-300 focus:border-[#FFCC00]'
+                    }`}
                   />
+                  {formErrors.org && (
+                    <p className="text-[11px] font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      <span>{formErrors.org}</span>
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1994,9 +2162,28 @@ export default function PricingPage() {
                     required
                     placeholder="name@company.com"
                     value={formEmail}
-                    onChange={(e) => setFormEmail(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border border-zinc-300 text-zinc-900 focus:bg-white focus:outline-none focus:border-[#FFCC00]"
+                    onChange={(e) => {
+                      setFormEmail(e.target.value);
+                      if (formTouched.email) {
+                        setFormErrors((prev) => ({ ...prev, email: validateField('email', e.target.value) }));
+                      }
+                    }}
+                    onBlur={() => {
+                      setFormTouched((prev) => ({ ...prev, email: true }));
+                      setFormErrors((prev) => ({ ...prev, email: validateField('email', formEmail) }));
+                    }}
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border text-zinc-900 focus:bg-white focus:outline-none transition-colors ${
+                      formErrors.email
+                        ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/20'
+                        : 'border-zinc-300 focus:border-[#FFCC00]'
+                    }`}
                   />
+                  {formErrors.email && (
+                    <p className="text-[11px] font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      <span>{formErrors.email}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -2006,9 +2193,23 @@ export default function PricingPage() {
                     required
                     placeholder="+91 98765 43210"
                     value={formPhone}
-                    onChange={(e) => setFormPhone(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border border-zinc-300 text-zinc-900 focus:bg-white focus:outline-none focus:border-[#FFCC00]"
+                    onChange={handlePhoneChange}
+                    onBlur={() => {
+                      setFormTouched((prev) => ({ ...prev, phone: true }));
+                      setFormErrors((prev) => ({ ...prev, phone: validateField('phone', formPhone) }));
+                    }}
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border text-zinc-900 focus:bg-white focus:outline-none transition-colors ${
+                      formErrors.phone
+                        ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/20'
+                        : 'border-zinc-300 focus:border-[#FFCC00]'
+                    }`}
                   />
+                  {formErrors.phone && (
+                    <p className="text-[11px] font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      <span>{formErrors.phone}</span>
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -2019,9 +2220,28 @@ export default function PricingPage() {
                     type="text"
                     placeholder="e.g. Mumbai, New Delhi, Bengaluru"
                     value={formCity}
-                    onChange={(e) => setFormCity(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border border-zinc-300 text-zinc-900 focus:bg-white focus:outline-none focus:border-[#FFCC00]"
+                    onChange={(e) => {
+                      setFormCity(e.target.value);
+                      if (formTouched.city) {
+                        setFormErrors((prev) => ({ ...prev, city: validateField('city', e.target.value) }));
+                      }
+                    }}
+                    onBlur={() => {
+                      setFormTouched((prev) => ({ ...prev, city: true }));
+                      setFormErrors((prev) => ({ ...prev, city: validateField('city', formCity) }));
+                    }}
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border text-zinc-900 focus:bg-white focus:outline-none transition-colors ${
+                      formErrors.city
+                        ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/20'
+                        : 'border-zinc-300 focus:border-[#FFCC00]'
+                    }`}
                   />
+                  {formErrors.city && (
+                    <p className="text-[11px] font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      <span>{formErrors.city}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -2041,16 +2261,41 @@ export default function PricingPage() {
               </div>
 
               <div>
-                <label className="block font-semibold text-zinc-800 mb-1">
-                  Additional Notes / Specific Requirements
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold text-zinc-800">
+                    Additional Notes / Specific Requirements
+                  </label>
+                  <span className="text-[10px] text-zinc-400">
+                    {formMessage.length}/1000
+                  </span>
+                </div>
                 <textarea
                   rows={3}
+                  maxLength={1000}
                   placeholder="Tell us about your upcoming exhibitions, footfall expectations, or requested top-up channels..."
                   value={formMessage}
-                  onChange={(e) => setFormMessage(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border border-zinc-300 text-zinc-900 focus:bg-white focus:outline-none focus:border-[#FFCC00]"
+                  onChange={(e) => {
+                    setFormMessage(e.target.value);
+                    if (formTouched.message) {
+                      setFormErrors((prev) => ({ ...prev, message: validateField('message', e.target.value) }));
+                    }
+                  }}
+                  onBlur={() => {
+                    setFormTouched((prev) => ({ ...prev, message: true }));
+                    setFormErrors((prev) => ({ ...prev, message: validateField('message', formMessage) }));
+                  }}
+                  className={`w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border text-zinc-900 focus:bg-white focus:outline-none transition-colors ${
+                    formErrors.message
+                      ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/20'
+                      : 'border-zinc-300 focus:border-[#FFCC00]'
+                  }`}
                 />
+                {formErrors.message && (
+                  <p className="text-[11px] font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3 shrink-0" />
+                    <span>{formErrors.message}</span>
+                  </p>
+                )}
               </div>
 
               <div className="p-3 rounded-xl bg-zinc-50 border border-zinc-200 text-[11px] text-zinc-600 flex items-center gap-2">
