@@ -31,7 +31,10 @@ import {
   CreditCard,
   Download,
   Printer,
+  ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   ShieldCheck,
   Zap,
   Globe,
@@ -102,6 +105,16 @@ export default function LocationFeasibilityPage() {
   const [paymentMethod, setPaymentMethod] = useState('upi');
 
   const printRef = useRef(null);
+
+  // Pagination state for Exhibitions Present
+  const [eventsPage, setEventsPage] = useState(1);
+  const [eventsPerPage, setEventsPerPage] = useState(12);
+  const eventsSectionRef = useRef(null);
+
+  // Reset pagination when location or category changes
+  useEffect(() => {
+    setEventsPage(1);
+  }, [selectedCity, selectedCategory]);
 
   // Plan detection
   const isSuperAdmin = user?.role === 'super_admin';
@@ -680,100 +693,279 @@ export default function LocationFeasibilityPage() {
               </div>
 
               {/* Pillar 3: Events Present (Live Competitor Listing in this Location) */}
-              <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/70 pb-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5 text-amber-500" />
-                      <h3 className="text-base font-extrabold text-foreground">
-                        Exhibitions Present in {report.location} ({report.summary.totalEventsPresent})
-                      </h3>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Existing, scheduled and past trade fairs present in this location from the VisitExpo directory.
-                    </p>
-                  </div>
+              {(() => {
+                const allEvents = report.eventsPresent || [];
+                const totalEventPages = Math.max(1, Math.ceil(allEvents.length / eventsPerPage));
+                const safeEventsPage = Math.min(Math.max(1, eventsPage), totalEventPages);
+                const startIndex = (safeEventsPage - 1) * eventsPerPage;
+                const paginatedEvents = allEvents.slice(startIndex, startIndex + eventsPerPage);
 
-                  <span className="text-xs font-bold text-muted-foreground">
-                    Showing top active events
-                  </span>
-                </div>
-
-                {report.eventsPresent && report.eventsPresent.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                    {report.eventsPresent.map((evt, idx) => {
-                      const startDateStr = evt.startDate
-                        ? new Date(evt.startDate).toLocaleDateString('en-IN', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric'
-                          })
-                        : 'Dates TBA';
-
-                      return (
-                        <div
-                          key={evt.id || idx}
-                          className="p-4 rounded-xl bg-secondary/30 border border-border hover:border-primary/50 transition-all space-y-2.5 flex flex-col justify-between"
-                        >
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-[10px] font-bold text-muted-foreground font-mono">
-                                #{idx + 1}
-                              </span>
-                              {evt.isClaimed ? (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                                  <ShieldCheck className="h-3 w-3" />
-                                  Claimed
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                                  Unclaimed
-                                </span>
-                              )}
-                            </div>
-
-                            <h4 className="text-xs font-bold text-foreground line-clamp-2" title={evt.title}>
-                              {evt.title}
-                            </h4>
-
-                            <div className="text-[11px] text-muted-foreground space-y-1">
-                              <div className="flex items-center gap-1.5 truncate">
-                                <MapPin className="h-3 w-3 shrink-0 text-muted-foreground/70" />
-                                <span className="truncate">{evt.venue || report.location}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <Calendar className="h-3 w-3 shrink-0 text-muted-foreground/70" />
-                                <span>{startDateStr}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="pt-2 border-t border-border/50 flex items-center justify-between text-[11px]">
-                            <span className="text-muted-foreground truncate max-w-[130px]">
-                              {(evt.categories && evt.categories[0]) || 'Trade Show'}
-                            </span>
-                            <Link
-                              href={`/events/claim?search=${encodeURIComponent(evt.title)}`}
-                              className="text-primary hover:underline font-bold inline-flex items-center gap-1"
-                            >
-                              <span>Inspect</span>
-                              <ChevronRight className="h-3 w-3" />
-                            </Link>
-                          </div>
+                return (
+                  <div ref={eventsSectionRef} className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-4 scroll-mt-20">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/70 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-5 w-5 text-amber-500" />
+                          <h3 className="text-base font-extrabold text-foreground">
+                            Exhibitions Present in {report.location} ({report.summary.totalEventsPresent})
+                          </h3>
                         </div>
-                      );
-                    })}
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Existing, scheduled and past trade fairs present in this location from the VisitExpo directory.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="text-xs font-bold text-muted-foreground">
+                          Showing {allEvents.length === 0 ? 0 : startIndex + 1}-
+                          {Math.min(startIndex + eventsPerPage, allEvents.length)} of {allEvents.length} events
+                        </span>
+
+                        {allEvents.length > 6 && (
+                          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <span className="hidden sm:inline">Per page:</span>
+                            <select
+                              value={eventsPerPage}
+                              onChange={(e) => {
+                                setEventsPerPage(Number(e.target.value));
+                                setEventsPage(1);
+                              }}
+                              className="px-2 py-1 rounded-lg bg-secondary border border-border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-bold"
+                              aria-label="Events per page"
+                            >
+                              <option value={6}>6</option>
+                              <option value={9}>9</option>
+                              <option value={12}>12</option>
+                              <option value={18}>18</option>
+                              <option value={24}>24</option>
+                            </select>
+                          </label>
+                        )}
+                      </div>
+                    </div>
+
+                    {allEvents.length > 0 ? (
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                          {paginatedEvents.map((evt, idx) => {
+                            const globalIndex = startIndex + idx + 1;
+                            const startDateStr = evt.startDate
+                              ? new Date(evt.startDate).toLocaleDateString('en-IN', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric'
+                                })
+                              : 'Dates TBA';
+
+                            return (
+                              <div
+                                key={evt.id || idx}
+                                className="p-4 rounded-xl bg-secondary/30 border border-border hover:border-primary/50 transition-all space-y-2.5 flex flex-col justify-between"
+                              >
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[10px] font-bold text-muted-foreground font-mono">
+                                      #{globalIndex}
+                                    </span>
+                                    {evt.isClaimed ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                        <ShieldCheck className="h-3 w-3" />
+                                        Claimed
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                                        Unclaimed
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <h4 className="text-xs font-bold text-foreground line-clamp-2" title={evt.title}>
+                                    {evt.title}
+                                  </h4>
+
+                                  <div className="text-[11px] text-muted-foreground space-y-1">
+                                    <div className="flex items-center gap-1.5 truncate">
+                                      <MapPin className="h-3 w-3 shrink-0 text-muted-foreground/70" />
+                                      <span className="truncate">{evt.venue || report.location}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <Calendar className="h-3 w-3 shrink-0 text-muted-foreground/70" />
+                                      <span>{startDateStr}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="pt-2 border-t border-border/50 flex items-center justify-between text-[11px]">
+                                  <span className="text-muted-foreground truncate max-w-[130px]">
+                                    {(evt.categories && evt.categories[0]) || 'Trade Show'}
+                                  </span>
+                                  <Link
+                                    href={`/events/claim?search=${encodeURIComponent(evt.title)}`}
+                                    className="text-primary hover:underline font-bold inline-flex items-center gap-1"
+                                  >
+                                    <span>Inspect</span>
+                                    <ChevronRight className="h-3 w-3" />
+                                  </Link>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Pagination Controls */}
+                        {totalEventPages > 1 && (
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-border/70 mt-2">
+                            <span className="text-xs text-muted-foreground font-semibold">
+                              Page <strong className="text-foreground">{safeEventsPage}</strong> of{' '}
+                              <strong className="text-foreground">{totalEventPages}</strong> ({allEvents.length} total events)
+                            </span>
+
+                            <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                              {/* First Page */}
+                              <button
+                                onClick={() => {
+                                  setEventsPage(1);
+                                  eventsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }}
+                                disabled={safeEventsPage === 1}
+                                className="p-2 rounded-xl border border-border bg-card hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed text-foreground transition-all cursor-pointer"
+                                title="First Page"
+                              >
+                                <ChevronsLeft className="h-4 w-4" />
+                              </button>
+
+                              {/* Previous Page */}
+                              <button
+                                onClick={() => {
+                                  setEventsPage((p) => Math.max(1, p - 1));
+                                  eventsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }}
+                                disabled={safeEventsPage === 1}
+                                className="flex items-center gap-1 px-3 py-2 rounded-xl border border-border bg-card hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed text-xs font-bold text-foreground transition-all cursor-pointer"
+                              >
+                                <ChevronLeft className="h-4 w-4" />
+                                <span className="hidden sm:inline">Prev</span>
+                              </button>
+
+                              {/* Page Numbers */}
+                              <div className="flex items-center gap-1">
+                                {(() => {
+                                  const pages = [];
+                                  const maxVisible = 5;
+                                  let start = Math.max(1, safeEventsPage - 2);
+                                  let end = Math.min(totalEventPages, start + maxVisible - 1);
+                                  if (end - start < maxVisible - 1) {
+                                    start = Math.max(1, end - maxVisible + 1);
+                                  }
+
+                                  if (start > 1) {
+                                    pages.push(
+                                      <button
+                                        key={1}
+                                        onClick={() => {
+                                          setEventsPage(1);
+                                          eventsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                        }}
+                                        className="h-8 w-8 rounded-xl border border-border bg-card hover:bg-secondary text-xs font-bold text-foreground transition-all cursor-pointer"
+                                      >
+                                        1
+                                      </button>
+                                    );
+                                    if (start > 2) {
+                                      pages.push(
+                                        <span key="dots-start" className="px-1 text-xs text-muted-foreground">
+                                          ...
+                                        </span>
+                                      );
+                                    }
+                                  }
+
+                                  for (let i = start; i <= end; i++) {
+                                    pages.push(
+                                      <button
+                                        key={i}
+                                        onClick={() => {
+                                          setEventsPage(i);
+                                          eventsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                        }}
+                                        className={`h-8 w-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                          safeEventsPage === i
+                                            ? 'bg-primary text-black font-extrabold shadow-sm shadow-primary/20 ring-1 ring-primary/30'
+                                            : 'border border-border bg-card hover:bg-secondary text-foreground'
+                                        }`}
+                                      >
+                                        {i}
+                                      </button>
+                                    );
+                                  }
+
+                                  if (end < totalEventPages) {
+                                    if (end < totalEventPages - 1) {
+                                      pages.push(
+                                        <span key="dots-end" className="px-1 text-xs text-muted-foreground">
+                                          ...
+                                        </span>
+                                      );
+                                    }
+                                    pages.push(
+                                      <button
+                                        key={totalEventPages}
+                                        onClick={() => {
+                                          setEventsPage(totalEventPages);
+                                          eventsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                        }}
+                                        className="h-8 w-8 rounded-xl border border-border bg-card hover:bg-secondary text-xs font-bold text-foreground transition-all cursor-pointer"
+                                      >
+                                        {totalEventPages}
+                                      </button>
+                                    );
+                                  }
+
+                                  return pages;
+                                })()}
+                              </div>
+
+                              {/* Next Page */}
+                              <button
+                                onClick={() => {
+                                  setEventsPage((p) => Math.min(totalEventPages, p + 1));
+                                  eventsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }}
+                                disabled={safeEventsPage === totalEventPages}
+                                className="flex items-center gap-1 px-3 py-2 rounded-xl border border-border bg-card hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed text-xs font-bold text-foreground transition-all cursor-pointer"
+                              >
+                                <span className="hidden sm:inline">Next</span>
+                                <ChevronRight className="h-4 w-4" />
+                              </button>
+
+                              {/* Last Page */}
+                              <button
+                                onClick={() => {
+                                  setEventsPage(totalEventPages);
+                                  eventsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }}
+                                disabled={safeEventsPage === totalEventPages}
+                                className="p-2 rounded-xl border border-border bg-card hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed text-foreground transition-all cursor-pointer"
+                                title="Last Page"
+                              >
+                                <ChevronsRight className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="p-8 text-center bg-secondary/30 rounded-xl space-y-2">
+                        <Sparkles className="h-8 w-8 text-primary mx-auto" />
+                        <h4 className="text-sm font-bold text-foreground">Zero Direct Competitors Found!</h4>
+                        <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                          No competing exhibitions are currently scheduled in {report.location} under this sector. This indicates an open market opportunity for early movers!
+                        </p>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="p-8 text-center bg-secondary/30 rounded-xl space-y-2">
-                    <Sparkles className="h-8 w-8 text-primary mx-auto" />
-                    <h4 className="text-sm font-bold text-foreground">Zero Direct Competitors Found!</h4>
-                    <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                      No competing exhibitions are currently scheduled in {report.location} under this sector. This indicates an open market opportunity for early movers!
-                    </p>
-                  </div>
-                )}
-              </div>
+                );
+              })()}
 
               {/* Pillar 4: Go/No-Go Decision Matrix (SWOT Analysis) */}
               <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-4">

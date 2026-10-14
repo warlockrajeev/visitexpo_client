@@ -1087,6 +1087,13 @@ export default function PricingPage() {
                     >
                       <span>Plan Active · Open Dashboard</span>
                     </Link>
+                  ) : user?.role === 'organizer' && (activePlanId === 'enterprise' || activePlanId === 'growth') ? (
+                    <Link
+                      href="/dashboard"
+                      className="w-full py-2.5 px-4 rounded-xl border border-zinc-300 text-zinc-700 hover:bg-zinc-50 text-xs font-bold transition-all text-center block"
+                    >
+                      Included in Your {activePlanId.toUpperCase()} Plan
+                    </Link>
                   ) : (
                     <button
                       onClick={() => handleSelectPlan('starter', starterPlan?.name || 'Organizer Starter')}
@@ -1778,12 +1785,21 @@ export default function PricingPage() {
               Join thousands of trade fairs, consumer expos, and business conferences connecting directly with buyers on VisitExpo.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-              <button
-                onClick={() => handleSelectPlan('starter', 'Organizer Starter')}
-                className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-[#FFCC00] text-black font-extrabold text-xs transition-all shadow-md cursor-pointer hover:bg-[#e6b800]"
-              >
-                Get Started with Starter (₹14,999/Qtr)
-              </button>
+              {user?.role === 'organizer' && (activePlanId === 'starter' || activePlanId === 'enterprise' || activePlanId === 'growth') ? (
+                <Link
+                  href="/dashboard"
+                  className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-[#FFCC00] text-black font-extrabold text-xs transition-all shadow-md cursor-pointer hover:bg-[#e6b800] inline-flex items-center justify-center"
+                >
+                  Open Organizer Dashboard
+                </Link>
+              ) : (
+                <button
+                  onClick={() => handleSelectPlan('starter', 'Organizer Starter')}
+                  className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-[#FFCC00] text-black font-extrabold text-xs transition-all shadow-md cursor-pointer hover:bg-[#e6b800]"
+                >
+                  Get Started with Starter (₹14,999/Qtr)
+                </button>
+              )}
               <a
                 href="tel:+919323677688"
                 className="w-full sm:w-auto px-6 py-3.5 rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs transition-all cursor-pointer inline-flex items-center justify-center gap-2"

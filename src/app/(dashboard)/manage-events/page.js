@@ -1139,7 +1139,17 @@ export default function EventsPage() {
                 {/* Content */}
                 <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                   <div className="space-y-2">
-                    <h3 className="font-bold text-lg leading-tight text-foreground line-clamp-1">{evt.title}</h3>
+                    <h3 className="font-bold text-lg leading-tight text-foreground line-clamp-1">
+                      <a
+                        href={`/events/${evt.slug || evt._id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="hover:text-primary transition-colors cursor-pointer"
+                        title="View event details on VisitExpo"
+                      >
+                        {evt.title}
+                      </a>
+                    </h3>
                     <div
                       className="text-xs text-muted-foreground line-clamp-2 leading-relaxed [&_strong]:font-semibold [&_strong]:text-foreground [&_b]:font-semibold [&_b]:text-foreground [&_em]:italic"
                       dangerouslySetInnerHTML={{
@@ -1192,14 +1202,6 @@ export default function EventsPage() {
                         >
                           {isUpdating ? <><Loader2 className="h-3 w-3 animate-spin" /> Publishing...</> : 'Publish'}
                         </button>
-                      ) : evt.status === 'published' ? (
-                        <button
-                          onClick={() => updateEventStatus(evt._id, 'completed')}
-                          disabled={isUpdating || isDeleting}
-                          className="inline-flex items-center gap-1 text-xs text-blue-500 hover:bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20 font-semibold disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {isUpdating ? <><Loader2 className="h-3 w-3 animate-spin" /> Updating...</> : 'Mark Completed'}
-                        </button>
                       ) : null}
                     </div>
 
@@ -1226,11 +1228,22 @@ export default function EventsPage() {
                         {isDeleting ? <Loader2 className="h-4.5 w-4.5 animate-spin text-destructive" /> : <Trash2 className="h-4.5 w-4.5" />}
                       </button>
                       <a
+                        href={`/events/${evt.slug || evt._id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-1.5 text-muted-foreground hover:text-primary hover:bg-secondary rounded-md transition-colors cursor-pointer"
+                        title="View Event Details on VisitExpo (client.visitexpo.in)"
+                        aria-label="View Event Details on VisitExpo Platform"
+                      >
+                        <Eye className="h-4.5 w-4.5" />
+                      </a>
+                      <a
                         href={`https://visitexpo.in/event/${evt.slug}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="p-1.5 text-muted-foreground hover:text-primary hover:bg-secondary rounded-md transition-colors"
-                        title="View Public Link"
+                        className="p-1.5 text-muted-foreground hover:text-primary hover:bg-secondary rounded-md transition-colors cursor-pointer"
+                        title="View on WordPress (visitexpo.in)"
+                        aria-label="View on WordPress"
                       >
                         <ExternalLink className="h-4.5 w-4.5" />
                       </a>
