@@ -24,6 +24,8 @@ import {
   Printer,
   Filter
 } from 'lucide-react';
+import { showSweetConfirm, showSweetSuccess, showSweetError } from '../../../utils/sweetalert.js';
+import { printBadge } from '../../../utils/printBadge.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -202,6 +204,30 @@ export default function ExposPage() {
     setClaimError('');
     setClaimSuccessMessage('');
     const eventId = expo.id || expo._id;
+
+    const confirmed = await showSweetConfirm(
+      {
+        title: 'Claim Free Visitor Pass?',
+        icon: 'question',
+        confirmButtonText: 'Yes, Claim Pass',
+        cancelButtonText: 'Cancel',
+        isDanger: false
+      },
+      '',
+      {
+        html: `
+          <div style="font-size: 13px; line-height: 1.5; margin-top: 6px; color: inherit;">
+            <p style="margin-bottom: 8px;">Are you sure you want to claim a free visitor pass for:</p>
+            <div style="font-weight: 800; font-size: 15px; margin: 8px 0; color: #f59e0b;">${expo.title}</div>
+            ${expo.venue || expo.city ? `<div style="font-size: 12px; margin-bottom: 8px; opacity: 0.85;">📍 ${[expo.venue, expo.city].filter(Boolean).join(', ')}</div>` : ''}
+            <div style="font-size: 12px; color: #10b981; font-weight: 600; margin-top: 8px;">✓ Instant digital QR entry badge will be generated for gate check-in</div>
+          </div>
+        `
+      }
+    );
+
+    if (!confirmed) return;
+
     setClaimingId(eventId);
 
     try {
@@ -219,10 +245,12 @@ export default function ExposPage() {
       if (res.data && res.data.success) {
         setClaimSuccessMessage(`Pass confirmed for "${expo.title}"! Your QR badge is active.`);
         await fetchMyPasses();
+        showSweetSuccess(`Your digital entry badge for "${expo.title}" is ready and available under My Passes & Badges.`, 'Pass Confirmed! 🎉');
       }
     } catch (err) {
       const errMsg = err.response?.data?.error || 'Registration could not be completed. You may already be registered.';
       setClaimError(errMsg);
+      showSweetError(errMsg, 'Registration Notice');
     } finally {
       setClaimingId(null);
     }
@@ -454,10 +482,10 @@ export default function ExposPage() {
       {/* MODAL: Printable QR Entry Badge */}
       {selectedPassForBadge && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="relative w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-5 text-center">
+          <div className="relative w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-5 text-center printable-badge-card">
             <button
               onClick={() => setSelectedPassForBadge(null)}
-              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground text-xs p-1 rounded-lg border border-border bg-secondary cursor-pointer"
+              className="no-print absolute top-4 right-4 text-muted-foreground hover:text-foreground text-xs p-1 rounded-lg border border-border bg-secondary cursor-pointer"
             >
               ✕
             </button>
@@ -497,10 +525,10 @@ export default function ExposPage() {
               Present this digital pass at the entrance scanner for instant check-in.
             </p>
 
-            <div className="flex items-center gap-2 pt-1">
+            <div className="no-print flex items-center gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={() => printBadge(selectedPassForBadge)}
                 className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-2.5 text-xs shadow-md transition-all cursor-pointer"
               >
                 <Printer className="h-4 w-4" /> Print Badge

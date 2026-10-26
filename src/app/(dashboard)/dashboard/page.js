@@ -11,6 +11,8 @@ import Link from 'next/link';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import SearchableSelect from '../../../components/SearchableSelect.js';
+import { showSweetConfirm, showSweetSuccess, showSweetError } from '../../../utils/sweetalert.js';
+import { printBadge } from '../../../utils/printBadge.js';
 import {
   Users,
   Target,
@@ -64,7 +66,8 @@ import {
   Copy,
   Key,
   Terminal,
-  Code2
+  Code2,
+  RotateCw
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -2698,6 +2701,8 @@ function VisitorDashboard() {
   const [engagements, setEngagements] = useState({ all: [], interestedEvents: [], followedEvents: [] });
   const [loadingEngagements, setLoadingEngagements] = useState(true);
   const [engagementTab, setEngagementTab] = useState('all');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshSuccess, setRefreshSuccess] = useState(false);
 
   // Fetch visitor's marked interested and followed events
   const fetchMyEngagements = async () => {
@@ -2723,12 +2728,51 @@ function VisitorDashboard() {
       const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
       const res = await axios.get(`${API_URL}/visitors/my-passes`, { headers });
       if (res.data && res.data.success) {
-        setPasses(res.data.data.docs || []);
+        const docs = res.data.data?.docs || res.data.data || [];
+        const validList = Array.isArray(docs) ? docs : [];
+        setPasses(validList);
+        if (typeof window !== 'undefined' && user) {
+          const userId = user.id || user._id;
+          sessionStorage.setItem(`visitexpo_visitor_passes_cache_${userId}`, JSON.stringify(validList));
+        }
       }
     } catch (err) {
       console.warn('Could not fetch visitor passes:', err);
     } finally {
       setLoadingPasses(false);
+    }
+  };
+
+  // Comprehensive Refresh: Invalidate caches and fetch fresh passes, expos, and engagements
+  const handleRefreshDashboard = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    setRefreshSuccess(false);
+
+    try {
+      // Clear stale sessionStorage caches so new events & passes are guaranteed fresh
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('visitexpo_visitor_expos_cache');
+        const userId = user?.id || user?._id;
+        if (userId) {
+          sessionStorage.removeItem(`visitexpo_visitor_passes_cache_${userId}`);
+        }
+      }
+
+      // Concurrently re-fetch passes, expos, and user engagements with minimum visual duration
+      await Promise.allSettled([
+        fetchMyPasses(),
+        fetchExpos(),
+        fetchMyEngagements(),
+        new Promise((resolve) => setTimeout(resolve, 600))
+      ]);
+
+      setRefreshSuccess(true);
+      setTimeout(() => setRefreshSuccess(false), 2200);
+    } catch (err) {
+      console.warn('Refresh dashboard error:', err);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -2805,6 +2849,30 @@ function VisitorDashboard() {
     setClaimError('');
     setClaimSuccessMessage('');
     const eventId = event._id || event.id;
+
+    const confirmed = await showSweetConfirm(
+      {
+        title: 'Claim Free Visitor Pass?',
+        icon: 'question',
+        confirmButtonText: 'Yes, Claim Pass',
+        cancelButtonText: 'Cancel',
+        isDanger: false
+      },
+      '',
+      {
+        html: `
+          <div style="font-size: 13px; line-height: 1.5; margin-top: 6px; color: inherit;">
+            <p style="margin-bottom: 8px;">Are you sure you want to claim a free visitor pass for:</p>
+            <div style="font-weight: 800; font-size: 15px; margin: 8px 0; color: #f59e0b;">${event.title}</div>
+            ${event.venue || event.city ? `<div style="font-size: 12px; margin-bottom: 8px; opacity: 0.85;">📍 ${[event.venue, event.city].filter(Boolean).join(', ')}</div>` : ''}
+            <div style="font-size: 12px; color: #10b981; font-weight: 600; margin-top: 8px;">✓ Instant digital QR entry badge will be generated for gate check-in</div>
+          </div>
+        `
+      }
+    );
+
+    if (!confirmed) return;
+
     setClaimingEventId(eventId);
 
     try {
@@ -2822,10 +2890,12 @@ function VisitorDashboard() {
       if (res.data && res.data.success) {
         setClaimSuccessMessage(`Pass confirmed for "${event.title}"! Your digital badge is ready below.`);
         await fetchMyPasses();
+        showSweetSuccess(`Your digital entry badge for "${event.title}" is ready and available under My Passes & Badges.`, 'Pass Confirmed! 🎉');
       }
     } catch (err) {
       const errMsg = err.response?.data?.error || 'Registration could not be completed. You may already be registered.';
       setClaimError(errMsg);
+      showSweetError(errMsg, 'Registration Notice');
     } finally {
       setClaimingEventId(null);
     }
@@ -2871,31 +2941,48 @@ function VisitorDashboard() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 shrink-0">
           <a
             href="#explore-expos"
-            className="inline-flex items-center gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 text-xs font-bold transition-all shadow-md shadow-primary/10 cursor-pointer"
+            className="group inline-flex items-center justify-center gap-2 rounded-xl bg-primary hover:bg-amber-400 text-primary-foreground px-4 py-2.5 text-xs font-bold transition-all duration-200 shadow-sm hover:shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer whitespace-nowrap"
           >
-            <Ticket className="h-4 w-4" /> Claim Passes Here
+            <Ticket className="h-4 w-4 shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-12" />
+            <span>Claim Passes Here</span>
           </a>
           <Link
-            href="/organizers"
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-xs font-bold transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
-          >
-            <MessageSquare className="h-4 w-4" /> Organizers &amp; Live Chat
-          </Link>
-          <Link
             href="/expos"
-            className="inline-flex items-center gap-2 rounded-xl border border-border bg-secondary hover:bg-secondary/80 px-4 py-2.5 text-xs font-bold text-foreground transition-colors cursor-pointer"
+            className="group inline-flex items-center justify-center gap-2 rounded-xl border border-border/80 bg-secondary/80 hover:bg-card hover:border-primary/50 text-foreground hover:text-primary px-4 py-2.5 text-xs font-bold transition-all duration-200 shadow-2xs hover:shadow-md hover:shadow-primary/10 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer whitespace-nowrap"
           >
-            <Calendar className="h-4 w-4" /> Browse Live Expos &rarr;
+            <Calendar className="h-4 w-4 shrink-0 transition-transform duration-300 group-hover:scale-110" />
+            <span>Browse Live Expos</span>
+            <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
           </Link>
           <button
-            onClick={fetchMyPasses}
-            className="inline-flex items-center gap-2 rounded-xl border border-border bg-secondary hover:bg-secondary/80 px-3 py-2.5 text-xs font-bold text-foreground transition-colors cursor-pointer"
-            title="Refresh Passes"
+            type="button"
+            onClick={handleRefreshDashboard}
+            disabled={isRefreshing}
+            className={`group inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-bold transition-all duration-200 shadow-2xs hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer whitespace-nowrap ${
+              refreshSuccess
+                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 shadow-emerald-500/10'
+                : 'border-border/80 bg-secondary/80 hover:bg-card hover:border-primary/50 text-foreground hover:text-primary hover:shadow-primary/10'
+            }`}
+            title="Refresh Passes, Exhibitions & Bookmarks"
           >
-            Refresh
+            {refreshSuccess ? (
+              <>
+                <Check className="h-4 w-4 shrink-0 text-emerald-500 animate-in zoom-in" />
+                <span>Refreshed!</span>
+              </>
+            ) : (
+              <>
+                <RotateCw
+                  className={`h-4 w-4 shrink-0 transition-transform duration-500 ${
+                    isRefreshing ? 'animate-spin text-primary' : 'group-hover:rotate-180'
+                  }`}
+                />
+                <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -2918,11 +3005,11 @@ function VisitorDashboard() {
         </div>
         <Link
           href="/organizers"
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-500/20 shrink-0 transition-all hover:scale-102"
+          className="group inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 shrink-0 transition-all duration-200 hover:shadow-lg hover:shadow-emerald-600/30 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
         >
-          <Building className="h-4 w-4" />
-          <span>Explore Organizers &amp; Chat</span>
-          <ArrowRight className="h-3.5 w-3.5" />
+          <Building className="h-4 w-4 shrink-0 transition-transform duration-300 group-hover:scale-110" />
+          <span>Explore Organizers &amp; Exhibitions</span>
+          <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
         </Link>
       </div>
 
@@ -3003,9 +3090,13 @@ function VisitorDashboard() {
             </h3>
             <p className="text-xs text-muted-foreground">Show these QR badges at event entry checkpoints for instant paperless entry.</p>
           </div>
-          <span className="text-xs font-semibold text-muted-foreground">
-            Total Passes: <strong className="text-foreground">{passes.length}</strong>
-          </span>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/25 text-xs font-bold shadow-2xs shrink-0 self-start sm:self-auto">
+            <Ticket className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span className="text-foreground font-semibold">Total Passes:</span>
+            <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs font-black shadow-xs">
+              {passes.length}
+            </span>
+          </div>
         </div>
 
         {loadingPasses ? (
@@ -3044,25 +3135,37 @@ function VisitorDashboard() {
               const qrData = pass.qrCode || `VIS-${pass._id}`;
               const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(qrData)}`;
 
+              const eventSlug = pass.event?.slug || (typeof pass.event === 'object' ? (pass.event?._id || pass.event?.id) : pass.event);
+              const eventUrl = eventSlug ? `/expo/${eventSlug}` : '/expos';
+
               return (
                 <div
                   key={pass._id}
-                  className="rounded-2xl border border-border bg-card p-5 shadow-sm hover:border-primary/50 transition-all flex flex-col justify-between space-y-4 relative overflow-hidden"
+                  className="rounded-2xl border border-border bg-card p-5 shadow-sm hover:border-primary/50 hover:shadow-md transition-all flex flex-col justify-between space-y-4"
                 >
-                  {/* Decorative top accent */}
-                  <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-primary via-amber-400 to-pink-500" />
-
-                  <div className="space-y-3 pt-1">
+                  <div className="space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="space-y-1">
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 uppercase">
                           <CheckCircle2 className="h-3 w-3" /> {pass.registrationStatus || 'Confirmed'}
                         </span>
-                        <h4 className="text-sm font-bold text-foreground leading-snug">{eventTitle}</h4>
+                        <Link
+                          href={eventUrl}
+                          className="group/title block cursor-pointer transition-colors"
+                          title={`Click to view more details about ${eventTitle}`}
+                        >
+                          <h4 className="text-sm font-bold text-foreground group-hover/title:text-primary transition-colors leading-snug line-clamp-2">
+                            {eventTitle}
+                          </h4>
+                        </Link>
                       </div>
                     </div>
 
-                    <div className="space-y-1.5 text-xs text-muted-foreground">
+                    <Link
+                      href={eventUrl}
+                      className="block space-y-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      title="Click to view event dates, venue and details"
+                    >
                       <div className="flex items-center gap-2">
                         <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
                         <span className="truncate">{eventVenue}, {eventCity}</span>
@@ -3076,17 +3179,24 @@ function VisitorDashboard() {
                         <span className="font-semibold text-foreground">{pass.name}</span>
                         {pass.company && <span className="text-[11px]">• {pass.company}</span>}
                       </div>
-                    </div>
+                    </Link>
 
                     {/* QR Preview Snippet */}
-                    <div className="flex items-center gap-3 bg-secondary/50 p-3 rounded-xl border border-border/60">
+                    <div
+                      onClick={() => setSelectedPassForBadge(pass)}
+                      className="flex items-center gap-3 bg-secondary/50 hover:bg-secondary/80 p-3 rounded-xl border border-border/60 hover:border-primary/40 transition-all cursor-pointer group/qr"
+                      title="Click to view full digital entry badge"
+                    >
                       <img
                         src={qrUrl}
                         alt="QR Code"
-                        className="h-14 w-14 rounded-lg bg-white p-1 border border-border object-contain"
+                        className="h-14 w-14 rounded-lg bg-white p-1 border border-border object-contain group-hover/qr:scale-105 transition-transform"
                       />
-                      <div className="overflow-hidden space-y-0.5">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Badge Ref Code</span>
+                      <div className="overflow-hidden space-y-0.5 flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Badge Ref Code</span>
+                          <span className="text-[10px] font-bold text-primary group-hover/qr:underline">View Badge →</span>
+                        </div>
                         <p className="text-xs font-mono font-bold text-foreground truncate">
                           VIS-{pass._id.slice(-6).toUpperCase()}
                         </p>
@@ -3097,19 +3207,21 @@ function VisitorDashboard() {
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-border flex items-center justify-between gap-2">
+                  <div className="pt-3 border-t border-border grid grid-cols-2 gap-2">
                     <button
+                      type="button"
                       onClick={() => setSelectedPassForBadge(pass)}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground py-2 px-3 text-xs font-bold transition-all shadow-sm cursor-pointer"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary hover:bg-amber-400 text-primary-foreground py-2.5 px-3 text-xs font-bold transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 cursor-pointer whitespace-nowrap"
                     >
-                      <QrCode className="h-3.5 w-3.5" /> View QR Badge
+                      <QrCode className="h-3.5 w-3.5 shrink-0" />
+                      <span>View Badge</span>
                     </button>
                     <Link
-                      href="/expos"
-                      className="p-2 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                      title="Explore Event Details"
+                      href={eventUrl}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-border/80 bg-secondary/80 hover:bg-card hover:border-primary/50 text-foreground hover:text-primary py-2.5 px-3 text-xs font-bold transition-all duration-200 shadow-2xs hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 cursor-pointer whitespace-nowrap group/details"
                     >
-                      <ExternalLink className="h-4 w-4" />
+                      <span>Expo Details</span>
+                      <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 group-hover/details:translate-x-1" />
                     </Link>
                   </div>
                 </div>
@@ -3384,11 +3496,11 @@ function VisitorDashboard() {
       {/* MODAL: Printable Digital QR Entry Badge */}
       {selectedPassForBadge && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="relative w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-5 text-center">
+          <div className="relative w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-5 text-center printable-badge-card">
             {/* Close Button */}
             <button
               onClick={() => setSelectedPassForBadge(null)}
-              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground text-xs p-1 rounded-lg border border-border bg-secondary cursor-pointer"
+              className="no-print absolute top-4 right-4 text-muted-foreground hover:text-foreground text-xs p-1 rounded-lg border border-border bg-secondary cursor-pointer"
             >
               ✕
             </button>
@@ -3432,10 +3544,10 @@ function VisitorDashboard() {
             </p>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-2 pt-1">
+            <div className="no-print flex items-center gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={() => printBadge(selectedPassForBadge)}
                 className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-2.5 text-xs shadow-md transition-all cursor-pointer"
               >
                 <Printer className="h-4 w-4" /> Print Badge

@@ -465,7 +465,7 @@ export default function DashboardLayout({ children }) {
 
       {/* Sidebar Navigation */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-border bg-card transition-transform duration-300 md:static md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 md:w-[272px] flex-col border-r border-border bg-card transition-transform duration-300 md:static md:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -498,18 +498,18 @@ export default function DashboardLayout({ children }) {
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                className={`group flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
                   isActive
                     ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
-                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground hover:translate-x-1'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <item.icon className="h-4.5 w-4.5 flex-shrink-0" />
-                  <span>{item.name}</span>
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <item.icon className="h-4.5 w-4.5 shrink-0" />
+                  <span className="whitespace-nowrap truncate">{item.name}</span>
                 </div>
                 {item.badge && (
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ml-2 leading-normal ${
                     isActive ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-primary/10 text-primary'
                   }`}>
                     {item.badge}
@@ -525,14 +525,14 @@ export default function DashboardLayout({ children }) {
         <div className="p-4 border-t border-border bg-muted/20">
           <Link
             href="/"
-            className="flex w-full items-center justify-between rounded-lg px-4 py-2.5 text-xs font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground mb-2 transition-colors"
+            className="group flex w-full items-center justify-between rounded-lg px-4 py-2.5 text-xs font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground mb-2 transition-all duration-200 hover:translate-x-1"
             title="Go back to VisitExpo landing page"
           >
             <span className="flex items-center gap-3">
-              <Home className="h-4.5 w-4.5 text-primary" />
+              <Home className="h-4.5 w-4.5 text-primary transition-transform duration-200 group-hover:scale-110" />
               Explore Events
             </span>
-            <ArrowRight className="h-3.5 w-3.5 opacity-60" />
+            <ArrowRight className="h-3.5 w-3.5 opacity-60 transition-transform duration-200 group-hover:translate-x-1 group-hover:opacity-100" />
           </Link>
 
           <button
@@ -608,10 +608,10 @@ export default function DashboardLayout({ children }) {
             {/* Back to Landing Page Button */}
             <Link
               href="/"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card hover:bg-secondary px-3 py-1.5 text-xs font-bold text-foreground transition-all shadow-2xs cursor-pointer btn-press active:scale-95"
+              className="group inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-card hover:bg-amber-500/10 hover:border-amber-500/50 hover:text-amber-600 dark:hover:text-amber-400 px-3.5 py-1.5 text-xs font-bold text-foreground transition-all duration-200 shadow-2xs hover:shadow-md hover:shadow-amber-500/15 hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-0 active:scale-95 cursor-pointer"
               title="Return to VisitExpo Landing Page"
             >
-              <ArrowLeft className="h-3.5 w-3.5 text-primary" />
+              <ArrowLeft className="h-3.5 w-3.5 text-primary transition-transform duration-200 group-hover:-translate-x-1" />
               <span>Explore Events</span>
             </Link>
 
@@ -661,16 +661,18 @@ export default function DashboardLayout({ children }) {
             {user?.role === 'visitor' ? (
               <Link
                 href="/expos"
-                className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"
+                className="group hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-amber-400 hover:brightness-105 active:brightness-95 px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-sm hover:shadow-lg hover:shadow-primary/40 hover:-translate-y-0.5 hover:scale-[1.03] active:translate-y-0 active:scale-95 transition-all duration-200 cursor-pointer"
               >
-                <Ticket className="h-3.5 w-3.5" /> Browse Live Expos
+                <Ticket className="h-3.5 w-3.5 transition-transform duration-200 group-hover:scale-125 group-hover:-rotate-12" />
+                <span>Browse Live Expos</span>
               </Link>
             ) : user?.role === 'exhibitor' ? (
               <Link
                 href="/expos"
-                className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-border bg-card hover:bg-secondary px-3.5 py-1.5 text-xs font-bold text-foreground transition-all shadow-sm"
+                className="group hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-card hover:bg-amber-500/10 hover:border-amber-500/50 hover:text-amber-600 dark:hover:text-amber-400 px-3.5 py-1.5 text-xs font-bold text-foreground transition-all duration-200 shadow-sm hover:shadow-md hover:shadow-amber-500/15 hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-0 active:scale-95 cursor-pointer"
               >
-                <Ticket className="h-3.5 w-3.5 text-primary" /> Browse Live Expos
+                <Ticket className="h-3.5 w-3.5 text-primary transition-transform duration-200 group-hover:scale-125 group-hover:-rotate-12" />
+                <span>Browse Live Expos</span>
               </Link>
             ) : (
               <>
