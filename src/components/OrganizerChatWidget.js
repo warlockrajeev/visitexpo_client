@@ -16,9 +16,9 @@ import {
   Loader2,
   Building,
   User,
-  Check,
-  CheckCheck,
-  Sparkles,
+  Lock,
+  AlertCircle,
+  MessageSquare,
   Phone,
   Mail,
   ChevronDown,
@@ -82,6 +82,7 @@ export default function OrganizerChatWidget({
   const [phone, setPhone] = useState(user?.phone || '');
   const [company, setCompany] = useState(user?.company || '');
   const [initialMessage, setInitialMessage] = useState('');
+  const [formErrors, setFormErrors] = useState({});
 
   // Active chat message stream
   const [messages, setMessages] = useState([]);
@@ -114,10 +115,12 @@ export default function OrganizerChatWidget({
   // Update participant details when user logs in
   useEffect(() => {
     if (user) {
-      if (!name) setName(user.name || '');
-      if (!email) setEmail(user.email || '');
-      if (!phone) setPhone(user.phone || '');
-      if (!company) setCompany(user.company || '');
+      if (user.name) setName(user.name);
+      if (user.email) setEmail(user.email);
+      if (user.phone) setPhone(user.phone);
+      if (user.company || user.organization?.name) {
+        setCompany(user.company || user.organization?.name);
+      }
       if (user.role === 'exhibitor') setParticipantRole('exhibitor');
     }
   }, [user]);
@@ -254,10 +257,103 @@ export default function OrganizerChatWidget({
     }
   }, [messages, isOpen]);
 
+  // Strict field-type validation logic
+  const validateWidgetField = (field, value, role = participantRole) => {
+    const val = (value || '').trim();
+    switch (field) {
+      case 'name': {
+        if (!val) return 'Please provide your full name.';
+        if (val.length < 2) return 'Full name must be at least 2 characters.';
+        const letterCount = (val.match(/[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF]/g) || []).length;
+        if (letterCount < 2) return 'Please enter a valid name (letters only).';
+        const validNameRegex = /^[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF\s.'-]+$/;
+        if (!validNameRegex.test(val)) return 'Name should only contain letters and standard punctuation.';
+        return null;
+      }
+      case 'email': {
+        if (!val) return 'Please provide your email address.';
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!emailRegex.test(val)) return 'Please enter a valid email address (e.g. name@domain.com).';
+        return null;
+      }
+      case 'phone': {
+        if (!val) return null;
+        const digits = val.replace(/\D/g, '');
+        if (digits.length < 7 || digits.length > 15) {
+          return 'Please enter a valid phone number (7 to 15 digits).';
+        }
+        const phoneRegex = /^(\+?[0-9\s\-()]{7,20})$/;
+        if (!phoneRegex.test(val)) {
+          return 'Phone number contains invalid characters.';
+        }
+        return null;
+      }
+      case 'company': {
+        if (role === 'exhibitor') {
+          if (!val) return 'Company name is required for exhibitors.';
+        }
+        if (val) {
+          if (val.length < 2) return 'Company name must be at least 2 characters.';
+          const alphaNumCount = (val.match(/[a-zA-Z0-9]/g) || []).length;
+          if (alphaNumCount < 2) return 'Please enter a valid company name (letters or numbers).';
+        }
+        return null;
+      }
+      case 'message': {
+        if (!val) return 'Please type a brief message to start the inquiry.';
+        if (val.length < 5) return 'Message must be at least 5 characters.';
+        const alphaNumCount = (val.match(/[a-zA-Z0-9]/g) || []).length;
+        if (alphaNumCount < 3) return 'Please enter a meaningful message with text.';
+        return null;
+      }
+      default:
+        return null;
+    }
+  };
+
+  const handleWidgetBlur = (field) => {
+    let val = '';
+    if (field === 'name') val = name;
+    else if (field === 'email') val = email;
+    else if (field === 'phone') val = phone;
+    else if (field === 'company') val = company;
+    else if (field === 'message') val = initialMessage;
+
+    const err = validateWidgetField(field, val, participantRole);
+    setFormErrors((prev) => {
+      if (err) {
+        return { ...prev, [field]: err };
+      } else {
+        if (!prev[field]) return prev;
+        const updated = { ...prev };
+        delete updated[field];
+        return updated;
+      }
+    });
+  };
+
   // Start new conversation
   const handleStartChat = async (e) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim()) return;
+
+    const nameErr = validateWidgetField('name', name, participantRole);
+    const emailErr = validateWidgetField('email', email, participantRole);
+    const phoneErr = validateWidgetField('phone', phone, participantRole);
+    const companyErr = validateWidgetField('company', company, participantRole);
+    const messageErr = validateWidgetField('message', initialMessage, participantRole);
+
+    const errors = {};
+    if (nameErr) errors.name = nameErr;
+    if (emailErr) errors.email = emailErr;
+    if (phoneErr) errors.phone = phoneErr;
+    if (companyErr) errors.company = companyErr;
+    if (messageErr) errors.message = messageErr;
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
 
     setStartingChat(true);
     try {
@@ -363,17 +459,17 @@ export default function OrganizerChatWidget({
           {/* Header */}
           <div className="flex-shrink-0 bg-primary text-primary-foreground p-3.5 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ring-2 ring-white/30">
+              <div className="h-9 w-9 rounded-full bg-black/15 border border-black/10 flex items-center justify-center text-xs font-black text-neutral-950 flex-shrink-0">
                 {displayName.charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <h3 className="text-xs font-bold text-white truncate max-w-[170px]">
+                  <h3 className="text-xs font-black text-neutral-950 truncate max-w-[170px]">
                     {displayName}
                   </h3>
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse" />
                 </div>
-                <p className="text-[10px] text-white/80 truncate">
+                <p className="text-[10px] font-bold text-neutral-900/85 truncate">
                   {eventTitle || 'Exhibition Official Desk'} • Active Now
                 </p>
               </div>
@@ -383,18 +479,18 @@ export default function OrganizerChatWidget({
               <button
                 type="button"
                 onClick={handleClose}
-                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="h-7 w-7 rounded-full bg-black/15 hover:bg-black/30 active:bg-black/45 text-neutral-950 flex items-center justify-center border border-black/10 shadow-xs transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
                 title="Minimize chat"
               >
-                <Minimize2 className="h-4 w-4" />
+                <Minimize2 className="h-3.5 w-3.5" />
               </button>
               <button
                 type="button"
                 onClick={handleClose}
-                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="h-7 w-7 rounded-full bg-black/20 hover:bg-black/35 active:bg-black/50 text-neutral-950 flex items-center justify-center border border-black/15 shadow-xs transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
                 title="Close chat"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5 stroke-[2.5]" />
               </button>
             </div>
           </div>
@@ -407,7 +503,7 @@ export default function OrganizerChatWidget({
                 {/* Welcome Card */}
                 <div className="bg-secondary/60 border border-border rounded-xl p-3.5 space-y-1.5">
                   <div className="flex items-center gap-2 text-xs font-bold text-foreground">
-                    <Sparkles className="h-4 w-4 text-primary" />
+                    <MessageSquare className="h-4 w-4 text-primary" />
                     <span>Welcome to our Exhibition Desk!</span>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
@@ -415,7 +511,7 @@ export default function OrganizerChatWidget({
                   </p>
                 </div>
 
-                <form onSubmit={handleStartChat} className="space-y-3">
+                <form noValidate onSubmit={handleStartChat} className="space-y-3">
                   {/* Role Selector: Visitor vs Exhibitor */}
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">
@@ -424,8 +520,11 @@ export default function OrganizerChatWidget({
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => setParticipantRole('visitor')}
-                        className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-bold transition-all ${
+                        onClick={() => {
+                          setParticipantRole('visitor');
+                          if (formErrors.company) setFormErrors((prev) => ({ ...prev, company: null }));
+                        }}
+                        className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                           participantRole === 'visitor'
                             ? 'bg-sky-500/10 border-sky-500 text-sky-600 dark:text-sky-400 ring-1 ring-sky-500/20'
                             : 'bg-secondary border-border text-muted-foreground'
@@ -438,7 +537,7 @@ export default function OrganizerChatWidget({
                       <button
                         type="button"
                         onClick={() => setParticipantRole('exhibitor')}
-                        className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-bold transition-all ${
+                        className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                           participantRole === 'exhibitor'
                             ? 'bg-purple-500/10 border-purple-500 text-purple-600 dark:text-purple-400 ring-1 ring-purple-500/20'
                             : 'bg-secondary border-border text-muted-foreground'
@@ -452,55 +551,156 @@ export default function OrganizerChatWidget({
 
                   {/* Name Input */}
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-foreground">Your Name *</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-foreground">Your Name *</label>
+                      {Boolean(user?.name) && (
+                        <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                          <Lock className="h-2.5 w-2.5" /> Auto-filled
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="text"
-                      required
+                      disabled={Boolean(user?.name)}
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onBlur={() => handleWidgetBlur('name')}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setName(val);
+                        if (formErrors.name) {
+                          const err = validateWidgetField('name', val, participantRole);
+                          setFormErrors((prev) => ({ ...prev, name: err }));
+                        }
+                      }}
                       placeholder="e.g. Rahul Sharma"
-                      className="w-full px-3 py-2 bg-secondary/60 border border-border rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      className={`w-full px-3 py-2 bg-secondary/60 border rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-75 disabled:cursor-not-allowed disabled:bg-muted/80 disabled:border-border/60 transition-all ${
+                        formErrors.name
+                          ? 'border-rose-500 bg-rose-500/5 focus:border-rose-500 focus:ring-rose-500/20 ring-1 ring-rose-500/20'
+                          : 'border-border focus:border-primary/40 focus:ring-primary/20'
+                      }`}
                     />
+                    {formErrors.name && (
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-rose-500 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg mt-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        <span>{formErrors.name}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Email Input */}
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-foreground">Email Address *</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-foreground">Email Address *</label>
+                      {Boolean(user?.email) && (
+                        <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                          <Lock className="h-2.5 w-2.5" /> Auto-filled
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="email"
-                      required
+                      disabled={Boolean(user?.email)}
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onBlur={() => handleWidgetBlur('email')}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEmail(val);
+                        if (formErrors.email) {
+                          const err = validateWidgetField('email', val, participantRole);
+                          setFormErrors((prev) => ({ ...prev, email: err }));
+                        }
+                      }}
                       placeholder="e.g. rahul@company.com"
-                      className="w-full px-3 py-2 bg-secondary/60 border border-border rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      className={`w-full px-3 py-2 bg-secondary/60 border rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-75 disabled:cursor-not-allowed disabled:bg-muted/80 disabled:border-border/60 transition-all ${
+                        formErrors.email
+                          ? 'border-rose-500 bg-rose-500/5 focus:border-rose-500 focus:ring-rose-500/20 ring-1 ring-rose-500/20'
+                          : 'border-border focus:border-primary/40 focus:ring-primary/20'
+                      }`}
                     />
+                    {formErrors.email && (
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-rose-500 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg mt-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        <span>{formErrors.email}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Phone Input (Optional) */}
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-foreground">WhatsApp / Mobile (Optional)</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-foreground">WhatsApp / Mobile (Optional)</label>
+                      {Boolean(user?.phone) && (
+                        <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                          <Lock className="h-2.5 w-2.5" /> Auto-filled
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="tel"
+                      disabled={Boolean(user?.phone)}
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      onBlur={() => handleWidgetBlur('phone')}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setPhone(val);
+                        if (formErrors.phone) {
+                          const err = validateWidgetField('phone', val, participantRole);
+                          setFormErrors((prev) => ({ ...prev, phone: err }));
+                        }
+                      }}
                       placeholder="+91 98765 43210"
-                      className="w-full px-3 py-2 bg-secondary/60 border border-border rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      className={`w-full px-3 py-2 bg-secondary/60 border rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-75 disabled:cursor-not-allowed disabled:bg-muted/80 disabled:border-border/60 transition-all ${
+                        formErrors.phone
+                          ? 'border-rose-500 bg-rose-500/5 focus:border-rose-500 focus:ring-rose-500/20 ring-1 ring-rose-500/20'
+                          : 'border-border focus:border-primary/40 focus:ring-primary/20'
+                      }`}
                     />
+                    {formErrors.phone && (
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-rose-500 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg mt-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        <span>{formErrors.phone}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Company Input (Optional for Visitor, Recommended for Exhibitor) */}
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-foreground">
-                      Company / Organization {participantRole === 'exhibitor' ? '*' : '(Optional)'}
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-foreground">
+                        Company / Organization {participantRole === 'exhibitor' ? '*' : '(Optional)'}
+                      </label>
+                      {Boolean(user?.company || user?.organization?.name) && (
+                        <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                          <Lock className="h-2.5 w-2.5" /> Auto-filled
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="text"
-                      required={participantRole === 'exhibitor'}
+                      disabled={Boolean(user?.company || user?.organization?.name)}
                       value={company}
-                      onChange={(e) => setCompany(e.target.value)}
+                      onBlur={() => handleWidgetBlur('company')}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCompany(val);
+                        if (formErrors.company) {
+                          const err = validateWidgetField('company', val, participantRole);
+                          setFormErrors((prev) => ({ ...prev, company: err }));
+                        }
+                      }}
                       placeholder="e.g. Tata Tech / Apex Innovations"
-                      className="w-full px-3 py-2 bg-secondary/60 border border-border rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      className={`w-full px-3 py-2 bg-secondary/60 border rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-75 disabled:cursor-not-allowed disabled:bg-muted/80 disabled:border-border/60 transition-all ${
+                        formErrors.company
+                          ? 'border-rose-500 bg-rose-500/5 focus:border-rose-500 focus:ring-rose-500/20 ring-1 ring-rose-500/20'
+                          : 'border-border focus:border-primary/40 focus:ring-primary/20'
+                      }`}
                     />
+                    {formErrors.company && (
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-rose-500 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg mt-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        <span>{formErrors.company}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Initial Message */}
@@ -508,16 +708,33 @@ export default function OrganizerChatWidget({
                     <label className="text-[11px] font-bold text-foreground">Message to Organizer *</label>
                     <textarea
                       rows={2}
-                      required
                       value={initialMessage}
-                      onChange={(e) => setInitialMessage(e.target.value)}
+                      onBlur={() => handleWidgetBlur('message')}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setInitialMessage(val);
+                        if (formErrors.message) {
+                          const err = validateWidgetField('message', val, participantRole);
+                          setFormErrors((prev) => ({ ...prev, message: err }));
+                        }
+                      }}
                       placeholder={
                         participantRole === 'exhibitor'
                           ? 'I want details about booth availability & pricing...'
                           : 'I would like to inquire about entry registration & passes...'
                       }
-                      className="w-full px-3 py-2 bg-secondary/60 border border-border rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      className={`w-full px-3 py-2 bg-secondary/60 border rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 transition-all ${
+                        formErrors.message
+                          ? 'border-rose-500 bg-rose-500/5 focus:border-rose-500 focus:ring-rose-500/20 ring-1 ring-rose-500/20'
+                          : 'border-border focus:border-primary/40 focus:ring-primary/20'
+                      }`}
                     />
+                    {formErrors.message && (
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-rose-500 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg mt-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        <span>{formErrors.message}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Submit Button */}

@@ -82,6 +82,7 @@ import {
 } from 'recharts';
 import { useAuth } from '../../../context/AuthContext.js';
 import { renderCardDescription } from '../../../utils/textFormatters.js';
+import ShowCountdownTimer from '../../../components/ShowCountdownTimer.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -3141,7 +3142,7 @@ function VisitorDashboard() {
               return (
                 <div
                   key={pass._id}
-                  className="rounded-2xl border border-border bg-card p-5 shadow-sm hover:border-primary/50 hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                  className="group/pass rounded-2xl border border-border/80 bg-card p-5 shadow-sm hover:shadow-xl hover:shadow-primary/10 hover:border-primary/60 dark:hover:border-amber-400/50 hover:-translate-y-1.5 transition-all duration-300 ease-out flex flex-col justify-between space-y-4 relative"
                 >
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-2">
@@ -3180,6 +3181,16 @@ function VisitorDashboard() {
                         {pass.company && <span className="text-[11px]">• {pass.company}</span>}
                       </div>
                     </Link>
+
+                    {/* Live Show Countdown Timer */}
+                    {pass.event?.startDate && (
+                      <ShowCountdownTimer
+                        startDate={pass.event.startDate}
+                        endDate={pass.event.endDate}
+                        timings={pass.event.timings}
+                        variant="card"
+                      />
+                    )}
 
                     {/* QR Preview Snippet */}
                     <div
@@ -3327,7 +3338,7 @@ function VisitorDashboard() {
                 {displayList.map((item) => (
                   <div
                     key={item._id}
-                    className="rounded-2xl border border-border bg-card p-4 shadow-sm hover:border-primary/50 transition-all flex flex-col justify-between space-y-3"
+                    className="group/saved rounded-2xl border border-border/80 bg-card p-4 shadow-sm hover:shadow-lg hover:shadow-primary/10 hover:border-primary/60 dark:hover:border-amber-400/50 hover:-translate-y-1.5 transition-all duration-300 ease-out flex flex-col justify-between space-y-3"
                   >
                     <div className="space-y-2">
                       <div className="flex items-start justify-between gap-2">
@@ -3422,27 +3433,43 @@ function VisitorDashboard() {
                 ? `${new Date(expo.startDate).toLocaleDateString()} - ${new Date(expo.endDate || expo.startDate).toLocaleDateString()}`
                 : 'Upcoming 2026';
 
+              const expoSlug = expo.slug || expo._id || expoId;
+              const expoUrl = `/expo/${expoSlug}`;
+
               return (
                 <div
                   key={expoId}
-                  className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm hover:border-primary/50 transition-all flex flex-col justify-between"
+                  className="group/expo rounded-2xl border border-border/80 bg-card overflow-hidden shadow-sm hover:shadow-xl hover:shadow-primary/10 hover:border-primary/60 dark:hover:border-amber-400/50 hover:-translate-y-1.5 transition-all duration-300 ease-out flex flex-col justify-between relative"
                 >
-                  <div className="relative h-32 bg-zinc-900 overflow-hidden">
+                  <div className="relative h-36 bg-zinc-900 overflow-hidden">
                     {expo.banner ? (
-                      <img src={expo.banner} alt={expo.title} className="h-full w-full object-cover" />
+                      <img
+                        src={expo.banner}
+                        alt={expo.title}
+                        className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover/expo:scale-108"
+                      />
                     ) : (
                       <div className="h-full w-full bg-gradient-to-tr from-zinc-900 via-zinc-800 to-zinc-900 flex items-center justify-center">
                         <Calendar className="h-10 w-10 text-muted-foreground/30" />
                       </div>
                     )}
-                    <span className="absolute top-2.5 right-2.5 rounded-full bg-black/60 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-white border border-white/10">
+                    {/* Gradient Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent group-hover/expo:from-black/80 transition-colors duration-300 pointer-events-none" />
+
+                    <span className="absolute top-2.5 right-2.5 rounded-full bg-black/60 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-white border border-white/10 group-hover/expo:border-primary/40 transition-colors shadow-xs">
                       {expo.category || 'Trade Show'}
                     </span>
                   </div>
 
                   <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
                     <div className="space-y-1.5">
-                      <h4 className="text-sm font-bold text-foreground line-clamp-1">{expo.title}</h4>
+                      <Link
+                        href={expoUrl}
+                        className="block text-sm font-bold text-foreground line-clamp-1 group-hover/expo:text-primary transition-colors cursor-pointer leading-snug"
+                        title={expo.title}
+                      >
+                        {expo.title}
+                      </Link>
                       <div
                         className="text-xs text-muted-foreground line-clamp-2 leading-relaxed [&_strong]:font-semibold [&_strong]:text-foreground [&_b]:font-semibold [&_b]:text-foreground [&_em]:italic"
                         dangerouslySetInnerHTML={{
@@ -3451,7 +3478,7 @@ function VisitorDashboard() {
                       />
                       <div className="pt-1 space-y-1 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1.5">
-                          <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
+                          <MapPin className="h-3.5 w-3.5 text-primary shrink-0 transition-transform duration-200 group-hover/expo:scale-110" />
                           <span className="truncate">{expo.venue || 'Convention Center'}, {expo.city || 'India'}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
@@ -3459,11 +3486,21 @@ function VisitorDashboard() {
                           <span>{expoDates}</span>
                         </div>
                       </div>
+                      {expo.startDate && (
+                        <div className="pt-1.5">
+                          <ShowCountdownTimer
+                            startDate={expo.startDate}
+                            endDate={expo.endDate}
+                            timings={expo.timings}
+                            variant="compact"
+                          />
+                        </div>
+                      )}
                     </div>
 
                     <div className="pt-2 border-t border-border">
                       {isClaimed ? (
-                        <div className="w-full py-2 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-bold flex items-center justify-center gap-1.5">
+                        <div className="w-full py-2 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs">
                           <CheckCircle2 className="h-4 w-4" /> Pass Confirmed
                         </div>
                       ) : (
@@ -3471,7 +3508,7 @@ function VisitorDashboard() {
                           type="button"
                           onClick={() => handleClaimPass(expo)}
                           disabled={isClaiming}
-                          className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-2 text-xs transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                          className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-primary hover:bg-amber-400 text-primary-foreground font-bold py-2.5 text-xs transition-all duration-200 shadow-sm hover:shadow-md hover:shadow-primary/20 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] cursor-pointer disabled:opacity-50"
                         >
                           {isClaiming ? (
                             <>
@@ -3479,7 +3516,7 @@ function VisitorDashboard() {
                             </>
                           ) : (
                             <>
-                              <Ticket className="h-3.5 w-3.5" /> Claim Free Visitor Pass
+                              <Ticket className="h-3.5 w-3.5 transition-transform duration-200 group-hover/expo:rotate-12" /> Claim Free Visitor Pass
                             </>
                           )}
                         </button>
@@ -3529,6 +3566,18 @@ function VisitorDashboard() {
                 {selectedPassForBadge.company || 'Trade Visitor'}
               </span>
             </div>
+
+            {/* Live Show Countdown Timer */}
+            {selectedPassForBadge.event?.startDate && (
+              <div className="no-print">
+                <ShowCountdownTimer
+                  startDate={selectedPassForBadge.event.startDate}
+                  endDate={selectedPassForBadge.event.endDate}
+                  timings={selectedPassForBadge.event.timings}
+                  variant="modal"
+                />
+              </div>
+            )}
 
             {/* High-Resolution QR Code */}
             <div className="flex flex-col items-center justify-center p-3 bg-white rounded-2xl border border-zinc-300 shadow-inner">

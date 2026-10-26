@@ -1478,9 +1478,10 @@ export default function ExpoDetailsPage() {
                   <button
                     type="button"
                     onClick={() => setShowReviewModal(true)}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-zinc-600 hover:text-zinc-900 ml-1 cursor-pointer"
+                    className="group/review inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-zinc-700 bg-zinc-100/90 hover:bg-amber-100 hover:text-amber-950 border border-zinc-200/90 hover:border-amber-400 shadow-2xs hover:shadow-xs transition-all duration-200 cursor-pointer active:scale-95 ml-1"
+                    title="Rate and add a review for this expo"
                   >
-                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500 transition-transform duration-200 group-hover/review:scale-120 group-hover/review:rotate-12" />
                     <span>Add a review</span>
                   </button>
                 </div>
@@ -1619,25 +1620,25 @@ export default function ExpoDetailsPage() {
             <div className="flex flex-col sm:flex-row lg:flex-col items-end justify-between gap-4 shrink-0">
               
               {/* Follow Expo, Save & Share Links */}
-              <div className="flex items-center gap-3.5 sm:gap-4 text-xs font-semibold text-zinc-600 flex-wrap">
+              <div className="flex items-center gap-2 sm:gap-2.5 text-xs font-semibold flex-wrap">
                 <button
                   type="button"
                   onClick={handleToggleFollowExpo}
-                  className={`inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                  className={`group/follow inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer active:scale-95 shadow-2xs border ${
                     isFollowingExpo
-                      ? 'text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200'
-                      : 'hover:text-zinc-900'
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-emerald-500/20'
+                      : 'bg-zinc-100 hover:bg-emerald-100 text-zinc-700 hover:text-emerald-900 border-zinc-200 hover:border-emerald-400'
                   }`}
                   title={isFollowingExpo ? 'You are following this expo' : 'Follow expo for updates'}
                 >
                   {isFollowingExpo ? (
                     <>
-                      <BellRing className="h-4 w-4 fill-emerald-600 text-emerald-600" />
+                      <BellRing className="h-3.5 w-3.5 fill-white text-white" />
                       <span>Following</span>
                     </>
                   ) : (
                     <>
-                      <Bell className="h-4 w-4" />
+                      <Bell className="h-3.5 w-3.5 text-zinc-500 transition-all duration-200 group-hover/follow:text-emerald-700 group-hover/follow:scale-110" />
                       <span>Follow Expo</span>
                     </>
                   )}
@@ -1646,11 +1647,18 @@ export default function ExpoDetailsPage() {
                 <button
                   type="button"
                   onClick={handleSave}
-                  className={`inline-flex items-center gap-1 hover:text-zinc-900 cursor-pointer ${
-                    isSaved ? 'text-[#FF2E63] font-bold' : ''
+                  className={`group/save inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer active:scale-95 shadow-2xs border ${
+                    isSaved
+                      ? 'bg-[#FF2E63] hover:bg-[#e02656] text-white border-[#FF2E63] shadow-rose-500/20'
+                      : 'bg-zinc-100 hover:bg-rose-100 text-zinc-700 hover:text-[#FF2E63] border-zinc-200 hover:border-rose-400'
                   }`}
+                  title={isSaved ? 'Saved in bookmarks' : 'Save this expo'}
                 >
-                  <Bookmark className={`h-4 w-4 ${isSaved ? 'fill-[#FF2E63]' : ''}`} />
+                  <Bookmark
+                    className={`h-3.5 w-3.5 transition-all duration-200 group-hover/save:scale-110 ${
+                      isSaved ? 'fill-white text-white' : 'text-zinc-500 group-hover/save:text-[#FF2E63]'
+                    }`}
+                  />
                   <span>{isSaved ? 'Saved' : 'Save'}</span>
                 </button>
 
@@ -1658,16 +1666,17 @@ export default function ExpoDetailsPage() {
                   type="button"
                   onClick={handleShare}
                   disabled={isSharing}
-                  className="inline-flex items-center gap-1 hover:text-zinc-900 cursor-pointer disabled:opacity-60"
+                  className="group/share inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-zinc-100 hover:bg-blue-100 text-zinc-700 hover:text-blue-900 border border-zinc-200 hover:border-blue-400 transition-all duration-200 cursor-pointer active:scale-95 shadow-2xs disabled:opacity-60"
+                  title="Share this expo"
                 >
-                  <Share2 className="h-4 w-4" />
+                  <Share2 className="h-3.5 w-3.5 text-zinc-500 transition-all duration-200 group-hover/share:text-blue-700 group-hover/share:scale-110" />
                   <span>{isSharing ? 'Sharing…' : 'Share'}</span>
                 </button>
 
                 <GoogleCalendarButton
                   event={event}
                   variant="compact"
-                  className="py-1 px-2.5 text-xs font-semibold"
+                  className="py-1.5 px-3 text-xs font-bold shadow-2xs"
                 />
               </div>
 

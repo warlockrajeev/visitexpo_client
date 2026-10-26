@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { showSweetConfirm, showSweetSuccess, showSweetError } from '../../../utils/sweetalert.js';
 import { printBadge } from '../../../utils/printBadge.js';
+import ShowCountdownTimer from '../../../components/ShowCountdownTimer.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -353,10 +354,10 @@ export default function ExposPage() {
               key={cat}
               type="button"
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
                 selectedCategory === cat
-                  ? 'bg-primary text-primary-foreground shadow-xs font-bold'
-                  : 'bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground border border-border/60'
+                  ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black border border-amber-500 shadow-sm ring-2 ring-amber-500/30'
+                  : 'bg-card hover:bg-amber-400 hover:text-black hover:border-amber-500 dark:hover:bg-amber-500 dark:hover:text-black text-foreground/80 border border-border/80 hover:shadow-xs hover:-translate-y-0.5'
               }`}
             >
               {cat}
@@ -403,21 +404,21 @@ export default function ExposPage() {
               return (
                 <div
                   key={expoId}
-                  className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm hover:border-primary/50 transition-all flex flex-col justify-between group"
+                  className="rounded-2xl border border-border/80 bg-card overflow-hidden shadow-sm hover:shadow-xl hover:shadow-primary/10 hover:border-primary/60 dark:hover:border-amber-400/50 hover:-translate-y-1.5 transition-all duration-300 ease-out flex flex-col justify-between group"
                 >
                   <div className="relative h-44 w-full bg-zinc-900 overflow-hidden">
                     {expo.image ? (
                       <img
                         src={expo.image}
                         alt={expo.title}
-                        className="h-full w-full object-cover group-hover:scale-103 transition-transform duration-300"
+                        className="h-full w-full object-cover group-hover:scale-108 transition-transform duration-500 ease-out"
                       />
                     ) : (
                       <div className="h-full w-full bg-gradient-to-tr from-zinc-900 via-zinc-800 to-zinc-900 flex items-center justify-center">
                         <Calendar className="h-10 w-10 text-muted-foreground/30" />
                       </div>
                     )}
-                    <span className="absolute top-3 left-3 rounded-md bg-black/70 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-white border border-white/10">
+                    <span className="absolute top-3 left-3 rounded-md bg-black/70 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-white border border-white/10 group-hover:border-primary/40 transition-colors">
                       {expo.category || 'Trade Show'}
                     </span>
                     <span className="absolute top-3 right-3 rounded-md bg-[#FFCC00] px-2.5 py-0.5 text-[10px] font-extrabold text-zinc-950 shadow-sm">
@@ -432,7 +433,7 @@ export default function ExposPage() {
                         <span>{expo.dates || 'Upcoming 2026'}</span>
                       </div>
 
-                      <h3 className="font-bold text-sm text-foreground leading-snug line-clamp-2" title={expo.title}>
+                      <h3 className="font-bold text-sm text-foreground leading-snug line-clamp-2 group-hover:text-primary transition-colors" title={expo.title}>
                         {expo.title}
                       </h3>
 
@@ -445,6 +446,17 @@ export default function ExposPage() {
                         <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed pt-1">
                           {expo.description}
                         </p>
+                      )}
+
+                      {expo.startDate && (
+                        <div className="pt-2">
+                          <ShowCountdownTimer
+                            startDate={expo.startDate}
+                            endDate={expo.endDate}
+                            timings={expo.timings}
+                            variant="compact"
+                          />
+                        </div>
                       )}
                     </div>
 
