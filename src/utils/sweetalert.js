@@ -168,22 +168,30 @@ export const showSweetConfirm = async (titleOrOptions, text = '', customConfig =
 
   const baseConfig = getThemeConfig();
 
-  const result = await Swal.fire({
+  const fireOptions = {
     ...baseConfig,
     title,
-    text: message,
     icon,
     showCancelButton: true,
     confirmButtonText,
     cancelButtonText,
     reverseButtons: true,
-    focusCancel: true,
+    focusCancel: false,
     customClass: {
       ...baseConfig.customClass,
       confirmButton: isDanger ? 'visitexpo-swal-confirm-danger-btn' : 'visitexpo-swal-confirm-btn'
     },
     ...customConfig
-  });
+  };
+
+  if (titleOrOptions && typeof titleOrOptions === 'object' && titleOrOptions.html) {
+    fireOptions.html = titleOrOptions.html;
+  }
+  if (message && !fireOptions.html) {
+    fireOptions.text = message;
+  }
+
+  const result = await Swal.fire(fireOptions);
 
   return Boolean(result.isConfirmed);
 };

@@ -231,6 +231,41 @@ export default function Navbar({ solid = false }) {
     }
   ];
 
+  const isItemActive = (item) => {
+    if (!pathname) return false;
+
+    if (item.id === 'explore') {
+      return (
+        pathname === '/events' ||
+        pathname.startsWith('/events/') ||
+        pathname.startsWith('/expo/') ||
+        pathname.startsWith('/category/') ||
+        pathname.startsWith('/city/')
+      );
+    }
+    if (item.id === 'foryou') {
+      return pathname === '/recommendations' || pathname.startsWith('/recommendations/');
+    }
+    if (item.id === 'pricing') {
+      return pathname === '/pricing' || pathname.startsWith('/pricing/');
+    }
+    if (item.id === 'contact') {
+      return pathname === '/contact' || pathname.startsWith('/contact/');
+    }
+    if (item.isAnchor) {
+      if (typeof window !== 'undefined' && pathname === '/') {
+        return window.location.hash === '#claim';
+      }
+      return false;
+    }
+
+    const cleanHref = item.href?.split('?')[0]?.split('#')[0];
+    if (cleanHref && cleanHref !== '/') {
+      return pathname === cleanHref || pathname.startsWith(`${cleanHref}/`);
+    }
+    return false;
+  };
+
   const handleNavClick = (item, e) => {
     if (item.isAnchor) {
       if (pathname === '/') {
@@ -241,6 +276,11 @@ export default function Navbar({ solid = false }) {
         }
         return;
       }
+    }
+
+    if (isItemActive(item)) {
+      e?.preventDefault();
+      return;
     }
 
     const cleanHref = item.href.split('?')[0].split('#')[0];
@@ -295,24 +335,31 @@ export default function Navbar({ solid = false }) {
         </Link>
 
         {/* Desktop Navigation Links */}
-        <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-zinc-200">
+        <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-zinc-200" aria-label="Main navigation">
           {navItems.map((item) => {
             const isLoading = loadingNavId === item.id;
+            const isActive = isItemActive(item);
             return (
               <Link
                 key={item.id}
                 href={item.href}
                 onClick={(e) => handleNavClick(item, e)}
-                className={`relative inline-flex items-center gap-1.5 py-1 transition-all select-none ${
+                aria-current={isActive ? 'page' : undefined}
+                className={`relative inline-flex items-center gap-1.5 py-1.5 transition-all select-none ${
                   isLoading
                     ? 'text-[#FFCC00] font-bold pointer-events-none'
-                    : 'text-zinc-200 hover:text-white'
+                    : isActive
+                    ? 'text-[#FFCC00] font-bold'
+                    : 'text-zinc-300 hover:text-white'
                 }`}
               >
                 {isLoading && (
                   <Loader2 className="h-3 w-3 animate-spin text-[#FFCC00] shrink-0" />
                 )}
                 <span>{item.label}</span>
+                {isActive && !isLoading && (
+                  <span className="absolute -bottom-1 left-0 right-0 h-[2.5px] bg-[#FFCC00] rounded-full shadow-[0_0_8px_#FFCC00]" />
+                )}
                 {isLoading && (
                   <span className="absolute -bottom-1 left-0 right-0 h-[2px] bg-[#FFCC00] rounded-full animate-pulse shadow-[0_0_8px_#FFCC00]" />
                 )}
@@ -601,29 +648,36 @@ export default function Navbar({ solid = false }) {
           )}
 
           {/* Navigation Links */}
-          <nav className="flex flex-col space-y-3 text-sm font-semibold text-zinc-200">
+          <nav className="flex flex-col space-y-1.5 text-sm font-semibold text-zinc-200">
             {navItems.map((item) => {
               const isLoading = loadingNavId === item.id;
+              const isActive = isItemActive(item);
               return (
                 <Link
                   key={item.id}
                   href={item.href}
                   onClick={(e) => {
                     handleNavClick(item, e);
-                    if (item.isAnchor && pathname === '/') {
-                      setMobileMenuOpen(false);
-                    }
+                    setMobileMenuOpen(false);
                   }}
-                  className={`flex items-center gap-2 py-1.5 transition-colors ${
-                    isLoading
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all ${
+                    isActive
+                      ? 'bg-[#FFCC00]/10 text-[#FFCC00] font-bold border border-[#FFCC00]/30 shadow-xs'
+                      : isLoading
                       ? 'text-[#FFCC00] font-bold pointer-events-none'
-                      : 'hover:text-white text-zinc-200'
+                      : 'hover:text-white hover:bg-zinc-900 text-zinc-300'
                   }`}
                 >
-                  {isLoading && (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-[#FFCC00] shrink-0" />
+                  <div className="flex items-center gap-2.5">
+                    {isLoading && (
+                      <Loader2 className="h-4 w-4 animate-spin text-[#FFCC00] shrink-0" />
+                    )}
+                    <span>{item.mobileLabel || item.label}</span>
+                  </div>
+                  {isActive && (
+                    <span className="h-2 w-2 rounded-full bg-[#FFCC00] shadow-[0_0_8px_#FFCC00]" />
                   )}
-                  <span>{item.mobileLabel || item.label}</span>
                 </Link>
               );
             })}

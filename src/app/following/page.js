@@ -57,31 +57,53 @@ export default function FollowingPage() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // 1. Fetch live events & organizers directory in parallel
+  // 1. Fetch live events & organizers directory in parallel with instant cache
   useEffect(() => {
     let isMounted = true;
+
+    // Check instant sessionStorage cache first (0ms)
+    if (typeof window !== 'undefined') {
+      const cached =
+        sessionStorage.getItem('visitexpo_bookmarks_events_cache') ||
+        sessionStorage.getItem('visitexpo_home_events') ||
+        sessionStorage.getItem('visitexpo_visitor_expos_cache');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setAllEvents(parsed);
+          }
+        } catch (_) {}
+      }
+    }
+
+    const maxTimer = setTimeout(() => {
+      if (isMounted) setLoading(false);
+    }, 1200);
+
     const fetchData = async () => {
-      setLoading(true);
       try {
         let eventsList = [];
         try {
-          const res = await axios.get('/api/wordpress-events');
+          const res = await axios.get('/api/wordpress-events', { timeout: 3500 });
           if (res.data?.success && Array.isArray(res.data?.events) && res.data.events.length > 0) {
             eventsList = res.data.events;
           }
         } catch (_) {}
 
         if (eventsList.length === 0) {
-          const fetchRes = await fetch('/api/wordpress-events');
-          if (fetchRes.ok) {
-            const json = await fetchRes.json();
-            if (json?.success && Array.isArray(json?.events)) {
-              eventsList = json.events;
+          try {
+            const fetchRes = await fetch('/api/wordpress-events', { signal: AbortSignal.timeout(3500) });
+            if (fetchRes.ok) {
+              const json = await fetchRes.json();
+              if (json?.success && Array.isArray(json?.events)) {
+                eventsList = json.events;
+              }
             }
-          }
+          } catch (_) {}
         }
 
-        const orgsRes = await axios.get(`${API_URL}/chat/organizers-directory`).catch(() => null);
+        const orgsRes = await axios.get(`${API_URL}/chat/organizers-directory`, { timeout: 3000 }).catch(() => null);
 
         if (isMounted) {
           if (eventsList.length > 0) setAllEvents(eventsList);
@@ -92,12 +114,16 @@ export default function FollowingPage() {
       } catch (err) {
         console.error('Failed to load following directory data:', err);
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          clearTimeout(maxTimer);
+          setLoading(false);
+        }
       }
     };
     fetchData();
     return () => {
       isMounted = false;
+      clearTimeout(maxTimer);
     };
   }, []);
 
@@ -116,6 +142,10 @@ export default function FollowingPage() {
         const rawDetails = localStorage.getItem('visitexpo_saved_event_details');
         if (rawDetails) {
           setSavedDetailsMap(JSON.parse(rawDetails) || {});
+        }
+
+        if (followed || rawDetails) {
+          setLoading(false);
         }
       } catch (_) {}
     }
@@ -482,7 +512,7 @@ export default function FollowingPage() {
         )}
 
         {/* Content Section */}
-        {loading ? (
+        {loading && followedSlugs.size === 0 ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-16 flex flex-col items-center justify-center space-y-3 shadow-xs">
             <div className="h-9 w-9 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
             <p className="text-sm font-medium text-zinc-500">

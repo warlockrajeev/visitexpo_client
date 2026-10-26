@@ -41,7 +41,7 @@ import {
   Compass,
   Check
 } from 'lucide-react';
-import { showSweetConfirm, showSweetSuccess, showSweetError } from '@/utils/sweetalert.js';
+import { showSweetConfirm, showSweetSuccess, showSweetError, showSweetAlert } from '@/utils/sweetalert.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -72,13 +72,29 @@ export default function BookmarksPage() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // 1. Fetch live events directory with resilient fallback
+  // 1. Fetch live events directory with instant sessionStorage cache & resilient fallback
   const fetchLiveEvents = async () => {
     try {
+      // Check instant sessionStorage cache first (0ms)
+      if (typeof window !== 'undefined') {
+        const cached =
+          sessionStorage.getItem('visitexpo_bookmarks_events_cache') ||
+          sessionStorage.getItem('visitexpo_home_events') ||
+          sessionStorage.getItem('visitexpo_visitor_expos_cache');
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setAllEvents(parsed);
+            }
+          } catch (_) {}
+        }
+      }
+
       let eventsList = [];
-      // Try primary API
+      // Try primary API with strict 3.5s timeout and sensible limit
       try {
-        const res = await axios.get(`${API_URL}/events?limit=250&status=published`);
+        const res = await axios.get(`${API_URL}/events?limit=100&status=published`, { timeout: 3500 });
         if (res.data?.success && Array.isArray(res.data?.data?.docs)) {
           eventsList = res.data.data.docs;
         } else if (res.data?.success && Array.isArray(res.data?.data)) {
@@ -86,10 +102,10 @@ export default function BookmarksPage() {
         }
       } catch (_) {}
 
-      // Fallback to local next route or wordpress-events
+      // Fallback to local next route or wordpress-events with timeout
       if (eventsList.length === 0) {
         try {
-          const res = await axios.get('/api/wordpress-events');
+          const res = await axios.get('/api/wordpress-events', { timeout: 3500 });
           if (res.data?.success && Array.isArray(res.data?.events) && res.data.events.length > 0) {
             eventsList = res.data.events;
           }
@@ -98,6 +114,11 @@ export default function BookmarksPage() {
 
       if (eventsList.length > 0) {
         setAllEvents(eventsList);
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.setItem('visitexpo_bookmarks_events_cache', JSON.stringify(eventsList.slice(0, 100)));
+          } catch (_) {}
+        }
       }
     } catch (err) {
       console.warn('Could not load events in bookmarks:', err);
@@ -111,21 +132,30 @@ export default function BookmarksPage() {
         const saved = localStorage.getItem('visitexpo_saved_events');
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
+          if (Array.isArray(parsed) && parsed.length > 0) {
             setSavedEventIds(new Set(parsed));
           }
         }
 
         const rawDetails = localStorage.getItem('visitexpo_saved_event_details');
         if (rawDetails) {
-          setSavedDetailsMap(JSON.parse(rawDetails) || {});
+          const parsedDetails = JSON.parse(rawDetails) || {};
+          setSavedDetailsMap(parsedDetails);
         }
 
         const interested = localStorage.getItem('visitexpo_interested_events');
         if (interested) {
           const parsedInt = JSON.parse(interested);
-          if (Array.isArray(parsedInt)) {
+          if (Array.isArray(parsedInt) && parsedInt.length > 0) {
             setInterestedSlugs(new Set(parsedInt.map((s) => String(s).toLowerCase().trim())));
+          }
+        }
+
+        const claimed = localStorage.getItem('visitexpo_claimed_passes');
+        if (claimed) {
+          const parsedClaimed = JSON.parse(claimed);
+          if (Array.isArray(parsedClaimed) && parsedClaimed.length > 0) {
+            setClaimedPassIds(new Set(parsedClaimed.map(String)));
           }
         }
       } catch (_) {}
@@ -134,7 +164,7 @@ export default function BookmarksPage() {
     const identifier = user?.email || user?.id || user?._id;
     if (identifier) {
       try {
-        const res = await axios.get(`${API_URL}/engagements/user/${encodeURIComponent(identifier)}`);
+        const res = await axios.get(`${API_URL}/engagements/user/${encodeURIComponent(identifier)}`, { timeout: 3000 });
         if (res.data?.success && res.data?.data) {
           const bookmarkedList = res.data.data.bookmarkedEvents || [];
           const interestedList = res.data.data.interestedEvents || [];
@@ -172,13 +202,79 @@ export default function BookmarksPage() {
 
   useEffect(() => {
     let isMounted = true;
-    (async () => {
-      setLoading(true);
-      await Promise.all([fetchLiveEvents(), loadUserBookmarks()]);
+
+    // Fast synchronous hydration on client mount (0ms)
+    let hasImmediateData = false;
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('visitexpo_saved_events');
+        const rawDetails = localStorage.getItem('visitexpo_saved_event_details');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setSavedEventIds(new Set(parsed));
+            hasImmediateData = true;
+          }
+        }
+        if (rawDetails) {
+          const parsedDetails = JSON.parse(rawDetails) || {};
+          if (Object.keys(parsedDetails).length > 0) {
+            setSavedDetailsMap(parsedDetails);
+            hasImmediateData = true;
+          }
+        }
+        const interested = localStorage.getItem('visitexpo_interested_events');
+        if (interested) {
+          const parsedInt = JSON.parse(interested);
+          if (Array.isArray(parsedInt) && parsedInt.length > 0) {
+            setInterestedSlugs(new Set(parsedInt.map((s) => String(s).toLowerCase().trim())));
+          }
+        }
+        const claimed = localStorage.getItem('visitexpo_claimed_passes');
+        if (claimed) {
+          const parsedClaimed = JSON.parse(claimed);
+          if (Array.isArray(parsedClaimed) && parsedClaimed.length > 0) {
+            setClaimedPassIds(new Set(parsedClaimed.map(String)));
+          }
+        }
+        const cached =
+          sessionStorage.getItem('visitexpo_bookmarks_events_cache') ||
+          sessionStorage.getItem('visitexpo_home_events') ||
+          sessionStorage.getItem('visitexpo_visitor_expos_cache');
+        if (cached) {
+          const parsedEvents = JSON.parse(cached);
+          if (Array.isArray(parsedEvents) && parsedEvents.length > 0) {
+            setAllEvents(parsedEvents);
+          }
+        }
+      } catch (_) {}
+    }
+
+    // If local bookmarks exist, unlock UI immediately without waiting for server network!
+    if (hasImmediateData) {
+      setLoading(false);
+    }
+
+    // Maximum 1.2s safety timeout for empty-state users so spinner never hangs indefinitely
+    const maxLoadingTimer = setTimeout(() => {
       if (isMounted) setLoading(false);
+    }, 1200);
+
+    // Non-blocking network sync in background
+    (async () => {
+      try {
+        await Promise.all([fetchLiveEvents(), loadUserBookmarks()]);
+      } finally {
+        if (isMounted) {
+          clearTimeout(maxLoadingTimer);
+          setLoading(false);
+        }
+      }
     })();
+
     return () => {
       isMounted = false;
+      clearTimeout(maxLoadingTimer);
     };
   }, [user]);
 
@@ -358,24 +454,59 @@ export default function BookmarksPage() {
     }
   };
 
-  // Handle Claim Pass (with Theme-Aware SweetAlert Modal)
+  // Handle Claim Pass (with Theme-Aware Interactive Confirmation Pop-up)
   const handleClaimPass = async (evt) => {
+    const slug = (evt.slug || evt.id || '').toLowerCase().trim();
+    const idKey = String(evt.id || evt._id || slug).trim();
+    const isAlreadyClaimed =
+      claimedPassIds.has(idKey) ||
+      claimedPassIds.has(slug) ||
+      (evt._id && claimedPassIds.has(String(evt._id))) ||
+      (evt.id && claimedPassIds.has(String(evt.id)));
+
+    // If pass is already issued, display informative status confirmation modal
+    if (isAlreadyClaimed) {
+      await showSweetAlert(
+        {
+          title: 'Visitor Pass Already Issued! ✓',
+          icon: 'success',
+          confirmButtonText: 'Great, Understood',
+          html: `
+            <div style="font-size: 13px; line-height: 1.6; text-align: left; padding: 4px;">
+              <p style="margin-bottom: 8px; font-weight: 500;">You already have an active complimentary pass for:</p>
+              <div style="font-weight: 800; font-size: 15px; margin-bottom: 6px; color: #10b981;">${evt.title}</div>
+              ${evt.dates ? `<p style="font-size: 12px; margin-bottom: 4px; font-weight: 600;">📅 ${evt.dates}</p>` : ''}
+              ${evt.venue || evt.city ? `<p style="font-size: 12px; opacity: 0.8; margin-bottom: 12px;">📍 ${[evt.venue, evt.city].filter(Boolean).join(', ')}</p>` : ''}
+              <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 12px; font-size: 12px; font-weight: 600; color: #059669;">
+                ✓ Active pass registered to your account.<br />
+                ✓ Present your name or registered email at the registration gate for fast-track badge printing.
+              </div>
+            </div>
+          `
+        },
+        'success'
+      );
+      return;
+    }
+
+    // Confirmation pop-up before issuing pass
     const confirmed = await showSweetConfirm(
       {
-        title: 'Claim Free Visitor Pass?',
+        title: 'Confirm Free Visitor Pass?',
         icon: 'question',
         confirmButtonText: 'Yes, Issue Pass',
         cancelButtonText: 'Cancel',
-        isDanger: false
-      },
-      '',
-      {
+        isDanger: false,
         html: `
-          <div style="font-size: 13px; line-height: 1.5; color: inherit;">
-            <p style="margin-bottom: 8px;">Claim your instant complimentary gate pass for:</p>
-            <div style="font-weight: 800; font-size: 15px; margin: 8px 0; color: #f59e0b;">${evt.title}</div>
-            ${evt.venue || evt.city ? `<div style="font-size: 12px; margin-bottom: 8px; opacity: 0.85;">📍 ${[evt.venue, evt.city].filter(Boolean).join(', ')}</div>` : ''}
-            <div style="font-size: 12px; color: #10b981; font-weight: 600; margin-top: 8px;">✓ Digital QR badge will be saved to your Visitor Dashboard for instant check-in.</div>
+          <div style="font-size: 13px; line-height: 1.6; text-align: left; padding: 4px;">
+            <p style="margin-bottom: 8px; font-weight: 500;">Confirm your complimentary registration and digital badge for:</p>
+            <div style="font-weight: 800; font-size: 15px; margin-bottom: 6px; color: #f59e0b;">${evt.title}</div>
+            ${evt.dates ? `<p style="font-size: 12px; margin-bottom: 4px; font-weight: 600;">📅 ${evt.dates}</p>` : ''}
+            ${evt.venue || evt.city ? `<p style="font-size: 12px; opacity: 0.8; margin-bottom: 12px;">📍 ${[evt.venue, evt.city].filter(Boolean).join(', ')}</p>` : ''}
+            <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 12px; padding: 12px; font-size: 12px; color: #d97706; font-weight: 600;">
+              ✓ Free gate admission to exhibition halls<br />
+              ✓ Digital badge synced directly with your visitor account
+            </div>
           </div>
         `
       }
@@ -399,9 +530,18 @@ export default function BookmarksPage() {
       } catch (_) {}
     }
 
-    setClaimedPassIds((prev) => new Set(prev).add(evt.id || evt._id || evt.slug));
+    setClaimedPassIds((prev) => {
+      const next = new Set(prev);
+      const keys = [evt.id, evt._id, evt.slug, slug, idKey].filter(Boolean).map(String);
+      keys.forEach((k) => next.add(k));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('visitexpo_claimed_passes', JSON.stringify(Array.from(next)));
+      }
+      return next;
+    });
+
     showSweetSuccess(
-      `Your digital pass for "${evt.title}" is ready and accessible in your Visitor Dashboard under My Passes & Badges.`,
+      `Your complimentary digital pass for "${evt.title}" is ready and registered to your visitor account!`,
       'Visitor Pass Confirmed! 🎉'
     );
   };
@@ -815,7 +955,7 @@ export default function BookmarksPage() {
         )}
 
         {/* Content Section: Loading | Empty State | Bookmarked Cards */}
-        {loading ? (
+        {loading && bookmarkedEvents.length === 0 ? (
           <div className="rounded-3xl border border-border bg-card p-16 flex flex-col items-center justify-center space-y-3 shadow-xs">
             <div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" />
             <p className="text-xs font-semibold text-muted-foreground">
@@ -976,11 +1116,16 @@ export default function BookmarksPage() {
             }
           >
             {bookmarkedEvents.map((evt) => {
-              const eventSlug = evt.slug || evt.id;
-              const isClaimed = claimedPassIds.has(evt.id);
+              const eventSlug = (evt.slug || evt.id || '').toLowerCase().trim();
+              const idKey = String(evt.id || evt._id || eventSlug).trim();
+              const isClaimed =
+                claimedPassIds.has(idKey) ||
+                claimedPassIds.has(eventSlug) ||
+                (evt._id && claimedPassIds.has(String(evt._id))) ||
+                (evt.id && claimedPassIds.has(String(evt.id)));
               const isInterested =
-                interestedSlugs.has(String(eventSlug).toLowerCase()) ||
-                interestedSlugs.has(String(evt.id).toLowerCase());
+                interestedSlugs.has(eventSlug) ||
+                interestedSlugs.has(idKey);
 
               if (viewMode === 'list') {
                 return (
@@ -1057,10 +1202,20 @@ export default function BookmarksPage() {
                       <button
                         type="button"
                         onClick={() => handleClaimPass(evt)}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-amber-400 text-primary-foreground font-bold px-3.5 py-2 text-xs transition shadow-sm cursor-pointer"
+                        className="cursor-pointer"
+                        title={isClaimed ? 'Pass already issued - click to view details' : 'Claim free pass'}
                       >
-                        <Ticket className="h-3.5 w-3.5" />
-                        <span>{isClaimed ? 'Pass Confirmed' : 'Claim Pass'}</span>
+                        {isClaimed ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 text-xs font-bold shadow-2xs hover:bg-emerald-100 transition-colors">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span>Pass Issued</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-amber-400 text-primary-foreground font-black px-3.5 py-1.5 text-xs transition shadow-sm hover:shadow-md hover:scale-105 active:scale-95">
+                            <Ticket className="h-3.5 w-3.5" />
+                            <span>Get Pass</span>
+                          </span>
+                        )}
                       </button>
 
                       <button
@@ -1182,19 +1337,20 @@ export default function BookmarksPage() {
                           <span className="hidden xs:inline">{isInterested ? 'Saved' : 'Interest'}</span>
                         </button>
 
-                        {/* Claim Pass */}
+                        {/* Claim Pass / Pass Issued Button with Confirmation Pop-up */}
                         <button
                           type="button"
                           onClick={() => handleClaimPass(evt)}
                           className="cursor-pointer"
+                          title={isClaimed ? 'Pass already issued - click to view details' : 'Claim free pass'}
                         >
                           {isClaimed ? (
-                            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-bold">
-                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                              Pass Confirmed
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 text-xs font-bold shadow-2xs hover:bg-emerald-100 transition-colors">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                              <span>Pass Issued</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary hover:bg-amber-400 text-primary-foreground font-black text-xs transition shadow-sm active:scale-95">
+                            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary hover:bg-amber-400 text-primary-foreground font-black text-xs transition shadow-sm hover:shadow-md hover:scale-105 active:scale-95">
                               <span>Get Pass</span>
                               <ArrowRight className="h-3 w-3" />
                             </span>

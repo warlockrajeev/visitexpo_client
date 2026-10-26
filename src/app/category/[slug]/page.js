@@ -169,45 +169,33 @@ export default function CategoryEventsPage() {
       {/* 1. TOP SUB-NAV BAR (Events | Companies | People) (VisitExpo Theme)        */}
       {/* ========================================================================= */}
       <div className="bg-white border-b border-zinc-200 pt-24 sm:pt-28">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-6 text-xs sm:text-sm font-bold">
-          <button
-            type="button"
-            onClick={() => setActiveTab('events')}
-            className={`py-3 flex items-center gap-1.5 transition-colors cursor-pointer border-b-2 ${
-              activeTab === 'events'
-                ? 'border-[#FF2E63] text-[#FF2E63]'
-                : 'border-transparent text-zinc-600 hover:text-zinc-900'
-            }`}
-          >
-            <CalendarIcon className="h-4 w-4" />
-            <span>Events</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('companies')}
-            className={`py-3 flex items-center gap-1.5 transition-colors cursor-pointer border-b-2 ${
-              activeTab === 'companies'
-                ? 'border-[#FF2E63] text-[#FF2E63]'
-                : 'border-transparent text-zinc-600 hover:text-zinc-900'
-            }`}
-          >
-            <Building className="h-4 w-4" />
-            <span>Companies</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('people')}
-            className={`py-3 flex items-center gap-1.5 transition-colors cursor-pointer border-b-2 ${
-              activeTab === 'people'
-                ? 'border-[#FF2E63] text-[#FF2E63]'
-                : 'border-transparent text-zinc-600 hover:text-zinc-900'
-            }`}
-          >
-            <Users className="h-4 w-4" />
-            <span>People</span>
-          </button>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-6 text-xs sm:text-sm font-bold -mb-px">
+          {[
+            { id: 'events', label: 'Events', icon: CalendarIcon },
+            { id: 'companies', label: 'Companies', icon: Building },
+            { id: 'people', label: 'People', icon: Users }
+          ].map((tab) => {
+            const isActive = activeTab === tab.id;
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`relative py-3 flex items-center gap-1.5 transition-colors cursor-pointer select-none font-bold ${
+                  isActive
+                    ? 'text-[#FF2E63] font-black'
+                    : 'text-zinc-600 hover:text-zinc-900'
+                }`}
+              >
+                <Icon className={`h-4 w-4 ${isActive ? 'text-[#FF2E63]' : ''}`} />
+                <span>{tab.label}</span>
+                {isActive && (
+                  <span className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-[#FF2E63] rounded-full shadow-[0_1px_6px_rgba(255,46,99,0.5)]" />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 

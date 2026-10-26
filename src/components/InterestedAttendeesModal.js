@@ -98,7 +98,7 @@ export default function InterestedAttendeesModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full text-zinc-400 hover:text-zinc-700 hover:bg-zinc-200/60 transition-colors cursor-pointer"
+            className="p-1.5 rounded-xl text-zinc-400 hover:text-rose-600 bg-zinc-100 hover:bg-rose-50 border border-zinc-200/80 hover:border-rose-200 transition-all duration-200 cursor-pointer active:scale-95 shadow-2xs"
             aria-label="Close modal"
           >
             <X className="h-5 w-5" />
@@ -124,7 +124,7 @@ export default function InterestedAttendeesModal({
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 hover:text-zinc-700"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-zinc-400 hover:text-zinc-900 hover:bg-zinc-200 px-2 py-0.5 rounded-md transition-colors"
               >
                 Clear
               </button>
@@ -144,10 +144,10 @@ export default function InterestedAttendeesModal({
                 key={tab.id}
                 type="button"
                 onClick={() => setSelectedType(tab.id)}
-                className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg whitespace-nowrap text-xs font-bold transition-all duration-200 cursor-pointer active:scale-95 border ${
                   selectedType === tab.id
-                    ? 'bg-zinc-900 text-white font-bold shadow-xs'
-                    : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200/70'
+                    ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs'
+                    : 'bg-zinc-100 hover:bg-amber-100 text-zinc-700 hover:text-amber-950 border-zinc-200 hover:border-amber-300'
                 }`}
               >
                 {tab.label}
@@ -275,10 +275,10 @@ export default function InterestedAttendeesModal({
                   <button
                     type="button"
                     onClick={() => onToggleFollowAttendee(att)}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-1.5 cursor-pointer active:scale-95 border shadow-2xs ${
                       isFollowing
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                        : 'bg-zinc-900 hover:bg-zinc-800 text-white shadow-2xs'
+                        ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 hover:text-emerald-950 border-emerald-300 hover:border-emerald-400'
+                        : 'bg-zinc-900 hover:bg-blue-600 text-white border-zinc-900 hover:border-blue-600'
                     }`}
                   >
                     {isFollowing ? (
@@ -297,7 +297,7 @@ export default function InterestedAttendeesModal({
                   <button
                     type="button"
                     onClick={() => onConnectAttendee(att)}
-                    className="p-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-xl border border-zinc-200 hover:border-blue-400 bg-zinc-100 hover:bg-blue-100 text-zinc-600 hover:text-blue-900 transition-all duration-200 cursor-pointer active:scale-95 shadow-2xs"
                     title="Send connection note"
                   >
                     <MessageSquare className="h-4 w-4" />
@@ -325,7 +325,7 @@ export default function InterestedAttendeesModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 font-bold cursor-pointer"
+              className="px-4 py-1.5 rounded-xl border border-rose-300 hover:border-rose-600 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white font-bold text-xs transition-all duration-200 cursor-pointer active:scale-95 shadow-2xs"
             >
               Close
             </button>

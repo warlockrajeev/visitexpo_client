@@ -28,6 +28,7 @@ import OrganizerChatWidget from '../../../components/OrganizerChatWidget.js';
 import GoogleCalendarButton from '../../../components/GoogleCalendarButton.js';
 import GoogleCalendarModal from '../../../components/GoogleCalendarModal.js';
 import { slugifyVenue } from '../../../data/venuesData.js';
+import { showSweetAlert, showSweetConfirm, showSweetSuccess } from '../../../utils/sweetalert.js';
 import {
   Calendar,
   MapPin,
@@ -40,6 +41,7 @@ import {
   ChevronRight,
   Play,
   CheckCircle2,
+  AlertCircle,
   ExternalLink,
   ShieldCheck,
   Clock,
@@ -78,7 +80,9 @@ import {
   Package,
   Download,
   X,
-  Maximize2
+  Maximize2,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 
 const API_URL =
@@ -107,7 +111,8 @@ function decodeHtmlEntities(str) {
 
 function formatInlineHtml(text) {
   if (!text) return '';
-  return text
+  const decoded = decodeHtmlEntities(text);
+  return decoded
     .replace(/\*\*\s*([^*]+?)\s*\*\*/g, '<strong>$1</strong>')
     .replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em>$1</em>')
     .replace(/#{1,6}\s*/g, '')
@@ -115,114 +120,301 @@ function formatInlineHtml(text) {
     .trim();
 }
 
-function renderCleanDescription(rawText, isExpanded, eventTitle = '') {
-  if (!rawText || typeof rawText !== 'string') return null;
+function parseDescriptionBlocks(rawText, eventTitle = '') {
+  if (!rawText || typeof rawText !== 'string') return [];
 
-  const normalized = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  const rawLines = normalized.split('\n');
+  let text = decodeHtmlEntities(rawText || '').trim();
+  // Normalize HTML tags if present from CMS/WordPress
+  text = text
+    .replace(/<br\s*[\/]?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
+
+  // Insert newlines before known emoji markers + labels
+  text = text.replace(
+    /(?<!\n)\s*([\p{Extended_Pictographic}\uFE0F]{1,3})\s*(Dates|Hours|Timings|Venue|Location|Target Audience|Key Exhibition Sectors|Key Highlights|Exhibition Sectors|Highlights|[A-Z][a-zA-Z0-9\s&/\-]{2,40}:)/gu,
+    '\n\n$1 $2'
+  );
+
+  // Insert newlines before any emoji bullet
+  text = text.replace(
+    /(?<!\n)\s*([\p{Extended_Pictographic}\uFE0F]{1,3})\s+/gu,
+    '\n\n$1 '
+  );
+
+  // Detect ALL-CAPS headline blocks (18+ chars of caps with common event keywords)
+  text = text.replace(
+    /(?<!\n)\s*([A-Z0-9\s&,'\-–—/]{18,}(?:ARRIVES|EXHIBITION|CONFERENCE|SUMMIT|EXPO|SHOW|INDIA|MUMBAI|DELHI|GLOBAL|ASIA)[!.]?)\s*/g,
+    '\n\n###HEADLINE### $1\n\n'
+  );
+
+  const rawLines = text.split('\n');
   const lines = [];
-  let isFirstLine = true;
+  const normTitle = (eventTitle || '').trim().toLowerCase();
 
   for (let i = 0; i < rawLines.length; i++) {
-    let line = rawLines[i].trim();
-    if (lines.length === 0 && !line) continue;
-    if (isFirstLine && line) {
-      isFirstLine = false;
-      const strippedHeader = line.replace(/^#{1,6}\s*/, '').trim().toLowerCase();
-      const normTitle = (eventTitle || '').trim().toLowerCase();
-      if (normTitle && (strippedHeader === normTitle || strippedHeader.includes(normTitle))) {
-        continue;
-      }
-    }
-    // Skip lone hashtag lines like "###" or "##"
+    const line = rawLines[i].trim();
+    if (!line) continue;
+    // Skip lone emojis
+    if (/^[\p{Extended_Pictographic}\uFE0F\s]+$/u.test(line)) continue;
+    const stripped = line.replace(/^#{1,6}\s*/, '').trim().toLowerCase();
+    if (stripped === normTitle && lines.length === 0) continue;
     if (/^#{1,6}$/.test(line)) continue;
-    lines.push(rawLines[i]);
+    lines.push(line);
   }
 
-  const elements = [];
-  let currentList = [];
-  let currentParagraphLines = [];
+  const blocks = [];
+  let pendingLogistics = [];
+  let pendingHighlights = [];
+  let pendingList = [];
 
-  const flushParagraph = (key) => {
-    if (currentParagraphLines.length > 0) {
-      const combined = currentParagraphLines.join(' ').trim();
-      if (combined) {
-        const cleaned = formatInlineHtml(combined);
-        if (cleaned) {
-          elements.push(
-            <p
-              key={`p-${key}`}
-              className="text-zinc-700 text-xs sm:text-sm leading-relaxed my-2"
-              dangerouslySetInnerHTML={{ __html: cleaned }}
-            />
-          );
-        }
-      }
-      currentParagraphLines = [];
+  const flushLogistics = () => {
+    if (pendingLogistics.length > 0) {
+      blocks.push({ type: 'logistics', items: [...pendingLogistics] });
+      pendingLogistics = [];
     }
   };
 
-  const flushList = (key) => {
-    if (currentList.length > 0) {
-      elements.push(
-        <ul key={`ul-${key}`} className="list-disc pl-5 my-2 space-y-1">
-          {currentList.map((item, idx) => (
+  const flushHighlights = () => {
+    if (pendingHighlights.length > 0) {
+      blocks.push({ type: 'highlights', items: [...pendingHighlights] });
+      pendingHighlights = [];
+    }
+  };
+
+  const flushList = () => {
+    if (pendingList.length > 0) {
+      blocks.push({ type: 'list', items: [...pendingList] });
+      pendingList = [];
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // 1. Headline marker
+    if (line.startsWith('###HEADLINE###')) {
+      flushLogistics();
+      flushHighlights();
+      flushList();
+      const content = line.replace('###HEADLINE###', '').trim();
+      blocks.push({ type: 'headline', text: content });
+      continue;
+    }
+
+    // 2. Logistics items: Dates, Hours, Venue, Target Audience
+    const logisticsMatch = line.match(/^([\p{Extended_Pictographic}\uFE0F\s]*)\s*(Dates|Hours|Timings|Venue|Location|Target Audience):\s*(.+)$/iu);
+    if (logisticsMatch) {
+      flushHighlights();
+      flushList();
+      const label = logisticsMatch[2].trim();
+      let emoji = logisticsMatch[1].trim();
+      if (!emoji) {
+        const l = label.toLowerCase();
+        emoji = l.includes('date') ? '🗓' : l.includes('hour') || l.includes('time') ? '⏰' : l.includes('venue') || l.includes('loc') ? '📍' : '🎯';
+      }
+      pendingLogistics.push({
+        emoji,
+        label,
+        value: logisticsMatch[3].trim()
+      });
+      continue;
+    }
+
+    // 3. Section Header like "Key Exhibition Sectors & Highlights:"
+    if (/^([\p{Extended_Pictographic}\uFE0F\s]*)\s*(Key Exhibition Sectors|Key Highlights|Exhibition Sectors|Highlights)\b/iu.test(line)) {
+      flushLogistics();
+      flushList();
+      continue;
+    }
+
+    // 4. Highlight Items (Emoji followed by Title: Description)
+    const featureMatch = line.match(/^([\p{Extended_Pictographic}\uFE0F•\-\*]+)\s*([^:]+):\s*(.+)$/u);
+    if (featureMatch && (featureMatch[1].trim().length > 0 || pendingHighlights.length > 0)) {
+      flushLogistics();
+      flushList();
+      pendingHighlights.push({
+        emoji: featureMatch[1].trim() || '•',
+        title: featureMatch[2].trim(),
+        description: featureMatch[3].trim()
+      });
+      continue;
+    }
+
+    // 5. Standard bullet list item
+    const bulletMatch = line.match(/^([•\-\*]|\d+\.)\s+(.+)$/);
+    if (bulletMatch) {
+      flushLogistics();
+      flushHighlights();
+      pendingList.push(bulletMatch[2].trim());
+      continue;
+    }
+
+    // 6. Markdown heading
+    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+    if (headingMatch) {
+      flushLogistics();
+      flushHighlights();
+      flushList();
+      blocks.push({
+        type: 'heading',
+        level: headingMatch[1].length,
+        text: headingMatch[2].trim()
+      });
+      continue;
+    }
+
+    // 7. Plain paragraph
+    flushLogistics();
+    flushHighlights();
+    flushList();
+    blocks.push({ type: 'paragraph', text: line });
+  }
+
+  flushLogistics();
+  flushHighlights();
+  flushList();
+
+  return blocks;
+}
+
+function renderCleanDescription(rawText, isExpanded, eventTitle = '') {
+  if (!rawText || typeof rawText !== 'string') return null;
+
+  const blocks = parseDescriptionBlocks(rawText, eventTitle);
+  if (!blocks || blocks.length === 0) return null;
+
+  const rendered = [];
+
+  for (let idx = 0; idx < blocks.length; idx++) {
+    const block = blocks[idx];
+
+    if (block.type === 'headline') {
+      rendered.push(
+        <div
+          key={`headline-${idx}`}
+          className="p-3.5 sm:p-4 rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border-l-4 border-amber-500 my-3 shadow-2xs"
+        >
+          <p className="text-xs sm:text-sm font-extrabold text-amber-950 uppercase tracking-wide leading-snug">
+            {block.text}
+          </p>
+        </div>
+      );
+    } else if (block.type === 'logistics') {
+      rendered.push(
+        <div
+          key={`logistics-${idx}`}
+          className="my-4 rounded-xl border border-zinc-200/90 bg-gradient-to-b from-zinc-50/80 to-zinc-50/40 p-4 sm:p-5 shadow-2xs"
+        >
+          <div className="text-[11px] font-extrabold uppercase tracking-wider text-zinc-500 mb-3 flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+            <span>Quick Event Facts &amp; Logistics</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+            {block.items.map((item, i) => (
+              <div
+                key={i}
+                className="p-3 rounded-xl bg-white border border-zinc-200/80 shadow-2xs flex items-start gap-2.5 transition-shadow hover:shadow-xs"
+              >
+                <span className="text-lg shrink-0 select-none leading-none pt-0.5">{item.emoji}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] sm:text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
+                    {item.label}
+                  </div>
+                  <div
+                    className="text-xs sm:text-[13px] font-medium text-zinc-900 leading-snug mt-0.5"
+                    dangerouslySetInnerHTML={{ __html: formatInlineHtml(item.value) }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    } else if (block.type === 'highlights') {
+      rendered.push(
+        <div key={`highlights-${idx}`} className="my-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-[#FF2E63]" />
+            <h4 className="text-xs sm:text-sm font-extrabold text-zinc-900 uppercase tracking-wide">
+              Key Exhibition Sectors &amp; Highlights
+            </h4>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {block.items.map((item, i) => (
+              <div
+                key={i}
+                className="p-3.5 sm:p-4 rounded-xl border border-zinc-200/80 bg-gradient-to-b from-white to-zinc-50/50 shadow-2xs hover:border-zinc-300 transition-all space-y-1.5 group"
+              >
+                <div className="flex items-start gap-2.5">
+                  <span className="text-base shrink-0 select-none pt-0.5 group-hover:scale-110 transition-transform">
+                    {item.emoji}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    {item.title && (
+                      <h5 className="text-xs sm:text-sm font-bold text-zinc-900 leading-snug">
+                        {item.title}
+                      </h5>
+                    )}
+                    {item.description && (
+                      <p
+                        className="text-xs text-zinc-600 leading-relaxed mt-1"
+                        dangerouslySetInnerHTML={{ __html: formatInlineHtml(item.description) }}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    } else if (block.type === 'list') {
+      rendered.push(
+        <ul key={`list-${idx}`} className="list-disc pl-5 my-2 space-y-1">
+          {block.items.map((item, i) => (
             <li
-              key={idx}
+              key={i}
               className="text-zinc-700 text-xs sm:text-sm"
               dangerouslySetInnerHTML={{ __html: formatInlineHtml(item) }}
             />
           ))}
         </ul>
       );
-      currentList = [];
+    } else if (block.type === 'heading') {
+      rendered.push(
+        <h4
+          key={`heading-${idx}`}
+          className="text-sm sm:text-base font-bold text-zinc-900 mt-4 mb-1.5"
+          dangerouslySetInnerHTML={{ __html: formatInlineHtml(block.text) }}
+        />
+      );
+    } else {
+      // paragraph
+      rendered.push(
+        <p
+          key={`p-${idx}`}
+          className="text-zinc-700 text-xs sm:text-sm leading-relaxed my-2"
+          dangerouslySetInnerHTML={{ __html: formatInlineHtml(block.text) }}
+        />
+      );
     }
-  };
-
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
-    if (!trimmed) {
-      flushParagraph(i);
-      flushList(i);
-      continue;
-    }
-
-    const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
-    if (headingMatch) {
-      flushParagraph(i);
-      flushList(i);
-      const headingText = formatInlineHtml(headingMatch[2]);
-      if (headingText) {
-        elements.push(
-          <h4
-            key={`h-${i}`}
-            className="text-sm sm:text-base font-bold text-zinc-900 mt-4 mb-1.5"
-            dangerouslySetInnerHTML={{ __html: headingText }}
-          />
-        );
-      }
-      continue;
-    }
-
-    const listMatch = trimmed.match(/^([•\-\*]|\d+\.)\s+(.+)$/);
-    if (listMatch) {
-      flushParagraph(i);
-      currentList.push(listMatch[2]);
-      continue;
-    }
-
-    flushList(i);
-    currentParagraphLines.push(trimmed);
   }
 
-  flushParagraph('end');
-  flushList('end');
-
-  if (!isExpanded && elements.length > 2) {
-    return elements.slice(0, 2);
+  // Handle truncation when not expanded
+  if (!isExpanded && rendered.length > 2) {
+    const firstHeavyIdx = blocks.findIndex(
+      (b) => b.type === 'logistics' || b.type === 'highlights'
+    );
+    if (firstHeavyIdx !== -1 && firstHeavyIdx >= 1) {
+      return rendered.slice(0, Math.min(firstHeavyIdx, 3));
+    }
+    return rendered.slice(0, 2);
   }
 
-  return elements;
+  return rendered;
 }
 
 // Global Timezone Presets for Live Hybrid & Virtual Expos
@@ -293,7 +485,13 @@ export default function ExpoDetailsPage() {
   // Social & Interactive State
   const [isSaved, setIsSaved] = useState(false);
   const [isInterested, setIsInterested] = useState(false);
+  const [isPassClaimed, setIsPassClaimed] = useState(false);
   const [isFollowingExpo, setIsFollowingExpo] = useState(false);
+  const [isAppliedSpeaker, setIsAppliedSpeaker] = useState(false);
+  const [applyingSpeaker, setApplyingSpeaker] = useState(false);
+  const [isAppliedDelegation, setIsAppliedDelegation] = useState(false);
+
+  const hasClaimedPass = Boolean(isPassClaimed || isInterested);
   const [showAttendeesModal, setShowAttendeesModal] = useState(false);
   const [attendees, setAttendees] = useState([]);
   const [followedAttendeeIds, setFollowedAttendeeIds] = useState(new Set());
@@ -301,6 +499,7 @@ export default function ExpoDetailsPage() {
   const [attendeeSearch, setAttendeeSearch] = useState('');
   const [connectionModalUser, setConnectionModalUser] = useState(null);
   const [connectionNote, setConnectionNote] = useState('');
+  const [connectionNoteError, setConnectionNoteError] = useState('');
   const [connectionSent, setConnectionSent] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
@@ -331,8 +530,75 @@ export default function ExpoDetailsPage() {
     designation: '',
     message: ''
   });
+  const [inquiryErrors, setInquiryErrors] = useState({});
   const [inquirySubmitting, setInquirySubmitting] = useState(false);
   const [inquirySuccess, setInquirySuccess] = useState(false);
+
+  // Field validation helper for Direct Organizer Connect modal
+  const validateInquiryField = (field, value, type = inquiryType) => {
+    const val = (value || '').trim();
+    switch (field) {
+      case 'name':
+        if (!val) return 'Full name is required';
+        if (val.length < 2) return 'Name must be at least 2 characters';
+        if ((val.match(/[a-zA-Z]/g) || []).length < 2 || /^[^a-zA-Z0-9]+$/.test(val)) {
+          return 'Please enter a valid full name';
+        }
+        return null;
+      case 'email':
+        if (!val) return 'Work email is required';
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+          return 'Please enter a valid email address';
+        }
+        return null;
+      case 'phone':
+        if (val) {
+          const digits = val.replace(/\D/g, '');
+          if (digits.length < 7 || digits.length > 15 || /^[^a-zA-Z0-9]+$/.test(val)) {
+            return 'Please enter a valid phone number (7-15 digits)';
+          }
+        }
+        return null;
+      case 'company':
+        if (type === 'stall' && !val) {
+          return 'Company name is required for stall space booking';
+        }
+        if (val) {
+          const alphaNumCount = (val.match(/[a-zA-Z0-9]/g) || []).length;
+          if (alphaNumCount < 2 || /^[^a-zA-Z0-9]+$/.test(val) || /[!@#$%^&*+=|\\<>;~`]{3,}/.test(val)) {
+            return 'Please enter a valid company name (at least 2 letters/numbers)';
+          }
+        }
+        return null;
+      case 'designation':
+        if (val) {
+          const letterCount = (val.match(/[a-zA-Z]/g) || []).length;
+          if (letterCount < 2 || /^[^a-zA-Z0-9]+$/.test(val) || /[!@#$%^&*+=|\\<>;~`]{3,}/.test(val)) {
+            return 'Please enter a valid designation / role (e.g. Director, Manager)';
+          }
+        }
+        return null;
+      case 'message':
+        if (val) {
+          const alphaNumCount = (val.match(/[a-zA-Z0-9]/g) || []).length;
+          if (alphaNumCount < 3 || /^[^a-zA-Z0-9]+$/.test(val) || /[!@#$%^&*+=|\\<>;~`]{3,}/.test(val)) {
+            return 'Please enter a meaningful message (avoid pure symbols)';
+          }
+        }
+        return null;
+      default:
+        return null;
+    }
+  };
+
+  const validateInquiryForm = (formData = inquiryForm, type = inquiryType) => {
+    const errors = {};
+    ['name', 'email', 'phone', 'company', 'designation', 'message'].forEach((f) => {
+      const err = validateInquiryField(f, formData[f], type);
+      if (err) errors[f] = err;
+    });
+    return errors;
+  };
 
   const [virtualCheckedIn, setVirtualCheckedIn] = useState(false);
   const [checkedInSessions, setCheckedInSessions] = useState({});
@@ -360,12 +626,52 @@ export default function ExpoDetailsPage() {
   const [helpfulLikedIds, setHelpfulLikedIds] = useState(new Set());
   const [eventReviews, setEventReviews] = useState([]);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [commentErrors, setCommentErrors] = useState({});
+  const [reviewModalErrors, setReviewModalErrors] = useState({});
+
+  // Editing Comment State
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
+  const [editingCommentRating, setEditingCommentRating] = useState(5);
+  const [editingCommentError, setEditingCommentError] = useState('');
+  const [isUpdatingComment, setIsUpdatingComment] = useState(false);
+
+  const validateCommentField = (field, value) => {
+    const val = (value || '').trim();
+    switch (field) {
+      case 'name':
+        if (!val) return 'Your name is required';
+        if (val.length < 2) return 'Name must be at least 2 characters';
+        if ((val.match(/[a-zA-Z]/g) || []).length < 2 || /^[^a-zA-Z0-9]+$/.test(val)) {
+          return 'Please enter a valid name (letters only)';
+        }
+        return null;
+      case 'company':
+        if (val) {
+          const alphaNumCount = (val.match(/[a-zA-Z0-9]/g) || []).length;
+          if (alphaNumCount < 2 || /^[^a-zA-Z0-9]+$/.test(val) || /[!@#$%^&*+=|\\<>;~`]{3,}/.test(val)) {
+            return 'Please enter a valid company name (at least 2 letters/numbers)';
+          }
+        }
+        return null;
+      case 'comment':
+        if (!val) return 'Your comment or question is required';
+        if (val.length < 5) return 'Comment is too short (min 5 characters)';
+        const alphaNumCount = (val.match(/[a-zA-Z0-9]/g) || []).length;
+        if (alphaNumCount < 4 || /^[^a-zA-Z0-9]+$/.test(val) || /[!@#$%^&*+=|\\<>;~`]{4,}/.test(val)) {
+          return 'Please enter a meaningful comment (avoid pure symbols)';
+        }
+        return null;
+      default:
+        return null;
+    }
+  };
 
   // Live Organizer Chat State
   const [isChatEnabled, setIsChatEnabled] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  // Auto-prefill author details from user auth context
+  // Auto-prefill author & inquiry details from user auth context
   useEffect(() => {
     if (user?.name) {
       setReviewerName(prev => prev || user.name);
@@ -375,6 +681,16 @@ export default function ExpoDetailsPage() {
       const comp = user.company || user.organization?.name || '';
       setReviewerCompany(prev => prev || comp);
       setCommentCompany(prev => prev || comp);
+    }
+    if (user) {
+      setInquiryForm(prev => ({
+        ...prev,
+        name: user.name || prev.name || '',
+        email: user.email || prev.email || '',
+        phone: user.phone || prev.phone || '',
+        company: prev.company || user.company || user.organization?.name || '',
+        designation: prev.designation || user.designation || ''
+      }));
     }
   }, [user]);
 
@@ -405,13 +721,34 @@ export default function ExpoDetailsPage() {
     if (e && e.preventDefault) e.preventDefault();
 
     const txt = (fromModal ? reviewText : (commentText || reviewText)).trim();
-    if (!txt) {
-      showToast('Please enter your comment or review text.');
+    const authorName = (fromModal ? (reviewerName || user?.name) : (commentAuthor || reviewerName || user?.name || 'Trade Professional')).trim() || 'Verified Trade Visitor';
+    const comp = (fromModal ? reviewerCompany : commentCompany).trim();
+
+    const errors = {};
+    if (!user?.name && !user) {
+      const nameErr = validateCommentField('name', authorName);
+      if (nameErr) errors.name = nameErr;
+    }
+    const companyErr = validateCommentField('company', comp);
+    if (companyErr) errors.company = companyErr;
+
+    const commentErr = validateCommentField('comment', txt);
+    if (commentErr) errors.comment = commentErr;
+
+    if (Object.keys(errors).length > 0) {
+      if (fromModal) {
+        setReviewModalErrors(errors);
+      } else {
+        setCommentErrors(errors);
+      }
+      showToast('⚠️ Please fix the highlighted fields before submitting.');
       return;
     }
 
-    const authorName = (fromModal ? (reviewerName || user?.name) : (commentAuthor || reviewerName || user?.name || 'Trade Professional')).trim() || 'Verified Trade Visitor';
-    const company = (fromModal ? (reviewerCompany || user?.company) : (commentCompany || reviewerCompany || user?.company || '')).trim() || 'Trade Delegate';
+    if (fromModal) setReviewModalErrors({});
+    else setCommentErrors({});
+
+    const company = comp || (user?.company || user?.organization?.name || 'Trade Delegate');
     const ratingVal = Math.min(5, Math.max(1, Number(fromModal ? reviewRating : commentRating) || 5));
     const headlineVal = (fromModal ? reviewHeadline : '').trim();
 
@@ -439,8 +776,17 @@ export default function ExpoDetailsPage() {
     // Instant optimistic update
     setEventReviews(prev => [tempComment, ...prev]);
     setCommentText('');
+    setCommentCompany('');
+    setCommentRating(5);
+    setCommentErrors({});
+    if (!user) {
+      setCommentAuthor('');
+    }
     setReviewText('');
+    setReviewerCompany('');
     setReviewHeadline('');
+    setReviewRating(5);
+    setReviewModalErrors({});
     setShowReviewModal(false);
     showToast('Your comment has been posted successfully!');
 
@@ -473,6 +819,98 @@ export default function ExpoDetailsPage() {
       console.warn('Backend sync failed, saved locally:', err);
     } finally {
       setIsSubmittingComment(false);
+    }
+  };
+
+  // Edit & Delete Comment Handlers
+  const handleStartEditComment = (rev) => {
+    setEditingCommentId(rev.id);
+    setEditingCommentText(rev.review || rev.comment || '');
+    setEditingCommentRating(rev.rating || 5);
+    setEditingCommentError('');
+  };
+
+  const handleCancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditingCommentText('');
+    setEditingCommentRating(5);
+    setEditingCommentError('');
+  };
+
+  const handleSaveEditComment = async (commentId) => {
+    const err = validateCommentField('comment', editingCommentText);
+    if (err) {
+      setEditingCommentError(err);
+      return;
+    }
+    setEditingCommentError('');
+    setIsUpdatingComment(true);
+
+    const updatedText = editingCommentText.trim();
+    const updatedRating = editingCommentRating;
+
+    // Optimistically update in state
+    setEventReviews((prev) =>
+      prev.map((r) => {
+        if ((r._id || r.id) === commentId) {
+          return {
+            ...r,
+            review: updatedText,
+            comment: updatedText,
+            rating: updatedRating
+          };
+        }
+        return r;
+      })
+    );
+
+    setEditingCommentId(null);
+    showToast('✓ Comment updated successfully!');
+
+    if (!String(commentId).startsWith('temp_')) {
+      try {
+        await axios.put(`/api/reviews/${encodeURIComponent(commentId)}`, {
+          review: updatedText,
+          comment: updatedText,
+          rating: updatedRating
+        }).catch(() => {
+          return axios.put(`${API_URL}/reviews/${encodeURIComponent(commentId)}`, {
+            review: updatedText,
+            comment: updatedText,
+            rating: updatedRating
+          });
+        });
+      } catch (err) {
+        console.warn('Backend update failed, saved locally:', err);
+      }
+    }
+    setIsUpdatingComment(false);
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    const confirmed = await showSweetConfirm({
+      title: 'Delete Comment?',
+      text: 'Are you sure you want to remove this comment? This action cannot be undone.',
+      icon: 'warning',
+      confirmButtonText: 'Yes, Delete',
+      cancelButtonText: 'Cancel',
+      isDanger: true
+    });
+
+    if (!confirmed) return;
+
+    // Optimistically remove from state
+    setEventReviews((prev) => prev.filter((r) => (r._id || r.id) !== commentId));
+    showToast('Comment deleted.');
+
+    if (!String(commentId).startsWith('temp_')) {
+      try {
+        await axios.delete(`/api/reviews/${encodeURIComponent(commentId)}`).catch(() => {
+          return axios.delete(`${API_URL}/reviews/${encodeURIComponent(commentId)}`);
+        });
+      } catch (err) {
+        console.warn('Backend delete failed, removed locally:', err);
+      }
     }
   };
 
@@ -831,10 +1269,30 @@ export default function ExpoDetailsPage() {
     if (typeof window !== 'undefined' && slug) {
       try {
         const savedInterested = localStorage.getItem(`visitexpo_interested_${slug}`);
-        if (savedInterested === 'true') setIsInterested(true);
+        if (savedInterested === 'true') {
+          setIsInterested(true);
+          setIsPassClaimed(true);
+        }
+
+        const savedClaimed = localStorage.getItem('visitexpo_claimed_passes');
+        if (savedClaimed) {
+          try {
+            const set = new Set(JSON.parse(savedClaimed));
+            const keys = [slug, event?.slug, event?.id, event?._id].filter(Boolean).map(String);
+            if (keys.some((k) => set.has(k))) {
+              setIsPassClaimed(true);
+            }
+          } catch (_) {}
+        }
 
         const savedFollowExpo = localStorage.getItem(`visitexpo_follow_expo_${slug}`);
         if (savedFollowExpo === 'true') setIsFollowingExpo(true);
+
+        const savedAppliedSpeaker = localStorage.getItem(`visitexpo_applied_speaker_${slug}`);
+        if (savedAppliedSpeaker === 'true') setIsAppliedSpeaker(true);
+
+        const savedAppliedDelegation = localStorage.getItem(`visitexpo_applied_delegation_${slug}`);
+        if (savedAppliedDelegation === 'true') setIsAppliedDelegation(true);
 
         const savedFollowedAtt = localStorage.getItem(`visitexpo_followed_att_${slug}`);
         if (savedFollowedAtt) {
@@ -863,6 +1321,9 @@ export default function ExpoDetailsPage() {
           if (res.data.data.userStatus) {
             setIsInterested(!!res.data.data.userStatus.isInterested);
             setIsFollowingExpo(!!res.data.data.userStatus.isFollower);
+            if (res.data.data.userStatus.isInterested) {
+              setIsPassClaimed(true);
+            }
           }
         }
       } catch (err) {
@@ -1027,6 +1488,29 @@ export default function ExpoDetailsPage() {
     }
     const next = !isInterested;
     setIsInterested(next);
+    if (!next) {
+      setIsPassClaimed(false);
+      if (typeof window !== 'undefined') {
+        try {
+          const rawClaimed = localStorage.getItem('visitexpo_claimed_passes');
+          if (rawClaimed) {
+            const set = new Set(JSON.parse(rawClaimed));
+            [event?.id, event?._id, event?.slug, slug].filter(Boolean).forEach((k) => set.delete(String(k)));
+            localStorage.setItem('visitexpo_claimed_passes', JSON.stringify(Array.from(set)));
+          }
+        } catch (_) {}
+      }
+    } else {
+      setIsPassClaimed(true);
+      if (typeof window !== 'undefined') {
+        try {
+          const rawClaimed = localStorage.getItem('visitexpo_claimed_passes');
+          const nextClaimed = new Set(rawClaimed ? JSON.parse(rawClaimed) : []);
+          [event?.id, event?._id, event?.slug, slug].filter(Boolean).forEach((k) => nextClaimed.add(String(k)));
+          localStorage.setItem('visitexpo_claimed_passes', JSON.stringify(Array.from(nextClaimed)));
+        } catch (_) {}
+      }
+    }
     if (typeof window !== 'undefined') {
       try {
         const raw = localStorage.getItem('visitexpo_interested_events');
@@ -1085,6 +1569,170 @@ export default function ExpoDetailsPage() {
     } catch (err) {
       console.warn('Failed to persist interest to server:', err);
     }
+  };
+
+  const handleClaimVisitorPass = async () => {
+    if (hasClaimedPass) {
+      await showSweetAlert(
+        {
+          title: 'Visitor Pass Already Issued! ✓',
+          icon: 'success',
+          confirmButtonText: 'Great, Understood',
+          html: `
+            <div style="font-size: 13px; line-height: 1.6; text-align: left; padding: 4px;">
+              <p style="margin-bottom: 8px; font-weight: 500;">You already have an active complimentary visitor pass for:</p>
+              <div style="font-weight: 800; font-size: 15px; margin-bottom: 6px; color: #10b981;">${event?.title || 'This Exhibition'}</div>
+              ${event?.dates ? `<p style="font-size: 12px; margin-bottom: 4px; font-weight: 600;">📅 ${event.dates}</p>` : ''}
+              ${event?.venue || event?.city ? `<p style="font-size: 12px; opacity: 0.8; margin-bottom: 12px;">📍 ${[event.venue, event.city].filter(Boolean).join(', ')}</p>` : ''}
+              <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 12px; font-size: 12px; font-weight: 600; color: #059669;">
+                ✓ Active digital QR pass registered to your account.<br />
+                ✓ Present your name / registered email at fast-track entry kiosks at ${event?.city || 'the venue'}.
+              </div>
+            </div>
+          `
+        },
+        'success'
+      );
+      return;
+    }
+
+    if (!user) {
+      redirectToLogin();
+      return;
+    }
+
+    const confirmed = await showSweetConfirm({
+      title: 'Claim Free Visitor Pass?',
+      text: `Would you like to reserve your complimentary visitor pass for "${event?.title || 'this expo'}"?`,
+      icon: 'question',
+      confirmButtonText: 'Yes, Claim Free Pass',
+      cancelButtonText: 'Cancel',
+      isDanger: false
+    });
+
+    if (!confirmed) return;
+
+    const eventId = event?._id || event?.id;
+    if (eventId && user?.email) {
+      try {
+        await axios.post(`${API_URL}/visitors/register`, {
+          eventId,
+          name: user?.name || user?.email?.split('@')[0] || 'Visitor',
+          email: user?.email,
+          phone: user?.phone || '+91-9999999999',
+          company: user?.organization?.name || user?.company || 'Trade Attendee',
+          designation: 'Business Visitor',
+          country: 'India',
+          attendanceType: 'in_person'
+        });
+      } catch (_) {}
+    }
+
+    setIsPassClaimed(true);
+    setIsInterested(true);
+
+    if (typeof window !== 'undefined') {
+      try {
+        const rawClaimed = localStorage.getItem('visitexpo_claimed_passes');
+        const nextClaimed = new Set(rawClaimed ? JSON.parse(rawClaimed) : []);
+        [event?.id, event?._id, event?.slug, slug].filter(Boolean).forEach((k) => nextClaimed.add(String(k)));
+        localStorage.setItem('visitexpo_claimed_passes', JSON.stringify(Array.from(nextClaimed)));
+
+        const rawInt = localStorage.getItem('visitexpo_interested_events');
+        const nextInt = new Set(rawInt ? JSON.parse(rawInt) : []);
+        nextInt.add(slug);
+        localStorage.setItem('visitexpo_interested_events', JSON.stringify(Array.from(nextInt)));
+        localStorage.setItem(`visitexpo_interested_${slug}`, 'true');
+      } catch (_) {}
+    }
+
+    try {
+      await axios.post(`/api/events/${slug}/social`, {
+        actionType: 'interested',
+        eventTitle: event?.title,
+        eventCity: event?.city,
+        eventVenue: event?.venue,
+        eventDates: event?.dates,
+        eventCategory: event?.category,
+        eventImage: event?.image,
+        user: {
+          id: user.id || user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          company: user.company || user.organization?.name || '',
+          phone: user.phone || ''
+        }
+      });
+    } catch (_) {}
+
+    showSweetSuccess(
+      `Your complimentary digital pass for "${event?.title || 'this event'}" is ready and registered to your visitor account!`,
+      'Visitor Pass Confirmed! 🎉'
+    );
+  };
+
+  const handleApplyToSpeak = async () => {
+    if (isAppliedSpeaker) {
+      showSweetSuccess(
+        `Your keynote proposal and speaker profile for "${event?.title || 'this event'}" have already been submitted and are under review.`,
+        'Speaker Application Active ✓'
+      );
+      return;
+    }
+
+    const confirmed = await showSweetConfirm({
+      title: 'Apply as Keynote Speaker?',
+      text: `Would you like to submit your speaker application and keynote profile for "${event?.title || 'this expo'}" to the event organizers?`,
+      icon: 'question',
+      confirmButtonText: 'Yes, Submit Application',
+      cancelButtonText: 'Cancel',
+      isDanger: false
+    });
+
+    if (!confirmed) return;
+
+    setApplyingSpeaker(true);
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('visitexpo_token') : null;
+      await axios.post(
+        `${API_URL}/leads/inquire`,
+        {
+          eventId: event?._id || event?.id,
+          eventSlug: slug,
+          name: user?.name || 'Keynote Applicant',
+          email: user?.email || '',
+          phone: user?.phone || '',
+          company: user?.company || user?.organization?.name || '',
+          designation: user?.designation || 'Speaker / Panelist',
+          message: `Keynote Speaker Application submitted by ${user?.name || 'Applicant'} for ${event?.title || 'Exhibition'}.`,
+          inquiryType: 'Speaker Proposal'
+        },
+        token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+      ).catch(() => {});
+    } catch (_) {}
+
+    setIsAppliedSpeaker(true);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`visitexpo_applied_speaker_${slug}`, 'true');
+      } catch (_) {}
+    }
+    setApplyingSpeaker(false);
+    showSweetSuccess(
+      `Your speaker application for "${event?.title || 'this event'}" has been forwarded to the conference committee!`,
+      'Application Submitted! 🎙️'
+    );
+  };
+
+  const handleApplyDelegation = () => {
+    setIsAppliedDelegation(true);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`visitexpo_applied_delegation_${slug}`, 'true');
+      } catch (_) {}
+    }
+    showSweetSuccess('VIP Corporate Delegation inquiry submitted. Dedicated coordinator will contact your team.', 'Delegation Perks Applied ✓');
   };
 
   const handleToggleFollowExpo = async () => {
@@ -1176,6 +1824,29 @@ export default function ExpoDetailsPage() {
     });
   };
 
+  const validateConnectionNote = (value) => {
+    const val = (value || '').trim();
+    if (!val) {
+      return 'Please enter a personalized message or networking note.';
+    }
+    if (val.length < 10) {
+      return 'Message is too short. Please enter at least 10 characters.';
+    }
+    if (val.length > 500) {
+      return 'Message cannot exceed 500 characters.';
+    }
+    // Must contain letters / words, not just random symbols, punctuation, or numbers
+    const letterCount = (val.match(/[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF]/g) || []).length;
+    if (letterCount < 5) {
+      return 'Please enter a meaningful message with words (letters required, symbols only not allowed).';
+    }
+    // Check for spam repetitions like aaaaaaaaa or !!!!!!!!!
+    if (/(.)\1{9,}/.test(val)) {
+      return 'Message contains repetitive characters. Please enter a valid message.';
+    }
+    return null;
+  };
+
   const handleConnectAttendee = (att) => {
     if (!user) {
       redirectToLogin();
@@ -1187,11 +1858,18 @@ export default function ExpoDetailsPage() {
         att.objective || 'mutual B2B opportunities'
       }.`
     );
+    setConnectionNoteError('');
     setConnectionSent(false);
   };
 
   const handleSendConnectionNote = (e) => {
     e.preventDefault();
+    const err = validateConnectionNote(connectionNote);
+    if (err) {
+      setConnectionNoteError(err);
+      return;
+    }
+    setConnectionNoteError('');
     setConnectionSent(true);
     setTimeout(() => {
       setConnectionModalUser(null);
@@ -1263,6 +1941,7 @@ export default function ExpoDetailsPage() {
 
   const handleRequestBooth = (type = 'stall') => {
     setInquiryType(type);
+    setInquiryErrors({});
     if (user) {
       setInquiryForm((prev) => ({
         ...prev,
@@ -1278,7 +1957,23 @@ export default function ExpoDetailsPage() {
 
   const handleInquirySubmit = async (e) => {
     e.preventDefault();
-    if (!inquiryForm.email.trim()) return;
+    const effectiveForm = {
+      name: (inquiryForm.name || user?.name || '').trim(),
+      email: (inquiryForm.email || user?.email || '').trim(),
+      phone: (inquiryForm.phone || user?.phone || '').trim(),
+      company: (inquiryForm.company || user?.company || '').trim(),
+      designation: (inquiryForm.designation || user?.designation || '').trim(),
+      message: (inquiryForm.message || '').trim()
+    };
+
+    const errors = validateInquiryForm(effectiveForm, inquiryType);
+    if (Object.keys(errors).length > 0) {
+      setInquiryErrors(errors);
+      showToast('⚠️ Please fix the highlighted fields before submitting.');
+      return;
+    }
+    setInquiryErrors({});
+
     setInquirySubmitting(true);
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('visitexpo_token') : null;
@@ -1287,12 +1982,12 @@ export default function ExpoDetailsPage() {
         {
           eventId: event?._id || event?.id,
           eventSlug: slug,
-          name: inquiryForm.name || user?.name,
-          email: inquiryForm.email || user?.email,
-          phone: inquiryForm.phone || user?.phone,
-          company: inquiryForm.company || user?.company,
-          designation: inquiryForm.designation || user?.designation,
-          message: inquiryForm.message,
+          name: effectiveForm.name,
+          email: effectiveForm.email,
+          phone: effectiveForm.phone,
+          company: effectiveForm.company,
+          designation: effectiveForm.designation,
+          message: effectiveForm.message,
           inquiryType:
             inquiryType === 'stall'
               ? 'Stall Space Booking'
@@ -1308,6 +2003,7 @@ export default function ExpoDetailsPage() {
         setShowInquiryModal(false);
         setInquirySuccess(false);
         setInquiryForm({ name: '', email: '', phone: '', company: '', designation: '', message: '' });
+        setInquiryErrors({});
       }, 1800);
     } catch (err) {
       showToast('Failed to submit inquiry: ' + (err.response?.data?.error || err.message));
@@ -1486,16 +2182,10 @@ export default function ExpoDetailsPage() {
                   </button>
                 </div>
 
-                {/* Dates in Accent Red/Pink Color with 1-Click Google Calendar & Reminder */}
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <div className="text-xs sm:text-sm font-bold text-[#FF2E63]">
-                    {event?.dates || 'Upcoming 2026'}
-                  </div>
-                  <GoogleCalendarButton
-                    event={event}
-                    variant="pill"
-                    className="text-[11px] py-1 px-2.5"
-                  />
+                {/* Event Dates */}
+                <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#FF2E63]">
+                  <Calendar className="h-3.5 w-3.5 shrink-0" />
+                  <span>{event?.dates || 'Upcoming 2026'}</span>
                 </div>
 
                 {/* Event Title */}
@@ -1619,31 +2309,8 @@ export default function ExpoDetailsPage() {
             {/* Right Side: Save / Share / Follow & CTAs */}
             <div className="flex flex-col sm:flex-row lg:flex-col items-end justify-between gap-4 shrink-0">
               
-              {/* Follow Expo, Save & Share Links */}
+              {/* Save, Share & Calendar Links */}
               <div className="flex items-center gap-2 sm:gap-2.5 text-xs font-semibold flex-wrap">
-                <button
-                  type="button"
-                  onClick={handleToggleFollowExpo}
-                  className={`group/follow inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer active:scale-95 shadow-2xs border ${
-                    isFollowingExpo
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-emerald-500/20'
-                      : 'bg-zinc-100 hover:bg-emerald-100 text-zinc-700 hover:text-emerald-900 border-zinc-200 hover:border-emerald-400'
-                  }`}
-                  title={isFollowingExpo ? 'You are following this expo' : 'Follow expo for updates'}
-                >
-                  {isFollowingExpo ? (
-                    <>
-                      <BellRing className="h-3.5 w-3.5 fill-white text-white" />
-                      <span>Following</span>
-                    </>
-                  ) : (
-                    <>
-                      <Bell className="h-3.5 w-3.5 text-zinc-500 transition-all duration-200 group-hover/follow:text-emerald-700 group-hover/follow:scale-110" />
-                      <span>Follow Expo</span>
-                    </>
-                  )}
-                </button>
-
                 <button
                   type="button"
                   onClick={handleSave}
@@ -1746,10 +2413,10 @@ export default function ExpoDetailsPage() {
         {/* ========================================================================= */}
         {/* 2. STICKY NAVIGATION TABS (MATCHING 10TIMES SCREENSHOT 1 & 2)             */}
         {/* ========================================================================= */}
-        <div className="sticky top-16 sm:top-20 z-30 bg-white border border-zinc-200/90 rounded-xl px-4 sm:px-6 shadow-xs">
+        <div className="sticky top-16 sm:top-20 z-30 bg-white border border-zinc-200/90 rounded-xl px-2 sm:px-4 shadow-xs">
           
           {/* Navigation Links */}
-          <div className="flex items-center gap-6 sm:gap-8 overflow-x-auto text-xs sm:text-sm font-bold text-zinc-600 no-scrollbar">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto text-xs sm:text-sm font-bold text-zinc-600 no-scrollbar py-2" role="tablist" aria-label="Event Sections">
             {[
               { id: 'about', label: 'About' },
               { id: 'virtual', label: '🔴 Virtual Hub & Live Stream' },
@@ -1759,19 +2426,31 @@ export default function ExpoDetailsPage() {
               { id: 'speakers', label: 'Speakers' },
               { id: 'reviews', label: `Reviews & Comments (${eventReviews.length > 0 ? eventReviews.length : (reviewsCount || 3)})` },
               { id: 'deals', label: 'Deals' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'border-[#FF2E63] text-zinc-900 font-extrabold'
-                    : 'border-transparent hover:text-zinc-900'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+            ].map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`relative py-2.5 px-3.5 sm:px-4 rounded-lg transition-all cursor-pointer whitespace-nowrap select-none font-bold ${
+                    isActive
+                      ? 'text-[#FF2E63] font-black bg-rose-50/80 shadow-xs ring-1 ring-rose-200/60'
+                      : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100/70'
+                  }`}
+                >
+                  <span className="relative z-10">{tab.label}</span>
+                  {isActive && (
+                    <span
+                      className="absolute bottom-0 left-2.5 right-2.5 h-[3px] bg-[#FF2E63] rounded-full shadow-[0_1px_6px_rgba(255,46,99,0.5)]"
+                      aria-hidden="true"
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
 
         </div>
@@ -1824,20 +2503,20 @@ export default function ExpoDetailsPage() {
 
                     <button
                       type="button"
-                      onClick={handleInterested}
+                      onClick={handleClaimVisitorPass}
                       className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 ${
-                        isInterested
+                        hasClaimedPass
                           ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
                           : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 ring-1 ring-amber-400'
                       }`}
                     >
-                      {isInterested ? (
+                      {hasClaimedPass ? (
                         <>
                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                          <span>You are Confirmed ✓</span>
+                          <span>Pass Confirmed ✓</span>
                         </>
                       ) : (
-                        <span>+ Mark Yourself Interested</span>
+                        <span>Claim Free Pass</span>
                       )}
                     </button>
                   </div>
@@ -2016,10 +2695,21 @@ export default function ExpoDetailsPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={handleInterested}
-                    className="px-4 py-1.5 rounded-lg bg-zinc-900 text-white font-bold text-xs hover:bg-zinc-800 shrink-0 cursor-pointer"
+                    onClick={handleClaimVisitorPass}
+                    className={`px-4 py-1.5 rounded-lg font-bold text-xs shrink-0 cursor-pointer transition-colors flex items-center gap-1.5 ${
+                      hasClaimedPass
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        : 'bg-zinc-900 text-white hover:bg-zinc-800'
+                    }`}
                   >
-                    Claim Badge
+                    {hasClaimedPass ? (
+                      <>
+                        <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                        <span>Badge Claimed ✓</span>
+                      </>
+                    ) : (
+                      <span>Claim Badge</span>
+                    )}
                   </button>
                 </div>
               </div>
@@ -2110,13 +2800,14 @@ export default function ExpoDetailsPage() {
               {/* About Description */}
               <div className="space-y-1 text-zinc-700 text-xs sm:text-sm leading-relaxed">
                 {renderCleanDescription(event?.description, isReadMore, event?.title)}
-                {event?.description?.length > 320 && (
+                {(event?.description?.length > 280 || (event?.description && parseDescriptionBlocks(event.description, event.title)?.length > 2)) && (
                   <button
                     type="button"
                     onClick={() => setIsReadMore(!isReadMore)}
-                    className="text-xs font-bold text-[#FF2E63] hover:underline cursor-pointer inline-block mt-2"
+                    className="text-xs font-bold text-[#FF2E63] hover:text-[#d92252] cursor-pointer inline-flex items-center gap-1.5 mt-3 py-1 px-2.5 rounded-lg bg-rose-50 hover:bg-rose-100/80 transition-colors border border-rose-100 shadow-2xs"
                   >
-                    {isReadMore ? 'Show Less' : 'Read More &rarr;'}
+                    <span>{isReadMore ? 'Show Less' : 'Read Full Description & Highlights'}</span>
+                    <ArrowRight className={`h-3 w-3 transition-transform duration-200 ${isReadMore ? '-rotate-90' : ''}`} />
                   </button>
                 )}
               </div>
@@ -2808,11 +3499,31 @@ export default function ExpoDetailsPage() {
 
                   <button
                     type="button"
-                    onClick={() => showToast('Speaker application submitted to organizer.')}
-                    className="px-4 py-2 rounded-xl border border-zinc-300 hover:bg-zinc-50 text-zinc-800 font-bold text-xs shrink-0 flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                    onClick={handleApplyToSpeak}
+                    disabled={applyingSpeaker}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold shrink-0 flex items-center gap-1.5 transition-all duration-200 shadow-2xs active:scale-95 ${
+                      isAppliedSpeaker
+                        ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-emerald-500/10 cursor-pointer'
+                        : 'border border-zinc-300 hover:bg-zinc-50 text-zinc-800 cursor-pointer'
+                    }`}
+                    title={isAppliedSpeaker ? 'Speaker application active. Click to view status.' : 'Apply to speak at this expo'}
                   >
-                    <Megaphone className="h-3.5 w-3.5" />
-                    <span>Apply to Speak</span>
+                    {applyingSpeaker ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-600" />
+                        <span>Submitting...</span>
+                      </>
+                    ) : isAppliedSpeaker ? (
+                      <>
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>Applied to Speak ✓</span>
+                      </>
+                    ) : (
+                      <>
+                        <Megaphone className="h-3.5 w-3.5" />
+                        <span>Apply to Speak</span>
+                      </>
+                    )}
                   </button>
                 </div>
 
@@ -2884,7 +3595,7 @@ export default function ExpoDetailsPage() {
           {/* ============================================================= */}
           {/* TAB: REVIEWS & COMMENTS DISCUSSION                           */}
           {/* ============================================================= */}
-          {activeTab === 'reviews' && (
+          {(activeTab === 'reviews' || activeTab === 'feed') && (
             <div className="space-y-6">
               <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-7 shadow-xs space-y-6">
                 
@@ -2893,7 +3604,9 @@ export default function ExpoDetailsPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                      <h2 className="text-lg font-extrabold text-zinc-900">Ratings, Reviews &amp; Comments</h2>
+                      <h2 className="text-lg font-extrabold text-zinc-900">
+                        {activeTab === 'feed' ? 'Live Community Activity & Discussion Feed' : 'Ratings, Reviews & Comments'}
+                      </h2>
                       <span className="text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full">
                         {ratingValue} / 5.0 Rating
                       </span>
@@ -2991,14 +3704,20 @@ export default function ExpoDetailsPage() {
                   <form onSubmit={(e) => handlePostComment(e, false)} className="space-y-3.5">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-[11px] font-bold text-zinc-700 mb-1">Your Name *</label>
+                        <label className="flex items-center justify-between text-[11px] font-bold text-zinc-700 mb-1">
+                          <span>Your Name *</span>
+                          {Boolean(user?.name || user) && (
+                            <span className="text-[10px] text-zinc-400 font-semibold">Account Verified</span>
+                          )}
+                        </label>
                         <input
                           type="text"
                           required
+                          disabled={Boolean(user?.name || user)}
                           placeholder={user?.name || "e.g. Ananya Sen"}
-                          value={commentAuthor}
+                          value={commentAuthor || user?.name || ''}
                           onChange={(e) => setCommentAuthor(e.target.value)}
-                          className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] shadow-2xs font-medium"
+                          className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] shadow-2xs font-medium disabled:bg-zinc-100 disabled:text-zinc-500 disabled:border-zinc-200 disabled:cursor-not-allowed disabled:shadow-none"
                         />
                       </div>
                       <div>
@@ -3007,9 +3726,28 @@ export default function ExpoDetailsPage() {
                           type="text"
                           placeholder={user?.company || "e.g. Apex Industrial Systems"}
                           value={commentCompany}
-                          onChange={(e) => setCommentCompany(e.target.value)}
-                          className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] shadow-2xs font-medium"
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCommentCompany(val);
+                            if (commentErrors.company) {
+                              setCommentErrors((prev) => ({ ...prev, company: validateCommentField('company', val) }));
+                            }
+                          }}
+                          onBlur={(e) => {
+                            setCommentErrors((prev) => ({ ...prev, company: validateCommentField('company', e.target.value) }));
+                          }}
+                          className={`w-full px-3 py-2 text-xs rounded-xl transition-colors font-medium shadow-2xs focus:outline-none focus:ring-2 ${
+                            commentErrors.company
+                              ? 'border border-rose-400 bg-rose-50/30 focus:ring-rose-400 ring-1 ring-rose-400/50'
+                              : 'border border-zinc-200 bg-white text-zinc-900 focus:ring-[#FFCC00]'
+                          }`}
                         />
+                        {commentErrors.company && (
+                          <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-1">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-500" />
+                            <span>{commentErrors.company}</span>
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -3021,9 +3759,28 @@ export default function ExpoDetailsPage() {
                         rows={3}
                         placeholder="Write your comment, question about visitor passes, or exhibition impressions here..."
                         value={commentText}
-                        onChange={(e) => setCommentText(e.target.value)}
-                        className="w-full p-3 text-xs rounded-xl border border-zinc-200 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#FFCC00] shadow-2xs leading-relaxed"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCommentText(val);
+                          if (commentErrors.comment) {
+                            setCommentErrors((prev) => ({ ...prev, comment: validateCommentField('comment', val) }));
+                          }
+                        }}
+                        onBlur={(e) => {
+                          setCommentErrors((prev) => ({ ...prev, comment: validateCommentField('comment', e.target.value) }));
+                        }}
+                        className={`w-full p-3 text-xs rounded-xl shadow-2xs leading-relaxed transition-colors focus:outline-none focus:ring-2 resize-none ${
+                          commentErrors.comment
+                            ? 'border border-rose-400 bg-rose-50/30 focus:ring-rose-400 ring-1 ring-rose-400/50'
+                            : 'border border-zinc-200 bg-white text-zinc-900 focus:ring-[#FFCC00]'
+                        }`}
                       />
+                      {commentErrors.comment && (
+                        <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-1">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-500" />
+                          <span>{commentErrors.comment}</span>
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex items-center justify-between gap-3 pt-1">
@@ -3070,6 +3827,7 @@ export default function ExpoDetailsPage() {
                     ? eventReviews.map((r) => ({
                         id: r._id || r.id,
                         author: r.name,
+                        email: r.email,
                         role: `${r.title ? r.title + ' • ' : ''}${r.company || r.role || 'Verified Trade Buyer'}`,
                         rating: r.rating || 5,
                         headline: r.headline,
@@ -3115,6 +3873,13 @@ export default function ExpoDetailsPage() {
                       ]
                   ).map((rev, rIdx) => {
                     const isHelpfulClicked = rev.id && helpfulLikedIds.has(rev.id);
+                    const isOwner = Boolean(
+                      (user?.name && rev.author?.toLowerCase().trim() === user.name?.toLowerCase().trim()) ||
+                      (user?.email && rev.email?.toLowerCase().trim() === user.email?.toLowerCase().trim()) ||
+                      String(rev.id).startsWith('temp_') ||
+                      user?.role === 'admin' ||
+                      user?.role === 'organizer'
+                    );
 
                     return (
                       <div
@@ -3148,43 +3913,137 @@ export default function ExpoDetailsPage() {
                           </div>
                         </div>
 
-                        {rev.headline && (
-                          <div className="text-xs font-black text-zinc-950 pt-0.5">&ldquo;{rev.headline}&rdquo;</div>
+                        {editingCommentId === rev.id ? (
+                          <div className="space-y-3 pt-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-zinc-700">Rating:</span>
+                              <div className="flex items-center gap-1">
+                                {[1, 2, 3, 4, 5].map((s) => (
+                                  <button
+                                    key={s}
+                                    type="button"
+                                    onClick={() => setEditingCommentRating(s)}
+                                    className="p-0.5 cursor-pointer hover:scale-110 transition-transform"
+                                  >
+                                    <Star
+                                      className={`h-4 w-4 ${
+                                        s <= editingCommentRating ? 'fill-amber-400 text-amber-400' : 'text-zinc-300'
+                                      }`}
+                                    />
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <textarea
+                              rows={3}
+                              value={editingCommentText}
+                              onChange={(e) => {
+                                setEditingCommentText(e.target.value);
+                                if (editingCommentError) {
+                                  setEditingCommentError(validateCommentField('comment', e.target.value));
+                                }
+                              }}
+                              className={`w-full p-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 resize-none transition-colors ${
+                                editingCommentError
+                                  ? 'border border-rose-400 bg-rose-50/20 focus:ring-rose-400'
+                                  : 'border border-zinc-200 bg-zinc-50 focus:bg-white focus:ring-zinc-900'
+                              }`}
+                              placeholder="Update your comment..."
+                            />
+                            {editingCommentError && (
+                              <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-500" />
+                                <span>{editingCommentError}</span>
+                              </p>
+                            )}
+
+                            <div className="flex items-center justify-end gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={handleCancelEditComment}
+                                className="px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-600 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 transition-colors cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isUpdatingComment}
+                                onClick={() => handleSaveEditComment(rev.id)}
+                                className="px-4 py-1.5 rounded-lg text-xs font-bold text-zinc-950 bg-[#FFCC00] hover:bg-[#FFB703] transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                              >
+                                {isUpdatingComment ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                                <span>Save Changes</span>
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {rev.headline && (
+                              <div className="text-xs font-black text-zinc-950 pt-0.5">&ldquo;{rev.headline}&rdquo;</div>
+                            )}
+
+                            <p className="text-xs text-zinc-700 leading-relaxed font-normal">
+                              &ldquo;{rev.review}&rdquo;
+                            </p>
+
+                            {/* Comment Actions: Helpful, Edit, Delete, Reply */}
+                            <div className="flex items-center justify-between pt-2 border-t border-zinc-100 text-xs text-zinc-500">
+                              <button
+                                type="button"
+                                onClick={() => handleHelpfulReaction(rev.id)}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                                  isHelpfulClicked
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : 'hover:bg-zinc-100 text-zinc-600'
+                                }`}
+                              >
+                                <span>👍 Helpful ({rev.helpfulCount})</span>
+                              </button>
+
+                              <div className="flex items-center gap-3">
+                                {isOwner && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStartEditComment(rev)}
+                                      className="text-[11px] font-bold text-amber-600 hover:text-amber-700 hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                                      title="Edit your comment"
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                      <span>Edit</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteComment(rev.id)}
+                                      className="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                                      title="Delete this comment"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                      <span>Delete</span>
+                                    </button>
+                                  </>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCommentText(`@${rev.author} `);
+                                    const el = document.getElementById('comment-box-input');
+                                    if (el) {
+                                      el.focus();
+                                      el.scrollIntoView({ behavior: 'smooth' });
+                                    }
+                                  }}
+                                  className="text-[11px] font-bold text-zinc-500 hover:text-zinc-900 cursor-pointer"
+                                >
+                                  Reply
+                                </button>
+                              </div>
+                            </div>
+                          </>
                         )}
-
-                        <p className="text-xs text-zinc-700 leading-relaxed font-normal">
-                          &ldquo;{rev.review}&rdquo;
-                        </p>
-
-                        {/* Comment Actions: Helpful & Reply */}
-                        <div className="flex items-center justify-between pt-2 border-t border-zinc-100 text-xs text-zinc-500">
-                          <button
-                            type="button"
-                            onClick={() => handleHelpfulReaction(rev.id)}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
-                              isHelpfulClicked
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'hover:bg-zinc-100 text-zinc-600'
-                            }`}
-                          >
-                            <span>👍 Helpful ({rev.helpfulCount})</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCommentText(`@${rev.author} `);
-                              const el = document.getElementById('comment-box-input');
-                              if (el) {
-                                el.focus();
-                                el.scrollIntoView({ behavior: 'smooth' });
-                              }
-                            }}
-                            className="text-[11px] font-bold text-zinc-500 hover:text-zinc-900 cursor-pointer"
-                          >
-                            Reply
-                          </button>
-                        </div>
                       </div>
                     );
                   })}
@@ -3232,10 +4091,21 @@ export default function ExpoDetailsPage() {
                     </div>
                     <button
                       type="button"
-                      onClick={handleInterested}
-                      className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                      onClick={handleClaimVisitorPass}
+                      className={`w-full py-2.5 rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
+                        hasClaimedPass
+                          ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      }`}
                     >
-                      {isInterested ? 'Pass Confirmed ✓' : 'Claim Free Pass Now'}
+                      {hasClaimedPass ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 text-white" />
+                          <span>Pass Confirmed ✓</span>
+                        </>
+                      ) : (
+                        <span>Claim Free Pass Now</span>
+                      )}
                     </button>
                   </div>
 
@@ -3298,10 +4168,21 @@ export default function ExpoDetailsPage() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => showToast('Delegation inquiry submitted. Concierge will contact you.')}
-                      className="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                      onClick={handleApplyDelegation}
+                      className={`w-full py-2.5 rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
+                        isAppliedDelegation
+                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                          : 'bg-zinc-900 hover:bg-zinc-800 text-white'
+                      }`}
                     >
-                      Apply for Delegation Perks
+                      {isAppliedDelegation ? (
+                        <>
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                          <span>Delegation Perks Applied ✓</span>
+                        </>
+                      ) : (
+                        <span>Apply for Delegation Perks</span>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -3768,99 +4649,7 @@ export default function ExpoDetailsPage() {
             </div>
           )}
 
-          {/* ------------------------------------------------------------------- */}
-          {/* RECOMMENDED & SIMILAR TRADE SHOWS (POWERED BY RECOMMENDATION ENGINE) */}
-          {/* ------------------------------------------------------------------- */}
-          <div className="pt-8 border-t border-zinc-200/80 space-y-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 mb-1">
-                  <span>Recommendation Engine</span>
-                </div>
-                <h3 className="text-lg sm:text-xl font-extrabold text-zinc-900 tracking-tight">
-                  Similar &amp; Recommended Exhibitions
-                </h3>
-                <p className="text-xs text-zinc-500">
-                  Curated expos in {event?.city || 'India'} matching {event?.categories?.[0] || event?.category || 'this sector'}.
-                </p>
-              </div>
-              <Link
-                href="/recommendations"
-                className="text-xs font-bold text-[#FF2E63] hover:underline flex items-center gap-1"
-              >
-                <span>Explore More</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
 
-            {loadingRecommendations ? (
-              <div className="grid sm:grid-cols-2 gap-4">
-                {[1, 2].map((sk) => (
-                  <div key={sk} className="h-44 bg-zinc-100 rounded-2xl animate-pulse" />
-                ))}
-              </div>
-            ) : recommendedEvents.length > 0 ? (
-              <div className="grid sm:grid-cols-2 gap-4">
-                {recommendedEvents.map((rec) => (
-                  <div
-                    key={rec._id || rec.id || rec.slug}
-                    className="group bg-white border border-zinc-200 rounded-2xl p-4 flex flex-col justify-between hover:border-zinc-300 hover:shadow-md transition-all space-y-3"
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-[10px] font-extrabold text-zinc-700 bg-zinc-100 px-2.5 py-0.5 rounded-md truncate max-w-[60%]">
-                          {rec.categories?.[0] || rec.category || 'Exhibition'}
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-[10px] font-black bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-2.5 py-0.5 rounded-full shadow-2xs">
-                          <span>{rec.matchScore || 88}% Match</span>
-                        </span>
-                      </div>
-
-                      <Link
-                        href={`/expo/${rec.slug || rec.id || rec._id}`}
-                        className="font-bold text-xs sm:text-sm text-zinc-900 group-hover:text-[#FF2E63] transition-colors line-clamp-2 block leading-snug"
-                      >
-                        {rec.title}
-                      </Link>
-
-                      <div className="space-y-1 text-xs text-zinc-500">
-                        <div className="flex items-center gap-1.5 text-zinc-700 font-semibold">
-                          <Calendar className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-                          <span>{rec.startDate ? new Date(rec.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Upcoming'}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 truncate">
-                          <MapPin className="h-3.5 w-3.5 text-[#FF2E63] shrink-0" />
-                          <span className="truncate">{rec.venue || rec.city}</span>
-                        </div>
-                      </div>
-
-                      {rec.matchReasons && rec.matchReasons.length > 0 && (
-                        <div className="text-[10px] text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 font-medium">
-                          ✓ {rec.matchReasons[0]}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="pt-3 border-t border-zinc-100 flex items-center justify-between text-xs">
-                      <Link
-                        href={`/expo/${rec.slug || rec.id || rec._id}`}
-                        className="font-bold text-zinc-700 hover:text-zinc-950"
-                      >
-                        View Details
-                      </Link>
-                      <Link
-                        href={`/expo/${rec.slug || rec.id || rec._id}`}
-                        className="font-extrabold text-[#FF2E63] hover:underline flex items-center gap-1"
-                      >
-                        <span>Get Pass</span>
-                        <ArrowRight className="h-3 w-3" />
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
 
           </div>
 
@@ -3933,19 +4722,38 @@ export default function ExpoDetailsPage() {
 
             {/* Sidebar Card 3: Free Visitor Pass Guarantee */}
             <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs space-y-3">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                <h4 className="text-xs font-bold text-zinc-900">VisitExpo Official Pass Guarantee</h4>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                  <h4 className="text-xs font-bold text-zinc-900">VisitExpo Official Pass Guarantee</h4>
+                </div>
+                {hasClaimedPass && (
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    Active Pass
+                  </span>
+                )}
               </div>
               <p className="text-xs text-zinc-600 leading-relaxed">
                 Registered attendees receive a verified digital QR pass compatible with fast-track entry kiosks at {event?.city}.
               </p>
               <button
                 type="button"
-                onClick={handleInterested}
-                className="w-full py-2.5 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-extrabold text-xs shadow-xs transition-colors cursor-pointer"
+                onClick={handleClaimVisitorPass}
+                className={`w-full py-2.5 px-3 rounded-xl font-extrabold text-xs shadow-xs transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 active:scale-98 ${
+                  hasClaimedPass
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
+                    : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 ring-1 ring-amber-400'
+                }`}
               >
-                Claim Free Visitor Pass
+                {hasClaimedPass ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 text-white shrink-0" />
+                    <span>Pass Claimed ✓ (View Details)</span>
+                  </>
+                ) : (
+                  <span>Claim Free Visitor Pass</span>
+                )}
               </button>
             </div>
 
@@ -3955,16 +4763,112 @@ export default function ExpoDetailsPage() {
               <p className="text-xs text-amber-900/80 leading-relaxed">
                 Connect with our concierge for bulk tickets, exhibitor stall pricing, or accommodation discounts.
               </p>
-              <a
-                href="mailto:contact@visitexpo.in"
-                className="inline-block text-xs font-bold text-zinc-900 hover:underline pt-1"
+              <button
+                type="button"
+                onClick={() => handleRequestBooth('general')}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-900 hover:text-amber-800 hover:underline pt-1 cursor-pointer"
               >
-                Email Concierge &rarr;
-              </a>
+                <span>Email Concierge &rarr;</span>
+              </button>
             </div>
 
           </div>
 
+        </div>
+
+        {/* ========================================================================= */}
+        {/* 4. RECOMMENDED & SIMILAR TRADE SHOWS (FULL-WIDTH 4-COLUMN SHOWCASE)       */}
+        {/* ========================================================================= */}
+        <div className="pt-10 border-t border-zinc-200/80 space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 mb-1">
+                <span>Recommendation Engine</span>
+              </div>
+              <h3 className="text-lg sm:text-2xl font-extrabold text-zinc-900 tracking-tight">
+                Similar &amp; Recommended Exhibitions
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-500">
+                Curated expos in {event?.city || 'India'} matching {event?.categories?.[0] || event?.category || 'this sector'}.
+              </p>
+            </div>
+            <Link
+              href="/recommendations"
+              className="text-xs sm:text-sm font-bold text-[#FF2E63] hover:underline flex items-center gap-1"
+            >
+              <span>Explore More</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          {loadingRecommendations ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+              {[1, 2, 3, 4].map((sk) => (
+                <div key={sk} className="h-44 bg-zinc-100 rounded-2xl animate-pulse" />
+              ))}
+            </div>
+          ) : recommendedEvents.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+              {recommendedEvents.map((rec) => (
+                <div
+                  key={rec._id || rec.id || rec.slug}
+                  className="group bg-white border border-zinc-200/90 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-amber-400 hover:shadow-lg transition-all space-y-3 shadow-2xs"
+                >
+                  <div className="space-y-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-[10px] font-extrabold text-zinc-700 bg-zinc-100 px-2.5 py-0.5 rounded-md truncate max-w-[60%]">
+                        {rec.categories?.[0] || rec.category || 'Exhibition'}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-2.5 py-0.5 rounded-full shadow-2xs">
+                        <span>{rec.matchScore || 88}% Match</span>
+                      </span>
+                    </div>
+
+                    <Link
+                      href={`/expo/${rec.slug || rec.id || rec._id}`}
+                      className="font-bold text-xs sm:text-sm text-zinc-900 group-hover:text-[#FF2E63] transition-colors line-clamp-2 block leading-snug"
+                    >
+                      {rec.title}
+                    </Link>
+
+                    <div className="space-y-1 text-xs text-zinc-500">
+                      <div className="flex items-center gap-1.5 text-zinc-700 font-semibold">
+                        <Calendar className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                        <span>{rec.startDate ? new Date(rec.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Upcoming'}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 truncate">
+                        <MapPin className="h-3.5 w-3.5 text-[#FF2E63] shrink-0" />
+                        <span className="truncate">{rec.venue || rec.city}</span>
+                      </div>
+                    </div>
+
+                    {rec.matchReasons && rec.matchReasons.length > 0 && (
+                      <div className="text-[10px] text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 font-medium">
+                        ✓ {rec.matchReasons[0]}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-3 border-t border-zinc-100 flex items-center justify-between text-xs">
+                    <Link
+                      href={`/expo/${rec.slug || rec.id || rec._id}`}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-zinc-200 bg-zinc-100 hover:bg-zinc-200/90 text-zinc-800 hover:text-zinc-950 font-bold text-xs hover:underline transition-all shadow-2xs active:scale-95 cursor-pointer"
+                    >
+                      <span>View Details</span>
+                      <ChevronRight className="h-3 w-3 text-zinc-500" />
+                    </Link>
+                    <Link
+                      href={`/expo/${rec.slug || rec.id || rec._id}`}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-zinc-950 text-[#FFCC00] hover:bg-[#FFCC00] hover:text-zinc-950 font-black text-xs transition-all shadow-sm active:scale-95 cursor-pointer"
+                    >
+                      <span>Get Pass</span>
+                      <ArrowRight className="h-3 w-3" />
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
       </main>
@@ -4010,8 +4914,12 @@ export default function ExpoDetailsPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setConnectionModalUser(null)}
-                className="text-zinc-400 hover:text-zinc-600 p-1 cursor-pointer font-bold"
+                onClick={() => {
+                  setConnectionModalUser(null);
+                  setConnectionNoteError('');
+                }}
+                className="p-1.5 rounded-xl text-zinc-400 hover:text-rose-600 bg-zinc-100 hover:bg-rose-50 border border-zinc-200/80 hover:border-rose-200 transition-all duration-200 cursor-pointer active:scale-95 shadow-2xs font-bold"
+                aria-label="Close modal"
               >
                 ✕
               </button>
@@ -4024,31 +4932,59 @@ export default function ExpoDetailsPage() {
                 <p className="text-[11px] text-zinc-500">{connectionModalUser.name} has been notified via their VisitExpo inbox.</p>
               </div>
             ) : (
-              <form onSubmit={handleSendConnectionNote} className="space-y-3">
+              <form onSubmit={handleSendConnectionNote} noValidate className="space-y-3">
                 <div>
-                  <label className="block text-xs font-bold text-zinc-700 mb-1">
-                    Personalized Message / B2B Matchmaking Note
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-zinc-700">
+                      Personalized Message / B2B Matchmaking Note *
+                    </label>
+                    <span className={`text-[10px] font-semibold ${connectionNote.length > 500 ? 'text-rose-500 font-bold' : 'text-zinc-400'}`}>
+                      {connectionNote.length}/500
+                    </span>
+                  </div>
                   <textarea
                     rows={4}
-                    required
                     value={connectionNote}
-                    onChange={(e) => setConnectionNote(e.target.value)}
-                    className="w-full p-2.5 text-xs rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setConnectionNote(val);
+                      if (connectionNoteError) {
+                        const err = validateConnectionNote(val);
+                        setConnectionNoteError(err || '');
+                      }
+                    }}
+                    onBlur={() => {
+                      const err = validateConnectionNote(connectionNote);
+                      setConnectionNoteError(err || '');
+                    }}
+                    className={`w-full p-2.5 text-xs rounded-xl border bg-zinc-50 focus:bg-white focus:outline-none transition-all ${
+                      connectionNoteError
+                        ? 'border-rose-500 bg-rose-500/5 focus:border-rose-500 ring-1 ring-rose-500/20'
+                        : 'border-zinc-200 focus:ring-1 focus:ring-zinc-800'
+                    }`}
                     placeholder="Introduce yourself and specify products or cooperation you'd like to discuss..."
                   />
+                  {connectionNoteError && (
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-rose-600 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1.5 rounded-lg mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0 text-rose-500" />
+                      <span>{connectionNoteError}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center justify-end gap-2 pt-1">
                   <button
                     type="button"
-                    onClick={() => setConnectionModalUser(null)}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-600 hover:bg-zinc-100 cursor-pointer"
+                    onClick={() => {
+                      setConnectionModalUser(null);
+                      setConnectionNoteError('');
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-700 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 hover:border-zinc-400 shadow-xs transition-all duration-200 cursor-pointer active:scale-95"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5"
+                    className="px-5 py-2 rounded-xl bg-zinc-900 hover:bg-blue-600 text-white text-xs font-bold shadow-xs transition-all duration-200 cursor-pointer active:scale-95 flex items-center gap-1.5"
                   >
                     <Send className="h-3.5 w-3.5" />
                     <span>Send Request</span>
@@ -4099,14 +5035,20 @@ export default function ExpoDetailsPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-xs font-bold text-zinc-700 mb-1">Your Name *</label>
+                    <label className="flex items-center justify-between text-xs font-bold text-zinc-700 mb-1">
+                      <span>Your Name *</span>
+                      {Boolean(user?.name || user) && (
+                        <span className="text-[10px] text-zinc-400 font-semibold">Account Verified</span>
+                      )}
+                    </label>
                     <input
                       type="text"
                       required
+                      disabled={Boolean(user?.name || user)}
                       placeholder={user?.name || "e.g. Rahul Sharma"}
-                      value={reviewerName}
+                      value={reviewerName || user?.name || ''}
                       onChange={(e) => setReviewerName(e.target.value)}
-                      className="w-full p-2 text-xs rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                      className="w-full p-2 text-xs rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800 disabled:bg-zinc-100 disabled:text-zinc-500 disabled:border-zinc-200 disabled:cursor-not-allowed disabled:shadow-none"
                     />
                   </div>
                   <div>
@@ -4115,9 +5057,28 @@ export default function ExpoDetailsPage() {
                       type="text"
                       placeholder="e.g. Apex Industries"
                       value={reviewerCompany}
-                      onChange={(e) => setReviewerCompany(e.target.value)}
-                      className="w-full p-2 text-xs rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setReviewerCompany(val);
+                        if (reviewModalErrors.company) {
+                          setReviewModalErrors((prev) => ({ ...prev, company: validateCommentField('company', val) }));
+                        }
+                      }}
+                      onBlur={(e) => {
+                        setReviewModalErrors((prev) => ({ ...prev, company: validateCommentField('company', e.target.value) }));
+                      }}
+                      className={`w-full p-2 text-xs rounded-xl focus:outline-none focus:ring-1 ${
+                        reviewModalErrors.company
+                          ? 'border border-rose-400 bg-rose-50/30 focus:ring-rose-400'
+                          : 'border border-zinc-200 bg-zinc-50 focus:bg-white focus:ring-zinc-800'
+                      }`}
                     />
+                    {reviewModalErrors.company && (
+                      <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-1">
+                        <AlertCircle className="w-3 h-3 shrink-0 text-rose-500" />
+                        <span>{reviewModalErrors.company}</span>
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -4155,16 +5116,35 @@ export default function ExpoDetailsPage() {
                     rows={3}
                     placeholder="Share your experience regarding exhibition stalls, crowd quality, or venue facilities..."
                     value={reviewText}
-                    onChange={(e) => setReviewText(e.target.value)}
-                    className="w-full p-2.5 text-xs rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setReviewText(val);
+                      if (reviewModalErrors.comment) {
+                        setReviewModalErrors((prev) => ({ ...prev, comment: validateCommentField('comment', val) }));
+                      }
+                    }}
+                    onBlur={(e) => {
+                      setReviewModalErrors((prev) => ({ ...prev, comment: validateCommentField('comment', e.target.value) }));
+                    }}
+                    className={`w-full p-2.5 text-xs rounded-xl focus:outline-none focus:ring-1 resize-none ${
+                      reviewModalErrors.comment
+                        ? 'border border-rose-400 bg-rose-50/30 focus:ring-rose-400'
+                        : 'border border-zinc-200 bg-zinc-50 focus:bg-white focus:ring-zinc-800'
+                    }`}
                   />
+                  {reviewModalErrors.comment && (
+                    <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-1">
+                      <AlertCircle className="w-3 h-3 shrink-0 text-rose-500" />
+                      <span>{reviewModalErrors.comment}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-end gap-2 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowReviewModal(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-600 hover:bg-zinc-100"
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-700 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 hover:border-zinc-400 shadow-xs transition-all duration-200 cursor-pointer active:scale-95"
                   >
                     Cancel
                   </button>
@@ -4389,7 +5369,7 @@ export default function ExpoDetailsPage() {
                 <button
                   type="button"
                   onClick={() => setBoothChatModal(null)}
-                  className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs cursor-pointer transition-colors"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-700 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 hover:border-zinc-400 shadow-xs transition-all duration-200 cursor-pointer active:scale-95"
                 >
                   Cancel
                 </button>
@@ -4498,7 +5478,7 @@ export default function ExpoDetailsPage() {
                 <button
                   type="button"
                   onClick={() => setCheckInModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs cursor-pointer transition-colors"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-700 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 hover:border-zinc-400 shadow-xs transition-all duration-200 cursor-pointer active:scale-95"
                 >
                   Cancel
                 </button>
@@ -4537,7 +5517,10 @@ export default function ExpoDetailsPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setShowInquiryModal(false)}
+                onClick={() => {
+                  setShowInquiryModal(false);
+                  setInquiryErrors({});
+                }}
                 className="text-zinc-400 hover:text-white font-bold p-1 cursor-pointer transition-colors"
               >
                 ✕
@@ -4548,7 +5531,10 @@ export default function ExpoDetailsPage() {
             <div className="grid grid-cols-3 bg-zinc-100 p-1 border-b border-zinc-200 text-xs font-bold text-center">
               <button
                 type="button"
-                onClick={() => setInquiryType('stall')}
+                onClick={() => {
+                  setInquiryType('stall');
+                  setInquiryErrors({});
+                }}
                 className={`py-2 px-1 rounded-xl transition-all cursor-pointer ${
                   inquiryType === 'stall'
                     ? 'bg-white text-zinc-950 shadow-xs'
@@ -4559,7 +5545,10 @@ export default function ExpoDetailsPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setInquiryType('visitor_pass')}
+                onClick={() => {
+                  setInquiryType('visitor_pass');
+                  setInquiryErrors({});
+                }}
                 className={`py-2 px-1 rounded-xl transition-all cursor-pointer ${
                   inquiryType === 'visitor_pass'
                     ? 'bg-white text-zinc-950 shadow-xs'
@@ -4570,7 +5559,10 @@ export default function ExpoDetailsPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setInquiryType('general')}
+                onClick={() => {
+                  setInquiryType('general');
+                  setInquiryErrors({});
+                }}
                 className={`py-2 px-1 rounded-xl transition-all cursor-pointer ${
                   inquiryType === 'general'
                     ? 'bg-white text-zinc-950 shadow-xs'
@@ -4585,49 +5577,154 @@ export default function ExpoDetailsPage() {
             <form onSubmit={handleInquirySubmit} className="p-5 space-y-3.5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-zinc-700">Full Name *</label>
+                  <label className="text-xs font-bold text-zinc-700 flex items-center justify-between">
+                    <span>Full Name *</span>
+                    {Boolean(user?.name || user) && (
+                      <span className="text-[10px] text-zinc-400 font-semibold">Account Verified</span>
+                    )}
+                  </label>
                   <input
                     type="text"
                     required
+                    disabled={Boolean(user?.name || user)}
                     value={inquiryForm.name}
-                    onChange={(e) => setInquiryForm((prev) => ({ ...prev, name: e.target.value }))}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setInquiryForm((prev) => ({ ...prev, name: val }));
+                      if (inquiryErrors.name) {
+                        setInquiryErrors((prev) => ({ ...prev, name: validateInquiryField('name', val, inquiryType) }));
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (!user?.name && !user) {
+                        setInquiryErrors((prev) => ({ ...prev, name: validateInquiryField('name', e.target.value, inquiryType) }));
+                      }
+                    }}
                     placeholder="e.g. David Miller"
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                    className={`w-full rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 disabled:bg-zinc-100 disabled:text-zinc-500 disabled:border-zinc-200 disabled:cursor-not-allowed disabled:shadow-none transition-colors ${
+                      inquiryErrors.name
+                        ? 'border border-rose-400 bg-rose-50/20 focus:ring-rose-400'
+                        : 'border border-zinc-200 bg-zinc-50 focus:ring-zinc-900'
+                    }`}
                   />
+                  {inquiryErrors.name && (
+                    <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-0.5">
+                      <AlertCircle className="w-3 h-3 shrink-0 text-rose-500" />
+                      <span>{inquiryErrors.name}</span>
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-zinc-700">Work Email *</label>
+                  <label className="text-xs font-bold text-zinc-700 flex items-center justify-between">
+                    <span>Work Email *</span>
+                    {Boolean(user?.email || user) && (
+                      <span className="text-[10px] text-zinc-400 font-semibold">Account Verified</span>
+                    )}
+                  </label>
                   <input
                     type="email"
                     required
+                    disabled={Boolean(user?.email || user)}
                     value={inquiryForm.email}
-                    onChange={(e) => setInquiryForm((prev) => ({ ...prev, email: e.target.value }))}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setInquiryForm((prev) => ({ ...prev, email: val }));
+                      if (inquiryErrors.email) {
+                        setInquiryErrors((prev) => ({ ...prev, email: validateInquiryField('email', val, inquiryType) }));
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (!user?.email && !user) {
+                        setInquiryErrors((prev) => ({ ...prev, email: validateInquiryField('email', e.target.value, inquiryType) }));
+                      }
+                    }}
                     placeholder="name@company.com"
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                    className={`w-full rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 disabled:bg-zinc-100 disabled:text-zinc-500 disabled:border-zinc-200 disabled:cursor-not-allowed disabled:shadow-none transition-colors ${
+                      inquiryErrors.email
+                        ? 'border border-rose-400 bg-rose-50/20 focus:ring-rose-400'
+                        : 'border border-zinc-200 bg-zinc-50 focus:ring-zinc-900'
+                    }`}
                   />
+                  {inquiryErrors.email && (
+                    <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-0.5">
+                      <AlertCircle className="w-3 h-3 shrink-0 text-rose-500" />
+                      <span>{inquiryErrors.email}</span>
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-zinc-700">Phone / WhatsApp</label>
+                  <label className="text-xs font-bold text-zinc-700 flex items-center justify-between">
+                    <span>Phone / WhatsApp</span>
+                    {Boolean(user?.phone || user) && (
+                      <span className="text-[10px] text-zinc-400 font-semibold">Account Verified</span>
+                    )}
+                  </label>
                   <input
                     type="tel"
+                    disabled={Boolean(user?.phone || user)}
                     value={inquiryForm.phone}
-                    onChange={(e) => setInquiryForm((prev) => ({ ...prev, phone: e.target.value }))}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setInquiryForm((prev) => ({ ...prev, phone: val }));
+                      if (inquiryErrors.phone) {
+                        setInquiryErrors((prev) => ({ ...prev, phone: validateInquiryField('phone', val, inquiryType) }));
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (!user?.phone && !user) {
+                        setInquiryErrors((prev) => ({ ...prev, phone: validateInquiryField('phone', e.target.value, inquiryType) }));
+                      }
+                    }}
                     placeholder="+91 98765 43210"
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                    className={`w-full rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 disabled:bg-zinc-100 disabled:text-zinc-500 disabled:border-zinc-200 disabled:cursor-not-allowed disabled:shadow-none transition-colors ${
+                      inquiryErrors.phone
+                        ? 'border border-rose-400 bg-rose-50/20 focus:ring-rose-400'
+                        : 'border border-zinc-200 bg-zinc-50 focus:ring-zinc-900'
+                    }`}
                   />
+                  {inquiryErrors.phone && (
+                    <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-0.5">
+                      <AlertCircle className="w-3 h-3 shrink-0 text-rose-500" />
+                      <span>{inquiryErrors.phone}</span>
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-zinc-700">Company / Organization</label>
+                  <label className="text-xs font-bold text-zinc-700 flex items-center justify-between">
+                    <span>Company / Organization {inquiryType === 'stall' && <span className="text-rose-500">*</span>}</span>
+                    {inquiryType === 'stall' && (
+                      <span className="text-[10px] text-amber-600 font-semibold">Required for Stall</span>
+                    )}
+                  </label>
                   <input
                     type="text"
                     value={inquiryForm.company}
-                    onChange={(e) => setInquiryForm((prev) => ({ ...prev, company: e.target.value }))}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setInquiryForm((prev) => ({ ...prev, company: val }));
+                      if (inquiryErrors.company) {
+                        setInquiryErrors((prev) => ({ ...prev, company: validateInquiryField('company', val, inquiryType) }));
+                      }
+                    }}
+                    onBlur={(e) => {
+                      setInquiryErrors((prev) => ({ ...prev, company: validateInquiryField('company', e.target.value, inquiryType) }));
+                    }}
                     placeholder="e.g. Apex Confectionery"
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                    className={`w-full rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 transition-colors ${
+                      inquiryErrors.company
+                        ? 'border border-rose-400 bg-rose-50/30 focus:ring-rose-400 ring-1 ring-rose-400/50'
+                        : 'border border-zinc-200 bg-zinc-50 focus:ring-zinc-900'
+                    }`}
                   />
+                  {inquiryErrors.company && (
+                    <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-0.5">
+                      <AlertCircle className="w-3 h-3 shrink-0 text-rose-500" />
+                      <span>{inquiryErrors.company}</span>
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -4636,10 +5733,29 @@ export default function ExpoDetailsPage() {
                 <input
                   type="text"
                   value={inquiryForm.designation}
-                  onChange={(e) => setInquiryForm((prev) => ({ ...prev, designation: e.target.value }))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setInquiryForm((prev) => ({ ...prev, designation: val }));
+                    if (inquiryErrors.designation) {
+                      setInquiryErrors((prev) => ({ ...prev, designation: validateInquiryField('designation', val, inquiryType) }));
+                    }
+                  }}
+                  onBlur={(e) => {
+                    setInquiryErrors((prev) => ({ ...prev, designation: validateInquiryField('designation', e.target.value, inquiryType) }));
+                  }}
                   placeholder="e.g. VP of Procurement / Marketing Director"
-                  className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                  className={`w-full rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 transition-colors ${
+                    inquiryErrors.designation
+                      ? 'border border-rose-400 bg-rose-50/30 focus:ring-rose-400 ring-1 ring-rose-400/50'
+                      : 'border border-zinc-200 bg-zinc-50 focus:ring-zinc-900'
+                  }`}
                 />
+                {inquiryErrors.designation && (
+                  <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-0.5">
+                    <AlertCircle className="w-3 h-3 shrink-0 text-rose-500" />
+                    <span>{inquiryErrors.designation}</span>
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -4647,7 +5763,16 @@ export default function ExpoDetailsPage() {
                 <textarea
                   rows={3}
                   value={inquiryForm.message}
-                  onChange={(e) => setInquiryForm((prev) => ({ ...prev, message: e.target.value }))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setInquiryForm((prev) => ({ ...prev, message: val }));
+                    if (inquiryErrors.message) {
+                      setInquiryErrors((prev) => ({ ...prev, message: validateInquiryField('message', val, inquiryType) }));
+                    }
+                  }}
+                  onBlur={(e) => {
+                    setInquiryErrors((prev) => ({ ...prev, message: validateInquiryField('message', e.target.value, inquiryType) }));
+                  }}
                   placeholder={
                     inquiryType === 'stall'
                       ? 'Looking for a 18-36 sqm stall near main entrance, shell scheme...'
@@ -4655,8 +5780,18 @@ export default function ExpoDetailsPage() {
                       ? 'Registering delegation of 3 buyers for technology sourcing...'
                       : 'Need information regarding sponsorship packages...'
                   }
-                  className="w-full bg-zinc-50 border border-zinc-200 rounded-xl p-3 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 resize-none"
+                  className={`w-full rounded-xl p-3 text-xs text-zinc-900 focus:outline-none focus:ring-2 resize-none transition-colors ${
+                    inquiryErrors.message
+                      ? 'border border-rose-400 bg-rose-50/30 focus:ring-rose-400 ring-1 ring-rose-400/50'
+                      : 'border border-zinc-200 bg-zinc-50 focus:ring-zinc-900'
+                  }`}
                 />
+                {inquiryErrors.message && (
+                  <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-0.5">
+                    <AlertCircle className="w-3 h-3 shrink-0 text-rose-500" />
+                    <span>{inquiryErrors.message}</span>
+                  </p>
+                )}
               </div>
 
               <div className="pt-2 flex items-center justify-between border-t border-zinc-100">
@@ -4664,6 +5799,7 @@ export default function ExpoDetailsPage() {
                   type="button"
                   onClick={() => {
                     setShowInquiryModal(false);
+                    setInquiryErrors({});
                     router.push(`/onboarding/exhibitor?wp_slug=${encodeURIComponent(event?.slug || '')}&wp_post_id=${event?.wpPostId || event?.id || ''}`);
                   }}
                   className="text-[11px] font-bold text-zinc-500 hover:text-zinc-800 transition-colors underline cursor-pointer"
@@ -4673,14 +5809,17 @@ export default function ExpoDetailsPage() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setShowInquiryModal(false)}
-                    className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs cursor-pointer transition-colors"
+                    onClick={() => {
+                      setShowInquiryModal(false);
+                      setInquiryErrors({});
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-700 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 hover:border-zinc-400 shadow-xs transition-all duration-200 cursor-pointer active:scale-95"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    disabled={inquirySubmitting || !inquiryForm.email.trim()}
+                    disabled={inquirySubmitting}
                     className="px-5 py-2 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] disabled:opacity-50 text-zinc-950 font-black text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
                   >
                     {inquirySubmitting ? (

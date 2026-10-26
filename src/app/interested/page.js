@@ -27,11 +27,13 @@ import {
   ExternalLink,
   ChevronRight,
   Ticket,
-  Sparkles,
   Building,
   Layers,
-  Heart
+  Heart,
+  X,
+  Trash2
 } from 'lucide-react';
+import { showSweetConfirm, showSweetSuccess, showSweetAlert } from '@/utils/sweetalert.js';
 
 export default function InterestedEventsPage() {
   const { user } = useAuth();
@@ -52,42 +54,73 @@ export default function InterestedEventsPage() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // 1. Fetch live events list (with axios + fetch fallback)
+  // 1. Fetch live events list with instant sessionStorage cache & resilient fallback
   useEffect(() => {
     let isMounted = true;
+
+    // Check instant sessionStorage cache first (0ms)
+    if (typeof window !== 'undefined') {
+      const cached =
+        sessionStorage.getItem('visitexpo_bookmarks_events_cache') ||
+        sessionStorage.getItem('visitexpo_home_events') ||
+        sessionStorage.getItem('visitexpo_visitor_expos_cache');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setAllEvents(parsed);
+          }
+        } catch (_) {}
+      }
+    }
+
+    const maxTimer = setTimeout(() => {
+      if (isMounted) setLoading(false);
+    }, 1200);
+
     const fetchEvents = async () => {
-      setLoading(true);
       try {
         let eventsList = [];
         try {
-          const res = await axios.get('/api/wordpress-events');
+          const res = await axios.get('/api/wordpress-events', { timeout: 3500 });
           if (res.data?.success && Array.isArray(res.data?.events) && res.data.events.length > 0) {
             eventsList = res.data.events;
           }
         } catch (_) {}
 
         if (eventsList.length === 0) {
-          const fetchRes = await fetch('/api/wordpress-events');
-          if (fetchRes.ok) {
-            const json = await fetchRes.json();
-            if (json?.success && Array.isArray(json?.events)) {
-              eventsList = json.events;
+          try {
+            const fetchRes = await fetch('/api/wordpress-events', { signal: AbortSignal.timeout(3500) });
+            if (fetchRes.ok) {
+              const json = await fetchRes.json();
+              if (json?.success && Array.isArray(json?.events)) {
+                eventsList = json.events;
+              }
             }
-          }
+          } catch (_) {}
         }
 
         if (isMounted && eventsList.length > 0) {
           setAllEvents(eventsList);
+          if (typeof window !== 'undefined') {
+            try {
+              sessionStorage.setItem('visitexpo_bookmarks_events_cache', JSON.stringify(eventsList.slice(0, 100)));
+            } catch (_) {}
+          }
         }
       } catch (err) {
         console.error('Failed to load events in interested page:', err);
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          clearTimeout(maxTimer);
+          setLoading(false);
+        }
       }
     };
     fetchEvents();
     return () => {
       isMounted = false;
+      clearTimeout(maxTimer);
     };
   }, []);
 
@@ -114,6 +147,18 @@ export default function InterestedEventsPage() {
         const rawDetails = localStorage.getItem('visitexpo_saved_event_details');
         if (rawDetails) {
           setSavedDetailsMap(JSON.parse(rawDetails) || {});
+        }
+
+        const claimed = localStorage.getItem('visitexpo_claimed_passes');
+        if (claimed) {
+          const parsedClaimed = JSON.parse(claimed);
+          if (Array.isArray(parsedClaimed) && parsedClaimed.length > 0) {
+            setClaimedPassIds(new Set(parsedClaimed.map(String)));
+          }
+        }
+
+        if (interested || rawDetails) {
+          setLoading(false);
         }
       } catch (_) {}
     }
@@ -156,6 +201,28 @@ export default function InterestedEventsPage() {
 
   // Handle Remove Interest
   const handleRemoveInterest = async (evt) => {
+    const title = evt?.title || 'this exhibition';
+    const confirmed = await showSweetConfirm(
+      {
+        title: 'Remove from Interested?',
+        icon: 'question',
+        confirmButtonText: 'Yes, Remove',
+        cancelButtonText: 'Keep on List',
+        isDanger: true,
+        html: `
+          <div style="font-size: 13px; line-height: 1.6; text-align: left; padding: 4px;">
+            <p style="margin-bottom: 8px; font-weight: 500;">Are you sure you want to remove this exhibition from your interested list?</p>
+            <div style="font-weight: 800; font-size: 15px; margin-bottom: 8px; color: #f59e0b;">${title}</div>
+            <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 12px; padding: 10px; font-size: 12px; color: #b91c1c; font-weight: 500;">
+              This event will be removed from your attendance schedule and calendar reminders.
+            </div>
+          </div>
+        `
+      }
+    );
+
+    if (!confirmed) return;
+
     const slug = (evt.slug || evt.id || '').toLowerCase().trim();
     if (!slug) return;
 
@@ -220,10 +287,94 @@ export default function InterestedEventsPage() {
     }
   };
 
-  // Handle Claim Pass
-  const handleClaimPass = (evt) => {
-    setClaimedPassIds((prev) => new Set(prev).add(evt.id));
-    showToast(`Pass confirmed for "${evt.title}"! Badge generated.`);
+  // Handle Claim Pass (with Theme-Aware Interactive Confirmation Pop-up)
+  const handleClaimPass = async (evt) => {
+    const slug = (evt.slug || evt.id || '').toLowerCase().trim();
+    const idKey = String(evt.id || evt._id || slug).trim();
+    const isAlreadyClaimed =
+      claimedPassIds.has(idKey) ||
+      claimedPassIds.has(slug) ||
+      (evt._id && claimedPassIds.has(String(evt._id))) ||
+      (evt.id && claimedPassIds.has(String(evt.id)));
+
+    if (isAlreadyClaimed) {
+      await showSweetAlert(
+        {
+          title: 'Visitor Pass Already Issued! ✓',
+          icon: 'success',
+          confirmButtonText: 'Great, Understood',
+          html: `
+            <div style="font-size: 13px; line-height: 1.6; text-align: left; padding: 4px;">
+              <p style="margin-bottom: 8px; font-weight: 500;">You already have an active complimentary pass for:</p>
+              <div style="font-weight: 800; font-size: 15px; margin-bottom: 6px; color: #10b981;">${evt.title}</div>
+              ${evt.dates ? `<p style="font-size: 12px; margin-bottom: 4px; font-weight: 600;">📅 ${evt.dates}</p>` : ''}
+              ${evt.venue || evt.city ? `<p style="font-size: 12px; opacity: 0.8; margin-bottom: 12px;">📍 ${[evt.venue, evt.city].filter(Boolean).join(', ')}</p>` : ''}
+              <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 12px; font-size: 12px; font-weight: 600; color: #059669;">
+                ✓ Active pass registered to your account.<br />
+                ✓ Present your name / registered email at the registration gate for fast-track badge printing.
+              </div>
+            </div>
+          `
+        },
+        'success'
+      );
+      return;
+    }
+
+    const confirmed = await showSweetConfirm(
+      {
+        title: 'Confirm Free Visitor Pass?',
+        icon: 'question',
+        confirmButtonText: 'Yes, Issue Pass',
+        cancelButtonText: 'Cancel',
+        isDanger: false,
+        html: `
+          <div style="font-size: 13px; line-height: 1.6; text-align: left; padding: 4px;">
+            <p style="margin-bottom: 8px; font-weight: 500;">Confirm your complimentary registration and digital badge for:</p>
+            <div style="font-weight: 800; font-size: 15px; margin-bottom: 6px; color: #f59e0b;">${evt.title}</div>
+            ${evt.dates ? `<p style="font-size: 12px; margin-bottom: 4px; font-weight: 600;">📅 ${evt.dates}</p>` : ''}
+            ${evt.venue || evt.city ? `<p style="font-size: 12px; opacity: 0.8; margin-bottom: 12px;">📍 ${[evt.venue, evt.city].filter(Boolean).join(', ')}</p>` : ''}
+            <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 12px; padding: 12px; font-size: 12px; color: #d97706; font-weight: 600;">
+              ✓ Free gate admission to exhibition halls<br />
+              ✓ Digital badge synced directly with your visitor account
+            </div>
+          </div>
+        `
+      }
+    );
+
+    if (!confirmed) return;
+
+    const eventId = evt._id || evt.id;
+    if (eventId && user?.email) {
+      try {
+        await axios.post(`/api/visitors/register`, {
+          eventId,
+          name: user?.name || user?.email?.split('@')[0] || 'Visitor',
+          email: user?.email,
+          phone: user?.phone || '+91-9999999999',
+          company: user?.organization?.name || user?.company || 'Trade Attendee',
+          designation: 'Business Visitor',
+          country: 'India',
+          attendanceType: 'in_person'
+        });
+      } catch (_) {}
+    }
+
+    setClaimedPassIds((prev) => {
+      const next = new Set(prev);
+      const keys = [evt.id, evt._id, evt.slug, slug, idKey].filter(Boolean).map(String);
+      keys.forEach((k) => next.add(k));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('visitexpo_claimed_passes', JSON.stringify(Array.from(next)));
+      }
+      return next;
+    });
+
+    showSweetSuccess(
+      `Your complimentary digital pass for "${evt.title}" is ready and registered to your visitor account!`,
+      'Visitor Pass Confirmed! 🎉'
+    );
   };
 
   // Match helper for interested events
@@ -477,7 +628,7 @@ export default function InterestedEventsPage() {
         )}
 
         {/* Interested Events Content */}
-        {loading ? (
+        {loading && interestedEvents.length === 0 ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-16 flex flex-col items-center justify-center space-y-3 shadow-sm">
             <div className="h-9 w-9 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
             <p className="text-sm font-medium text-zinc-500">
@@ -514,9 +665,14 @@ export default function InterestedEventsPage() {
           /* GRID OF INTERESTED EVENTS */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
             {interestedEvents.map((evt) => {
-              const eventSlug = evt.slug || evt.id;
+              const eventSlug = (evt.slug || evt.id || '').toLowerCase().trim();
+              const idKey = String(evt.id || evt._id || eventSlug).trim();
               const isSaved = savedEventIds.has(evt.id) || savedEventIds.has(eventSlug);
-              const isClaimed = claimedPassIds.has(evt.id);
+              const isClaimed =
+                claimedPassIds.has(idKey) ||
+                claimedPassIds.has(eventSlug) ||
+                (evt._id && claimedPassIds.has(String(evt._id))) ||
+                (evt.id && claimedPassIds.has(String(evt.id)));
 
               return (
                 <article
@@ -548,11 +704,23 @@ export default function InterestedEventsPage() {
                       </span>
 
                       <div className="flex items-center gap-1.5 pointer-events-auto">
-                        {/* Interested Tag */}
-                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black bg-amber-400 text-zinc-950 shadow-md">
-                          <Star className="h-2.5 w-2.5 fill-zinc-950" />
-                          <span>Interested</span>
-                        </span>
+                        {/* Clickable Interested Badge - Click to remove interest */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleRemoveInterest(evt);
+                          }}
+                          className="group/tag inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black bg-amber-400 text-zinc-950 shadow-md hover:bg-rose-500 hover:text-white border border-amber-300 hover:border-rose-400 transition-all duration-200 cursor-pointer active:scale-95 select-none"
+                          title="Click to remove from interested list"
+                          aria-label={`Remove ${evt.title} from interested`}
+                        >
+                          <Star className="h-2.5 w-2.5 fill-current group-hover/tag:hidden transition-transform" />
+                          <X className="h-2.5 w-2.5 hidden group-hover/tag:inline stroke-[2.5]" />
+                          <span className="inline group-hover/tag:hidden">Interested</span>
+                          <span className="hidden group-hover/tag:inline font-bold">Remove</span>
+                        </button>
 
                         {/* Bookmark Button */}
                         <button
@@ -602,20 +770,10 @@ export default function InterestedEventsPage() {
                       </p>
                     </div>
 
-                    {/* Footer Actions */}
-                    <div className="pt-4 border-t border-zinc-100 flex items-center justify-between text-xs gap-2">
-                      {/* Remove Interest Button */}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveInterest(evt)}
-                        className="text-xs font-bold text-zinc-400 hover:text-rose-600 transition cursor-pointer"
-                        title="Remove from interested list"
-                      >
-                        Remove Interest
-                      </button>
-
-                      {/* Right: Actions */}
-                      <div className="flex items-center gap-2 flex-wrap">
+                    {/* Footer Actions - Structured 2-Row Clean Layout */}
+                    <div className="pt-3.5 border-t border-zinc-100 flex flex-col gap-2.5 mt-auto">
+                      {/* Upper Row: Calendar Reminder & Event Details */}
+                      <div className="flex items-center justify-between text-xs">
                         <GoogleCalendarButton
                           event={evt}
                           variant="compact"
@@ -624,20 +782,36 @@ export default function InterestedEventsPage() {
 
                         <Link
                           href={`/expo/${eventSlug}`}
-                          className="text-xs font-bold text-zinc-700 hover:text-zinc-950 hover:underline"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-zinc-200 bg-zinc-100 hover:bg-zinc-200/90 text-zinc-800 hover:text-zinc-950 text-xs font-bold transition shadow-2xs hover:border-zinc-300 active:scale-95"
                         >
-                          Details
+                          <span>Details</span>
+                          <ChevronRight className="h-3.5 w-3.5 text-zinc-500" />
                         </Link>
+                      </div>
 
+                      {/* Lower Row: Remove Interest & Primary Pass CTA */}
+                      <div className="flex items-center justify-between text-xs pt-1.5 border-t border-zinc-100/70">
+                        {/* Remove Interest Button with border and bg color */}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveInterest(evt)}
+                          className="group/rem inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200/90 bg-rose-50/80 hover:bg-rose-100 text-rose-700 hover:text-rose-800 text-xs font-bold transition cursor-pointer shadow-2xs hover:border-rose-300 active:scale-95 whitespace-nowrap"
+                          title="Remove from interested list"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-rose-600 transition-colors" />
+                          <span>Remove Interest</span>
+                        </button>
+
+                        {/* Claim Pass / Pass Issued Button */}
                         <button
                           type="button"
                           onClick={() => handleClaimPass(evt)}
-                          className="cursor-pointer"
+                          className="cursor-pointer shrink-0"
                         >
                           {isClaimed ? (
-                            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
+                            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold shadow-2xs">
                               <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                              Pass Issued
+                              <span>Pass Issued</span>
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-zinc-950 text-[#FFCC00] hover:bg-[#FFCC00] hover:text-zinc-950 font-black text-xs transition shadow-sm active:scale-95">

@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Calendar, CheckCircle2, Bell, Sparkles } from 'lucide-react';
+import { Calendar, CheckCircle2, Bell } from 'lucide-react';
 import { isEventReminderSet } from '../utils/calendarUtils.js';
 import GoogleCalendarModal from './GoogleCalendarModal.js';
 import { useAuth } from '../context/AuthContext.js';
