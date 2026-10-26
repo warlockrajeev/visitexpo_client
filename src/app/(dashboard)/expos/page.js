@@ -22,7 +22,8 @@ import {
   ArrowLeft,
   QrCode,
   Printer,
-  Filter
+  Filter,
+  X
 } from 'lucide-react';
 import { showSweetConfirm, showSweetSuccess, showSweetError } from '../../../utils/sweetalert.js';
 import { printBadge } from '../../../utils/printBadge.js';
@@ -484,10 +485,13 @@ export default function ExposPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="relative w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-5 text-center printable-badge-card">
             <button
+              type="button"
               onClick={() => setSelectedPassForBadge(null)}
-              className="no-print absolute top-4 right-4 text-muted-foreground hover:text-foreground text-xs p-1 rounded-lg border border-border bg-secondary cursor-pointer"
+              className="no-print absolute top-4 right-4 h-8 w-8 inline-flex items-center justify-center rounded-full bg-secondary/80 hover:bg-secondary border border-border/60 text-muted-foreground hover:text-foreground transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer shadow-xs"
+              title="Close badge modal"
+              aria-label="Close"
             >
-              ✕
+              <X className="h-4 w-4" />
             </button>
 
             <div className="space-y-1">

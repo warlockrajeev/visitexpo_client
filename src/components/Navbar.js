@@ -421,7 +421,7 @@ export default function Navbar({ solid = false }) {
                         <Link
                           href="/dashboard"
                           onClick={() => setProfileDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-700 hover:text-white transition-all cursor-pointer"
                         >
                           <Ticket className="h-4 w-4 text-primary" />
                           <span>My Passes &amp; Badges</span>
@@ -429,7 +429,7 @@ export default function Navbar({ solid = false }) {
                         <Link
                           href="/recommendations"
                           onClick={() => setProfileDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-700 hover:text-white transition-all cursor-pointer"
                         >
                           <Compass className="h-4 w-4 text-primary" />
                           <span>Recommended For You</span>
@@ -437,7 +437,7 @@ export default function Navbar({ solid = false }) {
                         <Link
                           href="/expos"
                           onClick={() => setProfileDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-700 hover:text-white transition-all cursor-pointer"
                         >
                           <Calendar className="h-4 w-4 text-primary" />
                           <span>Browse Live Expos</span>
@@ -448,7 +448,7 @@ export default function Navbar({ solid = false }) {
                         <Link
                           href="/events/wizard"
                           onClick={() => setProfileDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-700 hover:text-white transition-all cursor-pointer"
                         >
                           <Calendar className="h-4 w-4 text-amber-400" />
                           <span>Create New Event</span>
@@ -456,7 +456,7 @@ export default function Navbar({ solid = false }) {
                         <Link
                           href="/events/claim"
                           onClick={() => setProfileDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-700 hover:text-white transition-all cursor-pointer"
                         >
                           <ShieldCheck className="h-4 w-4 text-amber-400" />
                           <span>Claim Directory Expo</span>
@@ -467,7 +467,7 @@ export default function Navbar({ solid = false }) {
                     <Link
                       href="/bookmarks"
                       onClick={() => setProfileDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-700 hover:text-white transition-all cursor-pointer"
                     >
                       <Bookmark className="h-4 w-4 text-rose-400" />
                       <span>Saved Bookmarks</span>
@@ -476,7 +476,7 @@ export default function Navbar({ solid = false }) {
                     <Link
                       href="/interested"
                       onClick={() => setProfileDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-700 hover:text-white transition-all cursor-pointer"
                     >
                       <Star className="h-4 w-4 text-amber-400" />
                       <span>Interested Events</span>
@@ -485,7 +485,7 @@ export default function Navbar({ solid = false }) {
                     <Link
                       href="/following"
                       onClick={() => setProfileDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-700 hover:text-white transition-all cursor-pointer"
                     >
                       <Bell className="h-4 w-4 text-blue-400" />
                       <span>Followed Expos &amp; Organizers</span>
@@ -494,7 +494,7 @@ export default function Navbar({ solid = false }) {
                     <Link
                       href="/settings"
                       onClick={() => setProfileDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-700 hover:text-white transition-all cursor-pointer"
                     >
                       <Settings className="h-4 w-4 text-zinc-400" />
                       <span>My Profile &amp; Settings</span>
@@ -509,7 +509,7 @@ export default function Navbar({ solid = false }) {
                         setProfileDropdownOpen(false);
                         logout();
                       }}
-                      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors cursor-pointer"
+                      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-500/20 hover:text-red-200 transition-all cursor-pointer"
                     >
                       <LogOut className="h-4 w-4" />
                       <span>Sign Out</span>
