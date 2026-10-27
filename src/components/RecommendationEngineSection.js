@@ -760,7 +760,15 @@ export default function RecommendationEngineSection({
 
                       {/* Event Title */}
                       <h3 className="font-extrabold text-sm sm:text-base text-zinc-900 group-hover:text-[#FF2E63] transition-colors line-clamp-2 leading-tight">
-                        <Link href={`/expo/${ev.slug || ev.id || ev._id}`}>
+                        <Link
+                          href={`/expo/${ev.slug || ev.id || ev._id}`}
+                          onClick={() => {
+                            try {
+                              sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(ev));
+                            } catch (_) {}
+                          }}
+                          prefetch={true}
+                        >
                           {ev.title}
                         </Link>
                       </h3>
@@ -787,22 +795,40 @@ export default function RecommendationEngineSection({
                     <div className="pt-3 border-t border-zinc-100 flex items-center justify-between gap-2">
                       <Link
                         href={`/expo/${ev.slug || ev.id || ev._id}`}
-                        className="text-xs font-bold text-zinc-700 hover:text-zinc-950"
+                        onClick={() => {
+                          try {
+                            sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(ev));
+                          } catch (_) {}
+                        }}
+                        prefetch={true}
+                        className="text-xs font-bold text-zinc-700 hover:text-zinc-950 cursor-pointer"
                       >
                         View Details
                       </Link>
 
                       <div className="flex items-center gap-2">
                         <Link
-                          href={`/onboarding/exhibitor?wp_slug=${encodeURIComponent(ev.slug || '')}`}
-                          className="text-xs font-bold text-[#FF2E63] hover:underline"
+                          href={`/onboarding/exhibitor?wp_slug=${encodeURIComponent(ev.slug || '')}&wp_post_id=${ev.wpPostId || ev.id || ''}&title=${encodeURIComponent(ev.title || '')}&venue=${encodeURIComponent(ev.venue || '')}&city=${encodeURIComponent(ev.city || '')}&startDate=${encodeURIComponent(ev.startDate || '')}`}
+                          onClick={() => {
+                            try {
+                              sessionStorage.setItem('visitexpo_selected_event', JSON.stringify(ev));
+                            } catch (_) {}
+                          }}
+                          prefetch={true}
+                          className="text-xs font-bold text-[#FF2E63] hover:underline cursor-pointer"
                         >
                           Exhibit
                         </Link>
                         <span className="text-zinc-300">•</span>
                         <Link
                           href={`/expo/${ev.slug || ev.id || ev._id}`}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold text-xs shadow-xs transition-transform active:scale-95"
+                          onClick={() => {
+                            try {
+                              sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(ev));
+                            } catch (_) {}
+                          }}
+                          prefetch={true}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold text-xs shadow-xs transition-transform active:scale-95 cursor-pointer"
                         >
                           <span>Get Pass</span>
                           <ArrowRight className="h-3 w-3 text-primary" />

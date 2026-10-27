@@ -36,12 +36,92 @@ function ExhibitorOnboardingContent() {
   const searchParams = useSearchParams();
   const urlEventId = searchParams.get('eventId');
   const urlWpSlug = searchParams.get('wp_slug');
+  const urlWpPostId = searchParams.get('wp_post_id');
+  const urlTitle = searchParams.get('title');
+  const urlVenue = searchParams.get('venue');
+  const urlCity = searchParams.get('city');
+  const urlStartDate = searchParams.get('startDate');
+  const urlBanner = searchParams.get('banner');
+
+  // Instant synchronous event resolution from sessionStorage or URL query params (0ms)
+  const getInitialSelectedEvent = () => {
+    if (typeof window === 'undefined') return null;
+    try {
+      // 1. Check direct event stored from clicking "Exhibit"
+      const stored = sessionStorage.getItem('visitexpo_selected_event');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (
+          (urlWpSlug && parsed.slug === urlWpSlug) ||
+          (urlEventId && (parsed._id === urlEventId || parsed.id === urlEventId)) ||
+          (urlWpPostId && parsed.wpPostId == urlWpPostId) ||
+          (urlTitle && parsed.title?.toLowerCase() === urlTitle.toLowerCase())
+        ) {
+          return parsed;
+        }
+      }
+
+      // 2. Check homepage cached events
+      const homeEvents = sessionStorage.getItem('visitexpo_home_events');
+      if (homeEvents) {
+        const parsedList = JSON.parse(homeEvents);
+        if (Array.isArray(parsedList)) {
+          const match = parsedList.find(e =>
+            (urlWpSlug && (e.slug === urlWpSlug || (e.slug && e.slug.includes(urlWpSlug)))) ||
+            (urlEventId && (e._id === urlEventId || e.id === urlEventId)) ||
+            (urlWpPostId && e.wpPostId == urlWpPostId) ||
+            (urlTitle && e.title?.toLowerCase() === urlTitle.toLowerCase())
+          );
+          if (match) return match;
+        }
+      }
+
+      // 3. Fallback construct event directly from URL params
+      if (urlTitle || urlWpSlug) {
+        return {
+          _id: urlEventId || urlWpPostId || urlWpSlug,
+          id: urlEventId || urlWpPostId || urlWpSlug,
+          title: urlTitle || (urlWpSlug ? urlWpSlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Selected Exhibition'),
+          slug: urlWpSlug || '',
+          wpPostId: urlWpPostId || '',
+          venue: urlVenue || 'Exhibition Centre',
+          city: urlCity || 'India',
+          startDate: urlStartDate || new Date().toISOString(),
+          banner: urlBanner || ''
+        };
+      }
+    } catch (_) {}
+    return null;
+  };
+
+  // Instant initial events list from sessionStorage
+  const getInitialEventsList = () => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const homeEvents = sessionStorage.getItem('visitexpo_home_events');
+      if (homeEvents) {
+        const parsedList = JSON.parse(homeEvents);
+        if (Array.isArray(parsedList) && parsedList.length > 0) {
+          return parsedList;
+        }
+      }
+    } catch (_) {}
+    return [];
+  };
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [eventsLoading, setEventsLoading] = useState(true);
-  const [events, setEvents] = useState([]);
-  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [events, setEvents] = useState(getInitialEventsList);
+  const [selectedEvent, setSelectedEvent] = useState(getInitialSelectedEvent);
+  const [eventsLoading, setEventsLoading] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const homeEvents = sessionStorage.getItem('visitexpo_home_events');
+        if (homeEvents && JSON.parse(homeEvents)?.length > 0) return false;
+      } catch (_) {}
+    }
+    return true;
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
   const [submittedExhibitor, setSubmittedExhibitor] = useState(null);
@@ -62,34 +142,61 @@ function ExhibitorOnboardingContent() {
 
   const [staffInput, setStaffInput] = useState({ name: '', email: '', phone: '' });
 
-  // Load events on mount
+  // Non-blocking background sync for directory events
   useEffect(() => {
+    let isMounted = true;
+
+    // If we already have selectedEvent and a loaded events list, don't trigger heavy download
+    if (events.length > 0 && selectedEvent) {
+      setEventsLoading(false);
+      return;
+    }
+
     const fetchEvents = async () => {
       try {
-        const res = await axios.get(`${API_URL}/events`);
-        if (res.data && res.data.success && res.data.data.docs) {
-          const fetchedDocs = res.data.data.docs;
+        // Fast parallel fetch: try cached wordpress-events endpoint or lightweight query
+        const res = await axios.get('/api/wordpress-events', { timeout: 5000 }).catch(async () => {
+          return axios.get(`${API_URL}/events?limit=50`, { timeout: 5000 });
+        });
+
+        if (!isMounted) return;
+
+        let fetchedDocs = [];
+        if (res.data?.events && Array.isArray(res.data.events)) {
+          fetchedDocs = res.data.events;
+        } else if (res.data?.data?.docs && Array.isArray(res.data.data.docs)) {
+          fetchedDocs = res.data.data.docs;
+        }
+
+        if (fetchedDocs.length > 0) {
           setEvents(fetchedDocs);
 
-          // Auto select matching event by eventId or slug
-          if (urlEventId) {
-            const match = fetchedDocs.find(e => e._id === urlEventId);
-            if (match) setSelectedEvent(match);
-          } else if (urlWpSlug) {
-            const match = fetchedDocs.find(e => e.slug === urlWpSlug || e.slug.includes(urlWpSlug));
-            if (match) setSelectedEvent(match);
-          } else if (fetchedDocs.length > 0) {
-            setSelectedEvent(fetchedDocs[0]);
+          // If no event selected yet, match by URL
+          if (!selectedEvent) {
+            if (urlEventId) {
+              const match = fetchedDocs.find(e => e._id === urlEventId || e.id === urlEventId);
+              if (match) setSelectedEvent(match);
+            } else if (urlWpSlug) {
+              const match = fetchedDocs.find(e => (e.slug || '').includes(urlWpSlug));
+              if (match) setSelectedEvent(match);
+            } else if (urlWpPostId) {
+              const match = fetchedDocs.find(e => e.wpPostId == urlWpPostId);
+              if (match) setSelectedEvent(match);
+            } else {
+              setSelectedEvent(fetchedDocs[0]);
+            }
           }
         }
       } catch (err) {
-        console.error('Failed to load events', err);
+        console.warn('Background event sync error:', err?.message);
       } finally {
-        setEventsLoading(false);
+        if (isMounted) setEventsLoading(false);
       }
     };
+
     fetchEvents();
-  }, [urlEventId, urlWpSlug]);
+    return () => { isMounted = false; };
+  }, [urlEventId, urlWpSlug, urlWpPostId]);
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
@@ -137,7 +244,12 @@ function ExhibitorOnboardingContent() {
         .filter(Boolean);
 
       const payload = {
-        eventId: selectedEvent._id,
+        eventId: selectedEvent._id || selectedEvent.id || selectedEvent.wpPostId || selectedEvent.slug,
+        eventTitle: selectedEvent.title || '',
+        wpSlug: selectedEvent.slug || '',
+        venue: selectedEvent.venue || '',
+        city: selectedEvent.city || '',
+        startDate: selectedEvent.startDate || '',
         name: exhibitorForm.name,
         description: exhibitorForm.description,
         logo: exhibitorForm.logo,
@@ -173,13 +285,13 @@ function ExhibitorOnboardingContent() {
   ];
 
   const filteredEvents = events.filter(evt => {
-    const cleanTitle = evt.title.toLowerCase().trim();
+    const cleanTitle = (evt.title || '').toLowerCase().trim();
     const isSystem = EXCLUDED_SYSTEM_TITLES.some(sys => cleanTitle === sys || cleanTitle.includes(sys));
     if (isSystem) return false;
 
     return (
-      evt.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      evt.city.toLowerCase().includes(searchTerm.toLowerCase())
+      (evt.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (evt.city || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
 
@@ -258,8 +370,32 @@ function ExhibitorOnboardingContent() {
               </p>
             </div>
 
-            {/* Event Selector */}
-            <div className="space-y-4">
+            {/* Currently Selected Event Spotlight */}
+            {selectedEvent && (
+              <div className="p-4 rounded-xl border-2 border-primary/60 bg-primary/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="space-y-1">
+                  <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-extrabold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                    <Check className="h-3 w-3" /> Target Event Confirmed
+                  </span>
+                  <h3 className="text-sm font-bold text-foreground">{selectedEvent.title}</h3>
+                  <p className="text-xs text-muted-foreground flex items-center gap-2">
+                    <span>{selectedEvent.venue || 'Exhibition Centre'}, {selectedEvent.city || 'India'}</span>
+                    {selectedEvent.startDate && (
+                      <span>• <Calendar className="inline h-3 w-3" /> {new Date(selectedEvent.startDate).toLocaleDateString()}</span>
+                    )}
+                  </p>
+                </div>
+                <span className="text-xs font-bold text-primary px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20 shrink-0 text-center">
+                  Active Selection
+                </span>
+              </div>
+            )}
+
+            {/* Event Selector & Search */}
+            <div className="space-y-3">
+              <label className="block text-xs font-bold text-muted-foreground uppercase">
+                {selectedEvent ? 'Or Search & Switch to Another Event:' : 'Search Event Directory:'}
+              </label>
               <div className="relative">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <input
@@ -271,32 +407,38 @@ function ExhibitorOnboardingContent() {
                 />
               </div>
 
-              {eventsLoading ? (
-                <div className="py-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" /> Loading expo event directory...
+              {eventsLoading && events.length === 0 ? (
+                <div className="py-8 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" /> Loading expo event directory...
                 </div>
               ) : (
-                <div className="grid gap-3 max-h-[320px] overflow-y-auto pr-1">
-                  {filteredEvents.map((evt) => {
-                    const isSelected = selectedEvent?._id === evt._id;
+                <div className="grid gap-2.5 max-h-[280px] overflow-y-auto pr-1">
+                  {filteredEvents.map((evt, idx) => {
+                    const isSelected = selectedEvent && (
+                      (selectedEvent._id && evt._id && selectedEvent._id === evt._id) ||
+                      (selectedEvent.id && evt.id && selectedEvent.id === evt.id) ||
+                      (selectedEvent.wpPostId && evt.wpPostId && selectedEvent.wpPostId == evt.wpPostId) ||
+                      (selectedEvent.slug && evt.slug && selectedEvent.slug === evt.slug) ||
+                      (selectedEvent.title && evt.title && selectedEvent.title.toLowerCase() === evt.title.toLowerCase())
+                    );
                     return (
                       <div
-                        key={evt._id}
+                        key={evt._id || evt.id || evt.wpPostId || evt.slug || idx}
                         onClick={() => setSelectedEvent(evt)}
-                        className={`p-4 rounded-xl border transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                           isSelected
-                            ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                            ? 'border-primary bg-primary/10 ring-2 ring-primary/20 shadow-xs'
                             : 'border-border bg-background hover:border-border/80'
                         }`}
                       >
                         <div>
                           <h4 className="text-xs font-bold text-foreground">{evt.title}</h4>
                           <p className="text-[11px] text-muted-foreground mt-0.5">
-                            {evt.venue}, {evt.city} • <Calendar className="inline h-3 w-3" /> {new Date(evt.startDate).toLocaleDateString()}
+                            {evt.venue || 'Exhibition Venue'}, {evt.city || 'Location'} • <Calendar className="inline h-3 w-3" /> {evt.startDate ? new Date(evt.startDate).toLocaleDateString() : 'Upcoming'}
                           </p>
                         </div>
                         {isSelected && (
-                          <span className="text-xs font-bold text-primary flex items-center gap-1">
+                          <span className="text-xs font-bold text-primary flex items-center gap-1 shrink-0">
                             <Check className="h-4 w-4" /> Selected
                           </span>
                         )}

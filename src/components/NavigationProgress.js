@@ -26,11 +26,11 @@ export default function NavigationProgress() {
       });
     }, 80);
 
-    // Auto-complete loading after 1200ms max so the progress bar NEVER gets stuck or lingers
+    // Auto-complete loading after 800ms max so the progress bar NEVER gets stuck or lingers
     if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
     safetyTimeoutRef.current = setTimeout(() => {
       completeLoading();
-    }, 1200);
+    }, 800);
   };
 
   const completeLoading = () => {
@@ -75,9 +75,11 @@ export default function NavigationProgress() {
 
       try {
         const url = new URL(href, window.location.origin);
-        // If clicking the current exact page, don't trigger loading
-        if (url.pathname === window.location.pathname && url.search === window.location.search) {
-          return;
+        // If clicking the current exact page or in-page hash anchor, don't trigger loading
+        if (url.pathname === window.location.pathname) {
+          if (url.search === window.location.search || url.hash) {
+            return;
+          }
         }
       } catch (_) {}
 

@@ -7,7 +7,7 @@
  * role-based ticketing/sponsorship support, and VisitExpo brand styling.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar.js';
 import Footer from '@/components/Footer.js';
@@ -28,8 +28,28 @@ import {
   ChevronDown,
   ArrowRight,
   Sparkles,
-  Lock
+  Lock,
+  AlertCircle
 } from 'lucide-react';
+
+const isControlKey = (e) => {
+  return (
+    e.key === 'Backspace' ||
+    e.key === 'Tab' ||
+    e.key === 'Enter' ||
+    e.key === 'Escape' ||
+    e.key === 'ArrowLeft' ||
+    e.key === 'ArrowRight' ||
+    e.key === 'ArrowUp' ||
+    e.key === 'ArrowDown' ||
+    e.key === 'Delete' ||
+    e.key === 'Home' ||
+    e.key === 'End' ||
+    e.ctrlKey ||
+    e.metaKey ||
+    e.altKey
+  );
+};
 
 const CONTACT_ROLES = [
   { id: 'Visitor', label: 'Visitor / Delegate', icon: Ticket },
@@ -94,14 +114,140 @@ export default function ContactPage() {
   // Form State
   const [selectedRole, setSelectedRole] = useState('Visitor');
   const [name, setName] = useState(user?.name || '');
+  const [nameError, setNameError] = useState('');
   const [email, setEmail] = useState(user?.email || '');
+  const [emailError, setEmailError] = useState('');
   const [phone, setPhone] = useState(getInitialPhone);
+  const [phoneError, setPhoneError] = useState('');
+  const [phoneWarning, setPhoneWarning] = useState('');
+  const phoneWarningTimeoutRef = useRef(null);
   const [subject, setSubject] = useState('General Inquiry');
   const [message, setMessage] = useState('');
+  const [messageError, setMessageError] = useState('');
+  const [messageWarning, setMessageWarning] = useState('');
+  const messageWarningTimeoutRef = useRef(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
   const [openFaq, setOpenFaq] = useState(null);
+
+  const triggerPhoneWarning = (msg) => {
+    if (phoneWarningTimeoutRef.current) clearTimeout(phoneWarningTimeoutRef.current);
+    setPhoneWarning(msg);
+    phoneWarningTimeoutRef.current = setTimeout(() => {
+      setPhoneWarning('');
+    }, 2800);
+  };
+
+  const triggerMessageWarning = (msg) => {
+    if (messageWarningTimeoutRef.current) clearTimeout(messageWarningTimeoutRef.current);
+    setMessageWarning(msg);
+    messageWarningTimeoutRef.current = setTimeout(() => {
+      setMessageWarning('');
+    }, 2800);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (phoneWarningTimeoutRef.current) clearTimeout(phoneWarningTimeoutRef.current);
+      if (messageWarningTimeoutRef.current) clearTimeout(messageWarningTimeoutRef.current);
+    };
+  }, []);
+
+  const validatePhone = (val) => {
+    if (!val || !val.trim()) return '';
+    const digits = val.replace(/\D/g, '');
+    if (digits.length < 10) {
+      return 'Please enter a valid phone number (at least 10 digits).';
+    }
+    if (digits.length > 15) {
+      return 'Phone number cannot exceed 15 digits.';
+    }
+    if (digits.length === 10 && !/^[6-9]/.test(digits)) {
+      return 'Indian mobile numbers must start with 6, 7, 8, or 9.';
+    }
+    if (digits.length === 12 && digits.startsWith('91') && !/^[6-9]/.test(digits.slice(2))) {
+      return 'Indian mobile numbers must start with 6, 7, 8, or 9.';
+    }
+    return '';
+  };
+
+  const validateMessage = (val) => {
+    if (!val || !val.trim()) {
+      return 'Please enter your message.';
+    }
+    const trimmed = val.trim();
+    if (trimmed.length < 10) {
+      return 'Message must be at least 10 characters.';
+    }
+    if (trimmed.length > 1500) {
+      return 'Message cannot exceed 1500 characters.';
+    }
+    if (!/[a-zA-Z]{2,}/.test(trimmed)) {
+      return 'Please enter a meaningful message with words explaining your inquiry.';
+    }
+    const alphanumericCount = trimmed.replace(/[^a-zA-Z0-9]/g, '').length;
+    if (alphanumericCount < 5) {
+      return 'Please enter a genuine message with explanatory text, not just symbols.';
+    }
+    return '';
+  };
+
+  const handleMessageKeyDown = (e) => {
+    if (isControlKey(e)) return;
+    if (e.key === '<' || e.key === '>') {
+      e.preventDefault();
+      triggerMessageWarning('HTML brackets < and > are not allowed.');
+      return;
+    }
+  };
+
+  const handleMessageChange = (e) => {
+    const sanitized = e.target.value.replace(/[<>]/g, '');
+    setMessage(sanitized);
+    if (messageError) {
+      setMessageError(validateMessage(sanitized));
+    }
+  };
+
+  const handlePhoneKeyDown = (e) => {
+    if (isControlKey(e)) return;
+    if (/[a-zA-Z]/.test(e.key)) {
+      e.preventDefault();
+      triggerPhoneWarning('Letters cannot be entered in phone number.');
+      return;
+    }
+    if (e.key === '+' && (e.target.selectionStart !== 0 || e.target.value.includes('+'))) {
+      e.preventDefault();
+      triggerPhoneWarning('+ country code can only be at the beginning.');
+      return;
+    }
+    if ((e.key === '-' || e.key === ')') && e.target.selectionStart === 0) {
+      e.preventDefault();
+      triggerPhoneWarning('Phone number cannot start with a hyphen or parenthesis.');
+      return;
+    }
+    if (!/^[0-9+\s\-()]$/.test(e.key)) {
+      e.preventDefault();
+      triggerPhoneWarning(`Symbol (${e.key}) is not allowed in phone number.`);
+      return;
+    }
+  };
+
+  const handlePhoneChange = (e) => {
+    let val = e.target.value;
+    val = val.replace(/[^0-9+\s\-()]/g, '');
+    val = val.replace(/^[-)\s]+/, '');
+    if (val.includes('+')) {
+      const hasLeadingPlus = val.startsWith('+');
+      val = (hasLeadingPlus ? '+' : '') + val.replace(/\+/g, '');
+    }
+    val = val.replace(/-{2,}/g, '-');
+    setPhone(val);
+    if (phoneError) {
+      setPhoneError(validatePhone(val));
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -156,15 +302,51 @@ export default function ContactPage() {
     e.preventDefault();
     const finalName = (name || user?.name || '').trim();
     const finalEmail = (email || user?.email || '').trim();
+    const finalPhone = phone.trim();
     const finalMessage = message.trim();
 
-    if (!finalName || !finalEmail || !finalMessage) {
-      setErrorMessage('Please fill in your name, email, and message.');
+    if (!finalName) {
+      setNameError('Please enter your full name.');
+      setErrorMessage('Please enter your full name.');
+      return;
+    }
+    if (finalName.length < 2 || !/^[a-zA-Z\s.'-]+$/.test(finalName)) {
+      setNameError('Please enter a valid name (letters only).');
+      setErrorMessage('Please enter a valid name (letters only).');
+      return;
+    }
+
+    if (!finalEmail) {
+      setEmailError('Please enter your email address.');
+      setErrorMessage('Please enter your email address.');
+      return;
+    }
+    if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(finalEmail)) {
+      setEmailError('Please enter a valid email address (e.g. name@company.com).');
+      setErrorMessage('Please enter a valid email address.');
+      return;
+    }
+
+    const phoneValidationErr = validatePhone(finalPhone);
+    if (phoneValidationErr) {
+      setPhoneError(phoneValidationErr);
+      setErrorMessage(phoneValidationErr);
+      return;
+    }
+
+    const messageValidationErr = validateMessage(finalMessage);
+    if (messageValidationErr) {
+      setMessageError(messageValidationErr);
+      setErrorMessage(messageValidationErr);
       return;
     }
 
     setSubmitting(true);
     setErrorMessage(null);
+    setNameError('');
+    setEmailError('');
+    setPhoneError('');
+    setMessageError('');
 
     try {
       const res = await fetch('/api/contact', {
@@ -174,7 +356,7 @@ export default function ContactPage() {
           role: selectedRole,
           name: finalName,
           email: finalEmail,
-          phone: phone.trim(),
+          phone: finalPhone,
           subject: subject.trim(),
           message: finalMessage,
           source: 'contact_page'
@@ -315,7 +497,7 @@ export default function ContactPage() {
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} noValidate className="space-y-4">
                 {errorMessage && (
                   <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-xl">
                     {errorMessage}
@@ -380,18 +562,28 @@ export default function ContactPage() {
                     </div>
                     <input
                       type="text"
-                      required
                       disabled={Boolean(user)}
                       readOnly={Boolean(user)}
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) => {
+                        setName(e.target.value.replace(/[^a-zA-Z\s.'-]/g, ''));
+                        if (nameError) setNameError('');
+                      }}
                       placeholder="e.g. Rajeev Haldar"
                       className={`w-full px-3.5 py-2.5 rounded-xl border text-xs transition-all ${
                         user
                           ? 'bg-zinc-100 text-zinc-600 border-zinc-200 cursor-not-allowed select-none'
+                          : nameError
+                          ? 'bg-rose-50/40 border-rose-500 text-zinc-900 focus:bg-white focus:outline-none ring-1 ring-rose-500/20'
                           : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FF2E63]'
                       }`}
                     />
+                    {nameError && !user && (
+                      <p className="mt-1 text-[11px] font-medium text-rose-500 flex items-center gap-1 animate-in fade-in">
+                        <AlertCircle className="h-3 w-3 shrink-0 text-rose-500" />
+                        <span>{nameError}</span>
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -406,19 +598,31 @@ export default function ContactPage() {
                       )}
                     </div>
                     <input
-                      type="email"
-                      required
+                      type="text"
+                      inputMode="email"
+                      autoComplete="email"
                       disabled={Boolean(user)}
                       readOnly={Boolean(user)}
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value.replace(/\s/g, ''));
+                        if (emailError) setEmailError('');
+                      }}
                       placeholder="e.g. rajeev@visitexpo.in"
                       className={`w-full px-3.5 py-2.5 rounded-xl border text-xs transition-all ${
                         user
                           ? 'bg-zinc-100 text-zinc-600 border-zinc-200 cursor-not-allowed select-none'
+                          : emailError
+                          ? 'bg-rose-50/40 border-rose-500 text-zinc-900 focus:bg-white focus:outline-none ring-1 ring-rose-500/20'
                           : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FF2E63]'
                       }`}
                     />
+                    {emailError && !user && (
+                      <p className="mt-1 text-[11px] font-medium text-rose-500 flex items-center gap-1 animate-in fade-in">
+                        <AlertCircle className="h-3 w-3 shrink-0 text-rose-500" />
+                        <span>{emailError}</span>
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -429,7 +633,7 @@ export default function ContactPage() {
                       <label className="block text-xs font-semibold text-zinc-700">
                         Phone / WhatsApp Number
                       </label>
-                      {phone && (
+                      {phone && !phoneError && !phoneWarning && (
                         <span className="text-[10px] text-zinc-400 font-medium flex items-center gap-0.5">
                           <CheckCircle2 className="h-2.5 w-2.5 text-emerald-500" /> Auto-filled
                         </span>
@@ -437,11 +641,24 @@ export default function ContactPage() {
                     </div>
                     <input
                       type="tel"
+                      inputMode="tel"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      onKeyDown={handlePhoneKeyDown}
+                      onChange={handlePhoneChange}
+                      onBlur={() => setPhoneError(validatePhone(phone))}
                       placeholder="e.g. +91 98765 43210"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-xs text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FF2E63] transition-all"
+                      className={`w-full px-3.5 py-2.5 rounded-xl border text-xs transition-all ${
+                        phoneError || phoneWarning
+                          ? 'bg-rose-50/40 border-rose-500 text-zinc-900 focus:bg-white focus:outline-none ring-1 ring-rose-500/20'
+                          : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FF2E63]'
+                      }`}
                     />
+                    {(phoneWarning || phoneError) && (
+                      <p className="mt-1 text-[11px] font-medium text-rose-500 flex items-center gap-1 animate-in fade-in">
+                        <AlertCircle className="h-3 w-3 shrink-0 text-rose-500" />
+                        <span>{phoneWarning || phoneError}</span>
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -465,17 +682,33 @@ export default function ContactPage() {
 
                 {/* Message Textarea */}
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-700 mb-1">
-                    Your Message <span className="text-red-500">*</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-zinc-700">
+                      Your Message <span className="text-red-500">*</span>
+                    </label>
+                    <span className={`text-[10px] font-medium ${message.length > 1500 ? 'text-rose-500 font-bold' : 'text-zinc-400'}`}>
+                      {message.length} / 1500 chars
+                    </span>
+                  </div>
                   <textarea
                     rows={4}
-                    required
                     value={message}
-                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyDown={handleMessageKeyDown}
+                    onChange={handleMessageChange}
+                    onBlur={() => setMessageError(validateMessage(message))}
                     placeholder="Describe how we can help you or detail your trade show inquiry..."
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-xs text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FF2E63] transition-all resize-y"
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-xs transition-all resize-y ${
+                      messageError || messageWarning
+                        ? 'bg-rose-50/40 border-rose-500 text-zinc-900 focus:bg-white focus:outline-none ring-1 ring-rose-500/20'
+                        : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FF2E63]'
+                    }`}
                   />
+                  {(messageWarning || messageError) && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-500 flex items-center gap-1 animate-in fade-in">
+                      <AlertCircle className="h-3 w-3 shrink-0 text-rose-500" />
+                      <span>{messageWarning || messageError}</span>
+                    </p>
+                  )}
                 </div>
 
                 {/* Submit CTA */}

@@ -10,6 +10,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import axios from 'axios';
+import { useAuth } from '../../../context/AuthContext.js';
+import { showSweetAlert, showSweetConfirm, showSweetSuccess } from '../../../utils/sweetalert.js';
 import Navbar from '../../../components/Navbar.js';
 import OrganizerChatWidget from '../../../components/OrganizerChatWidget.js';
 import {
@@ -117,6 +120,42 @@ const ORGANIZERS_CONFIG = {
     scope: 'Multinational exhibition and convention organizer with operations across 4 continents, renowned for textile, garment technology, and energy expos.',
     banner: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=1600&auto=format&fit=crop'
   },
+  'guangdong-grandeur': {
+    id: 'guangdong-grandeur',
+    name: 'Guangdong Grandeur Intl Exhibition Group',
+    shortName: 'Grandeur Group',
+    searchTerm: 'Grandeur',
+    brandColor: '#B45309',
+    accentColor: '#F59E0B',
+    website: 'https://www.gzhw.com',
+    badge: 'Asia Pacific',
+    scope: 'Leading international exhibition organizer in the Asia-Pacific region, presenting major expos in amusement equipment, horticulture, and commercial displays.',
+    banner: 'https://images.unsplash.com/photo-1511578314322-379afb476865?q=80&w=1600&auto=format&fit=crop'
+  },
+  'mex-exhibitions': {
+    id: 'mex-exhibitions',
+    name: 'MEX Exhibitions Pvt. Ltd.',
+    shortName: 'MEX Exhibitions',
+    searchTerm: 'MEX Exhibitions',
+    brandColor: '#4338CA',
+    accentColor: '#6366F1',
+    website: 'https://cewexpo.com',
+    badge: 'Consumer & Sign',
+    scope: 'Pioneering exhibition company with over 4 decades of experience producing leading trade shows in signage, textiles, gifts, and building automation.',
+    banner: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=1600&auto=format&fit=crop'
+  },
+  'cii': {
+    id: 'cii',
+    name: 'Confederation of Indian Industry (CII)',
+    shortName: 'CII',
+    searchTerm: 'CII',
+    brandColor: '#15803D',
+    accentColor: '#22C55E',
+    website: 'https://www.cii.in',
+    badge: 'Apex Industry Body',
+    scope: 'India’s premier non-government, not-for-profit industry-led and industry-managed organisation, driving national economic development and hosting flagship summits.',
+    banner: 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?q=80&w=1600&auto=format&fit=crop'
+  },
   'koelnmesse': {
     id: 'koelnmesse',
     name: 'Koelnmesse India',
@@ -128,13 +167,123 @@ const ORGANIZERS_CONFIG = {
     badge: 'Food & Hardware Fairs',
     scope: 'World leader in food and beverage technology trade fairs, host to Anuga, ISM, and international hardware exhibitions.',
     banner: 'https://images.unsplash.com/photo-1511578314322-379afb476865?q=80&w=1600&auto=format&fit=crop'
+  },
+  'worldex': {
+    id: 'worldex',
+    name: 'Worldex India Exhibition & Promotion',
+    shortName: 'Worldex India',
+    searchTerm: 'Worldex',
+    brandColor: '#2563EB',
+    accentColor: '#60A5FA',
+    website: 'https://www.worldexindia.com',
+    badge: 'B2B Trade Marts',
+    scope: 'Facilitating international trade and cross-border partnerships between global manufacturers and Indian trade buyers across diverse industrial sectors.',
+    banner: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1600&auto=format&fit=crop'
+  },
+  'bridal-asia': {
+    id: 'bridal-asia',
+    name: 'Bridal Asia',
+    shortName: 'Bridal Asia',
+    searchTerm: 'Bridal Asia',
+    brandColor: '#BE185D',
+    accentColor: '#F472B6',
+    website: 'https://www.bridalasia.com',
+    badge: 'Luxury Lifestyle',
+    scope: 'Pinnacle luxury wedding, bridal jewellery, and haute couture exhibition bringing together the finest Indian couturiers and luxury lifestyle connoisseurs.',
+    banner: 'https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=1600&auto=format&fit=crop'
+  },
+  'ifema-madrid': {
+    id: 'ifema-madrid',
+    name: 'IFEMA MADRID (Feria de Madrid)',
+    shortName: 'IFEMA Madrid',
+    searchTerm: 'IFEMA',
+    brandColor: '#7C3AED',
+    accentColor: '#A78BFA',
+    website: 'https://www.ifema.es',
+    badge: 'Feria de Madrid',
+    scope: 'Premier Spanish trade fair operator managing Madrid’s convention facilities and organizing global benchmarks like FITUR, ARCOmadrid, and Fruit Attraction.',
+    banner: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=1600&auto=format&fit=crop'
+  },
+  'radeecal': {
+    id: 'radeecal',
+    name: 'Radeecal Communications',
+    shortName: 'Radeecal',
+    searchTerm: 'Radeecal',
+    brandColor: '#059669',
+    accentColor: '#34D399',
+    website: 'https://radeecal.in',
+    badge: 'Agri & Industrial',
+    scope: 'Specialist exhibition management organisation running highly acclaimed agricultural, dairy, plastic, and non-woven fabric exhibitions across Western India.',
+    banner: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?q=80&w=1600&auto=format&fit=crop'
+  },
+  'itpo': {
+    id: 'itpo',
+    name: 'India Trade Promotion Organisation (ITPO)',
+    shortName: 'ITPO',
+    searchTerm: 'ITPO',
+    brandColor: '#D97706',
+    accentColor: '#FBBF24',
+    website: 'https://www.itpo.gov.in',
+    badge: 'Govt of India',
+    scope: 'Nodal trade promotion agency of the Government of India, managing Bharat Mandapam (Pragati Maidan) and organizing India International Trade Fair (IITF).',
+    banner: 'https://images.unsplash.com/photo-1587825140708-dfaf72ae4b04?q=80&w=1600&auto=format&fit=crop'
+  },
+  'dmg-events': {
+    id: 'dmg-events',
+    name: 'dmg events',
+    shortName: 'dmg events',
+    searchTerm: 'dmg events',
+    brandColor: '#0D9488',
+    accentColor: '#2DD4BF',
+    website: 'https://www.dmgevents.com',
+    badge: 'Energy & Food',
+    scope: 'Global organizer of market-leading business events across the Middle East, Asia, and North America, including Gastech, ADIPEC, and Big 5 Construction.',
+    banner: 'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?q=80&w=1600&auto=format&fit=crop'
+  },
+  'montgomery-group': {
+    id: 'montgomery-group',
+    name: 'Montgomery Group',
+    shortName: 'Montgomery',
+    searchTerm: 'Montgomery',
+    brandColor: '#475569',
+    accentColor: '#94A3B8',
+    website: 'https://www.montgomerygroup.com',
+    badge: 'Global Hospitality',
+    scope: 'Independent global events company running market-leading trade exhibitions across food, drink, hospitality, security, and design since 1895.',
+    banner: 'https://images.unsplash.com/photo-1551818255-e6e10975bc17?q=80&w=1600&auto=format&fit=crop'
+  },
+  'scci-sharjah': {
+    id: 'scci-sharjah',
+    name: 'Expo Centre Sharjah (SCCI)',
+    shortName: 'Expo Centre Sharjah',
+    searchTerm: 'Sharjah',
+    brandColor: '#9333EA',
+    accentColor: '#C084FC',
+    website: 'https://www.sharjah.gov.ae',
+    badge: 'UAE Premier Expo',
+    scope: 'Pioneering exhibition centre of the United Arab Emirates hosting prestigious Middle Eastern trade fairs, including MidEast Watch & Jewellery Show.',
+    banner: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?q=80&w=1600&auto=format&fit=crop'
+  },
+  'ficci': {
+    id: 'ficci',
+    name: 'Federation of Indian Chambers of Commerce & Industry (FICCI)',
+    shortName: 'FICCI',
+    searchTerm: 'FICCI',
+    brandColor: '#B91C1C',
+    accentColor: '#F87171',
+    website: 'https://www.ficci.in',
+    badge: 'Apex Chamber',
+    scope: 'Largest and oldest apex business organisation in India, conceptualizing international conferences, business expos, and global trade delegations.',
+    banner: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=1600&auto=format&fit=crop'
   }
 };
 
 export default function OrganizerProfilePage() {
   const params = useParams();
   const router = useRouter();
-  const slug = (params?.slug || '').toLowerCase().trim();
+  const { user } = useAuth();
+  const rawSlug = Array.isArray(params?.slug) ? params.slug[0] : (params?.slug || '');
+  const slug = decodeURIComponent(rawSlug).toLowerCase().trim();
 
   // Resolve organizer config
   const org = useMemo(() => {
@@ -161,6 +310,7 @@ export default function OrganizerProfilePage() {
       banner: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=1600&auto=format&fit=crop'
     };
   }, [slug]);
+  const organizer = org;
 
   // Events State
   const [allEvents, setAllEvents] = useState([]);
@@ -194,6 +344,19 @@ export default function OrganizerProfilePage() {
     return () => { isMounted = false; };
   }, []);
 
+  // Hydrate claimed passes from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const claimed = localStorage.getItem('visitexpo_claimed_passes');
+        if (claimed) {
+          const parsed = JSON.parse(claimed);
+          if (Array.isArray(parsed)) setClaimedPassIds(new Set(parsed.map(String)));
+        }
+      } catch (_) {}
+    }
+  }, []);
+
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -207,9 +370,103 @@ export default function OrganizerProfilePage() {
     }
   };
 
-  const handleClaimPass = (evt) => {
-    setClaimedPassIds(prev => new Set(prev).add(evt.id));
-    showToast(`Pass Reserved! Free digital badge confirmed for "${evt.title}".`);
+  const handleClaimPass = async (evt) => {
+    if (!evt) return;
+    const slugKey = (evt.slug || evt.id || '').toLowerCase().trim();
+    const idKey = String(evt.id || evt._id || evt.wpPostId || slugKey).trim();
+    const isAlreadyClaimed =
+      claimedPassIds.has(idKey) ||
+      claimedPassIds.has(slugKey) ||
+      (evt._id && claimedPassIds.has(String(evt._id))) ||
+      (evt.id && claimedPassIds.has(String(evt.id))) ||
+      (evt.wpPostId && claimedPassIds.has(String(evt.wpPostId)));
+
+    if (isAlreadyClaimed) {
+      await showSweetAlert(
+        {
+          title: 'Visitor Pass Already Issued! ✓',
+          icon: 'success',
+          confirmButtonText: 'Great, Understood',
+          html: `
+            <div style="font-size: 13px; line-height: 1.6; text-align: left; padding: 4px;">
+              <p style="margin-bottom: 8px; font-weight: 500;">You already have an active complimentary pass for:</p>
+              <div style="font-weight: 800; font-size: 15px; margin-bottom: 6px; color: #10b981;">${evt.title || 'Exhibition'}</div>
+              ${evt.dates ? `<p style="font-size: 12px; margin-bottom: 4px; font-weight: 600;">📅 ${evt.dates}</p>` : ''}
+              ${evt.venue || evt.city ? `<p style="font-size: 12px; opacity: 0.8; margin-bottom: 12px;">📍 ${[evt.venue, evt.city].filter(Boolean).join(', ')}</p>` : ''}
+              <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 12px; font-size: 12px; font-weight: 600; color: #059669;">
+                ✓ Active pass registered to your account.<br />
+                ✓ Present your name / registered email at the registration gate for fast-track badge printing.
+              </div>
+            </div>
+          `
+        },
+        'success'
+      );
+      return;
+    }
+
+    const confirmed = await showSweetConfirm(
+      {
+        title: 'Confirm Free Visitor Pass?',
+        icon: 'question',
+        confirmButtonText: 'Yes, Get Pass',
+        cancelButtonText: 'Cancel',
+        isDanger: false,
+        html: `
+          <div style="font-size: 13px; line-height: 1.6; text-align: left; padding: 4px;">
+            <p style="margin-bottom: 8px; font-weight: 500;">Confirm your complimentary registration and digital badge for:</p>
+            <div style="font-weight: 800; font-size: 15px; margin-bottom: 6px; color: #f59e0b;">${evt.title || 'Exhibition'}</div>
+            ${evt.dates ? `<p style="font-size: 12px; margin-bottom: 4px; font-weight: 600;">📅 ${evt.dates}</p>` : ''}
+            ${evt.venue || evt.city ? `<p style="font-size: 12px; opacity: 0.8; margin-bottom: 12px;">📍 ${[evt.venue, evt.city].filter(Boolean).join(', ')}</p>` : ''}
+            <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 12px; padding: 12px; font-size: 12px; color: #d97706; font-weight: 600;">
+              ✓ Free gate admission to exhibition halls<br />
+              ✓ Digital badge synced directly with your visitor account
+            </div>
+          </div>
+        `
+      }
+    );
+
+    if (!confirmed) return;
+
+    if (!user) {
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : `/organizer/${slug}`;
+      router.push(`/login?role=visitor&redirect=${encodeURIComponent(currentPath)}`);
+      return;
+    }
+
+    const eventId = evt._id || evt.id || evt.wpPostId;
+    if (eventId && user?.email) {
+      try {
+        await axios.post(`/api/visitors/register`, {
+          eventId,
+          name: user?.name || user?.email?.split('@')[0] || 'Visitor',
+          email: user?.email,
+          phone: user?.phone || '+91-9999999999',
+          company: user?.organization?.name || user?.company || 'Trade Attendee',
+          designation: 'Business Visitor',
+          country: 'India',
+          attendanceType: 'in_person'
+        });
+      } catch (_) {}
+    }
+
+    setClaimedPassIds((prev) => {
+      const next = new Set(prev);
+      const keys = [evt.id, evt._id, evt.slug, evt.wpPostId, slugKey, idKey].filter(Boolean).map(String);
+      keys.forEach((k) => next.add(k));
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('visitexpo_claimed_passes', JSON.stringify(Array.from(next)));
+        } catch (_) {}
+      }
+      return next;
+    });
+
+    showSweetSuccess(
+      `Your complimentary digital pass for "${evt.title}" is ready and registered to your visitor account!`,
+      'Visitor Pass Confirmed! 🎉'
+    );
   };
 
   // Filter events matching this organizer
@@ -506,15 +763,27 @@ export default function OrganizerProfilePage() {
                     <div className="p-4 sm:p-5 pt-0 border-t border-zinc-100 mt-2 flex items-center justify-between gap-2">
                       <Link
                         href={`/expo/${expo.slug || expo.id}`}
-                        className="text-xs font-bold text-zinc-700 hover:text-zinc-950 transition-colors"
+                        onClick={() => {
+                          try {
+                            sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(expo));
+                          } catch (_) {}
+                        }}
+                        prefetch={true}
+                        className="text-xs font-bold text-zinc-700 hover:text-zinc-950 transition-colors cursor-pointer"
                       >
                         View Details
                       </Link>
 
                       <div className="flex items-center gap-2">
                         <Link
-                          href={`/onboarding/exhibitor?wp_slug=${encodeURIComponent(expo.slug || '')}`}
-                          className="text-xs font-bold text-[#FF2E63] hover:underline"
+                          href={`/onboarding/exhibitor?wp_slug=${encodeURIComponent(expo.slug || '')}&wp_post_id=${expo.wpPostId || expo.id || ''}&title=${encodeURIComponent(expo.title || '')}&venue=${encodeURIComponent(expo.venue || '')}&city=${encodeURIComponent(expo.city || '')}&startDate=${encodeURIComponent(expo.startDate || '')}`}
+                          onClick={() => {
+                            try {
+                              sessionStorage.setItem('visitexpo_selected_event', JSON.stringify(expo));
+                            } catch (_) {}
+                          }}
+                          prefetch={true}
+                          className="text-xs font-bold text-[#FF2E63] hover:underline cursor-pointer"
                         >
                           Exhibit
                         </Link>
@@ -522,9 +791,14 @@ export default function OrganizerProfilePage() {
                         <span className="text-zinc-300">•</span>
 
                         {isClaimed ? (
-                          <span className="text-xs font-extrabold text-emerald-700 flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleClaimPass(expo)}
+                            className="text-xs font-extrabold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Pass registered - click to view badge details"
+                          >
                             <CheckCircle2 className="h-3.5 w-3.5" /> Pass Ready
-                          </span>
+                          </button>
                         ) : (
                           <button
                             type="button"
@@ -570,8 +844,8 @@ export default function OrganizerProfilePage() {
 
         {/* Live Organizer Chat Widget */}
         <OrganizerChatWidget
-          organizerName={organizer?.name}
-          organizerId={organizer?.id}
+          organizerName={org?.name || organizer?.name}
+          organizerId={org?.id || organizer?.id}
         />
 
       </main>

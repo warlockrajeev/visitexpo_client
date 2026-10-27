@@ -257,8 +257,14 @@ export default function EventDetailModal({
               </button>
 
               <Link
-                href={`/onboarding/exhibitor?wp_slug=${encodeURIComponent(event.slug || '')}&wp_post_id=${event.wpPostId || event.id || ''}`}
-                className="px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold text-xs shadow-sm transition-all text-center"
+                href={`/onboarding/exhibitor?wp_slug=${encodeURIComponent(event.slug || '')}&wp_post_id=${event.wpPostId || event.id || ''}&title=${encodeURIComponent(event.title || '')}&venue=${encodeURIComponent(event.venue || '')}&city=${encodeURIComponent(event.city || '')}&startDate=${encodeURIComponent(event.startDate || '')}`}
+                onClick={() => {
+                  try {
+                    sessionStorage.setItem('visitexpo_selected_event', JSON.stringify(event));
+                  } catch (_) {}
+                }}
+                prefetch={true}
+                className="px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold text-xs shadow-sm transition-all text-center cursor-pointer"
               >
                 Request a Booth
               </Link>

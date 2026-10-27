@@ -11,6 +11,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import axios from 'axios';
+import { useAuth } from '../../../context/AuthContext.js';
+import { showSweetAlert, showSweetConfirm, showSweetSuccess } from '../../../utils/sweetalert.js';
 import Navbar from '../../../components/Navbar.js';
 import {
   MapPin,
@@ -230,6 +233,7 @@ const CATEGORIES = [
 export default function CityEventsPage() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useAuth();
   const slug = (params?.slug || '').toLowerCase().trim();
 
   // Resolve city metadata
@@ -282,6 +286,19 @@ export default function CityEventsPage() {
     return () => { isMounted = false; };
   }, []);
 
+  // Hydrate claimed passes from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const claimed = localStorage.getItem('visitexpo_claimed_passes');
+        if (claimed) {
+          const parsed = JSON.parse(claimed);
+          if (Array.isArray(parsed)) setClaimedPassIds(new Set(parsed.map(String)));
+        }
+      } catch (_) {}
+    }
+  }, []);
+
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -295,9 +312,103 @@ export default function CityEventsPage() {
     }
   };
 
-  const handleClaimPass = (evt) => {
-    setClaimedPassIds(prev => new Set(prev).add(evt.id));
-    showToast(`Pass Reserved! Free digital visitor badge confirmed for "${evt.title}".`);
+  const handleClaimPass = async (evt) => {
+    if (!evt) return;
+    const slugKey = (evt.slug || evt.id || '').toLowerCase().trim();
+    const idKey = String(evt.id || evt._id || evt.wpPostId || slugKey).trim();
+    const isAlreadyClaimed =
+      claimedPassIds.has(idKey) ||
+      claimedPassIds.has(slugKey) ||
+      (evt._id && claimedPassIds.has(String(evt._id))) ||
+      (evt.id && claimedPassIds.has(String(evt.id))) ||
+      (evt.wpPostId && claimedPassIds.has(String(evt.wpPostId)));
+
+    if (isAlreadyClaimed) {
+      await showSweetAlert(
+        {
+          title: 'Visitor Pass Already Issued! ✓',
+          icon: 'success',
+          confirmButtonText: 'Great, Understood',
+          html: `
+            <div style="font-size: 13px; line-height: 1.6; text-align: left; padding: 4px;">
+              <p style="margin-bottom: 8px; font-weight: 500;">You already have an active complimentary pass for:</p>
+              <div style="font-weight: 800; font-size: 15px; margin-bottom: 6px; color: #10b981;">${evt.title || 'Exhibition'}</div>
+              ${evt.dates ? `<p style="font-size: 12px; margin-bottom: 4px; font-weight: 600;">📅 ${evt.dates}</p>` : ''}
+              ${evt.venue || evt.city ? `<p style="font-size: 12px; opacity: 0.8; margin-bottom: 12px;">📍 ${[evt.venue, evt.city].filter(Boolean).join(', ')}</p>` : ''}
+              <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 12px; font-size: 12px; font-weight: 600; color: #059669;">
+                ✓ Active pass registered to your account.<br />
+                ✓ Present your name / registered email at the registration gate for fast-track badge printing.
+              </div>
+            </div>
+          `
+        },
+        'success'
+      );
+      return;
+    }
+
+    const confirmed = await showSweetConfirm(
+      {
+        title: 'Confirm Free Visitor Pass?',
+        icon: 'question',
+        confirmButtonText: 'Yes, Get Pass',
+        cancelButtonText: 'Cancel',
+        isDanger: false,
+        html: `
+          <div style="font-size: 13px; line-height: 1.6; text-align: left; padding: 4px;">
+            <p style="margin-bottom: 8px; font-weight: 500;">Confirm your complimentary registration and digital badge for:</p>
+            <div style="font-weight: 800; font-size: 15px; margin-bottom: 6px; color: #f59e0b;">${evt.title || 'Exhibition'}</div>
+            ${evt.dates ? `<p style="font-size: 12px; margin-bottom: 4px; font-weight: 600;">📅 ${evt.dates}</p>` : ''}
+            ${evt.venue || evt.city ? `<p style="font-size: 12px; opacity: 0.8; margin-bottom: 12px;">📍 ${[evt.venue, evt.city].filter(Boolean).join(', ')}</p>` : ''}
+            <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 12px; padding: 12px; font-size: 12px; color: #d97706; font-weight: 600;">
+              ✓ Free gate admission to exhibition halls<br />
+              ✓ Digital badge synced directly with your visitor account
+            </div>
+          </div>
+        `
+      }
+    );
+
+    if (!confirmed) return;
+
+    if (!user) {
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : `/city/${slug}`;
+      router.push(`/login?role=visitor&redirect=${encodeURIComponent(currentPath)}`);
+      return;
+    }
+
+    const eventId = evt._id || evt.id || evt.wpPostId;
+    if (eventId && user?.email) {
+      try {
+        await axios.post(`/api/visitors/register`, {
+          eventId,
+          name: user?.name || user?.email?.split('@')[0] || 'Visitor',
+          email: user?.email,
+          phone: user?.phone || '+91-9999999999',
+          company: user?.organization?.name || user?.company || 'Trade Attendee',
+          designation: 'Business Visitor',
+          country: 'India',
+          attendanceType: 'in_person'
+        });
+      } catch (_) {}
+    }
+
+    setClaimedPassIds((prev) => {
+      const next = new Set(prev);
+      const keys = [evt.id, evt._id, evt.slug, evt.wpPostId, slugKey, idKey].filter(Boolean).map(String);
+      keys.forEach((k) => next.add(k));
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('visitexpo_claimed_passes', JSON.stringify(Array.from(next)));
+        } catch (_) {}
+      }
+      return next;
+    });
+
+    showSweetSuccess(
+      `Your complimentary digital pass for "${evt.title}" is ready and registered to your visitor account!`,
+      'Visitor Pass Confirmed! 🎉'
+    );
   };
 
   // Filter events matching this city
@@ -626,15 +737,27 @@ export default function CityEventsPage() {
                     <div className="p-4 sm:p-5 pt-0 border-t border-zinc-100 mt-2 flex items-center justify-between gap-2">
                       <Link
                         href={`/expo/${expo.slug || expo.id}`}
-                        className="text-xs font-bold text-zinc-700 hover:text-zinc-950 transition-colors"
+                        onClick={() => {
+                          try {
+                            sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(expo));
+                          } catch (_) {}
+                        }}
+                        prefetch={true}
+                        className="text-xs font-bold text-zinc-700 hover:text-zinc-950 transition-colors cursor-pointer"
                       >
                         View Details
                       </Link>
 
                       <div className="flex items-center gap-2">
                         <Link
-                          href={`/onboarding/exhibitor?wp_slug=${encodeURIComponent(expo.slug || '')}`}
-                          className="text-xs font-bold text-[#FF2E63] hover:underline"
+                          href={`/onboarding/exhibitor?wp_slug=${encodeURIComponent(expo.slug || '')}&wp_post_id=${expo.wpPostId || expo.id || ''}&title=${encodeURIComponent(expo.title || '')}&venue=${encodeURIComponent(expo.venue || '')}&city=${encodeURIComponent(expo.city || '')}&startDate=${encodeURIComponent(expo.startDate || '')}`}
+                          onClick={() => {
+                            try {
+                              sessionStorage.setItem('visitexpo_selected_event', JSON.stringify(expo));
+                            } catch (_) {}
+                          }}
+                          prefetch={true}
+                          className="text-xs font-bold text-[#FF2E63] hover:underline cursor-pointer"
                         >
                           Exhibit
                         </Link>
@@ -642,9 +765,14 @@ export default function CityEventsPage() {
                         <span className="text-zinc-300">•</span>
 
                         {isClaimed ? (
-                          <span className="text-xs font-extrabold text-emerald-700 flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleClaimPass(expo)}
+                            className="text-xs font-extrabold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Pass registered - click to view badge details"
+                          >
                             <CheckCircle2 className="h-3.5 w-3.5" /> Pass Ready
-                          </span>
+                          </button>
                         ) : (
                           <button
                             type="button"

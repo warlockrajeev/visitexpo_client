@@ -57,6 +57,7 @@ import {
   formatDistance
 } from '../utils/geoUtils.js';
 import axios from 'axios';
+import { showSweetAlert, showSweetConfirm, showSweetSuccess } from '../utils/sweetalert.js';
 import Navbar, { Logo } from '../components/Navbar.js';
 import ActionDiscoveryBanner from '../components/ActionDiscoveryBanner.js';
 import AdvertiseModal from '../components/AdvertiseModal.js';
@@ -294,6 +295,29 @@ export default function LandingPage() {
 
     fetchCriticalData();
     return () => { isMounted = false; };
+  }, []);
+
+  // Hydrate saved bookmarks, followed events, and claimed passes from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('visitexpo_saved_events');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) setSavedEventIds(new Set(parsed));
+        }
+        const followed = localStorage.getItem('visitexpo_followed_events');
+        if (followed) {
+          const parsed = JSON.parse(followed);
+          if (Array.isArray(parsed)) setFollowedEventSlugs(new Set(parsed.map(s => String(s).toLowerCase().trim())));
+        }
+        const claimed = localStorage.getItem('visitexpo_claimed_passes');
+        if (claimed) {
+          const parsed = JSON.parse(claimed);
+          if (Array.isArray(parsed)) setIssuedTicketIds(new Set(parsed.map(String)));
+        }
+      } catch (_) {}
+    }
   }, []);
 
   // DEFERRED: Fetch user-specific data separately (not blocking initial render)
@@ -553,8 +577,112 @@ export default function LandingPage() {
     }
   };
 
+  // Get Pass Handler with SweetAlert Confirmation Modal
+  const handleGetPass = async (expo) => {
+    if (!expo) return;
+    const slugKey = (expo.slug || expo.id || '').toLowerCase().trim();
+    const idKey = String(expo.id || expo._id || expo.wpPostId || slugKey).trim();
+    const isAlreadyClaimed =
+      issuedTicketIds.has(idKey) ||
+      issuedTicketIds.has(slugKey) ||
+      (expo._id && issuedTicketIds.has(String(expo._id))) ||
+      (expo.id && issuedTicketIds.has(String(expo.id))) ||
+      (expo.wpPostId && issuedTicketIds.has(String(expo.wpPostId)));
+
+    if (isAlreadyClaimed) {
+      await showSweetAlert(
+        {
+          title: 'Visitor Pass Already Issued! ✓',
+          icon: 'success',
+          confirmButtonText: 'Great, Understood',
+          html: `
+            <div style="font-size: 13px; line-height: 1.6; text-align: left; padding: 4px;">
+              <p style="margin-bottom: 8px; font-weight: 500;">You already have an active complimentary pass for:</p>
+              <div style="font-weight: 800; font-size: 15px; margin-bottom: 6px; color: #10b981;">${expo.title || 'Exhibition'}</div>
+              ${expo.dates ? `<p style="font-size: 12px; margin-bottom: 4px; font-weight: 600;">📅 ${expo.dates}</p>` : ''}
+              ${expo.venue || expo.city ? `<p style="font-size: 12px; opacity: 0.8; margin-bottom: 12px;">📍 ${[expo.venue, expo.city].filter(Boolean).join(', ')}</p>` : ''}
+              <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 12px; font-size: 12px; font-weight: 600; color: #059669;">
+                ✓ Active pass registered to your account.<br />
+                ✓ Present your name / registered email at the registration gate for fast-track badge printing.
+              </div>
+            </div>
+          `
+        },
+        'success'
+      );
+      return;
+    }
+
+    const confirmed = await showSweetConfirm(
+      {
+        title: 'Confirm Free Visitor Pass?',
+        icon: 'question',
+        confirmButtonText: 'Yes, Get Pass',
+        cancelButtonText: 'Cancel',
+        isDanger: false,
+        html: `
+          <div style="font-size: 13px; line-height: 1.6; text-align: left; padding: 4px;">
+            <p style="margin-bottom: 8px; font-weight: 500;">Confirm your complimentary registration and digital badge for:</p>
+            <div style="font-weight: 800; font-size: 15px; margin-bottom: 6px; color: #f59e0b;">${expo.title || 'Exhibition'}</div>
+            ${expo.dates ? `<p style="font-size: 12px; margin-bottom: 4px; font-weight: 600;">📅 ${expo.dates}</p>` : ''}
+            ${expo.venue || expo.city ? `<p style="font-size: 12px; opacity: 0.8; margin-bottom: 12px;">📍 ${[expo.venue, expo.city].filter(Boolean).join(', ')}</p>` : ''}
+            <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 12px; padding: 12px; font-size: 12px; color: #d97706; font-weight: 600;">
+              ✓ Free gate admission to exhibition halls<br />
+              ✓ Digital badge synced directly with your visitor account
+            </div>
+          </div>
+        `
+      }
+    );
+
+    if (!confirmed) return;
+
+    if (!user) {
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/';
+      router.push(`/login?role=visitor&redirect=${encodeURIComponent(currentPath)}`);
+      return;
+    }
+
+    const eventId = expo._id || expo.id || expo.wpPostId;
+    if (eventId && user?.email) {
+      try {
+        await axios.post(`${API_URL}/visitors/register`, {
+          eventId,
+          name: user?.name || user?.email?.split('@')[0] || 'Visitor',
+          email: user?.email,
+          phone: user?.phone || '+91-9999999999',
+          company: user?.organization?.name || user?.company || 'Trade Attendee',
+          designation: 'Business Visitor',
+          country: 'India',
+          attendanceType: 'in_person'
+        });
+      } catch (_) {}
+    }
+
+    setIssuedTicketIds((prev) => {
+      const next = new Set(prev);
+      const keys = [expo.id, expo._id, expo.slug, expo.wpPostId, slugKey, idKey].filter(Boolean).map(String);
+      keys.forEach((k) => next.add(k));
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('visitexpo_claimed_passes', JSON.stringify(Array.from(next)));
+        } catch (_) {}
+      }
+      return next;
+    });
+
+    showSweetSuccess(
+      `Your complimentary digital pass for "${expo.title}" is ready and registered to your visitor account!`,
+      'Visitor Pass Confirmed! 🎉'
+    );
+  };
+
   // Gated Action Handler - routes directly to the single unified login page
   const handleTriggerGated = (action, event) => {
+    if (action === 'ticket') {
+      handleGetPass(event);
+      return;
+    }
     if (user) {
       executeGatedAction(action, event, user);
     } else {
@@ -573,8 +701,8 @@ export default function LandingPage() {
       return;
     }
     if (action === 'ticket') {
-      setIssuedTicketIds(prev => new Set(prev).add(event.id));
-      showToast(`Pass Confirmed! Free Digital Badge reserved for "${event.title}".`);
+      handleGetPass(event);
+      return;
     } else if (action === 'save') {
       setSavedEventIds(prev => {
         const next = new Set(prev);
@@ -1763,8 +1891,19 @@ export default function LandingPage() {
               {displayedEvents.length > 0 && (
                 <div className="grid sm:grid-cols-2 gap-5">
                   {displayedEvents.map((expo) => {
-                    const isSaved = savedEventIds.has(expo.id);
-                    const isTicketClaimed = issuedTicketIds.has(expo.id);
+                    const expoSlugKey = (expo.slug || expo.id || '').toLowerCase().trim();
+                    const expoIdKey = String(expo.id || expo._id || expo.wpPostId || expoSlugKey).trim();
+                    const isSaved =
+                      savedEventIds.has(expo.id) ||
+                      savedEventIds.has(expoIdKey) ||
+                      savedEventIds.has(expoSlugKey) ||
+                      (expo._id && savedEventIds.has(expo._id));
+                    const isTicketClaimed =
+                      issuedTicketIds.has(expoIdKey) ||
+                      issuedTicketIds.has(expoSlugKey) ||
+                      (expo._id && issuedTicketIds.has(String(expo._id))) ||
+                      (expo.id && issuedTicketIds.has(String(expo.id))) ||
+                      (expo.wpPostId && issuedTicketIds.has(String(expo.wpPostId)));
 
                     return (
                       <div
@@ -1774,6 +1913,12 @@ export default function LandingPage() {
                         {/* Card Image Banner */}
                         <Link
                           href={`/expo/${expo.slug || expo.id}`}
+                          onClick={() => {
+                            try {
+                              sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(expo));
+                            } catch (_) {}
+                          }}
+                          prefetch={true}
                           className="relative h-44 w-full bg-zinc-100 overflow-hidden block"
                         >
                           <img
@@ -1858,6 +2003,12 @@ export default function LandingPage() {
                             <h3 className="font-extrabold text-sm text-zinc-900 line-clamp-1 hover:text-[#FF2E63] transition-colors">
                               <Link
                                 href={`/expo/${expo.slug || expo.id}`}
+                                onClick={() => {
+                                  try {
+                                    sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(expo));
+                                  } catch (_) {}
+                                }}
+                                prefetch={true}
                                 className="block"
                                 title={expo.title}
                               >
@@ -1900,6 +2051,12 @@ export default function LandingPage() {
                           <div className="pt-3 border-t border-zinc-100 flex items-center justify-between gap-2">
                             <Link
                               href={`/expo/${expo.slug || expo.id}`}
+                              onClick={() => {
+                                try {
+                                  sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(expo));
+                                } catch (_) {}
+                              }}
+                              prefetch={true}
                               className="text-xs font-bold text-zinc-700 hover:text-zinc-950 cursor-pointer"
                             >
                               View Details
@@ -1922,8 +2079,14 @@ export default function LandingPage() {
                               </button>
 
                               <Link
-                                href={`/onboarding/exhibitor?wp_slug=${encodeURIComponent(expo.slug || '')}&wp_post_id=${expo.wpPostId || ''}`}
-                                className="text-xs font-bold text-[#FF2E63] hover:underline"
+                                href={`/onboarding/exhibitor?wp_slug=${encodeURIComponent(expo.slug || '')}&wp_post_id=${expo.wpPostId || expo.id || ''}&title=${encodeURIComponent(expo.title || '')}&venue=${encodeURIComponent(expo.venue || '')}&city=${encodeURIComponent(expo.city || '')}&startDate=${encodeURIComponent(expo.startDate || '')}`}
+                                onClick={() => {
+                                  try {
+                                    sessionStorage.setItem('visitexpo_selected_event', JSON.stringify(expo));
+                                  } catch (_) {}
+                                }}
+                                prefetch={true}
+                                className="text-xs font-bold text-[#FF2E63] hover:underline cursor-pointer"
                               >
                                 Exhibit
                               </Link>
@@ -1931,14 +2094,19 @@ export default function LandingPage() {
                               <span className="text-zinc-300">•</span>
 
                               {isTicketClaimed ? (
-                                <span className="text-xs font-extrabold text-emerald-700 flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleGetPass(expo)}
+                                  className="text-xs font-extrabold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer transition-colors"
+                                  title="Pass registered - click to view badge details"
+                                >
                                   <CheckCircle2 className="h-3.5 w-3.5" /> Pass Ready
-                                </span>
+                                </button>
                               ) : (
                                 <button
                                   type="button"
-                                  onClick={() => handleTriggerGated('ticket', expo)}
-                                  className="text-xs font-extrabold text-zinc-900 hover:text-[#FF2E63] cursor-pointer flex items-center gap-0.5"
+                                  onClick={() => handleGetPass(expo)}
+                                  className="text-xs font-extrabold text-zinc-900 hover:text-[#FF2E63] cursor-pointer flex items-center gap-0.5 transition-colors"
                                 >
                                   <span>Get Pass</span>
                                   <ArrowRight className="h-3.5 w-3.5" />

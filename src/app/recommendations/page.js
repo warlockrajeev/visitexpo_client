@@ -44,7 +44,8 @@ import {
   Sliders,
   ShieldCheck,
   Star,
-  X
+  X,
+  Sparkles
 } from 'lucide-react';
 import { detectUserLocation } from '@/utils/geoUtils.js';
 
@@ -385,98 +386,110 @@ export default function RecommendationsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex flex-col">
+    <div className="min-h-screen bg-[#F8F9FA] text-zinc-900 font-sans antialiased selection:bg-[#FF2E63] selection:text-white flex flex-col justify-between">
       <Navbar solid={true} />
 
-      {/* Hero Header */}
-      <div className="pt-24 pb-12 bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 text-white border-b border-zinc-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-6">
-          
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="space-y-3 max-w-2xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black bg-primary/20 text-primary border border-primary/30">
-                <span>Personalized Matchmaking Engine</span>
-              </div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white">
-                Events Recommended For You
-              </h1>
-              <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed">
-                Discover trade shows and business expos scored against your geographic radius, selected industry clusters, and schedule readiness.
-              </p>
-            </div>
+      {/* Main Content Container */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-16 sm:pt-20 pb-16 space-y-4 sm:space-y-5 flex-1 w-full">
+        <div>
+          {/* Breadcrumb Navigation */}
+          <nav className="flex items-center gap-2 text-xs font-medium text-zinc-500 mb-2 sm:mb-2.5">
+            <Link href="/" className="hover:text-zinc-900 transition-colors">
+              Home
+            </Link>
+            <span>/</span>
+            <span className="text-zinc-900 font-bold">Recommended For You</span>
+          </nav>
 
-            {/* Save Preferences CTA */}
-            <div className="flex items-center gap-2.5">
-              <button
-                type="button"
-                onClick={handleSavePreferences}
-                disabled={savingPreferences}
-                className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer ${
-                  savedSuccess
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-primary hover:bg-amber-400 text-zinc-950 font-black'
-                }`}
-              >
-                {savedSuccess ? (
+          {/* Hero Header Banner */}
+          <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden bg-zinc-950 text-white shadow-lg">
+            <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/85 to-zinc-900/90 z-0" />
+            <div className="relative z-10 p-5 sm:p-6 md:p-7 space-y-3.5">
+              
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-2 max-w-2xl">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-[11px] font-bold text-[#FFCC00]">
+                    <Sparkles className="h-3.5 w-3.5 text-[#FF2E63]" />
+                    <span>Personalized Matchmaking Engine • AI Discovery</span>
+                  </div>
+                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-white leading-tight">
+                    Events Recommended For You
+                  </h1>
+                  <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed font-normal">
+                    Discover trade shows and business expos scored against your geographic radius, selected industry clusters, and schedule readiness.
+                  </p>
+                </div>
+
+                {/* Save Preferences CTA */}
+                <div className="flex items-center gap-2.5 shrink-0 self-start md:self-center">
+                  <button
+                    type="button"
+                    onClick={handleSavePreferences}
+                    disabled={savingPreferences}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer ${
+                      savedSuccess
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-black'
+                    }`}
+                  >
+                    {savedSuccess ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span>Preferences Saved</span>
+                      </>
+                    ) : savingPreferences ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin text-zinc-950" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Bookmark className="h-4 w-4" />
+                        <span>Save My Preferences</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={fetchRecommendations}
+                    className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-zinc-200 border border-white/15 transition-colors cursor-pointer"
+                    title="Refresh Recommendations"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-[#FFCC00]' : ''}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Stats Pill Bar */}
+              <div className="pt-2.5 flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-zinc-300 border-t border-white/10">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-white">{events.length}</span> expos tailored to your profile
+                </div>
+                <span className="text-zinc-600">•</span>
+                <div className="flex items-center gap-1.5">
+                  <span>Top Match:</span>
+                  <span className="text-emerald-400 font-extrabold">{events[0]?.matchScore || 95}%</span>
+                </div>
+                {detectedCity && (
                   <>
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>Preferences Saved</span>
-                  </>
-                ) : savingPreferences ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin text-zinc-950" />
-                    <span>Saving...</span>
-                  </>
-                ) : (
-                  <>
-                    <Bookmark className="h-4 w-4" />
-                    <span>Save My Preferences</span>
+                    <span className="text-zinc-600">•</span>
+                    <div className="flex items-center gap-1 text-zinc-300">
+                      <MapPin className="h-3.5 w-3.5 text-[#FF2E63]" />
+                      <span>GPS: {detectedCity}</span>
+                    </div>
                   </>
                 )}
-              </button>
+              </div>
 
-              <button
-                type="button"
-                onClick={fetchRecommendations}
-                className="p-2.5 rounded-xl bg-zinc-850 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 transition-colors cursor-pointer"
-                title="Refresh"
-              >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-primary' : ''}`} />
-              </button>
             </div>
           </div>
-
-          {/* Quick Stats Pill Bar */}
-          <div className="pt-2 flex flex-wrap items-center gap-4 text-xs text-zinc-400 border-t border-zinc-850">
-            <div className="flex items-center gap-1.5">
-              <span className="font-bold text-white">{events.length}</span> expos tailored to your profile
-            </div>
-            <span className="text-zinc-600">•</span>
-            <div className="flex items-center gap-1.5">
-              <span>Top Match:</span>
-              <span className="text-emerald-400 font-extrabold">{events[0]?.matchScore || 95}%</span>
-            </div>
-            {detectedCity && (
-              <>
-                <span className="text-zinc-600">•</span>
-                <div className="flex items-center gap-1 text-zinc-300">
-                  <MapPin className="h-3.5 w-3.5 text-[#FF2E63]" />
-                  <span>GPS: {detectedCity}</span>
-                </div>
-              </>
-            )}
-          </div>
-
         </div>
-      </div>
 
-      {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-10 flex-1 space-y-8 w-full">
-        
         {/* ===================================================================== */}
         {/* INTERACTIVE CONTROLS CONTAINER                                        */}
         {/* ===================================================================== */}
-        <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs space-y-5">
+        <div className="bg-white border border-zinc-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-xs space-y-4">
           
           {/* Location Bar */}
           <div className="space-y-2">
@@ -534,10 +547,10 @@ export default function RecommendationsPage() {
           <div className="space-y-2 pt-4 border-t border-zinc-100">
             <div className="flex items-center justify-between text-xs">
               <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-zinc-600">
-                <Compass className="h-3.5 w-3.5 text-primary" />
+                <Compass className="h-3.5 w-3.5 text-[#FF2E63]" />
                 <span>Industry Sectors &amp; Interests (Multi-Select)</span>
                 {selectedInterests.length > 0 && (
-                  <span className="text-[10px] font-extrabold bg-primary text-zinc-950 px-2 py-0.5 rounded-full ml-1">
+                  <span className="text-[10px] font-extrabold bg-[#FFCC00] text-zinc-950 px-2 py-0.5 rounded-full ml-1">
                     {selectedInterests.length} selected
                   </span>
                 )}
@@ -812,8 +825,14 @@ export default function RecommendationsPage() {
 
                       <div className="flex items-center gap-2">
                         <Link
-                          href={`/onboarding/exhibitor?wp_slug=${encodeURIComponent(ev.slug || '')}`}
-                          className="text-xs font-bold text-[#FF2E63] hover:underline"
+                          href={`/onboarding/exhibitor?wp_slug=${encodeURIComponent(ev.slug || '')}&wp_post_id=${ev.wpPostId || ev.id || ''}&title=${encodeURIComponent(ev.title || '')}&venue=${encodeURIComponent(ev.venue || '')}&city=${encodeURIComponent(ev.city || '')}&startDate=${encodeURIComponent(ev.startDate || '')}`}
+                          onClick={() => {
+                            try {
+                              sessionStorage.setItem('visitexpo_selected_event', JSON.stringify(ev));
+                            } catch (_) {}
+                          }}
+                          prefetch={true}
+                          className="text-xs font-bold text-[#FF2E63] hover:underline cursor-pointer"
                         >
                           Exhibit
                         </Link>

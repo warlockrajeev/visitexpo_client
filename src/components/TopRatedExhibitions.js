@@ -159,7 +159,17 @@ export default function TopRatedExhibitions({ events = [] }) {
 
                     {/* Title */}
                     <h3 className="text-xs sm:text-sm font-extrabold text-zinc-950 line-clamp-2 leading-snug group-hover:text-amber-600 transition-colors">
-                      <Link href={`/expo/${eventSlug}`}>{evt.title}</Link>
+                      <Link
+                        href={`/expo/${eventSlug}`}
+                        onClick={() => {
+                          try {
+                            sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(evt));
+                          } catch (_) {}
+                        }}
+                        prefetch={true}
+                      >
+                        {evt.title}
+                      </Link>
                     </h3>
 
                     {/* Dates */}
@@ -183,6 +193,12 @@ export default function TopRatedExhibitions({ events = [] }) {
 
                     <Link
                       href={`/expo/${eventSlug}`}
+                      onClick={() => {
+                        try {
+                          sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(evt));
+                        } catch (_) {}
+                      }}
+                      prefetch={true}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-950 hover:bg-[#FFCC00] text-[#FFCC00] hover:text-zinc-950 text-[11px] font-black transition-all shadow-2xs active:scale-95 cursor-pointer shrink-0"
                     >
                       <span>View</span>

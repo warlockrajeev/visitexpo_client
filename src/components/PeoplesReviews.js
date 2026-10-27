@@ -296,19 +296,19 @@ export default function PeoplesReviews() {
           <button
             type="button"
             onClick={() => setShowReviewModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold text-xs sm:text-sm transition-all duration-200 shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-95 cursor-pointer"
           >
-            <Plus className="h-3.5 w-3.5 text-[#FF2E63]" />
+            <Plus className="h-4 w-4 text-zinc-950 stroke-[3]" />
             <span>Write a Review</span>
           </button>
 
           {/* Slider Arrow Controls */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={handlePrev}
               aria-label="Previous reviews"
-              className="h-8 w-8 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 hover:border-zinc-300 text-zinc-700 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
+              className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-100 hover:border-zinc-300 text-zinc-800 flex items-center justify-center transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -316,7 +316,7 @@ export default function PeoplesReviews() {
               type="button"
               onClick={handleNext}
               aria-label="Next reviews"
-              className="h-8 w-8 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 hover:border-zinc-300 text-zinc-700 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
+              className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-100 hover:border-zinc-300 text-zinc-800 flex items-center justify-center transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95"
             >
               <ChevronRight className="h-4 w-4" />
             </button>

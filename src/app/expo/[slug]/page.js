@@ -469,9 +469,94 @@ export default function ExpoDetailsPage() {
   const { user } = useAuth();
   const slug = params?.slug || '';
 
-  // Event State
-  const [event, setEvent] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Synchronous instant event initialization from cache
+  const getInitialEvent = () => {
+    if (typeof window === 'undefined') return null;
+    const cleanSlug = String(slug || '').toLowerCase().trim();
+    if (!cleanSlug) return null;
+
+    try {
+      // 1. Actively selected expo in sessionStorage
+      const activeExpo = sessionStorage.getItem('visitexpo_active_expo');
+      if (activeExpo) {
+        const parsed = JSON.parse(activeExpo);
+        const pSlug = String(parsed.slug || '').toLowerCase().trim();
+        const pId = String(parsed.id || parsed._id || '').toLowerCase().trim();
+        const pWpId = String(parsed.wpPostId || '').toLowerCase().trim();
+        if (pSlug === cleanSlug || pId === cleanSlug || pWpId === cleanSlug) {
+          const charSum = (parsed.title || '').split('').reduce((acc, char, i) => acc + char.charCodeAt(0), 19);
+          return {
+            ...parsed,
+            title: decodeHtmlEntities(parsed.title),
+            rating: parsed.rating || (4.5 + ((charSum % 5) * 0.1)).toFixed(1),
+            reviewCount: parsed.reviewCount || (80 + (charSum % 180)),
+            followersCount: parsed.followersCount || parsed.interestedCount || (1100 + (charSum % 2900)),
+            edition: parsed.edition || `${8 + (charSum % 15)}th Edition`,
+            timings: parsed.timings || '9:00 AM – 5:00 PM (General Admission)',
+            entryType: parsed.entryType || (parsed.isFreeEvent === false ? `Paid Admission — ${getCurrencySymbol(parsed.currency || 'INR')}${parsed.paidTicketPrice || 500}` : 'Free Ticket for Industry Professionals'),
+            boothCost: parsed.boothCost || 'Starts from 145 USD / sqm',
+            turnout: parsed.turnout || '100,000+ Visitors • 2,000+ Exhibitors',
+            format: parsed.format || (charSum % 4 === 0 ? 'Hybrid Expo' : 'In-Person Expo'),
+            organizer: parsed.organizer || 'VisitExpo Verified Organizer'
+          };
+        }
+      }
+
+      // 2. Homepage cached events in sessionStorage
+      const homeEvents = sessionStorage.getItem('visitexpo_home_events');
+      if (homeEvents) {
+        const parsedList = JSON.parse(homeEvents);
+        if (Array.isArray(parsedList)) {
+          const match = parsedList.find((e) => {
+            if (!e) return false;
+            const itemSlug = String(e.slug || '').toLowerCase().trim();
+            const itemId = String(e.id || e._id || '').toLowerCase().trim();
+            const itemWpId = String(e.wpPostId || '').toLowerCase().trim();
+            return itemSlug === cleanSlug || itemId === cleanSlug || itemWpId === cleanSlug;
+          });
+          if (match) {
+            const charSum = (match.title || '').split('').reduce((acc, char, i) => acc + char.charCodeAt(0), 19);
+            return {
+              ...match,
+              title: decodeHtmlEntities(match.title),
+              rating: match.rating || (4.5 + ((charSum % 5) * 0.1)).toFixed(1),
+              reviewCount: match.reviewCount || (80 + (charSum % 180)),
+              followersCount: match.followersCount || match.interestedCount || (1100 + (charSum % 2900)),
+              edition: match.edition || `${8 + (charSum % 15)}th Edition`,
+              timings: match.timings || '9:00 AM – 5:00 PM (General Admission)',
+              entryType: match.entryType || (match.isFreeEvent === false ? `Paid Admission — ${getCurrencySymbol(match.currency || 'INR')}${match.paidTicketPrice || 500}` : 'Free Ticket for Industry Professionals'),
+              boothCost: match.boothCost || 'Starts from 145 USD / sqm',
+              turnout: match.turnout || '100,000+ Visitors • 2,000+ Exhibitors',
+              format: match.format || (charSum % 4 === 0 ? 'Hybrid Expo' : 'In-Person Expo'),
+              organizer: match.organizer || 'VisitExpo Verified Organizer'
+            };
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
+  };
+
+  // Event State - Initialized synchronously in 0ms if cached
+  const [event, setEvent] = useState(getInitialEvent);
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const cleanSlug = String(slug || '').toLowerCase().trim();
+      try {
+        const active = sessionStorage.getItem('visitexpo_active_expo');
+        if (active) {
+          const p = JSON.parse(active);
+          if (p?.slug === cleanSlug || p?.id === cleanSlug || p?.wpPostId == cleanSlug) return false;
+        }
+        const home = sessionStorage.getItem('visitexpo_home_events');
+        if (home) {
+          const list = JSON.parse(home);
+          if (list?.some(e => e?.slug === cleanSlug || e?.id === cleanSlug || e?.wpPostId == cleanSlug)) return false;
+        }
+      } catch (_) {}
+    }
+    return true;
+  });
 
   // Active Tab: 'about' | 'virtual' | 'feed' | 'exhibitors' | 'speakers' | 'reviews' | 'deals'
   const [activeTab, setActiveTab] = useState('about');
@@ -1164,15 +1249,19 @@ export default function ExpoDetailsPage() {
 
   // Fetch Event by slug or ID from dedicated API route or fallback to WordPress API
   useEffect(() => {
+    let isCancelled = false;
     const loadEvent = async () => {
-      setLoading(true);
+      // Only show full loading spinner if we have NO event in state
+      if (!event) {
+        setLoading(true);
+      }
       try {
         const cleanSlug = String(slug || '').toLowerCase().trim();
         let found = null;
 
         // 1. Direct single-event endpoint (returns genuine WordPress/MongoDB data, real images, FAQs, schedule, etc.)
         try {
-          const detailRes = await axios.get(`/api/events/${encodeURIComponent(cleanSlug)}`);
+          const detailRes = await axios.get(`/api/events/${encodeURIComponent(cleanSlug)}`, { timeout: 4000 });
           if (detailRes.data?.success && detailRes.data?.data) {
             found = detailRes.data.data;
           }
@@ -1180,26 +1269,30 @@ export default function ExpoDetailsPage() {
           // Proceed to directory search fallback
         }
 
-        // 2. Fallback to /api/wordpress-events
-        if (!found) {
-          const res = await axios.get('/api/wordpress-events');
-          if (res.data?.success && Array.isArray(res.data?.events)) {
-            found = res.data.events.find((e) => {
-              if (!e) return false;
-              const itemSlug = String(e.slug || '').toLowerCase();
-              const itemId = String(e.id || '').toLowerCase();
-              const itemWpId = String(e.wpPostId || '').toLowerCase();
-              const titleSlug = (e.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-              return (
-                itemSlug === cleanSlug ||
-                itemId === cleanSlug ||
-                itemWpId === cleanSlug ||
-                titleSlug === cleanSlug ||
-                (cleanSlug.length > 3 && (titleSlug.includes(cleanSlug) || cleanSlug.includes(titleSlug)))
-              );
-            });
-          }
+        // 2. Fallback to /api/wordpress-events only if no event found and no cached event
+        if (!found && !event) {
+          try {
+            const res = await axios.get('/api/wordpress-events', { timeout: 5000 });
+            if (res.data?.success && Array.isArray(res.data?.events)) {
+              found = res.data.events.find((e) => {
+                if (!e) return false;
+                const itemSlug = String(e.slug || '').toLowerCase();
+                const itemId = String(e.id || '').toLowerCase();
+                const itemWpId = String(e.wpPostId || '').toLowerCase();
+                const titleSlug = (e.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                return (
+                  itemSlug === cleanSlug ||
+                  itemId === cleanSlug ||
+                  itemWpId === cleanSlug ||
+                  titleSlug === cleanSlug ||
+                  (cleanSlug.length > 3 && (titleSlug.includes(cleanSlug) || cleanSlug.includes(titleSlug)))
+                );
+              });
+            }
+          } catch (_) {}
         }
+
+        if (isCancelled) return;
 
         if (found) {
           const charSum = (found.title || '').split('').reduce((acc, char, i) => acc + char.charCodeAt(0), 19);
@@ -1210,22 +1303,23 @@ export default function ExpoDetailsPage() {
             wpEventImages[String(found.wpPostId)] ||
             wpEventImages[found.slug];
 
-          setEvent({
+          setEvent(prev => ({
+            ...(prev || {}),
             ...found,
             title: decodeHtmlEntities(found.title),
-            image: resolvedImage || found.image,
-            rating: found.rating || (4.5 + ((charSum % 5) * 0.1)).toFixed(1),
-            reviewCount: found.reviewCount || (80 + (charSum % 180)),
-            followersCount: found.followersCount || found.interestedCount || (1100 + (charSum % 2900)),
-            edition: found.edition || `${8 + (charSum % 15)}th Edition`,
-            timings: found.timings || '9:00 AM – 5:00 PM (General Admission)',
-            entryType: found.entryType || (found.isFreeEvent === false ? `Paid Admission — ${getCurrencySymbol(found.currency || 'INR')}${found.paidTicketPrice || 500}` : 'Free Ticket for Industry Professionals'),
-            boothCost: found.boothCost || 'Starts from 145 USD / sqm',
-            turnout: found.turnout || '100,000+ Visitors • 2,000+ Exhibitors',
-            format: found.format || (charSum % 4 === 0 ? 'Hybrid Expo' : 'In-Person Expo'),
-            organizer: found.organizer || 'VisitExpo Verified Organizer'
-          });
-        } else {
+            image: resolvedImage || found.image || prev?.image,
+            rating: found.rating || prev?.rating || (4.5 + ((charSum % 5) * 0.1)).toFixed(1),
+            reviewCount: found.reviewCount || prev?.reviewCount || (80 + (charSum % 180)),
+            followersCount: found.followersCount || found.interestedCount || prev?.followersCount || (1100 + (charSum % 2900)),
+            edition: found.edition || prev?.edition || `${8 + (charSum % 15)}th Edition`,
+            timings: found.timings || prev?.timings || '9:00 AM – 5:00 PM (General Admission)',
+            entryType: found.entryType || prev?.entryType || (found.isFreeEvent === false ? `Paid Admission — ${getCurrencySymbol(found.currency || 'INR')}${found.paidTicketPrice || 500}` : 'Free Ticket for Industry Professionals'),
+            boothCost: found.boothCost || prev?.boothCost || 'Starts from 145 USD / sqm',
+            turnout: found.turnout || prev?.turnout || '100,000+ Visitors • 2,000+ Exhibitors',
+            format: found.format || prev?.format || (charSum % 4 === 0 ? 'Hybrid Expo' : 'In-Person Expo'),
+            organizer: found.organizer || prev?.organizer || 'VisitExpo Verified Organizer'
+          }));
+        } else if (!event) {
           // Default synthesized event matching slug
           const resolvedFallbackImage =
             wpEventImages[cleanSlug] ||
@@ -1255,13 +1349,14 @@ export default function ExpoDetailsPage() {
           });
         }
       } catch (err) {
-        console.error('Error fetching event details:', err);
+        console.warn('Error fetching event details:', err);
       } finally {
-        setLoading(false);
+        if (!isCancelled) setLoading(false);
       }
     };
 
     loadEvent();
+    return () => { isCancelled = true; };
   }, [slug]);
 
   // Load Social Local Persistence
@@ -5800,7 +5895,10 @@ export default function ExpoDetailsPage() {
                   onClick={() => {
                     setShowInquiryModal(false);
                     setInquiryErrors({});
-                    router.push(`/onboarding/exhibitor?wp_slug=${encodeURIComponent(event?.slug || '')}&wp_post_id=${event?.wpPostId || event?.id || ''}`);
+                    try {
+                      sessionStorage.setItem('visitexpo_selected_event', JSON.stringify(event));
+                    } catch (_) {}
+                    router.push(`/onboarding/exhibitor?wp_slug=${encodeURIComponent(event?.slug || '')}&wp_post_id=${event?.wpPostId || event?.id || ''}&title=${encodeURIComponent(event?.title || '')}&venue=${encodeURIComponent(event?.venue || '')}&city=${encodeURIComponent(event?.city || '')}&startDate=${encodeURIComponent(event?.startDate || '')}`);
                   }}
                   className="text-[11px] font-bold text-zinc-500 hover:text-zinc-800 transition-colors underline cursor-pointer"
                 >

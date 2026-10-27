@@ -12,7 +12,7 @@ const BACKEND_API_URL =
 
 // Cache for single event details
 const singleEventCache = new Map();
-const CACHE_TTL = 30 * 1000; // 30 seconds max
+const CACHE_TTL = 15 * 60 * 1000; // 15 minutes cache for ultra-fast sub-millisecond responses
 
 const NO_CACHE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
@@ -23,7 +23,7 @@ const NO_CACHE_HEADERS = {
 
 let cachedWpDocs = null;
 let cachedWpDocsTimestamp = 0;
-const WP_DOCS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const WP_DOCS_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 async function getWpDocs() {
   if (cachedWpDocs && (Date.now() - cachedWpDocsTimestamp < WP_DOCS_CACHE_TTL)) {
@@ -32,7 +32,8 @@ async function getWpDocs() {
   try {
     const wpRes = await fetch(`${WORDPRESS_URL}/wp-json/visitexpo/v1/inspect-event-meta`, {
       headers: { 'X-VisitExpo-Key': WORDPRESS_API_KEY },
-      cache: 'no-store'
+      cache: 'no-store',
+      signal: AbortSignal.timeout(4000)
     });
     if (wpRes.ok) {
       const wpData = await wpRes.json();
