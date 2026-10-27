@@ -275,37 +275,49 @@ export default function TicketingPage() {
       try {
         const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
         const res = await axios.get(buildDashboardEventsUrl(API_URL, user), { headers });
-        if (res.data && res.data.success && res.data.data.docs) {
-          const rawEvents = res.data.data.docs;
-          const userOrgId = user?.organization?._id || user?.organization;
+        let rawEvents = res.data?.data?.docs || [];
 
-          // Prioritize organizer's own / claimed events at the top
-          const sorted = [...rawEvents].sort((a, b) => {
-            const aOrg = a.organizer?._id || a.organizer;
-            const bOrg = b.organizer?._id || b.organizer;
-            const aIsMine = (userOrgId && aOrg?.toString() === userOrgId?.toString()) || (userId && a.claimedBy?.toString() === userId?.toString());
-            const bIsMine = (userOrgId && bOrg?.toString() === userOrgId?.toString()) || (userId && b.claimedBy?.toString() === userId?.toString());
-
-            if (aIsMine && !bIsMine) return -1;
-            if (!aIsMine && bIsMine) return 1;
-            return 0;
-          });
-
-          setEvents(sorted);
-          if (sorted.length > 0) {
-            setSelectedEventId(prev => prev || sorted[0]._id);
-          }
-
+        // Fallback: If no events returned for specific organizerId filter, fetch all user accessible events
+        if (rawEvents.length === 0 && user?.role !== 'super_admin') {
           try {
-            if (typeof window !== 'undefined') {
-              sessionStorage.setItem(cacheKey, JSON.stringify(sorted));
-            }
-          } catch (e) {
-            console.warn('Could not cache events:', e);
+            const fallbackRes = await axios.get(`${API_URL}/events?limit=100&all=true`, { headers });
+            rawEvents = fallbackRes.data?.data?.docs || [];
+          } catch (fbErr) {
+            console.warn('Fallback events fetch error:', fbErr);
           }
+        }
+
+        const userOrgId = user?.organization?._id || user?.organization;
+
+        // Prioritize organizer's own / claimed events at the top
+        const sorted = [...rawEvents].sort((a, b) => {
+          const aOrg = a.organizer?._id || a.organizer;
+          const bOrg = b.organizer?._id || b.organizer;
+          const aIsMine = (userOrgId && aOrg?.toString() === userOrgId?.toString()) || (userId && a.claimedBy?.toString() === userId?.toString());
+          const bIsMine = (userOrgId && bOrg?.toString() === userOrgId?.toString()) || (userId && b.claimedBy?.toString() === userId?.toString());
+
+          if (aIsMine && !bIsMine) return -1;
+          if (!aIsMine && bIsMine) return 1;
+          return 0;
+        });
+
+        setEvents(sorted);
+        if (sorted.length > 0) {
+          setSelectedEventId(prev => (prev && sorted.some(e => e._id === prev)) ? prev : sorted[0]._id);
+        } else {
+          setLoading(false);
+        }
+
+        try {
+          if (typeof window !== 'undefined' && sorted.length > 0) {
+            sessionStorage.setItem(cacheKey, JSON.stringify(sorted));
+          }
+        } catch (e) {
+          console.warn('Could not cache events:', e);
         }
       } catch (err) {
         console.error('Failed to load events', err);
+        setLoading(false);
         if (events.length === 0) {
           setError('Could not connect to API server. Ensure backend is running.');
         }
@@ -316,7 +328,13 @@ export default function TicketingPage() {
 
   // 2. Fetch Ticket Tiers & Orders
   const fetchData = async () => {
-    if (!selectedEventId) return;
+    if (!selectedEventId) {
+      setLoading(false);
+      setTickets([]);
+      setOrders([]);
+      setTotalRevenue(0);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -337,13 +355,18 @@ export default function TicketingPage() {
         if (ticketData.length > 0) {
           setSimulateForm(prev => ({ ...prev, ticketId: ticketData[0]._id }));
         }
+      } else {
+        setTickets([]);
       }
       if (orderResult.status === 'fulfilled' && orderResult.value.data?.success) {
         setOrders(orderResult.value.data.data.docs || []);
         setTotalRevenue(orderResult.value.data.data.totalRevenue || 0);
+      } else {
+        setOrders([]);
+        setTotalRevenue(0);
       }
-      if (ticketResult.status === 'rejected' || orderResult.status === 'rejected') {
-        throw ticketResult.status === 'rejected' ? ticketResult.reason : orderResult.reason;
+      if (ticketResult.status === 'rejected' && orderResult.status === 'rejected') {
+        throw ticketResult.reason || orderResult.reason;
       }
     } catch (err) {
       console.error('Error fetching ticketing details', err);
@@ -833,7 +856,19 @@ export default function TicketingPage() {
                 <CreditCard className="h-5 w-5 text-primary" /> Ticket Tiers
               </h3>
 
-              {loading ? (
+              {!selectedEventId ? (
+                <div className="border border-border rounded-xl p-6 text-center text-muted-foreground bg-card space-y-2">
+                  <Ticket className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
+                  <p className="text-xs font-semibold text-foreground">
+                    {events.length === 0 ? 'No events found.' : 'Select an active event above.'}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {events.length === 0
+                      ? 'Create an event in Event Wizard to configure pass tiers.'
+                      : 'Select an event to view and manage its pass pricing.'}
+                  </p>
+                </div>
+              ) : loading ? (
                 <div className="flex justify-center py-10">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
@@ -888,7 +923,19 @@ export default function TicketingPage() {
               </h3>
 
               <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-                {loading ? (
+                {!selectedEventId ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground gap-2">
+                    <Receipt className="h-10 w-10 text-muted-foreground/40" />
+                    <p className="text-xs font-semibold text-foreground">
+                      {events.length === 0 ? 'No events available' : 'No event selected'}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {events.length === 0
+                        ? 'Create an event to begin tracking order checkouts and tickets.'
+                        : 'Choose an active event from the dropdown above to view orders.'}
+                    </p>
+                  </div>
+                ) : loading ? (
                   <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     <p className="text-sm">Fetching ledger logs...</p>
