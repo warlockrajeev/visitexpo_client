@@ -516,8 +516,9 @@ export default function TicketingPage() {
       );
 
       if (res.data && res.data.success) {
-        setSelectedTicketDetail(res.data.ticket);
+        setSelectedTicketDetail(null);
         setReplyMessage('');
+        showSweetSuccess('Your reply has been posted successfully!');
         fetchSupportTickets();
       }
     } catch (err) {
@@ -537,9 +538,8 @@ export default function TicketingPage() {
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       if (res.data && res.data.success) {
-        if (selectedTicketDetail && selectedTicketDetail._id === ticketId) {
-          setSelectedTicketDetail(res.data.ticket);
-        }
+        setSelectedTicketDetail(null);
+        showSweetSuccess('Ticket marked as resolved successfully!');
         fetchSupportTickets();
       }
     } catch (err) {
