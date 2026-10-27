@@ -445,7 +445,8 @@ export async function GET(request) {
     // 1. Fetch from high-speed database-backed directory endpoint on Express server (MongoDB Atlas)
     try {
       const allRes = await fetch(`${BACKEND_API_URL}/events/all-directory`, {
-        cache: 'no-store'
+        cache: 'no-store',
+        signal: AbortSignal.timeout(2500)
       });
       if (allRes.ok) {
         const allJson = await allRes.json();
@@ -462,7 +463,8 @@ export async function GET(request) {
     if (!rawEvents || rawEvents.length === 0) {
       try {
         const dirRes = await fetch(`${BACKEND_API_URL}/events/directory`, {
-          cache: 'no-store'
+          cache: 'no-store',
+          signal: AbortSignal.timeout(2500)
         });
         if (dirRes.ok) {
           const dirJson = await dirRes.json();
@@ -488,7 +490,8 @@ export async function GET(request) {
           headers: {
             'X-VisitExpo-Key': WORDPRESS_API_KEY
           },
-          cache: 'no-store'
+          cache: 'no-store',
+          signal: AbortSignal.timeout(2500)
         });
 
         if (wpInspectRes.ok) {
@@ -536,7 +539,8 @@ export async function GET(request) {
           headers: {
             'X-VisitExpo-Key': WORDPRESS_API_KEY
           },
-          cache: 'no-store'
+          cache: 'no-store',
+          signal: AbortSignal.timeout(2500)
         });
 
         if (wpClaimRes.ok) {
@@ -553,7 +557,8 @@ export async function GET(request) {
     if (!rawEvents || rawEvents.length === 0) {
       try {
         const backendRes = await fetch(`${BACKEND_API_URL}/wordpress/claimable-events?limit=2500`, {
-          cache: 'no-store'
+          cache: 'no-store',
+          signal: AbortSignal.timeout(2500)
         });
         if (backendRes.ok) {
           const bData = await backendRes.json();

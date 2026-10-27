@@ -1,7 +1,6 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Suspense } from "react";
-import Script from "next/script";
 import NavigationProgress from "../components/NavigationProgress.js";
 import { ThemeProvider } from '../context/ThemeContext.js';
 import { AuthProvider } from '../context/AuthContext.js';
@@ -20,8 +19,8 @@ export const metadata = {
   title: "VisitExpo | Event Organizer Dashboard",
   description: "Enterprise SaaS Platform for Event Organizers. Build expos, track leads, and manage speakers.",
   icons: {
-    icon: "/logo.png",
-    apple: "/logo.png",
+    icon: "/favicon.ico",
+    apple: "/favicon.ico",
   },
 };
 
@@ -29,14 +28,13 @@ export default function RootLayout({ children }) {
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col transition-colors duration-200">
-        <Script
-          id="onesignal-sdk-page"
-          src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"
-          strategy="lazyOnload"
-        />
+      <body
+        suppressHydrationWarning
+        className="min-h-full flex flex-col transition-colors duration-200"
+      >
         <Suspense fallback={null}>
           <NavigationProgress />
         </Suspense>

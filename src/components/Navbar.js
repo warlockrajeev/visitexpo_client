@@ -139,7 +139,7 @@ export default function Navbar({ solid = false }) {
     {
       id: 'explore',
       label: 'Explore Events',
-      href: mounted && user ? '/events' : '/login?role=visitor&redirect=/events',
+      href: '/events',
       isAnchor: false
     },
     {

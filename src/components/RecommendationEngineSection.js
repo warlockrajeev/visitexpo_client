@@ -102,38 +102,27 @@ export default function RecommendationEngineSection({
   const router = useRouter();
   const { user } = useAuth();
 
-  // State with lazy initializers (run once on mount, no re-render loops)
-  const [selectedLocations, setSelectedLocations] = useState(() => {
-    if (defaultLocation) return [defaultLocation];
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = localStorage.getItem('visitexpo_user_preferences');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed.locations) && parsed.locations.length > 0) {
-            return parsed.locations;
-          }
-        }
-      } catch (err) {}
-    }
-    return ['New Delhi'];
-  });
+  // SSR-safe state initialization (identical on server and initial client render)
+  const [selectedLocations, setSelectedLocations] = useState(() => (defaultLocation ? [defaultLocation] : ['New Delhi']));
+  const [selectedInterests, setSelectedInterests] = useState(() => (Array.isArray(defaultInterests) && defaultInterests.length > 0 ? defaultInterests : ['Technology']));
 
-  const [selectedInterests, setSelectedInterests] = useState(() => {
-    if (Array.isArray(defaultInterests) && defaultInterests.length > 0) return defaultInterests;
+  // Hydrate user preferences from localStorage only after mount on client
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
         const cached = localStorage.getItem('visitexpo_user_preferences');
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed.interests) && parsed.interests.length > 0) {
-            return parsed.interests;
+          if (Array.isArray(parsed.locations) && parsed.locations.length > 0 && !defaultLocation) {
+            setSelectedLocations(parsed.locations);
+          }
+          if (Array.isArray(parsed.interests) && parsed.interests.length > 0 && (!defaultInterests || defaultInterests.length === 0)) {
+            setSelectedInterests(parsed.interests);
           }
         }
-      } catch (err) {}
+      } catch (_) {}
     }
-    return ['Technology'];
-  });
+  }, [defaultLocation, defaultInterests]);
 
   const [userCoords, setUserCoords] = useState(null);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);

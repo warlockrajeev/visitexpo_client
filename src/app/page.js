@@ -66,13 +66,12 @@ import TopRatedExhibitions from '../components/TopRatedExhibitions.js';
 import BannerSlider from '../components/BannerSlider.js';
 import SearchableSelect from '../components/SearchableSelect.js';
 
-// Lazy load components below the fold for faster initial render
-const RecommendationEngineSection = lazy(() => import('../components/RecommendationEngineSection.js'));
-const BrowseByCity = lazy(() => import('../components/BrowseByCity.js'));
-const ExploreVenues = lazy(() => import('../components/ExploreVenues.js'));
-const FeaturedOrganizers = lazy(() => import('../components/FeaturedOrganizers.js'));
-const PeoplesReviews = lazy(() => import('../components/PeoplesReviews.js'));
-const Footer = lazy(() => import('../components/Footer.js'));
+import RecommendationEngineSection from '../components/RecommendationEngineSection.js';
+import BrowseByCity from '../components/BrowseByCity.js';
+import ExploreVenues from '../components/ExploreVenues.js';
+import FeaturedOrganizers from '../components/FeaturedOrganizers.js';
+import PeoplesReviews from '../components/PeoplesReviews.js';
+import Footer from '../components/Footer.js';
 
 // Skeleton Components for loading states
 const SkeletonSection = ({ height = 'h-64' }) => (
@@ -1175,7 +1174,7 @@ export default function LandingPage() {
           {/* Hero CTAs */}
           <div className="pt-2 flex flex-wrap items-center justify-center gap-3.5">
             <Link
-              href={mounted && user ? '/events' : '/login?role=visitor&redirect=/events'}
+              href="/events"
               className="inline-flex items-center gap-2 rounded-full bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold px-8 py-3.5 text-xs sm:text-sm transition-all shadow-lg hover:scale-105 cursor-pointer"
             >
               <span>Explore Exhibitions</span>

@@ -538,26 +538,18 @@ export default function ExpoDetailsPage() {
     return null;
   };
 
-  // Event State - Initialized synchronously in 0ms if cached
-  const [event, setEvent] = useState(getInitialEvent);
-  const [loading, setLoading] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const cleanSlug = String(slug || '').toLowerCase().trim();
-      try {
-        const active = sessionStorage.getItem('visitexpo_active_expo');
-        if (active) {
-          const p = JSON.parse(active);
-          if (p?.slug === cleanSlug || p?.id === cleanSlug || p?.wpPostId == cleanSlug) return false;
-        }
-        const home = sessionStorage.getItem('visitexpo_home_events');
-        if (home) {
-          const list = JSON.parse(home);
-          if (list?.some(e => e?.slug === cleanSlug || e?.id === cleanSlug || e?.wpPostId == cleanSlug)) return false;
-        }
-      } catch (_) {}
+  // SSR-safe Event & Loading State (server and client initial render match 100%)
+  const [event, setEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Instantly hydrate event from client sessionStorage on mount
+  useEffect(() => {
+    const cached = getInitialEvent();
+    if (cached) {
+      setEvent(cached);
+      setLoading(false);
     }
-    return true;
-  });
+  }, [slug]);
 
   // Active Tab: 'about' | 'virtual' | 'feed' | 'exhibitors' | 'speakers' | 'reviews' | 'deals'
   const [activeTab, setActiveTab] = useState('about');
