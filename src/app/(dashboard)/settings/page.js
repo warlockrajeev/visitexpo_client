@@ -273,6 +273,8 @@ export default function SettingsPage() {
   const [visitorOtpTimer, setVisitorOtpTimer] = useState(0);
   const [visitorPhoneVerified, setVisitorPhoneVerified] = useState(true);
   const [visitorPhoneVerificationToken, setVisitorPhoneVerificationToken] = useState('');
+  const [visitorErrors, setVisitorErrors] = useState({});
+  const [visitorTouched, setVisitorTouched] = useState({});
 
   // User General Profile State (for organizers/exhibitors security tab)
   const [userProfileForm, setUserProfileForm] = useState({
@@ -345,8 +347,14 @@ export default function SettingsPage() {
         if (formState.currentPassword || formState.confirmPassword || isGoogleWithoutPassword) {
           err = 'New password is required.';
         }
+      } else if (/[<>]/.test(value)) {
+        err = 'Angle brackets (< and >) are not permitted in passwords.';
+      } else if (/\s/.test(value)) {
+        err = 'Password cannot contain spaces.';
       } else if (value.length < 6) {
         err = `Password must be at least 6 characters (currently ${value.length}).`;
+      } else if (value.length > 64) {
+        err = 'Password cannot exceed 64 characters.';
       } else if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(value)) {
         err = 'Password must contain at least one letter and one number.';
       } else if (!isGoogleWithoutPassword && formState.currentPassword && value === formState.currentPassword) {
@@ -357,6 +365,8 @@ export default function SettingsPage() {
         if (formState.newPassword) {
           err = 'Please confirm your new password.';
         }
+      } else if (/[<>]/.test(value)) {
+        err = 'Angle brackets (< and >) are not permitted in passwords.';
       } else if (value !== formState.newPassword) {
         err = 'Passwords do not match.';
       }
@@ -370,7 +380,123 @@ export default function SettingsPage() {
   // Validation Helpers
   const isValidEmail = (email) => {
     if (!email) return false;
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+    const trimmed = email.trim();
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+    if (!emailRegex.test(trimmed)) return false;
+    const parts = trimmed.split('@');
+    if (parts.length !== 2) return false;
+    const domain = parts[1];
+    const dotParts = domain.split('.');
+    if (dotParts.length < 2) return false;
+    const tld = dotParts[dotParts.length - 1];
+    return /^[a-zA-Z]{2,24}$/.test(tld);
+  };
+
+  const isValidName = (val) => {
+    if (!val || typeof val !== 'string') return false;
+    const trimmed = val.trim();
+    if (trimmed.length < 2 || trimmed.length > 60) return false;
+    const nameRegex = /^[a-zA-Z\u00C0-\u024F\s.'-]+$/;
+    const hasLetter = /[a-zA-Z\u00C0-\u024F]/;
+    return nameRegex.test(trimmed) && hasLetter.test(trimmed);
+  };
+
+  const isValidCity = (val) => {
+    if (!val || !val.trim()) return true;
+    const trimmed = val.trim();
+    if (trimmed.length < 2 || trimmed.length > 60) return false;
+    const cityRegex = /^[a-zA-Z\u00C0-\u024F\s.,'-]+$/;
+    const hasLetter = /[a-zA-Z\u00C0-\u024F]/;
+    return cityRegex.test(trimmed) && hasLetter.test(trimmed);
+  };
+
+  const isValidCompany = (val) => {
+    if (!val || !val.trim()) return true;
+    const trimmed = val.trim();
+    if (trimmed.length < 2 || trimmed.length > 100) return false;
+    const compRegex = /^[a-zA-Z0-9\u00C0-\u024F\s.,'&/()\-]+$/;
+    const hasAlphanumeric = /[a-zA-Z0-9\u00C0-\u024F]/;
+    return compRegex.test(trimmed) && hasAlphanumeric.test(trimmed);
+  };
+
+  const isValidDesignation = (val) => {
+    if (!val || !val.trim()) return true;
+    const trimmed = val.trim();
+    if (trimmed.length < 2 || trimmed.length > 80) return false;
+    const desigRegex = /^[a-zA-Z0-9\u00C0-\u024F\s.,'&/()\-]+$/;
+    const hasLetter = /[a-zA-Z\u00C0-\u024F]/;
+    return desigRegex.test(trimmed) && hasLetter.test(trimmed);
+  };
+
+  const validateVisitorField = (field, value) => {
+    let error = '';
+    const raw = typeof value === 'string' ? value : '';
+    const trimmed = raw.trim();
+
+    if (field === 'name') {
+      if (!trimmed) {
+        error = 'Full Name is required.';
+      } else if (trimmed.length < 2) {
+        error = 'Full Name must be at least 2 characters.';
+      } else if (!isValidName(trimmed)) {
+        error = 'Please enter a valid full name (letters only, no symbols).';
+      }
+    } else if (field === 'email') {
+      if (!trimmed) {
+        error = 'Email Address is required.';
+      } else if (!isValidEmail(trimmed)) {
+        error = 'Please enter a valid email address (e.g. name@example.com).';
+      }
+    } else if (field === 'phone') {
+      if (trimmed) {
+        const digits = cleanDigits(trimmed);
+        if (digits.length !== 10 || !/^[6-9]\d{9}$/.test(digits)) {
+          error = 'Enter a valid 10-digit Indian mobile number.';
+        }
+      }
+    } else if (field === 'city') {
+      if (trimmed && !isValidCity(trimmed)) {
+        error = 'Please enter a valid city or location (letters only).';
+      }
+    } else if (field === 'company') {
+      if (trimmed && !isValidCompany(trimmed)) {
+        error = 'Please enter a valid company name (letters/numbers, min 2 chars).';
+      }
+    } else if (field === 'designation') {
+      if (trimmed && !isValidDesignation(trimmed)) {
+        error = 'Please enter a valid job title or designation (min 2 chars).';
+      }
+    }
+
+    return error;
+  };
+
+  const getVisitorAvatarInitial = () => {
+    const candidate = visitorForm.name || user?.name || '';
+    const match = candidate.match(/[a-zA-Z]/);
+    return match ? match[0].toUpperCase() : 'V';
+  };
+
+  const handleVisitorChange = (field, value) => {
+    setVisitorForm((prev) => ({ ...prev, [field]: value }));
+    const err = validateVisitorField(field, value);
+    setVisitorErrors((prev) => {
+      const next = { ...prev };
+      if (err) next[field] = err;
+      else delete next[field];
+      return next;
+    });
+  };
+
+  const handleVisitorBlur = (field) => {
+    setVisitorTouched((prev) => ({ ...prev, [field]: true }));
+    const err = validateVisitorField(field, visitorForm[field]);
+    setVisitorErrors((prev) => {
+      const next = { ...prev };
+      if (err) next[field] = err;
+      else delete next[field];
+      return next;
+    });
   };
 
   const isValidGst = (gst) => {
@@ -436,6 +562,8 @@ export default function SettingsPage() {
       setVisitorOtpSent(false);
       setVisitorOtpCode('');
       setVisitorPhoneVerificationToken('');
+      setVisitorErrors({});
+      setVisitorTouched({});
 
       setUserProfileForm({
         name: user.name || '',
@@ -501,11 +629,18 @@ export default function SettingsPage() {
   };
 
   const handleVisitorPhoneChange = (val) => {
-    setVisitorForm((prev) => ({ ...prev, phone: val }));
-    const digits = cleanDigits(val);
+    const sanitizedVal = val.replace(/[^0-9+\s\-()]/g, '').slice(0, 16);
+    setVisitorForm((prev) => ({ ...prev, phone: sanitizedVal }));
+    const digits = cleanDigits(sanitizedVal);
     const initialDigits = cleanDigits(initialVisitorPhone);
-    const isInvalidPhone = val.trim() && (digits.length !== 10 || !/^[6-9]\d{9}$/.test(digits));
-    setVisitorPhoneError(isInvalidPhone ? 'Enter a valid 10-digit Indian mobile number.' : '');
+    const phoneErr = validateVisitorField('phone', sanitizedVal);
+    setVisitorPhoneError(phoneErr);
+    setVisitorErrors((prev) => {
+      const next = { ...prev };
+      if (phoneErr) next.phone = phoneErr;
+      else delete next.phone;
+      return next;
+    });
     if (digits === initialDigits) {
       setVisitorPhoneVerified(true);
       setVisitorOtpSent(false);
@@ -648,17 +783,28 @@ export default function SettingsPage() {
     setSaveSuccess('');
     setErrorMessage('');
 
-    // Validations
-    if (!visitorForm.name || visitorForm.name.trim().length < 2) {
-      setErrorMessage('Full Name is required (minimum 2 characters).');
-      setTimeout(() => setErrorMessage(''), 4000);
-      setSavingProfile(false);
-      return;
-    }
+    // Mark all fields touched
+    setVisitorTouched({
+      name: true,
+      email: true,
+      phone: true,
+      city: true,
+      company: true,
+      designation: true
+    });
 
-    if (!visitorForm.email || !isValidEmail(visitorForm.email)) {
-      setErrorMessage('Please provide a valid email address.');
-      setTimeout(() => setErrorMessage(''), 4000);
+    // Run full validation across all fields
+    const errors = {};
+    ['name', 'email', 'phone', 'city', 'company', 'designation'].forEach((f) => {
+      const err = validateVisitorField(f, visitorForm[f]);
+      if (err) errors[f] = err;
+    });
+
+    if (Object.keys(errors).length > 0) {
+      setVisitorErrors(errors);
+      const firstError = Object.values(errors)[0];
+      setErrorMessage(firstError || 'Please resolve field validation errors before saving.');
+      setTimeout(() => setErrorMessage(''), 4500);
       setSavingProfile(false);
       return;
     }
@@ -690,9 +836,9 @@ export default function SettingsPage() {
           name: visitorForm.name.trim(),
           email: visitorForm.email.trim(),
           phone: cleanVisitorDigits || visitorForm.phone,
-          company: visitorForm.company,
-          designation: visitorForm.designation,
-          city: visitorForm.city,
+          company: (visitorForm.company || '').trim(),
+          designation: (visitorForm.designation || '').trim(),
+          city: (visitorForm.city || '').trim(),
           ...(isVisitorPhoneChanged ? { phoneVerificationToken: visitorPhoneVerificationToken } : {})
         },
         { headers }
@@ -707,6 +853,7 @@ export default function SettingsPage() {
         setVisitorOtpSent(false);
         setVisitorOtpCode('');
         setVisitorPhoneVerificationToken('');
+        setVisitorErrors({});
         setSaveSuccess('Attendee profile details updated and saved successfully!');
         setTimeout(() => setSaveSuccess(''), 4000);
       }
@@ -913,8 +1060,14 @@ export default function SettingsPage() {
 
         if (!securityForm.newPassword) {
           errors.newPassword = 'New password is required.';
+        } else if (/[<>]/.test(securityForm.newPassword)) {
+          errors.newPassword = 'Angle brackets (< and >) are not permitted in passwords.';
+        } else if (/\s/.test(securityForm.newPassword)) {
+          errors.newPassword = 'Password cannot contain spaces.';
         } else if (securityForm.newPassword.length < 6) {
           errors.newPassword = `Password must be at least 6 characters (currently ${securityForm.newPassword.length}).`;
+        } else if (securityForm.newPassword.length > 64) {
+          errors.newPassword = 'Password cannot exceed 64 characters.';
         } else if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(securityForm.newPassword)) {
           errors.newPassword = 'Password must contain at least one letter and one number.';
         } else if (!isGoogleWithoutPassword && securityForm.currentPassword === securityForm.newPassword) {
@@ -1011,7 +1164,7 @@ export default function SettingsPage() {
       ];
 
   return (
-    <div className="space-y-6 max-w-4xl pb-12">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12 w-full font-sans">
       {/* Header banner */}
       <div className="bg-card p-6 rounded-2xl border border-border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -1057,7 +1210,7 @@ export default function SettingsPage() {
       {/* Tabs Layout */}
       <div className="flex flex-col md:flex-row gap-6 items-start">
         {/* Left Side: Tabs buttons */}
-        <div className="w-full md:w-64 bg-card border border-border rounded-2xl p-3 space-y-1.5 shadow-sm">
+        <div className="w-full md:w-64 lg:w-72 shrink-0 bg-card border border-border rounded-2xl p-3 space-y-1.5 shadow-sm">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -1075,7 +1228,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Right Side: Tab Workspace panel */}
-        <div className="flex-1 w-full bg-card border border-border rounded-2xl p-6 shadow-sm min-h-[400px]">
+        <div className="flex-1 w-full min-w-0 bg-card border border-border rounded-2xl p-6 shadow-sm min-h-[400px]">
           
           {/* VISITOR: Tab 1 Attendee Profile Form */}
           {activeTab === 'profile' && isVisitor && (
@@ -1092,24 +1245,24 @@ export default function SettingsPage() {
               {/* Attendee Identity Banner */}
               <div className="flex items-center gap-4 p-4 rounded-2xl bg-muted/20 border border-border">
                 <div className="h-16 w-16 shrink-0 rounded-2xl bg-gradient-to-br from-primary to-amber-500 flex items-center justify-center text-primary-foreground font-black text-2xl shadow-sm">
-                  {(visitorForm.name || user?.name || 'V').charAt(0).toUpperCase()}
+                  {getVisitorAvatarInitial()}
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <h4 className="text-sm font-bold text-foreground">
-                      {visitorForm.name || user?.name || 'Attendee'}
+                      {visitorErrors.name || !visitorForm.name.trim() ? (user?.name || 'Attendee') : visitorForm.name}
                     </h4>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                       Visitor Pass Holder
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    <Mail className="h-3.5 w-3.5" /> {visitorForm.email || user?.email}
+                    <Mail className="h-3.5 w-3.5" /> {visitorErrors.email || !visitorForm.email.trim() ? (user?.email || 'email@example.com') : visitorForm.email}
                   </p>
-                  {visitorForm.company && (
+                  {(visitorForm.company || user?.company) && !visitorErrors.company && (
                     <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-                      <Building className="h-3.5 w-3.5" /> {visitorForm.company}
-                      {visitorForm.designation && ` • ${visitorForm.designation}`}
+                      <Building className="h-3.5 w-3.5" /> {visitorForm.company || user?.company}
+                      {(visitorForm.designation || user?.designation) && !visitorErrors.designation && ` • ${visitorForm.designation || user?.designation}`}
                     </p>
                   )}
                 </div>
@@ -1118,53 +1271,106 @@ export default function SettingsPage() {
               {/* Basic Details */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Full Name *</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-muted-foreground uppercase">Full Name *</label>
+                    {visitorErrors.name && (visitorTouched.name || visitorForm.name) && (
+                      <span className="text-[10px] font-bold text-destructive flex items-center gap-0.5">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        {visitorErrors.name}
+                      </span>
+                    )}
+                  </div>
                   <div className="relative">
                     <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                     <input
                       type="text"
                       required
                       value={visitorForm.name}
-                      onChange={(e) => setVisitorForm((prev) => ({ ...prev, name: e.target.value }))}
+                      onChange={(e) => handleVisitorChange('name', e.target.value)}
+                      onBlur={() => handleVisitorBlur('name')}
                       placeholder="e.g. Rajeev Haldar"
-                      className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      aria-invalid={Boolean(visitorErrors.name && (visitorTouched.name || visitorForm.name))}
+                      className={`w-full rounded-xl border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 transition-all ${
+                        visitorErrors.name && (visitorTouched.name || visitorForm.name)
+                          ? 'border-destructive focus:ring-destructive/30 bg-destructive/5'
+                          : 'border-border focus:ring-primary'
+                      }`}
                     />
                   </div>
+                  {visitorErrors.name && (visitorTouched.name || visitorForm.name) && (
+                    <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" /> {visitorErrors.name}
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Email Address *</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-muted-foreground uppercase">Email Address *</label>
+                    {visitorErrors.email && (visitorTouched.email || visitorForm.email) && (
+                      <span className="text-[10px] font-bold text-destructive flex items-center gap-0.5">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        {visitorErrors.email}
+                      </span>
+                    )}
+                  </div>
                   <div className="relative">
                     <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                     <input
                       type="email"
                       required
                       value={visitorForm.email}
-                      onChange={(e) => setVisitorForm((prev) => ({ ...prev, email: e.target.value }))}
+                      onChange={(e) => handleVisitorChange('email', e.target.value)}
+                      onBlur={() => handleVisitorBlur('email')}
                       placeholder="your.email@example.com"
-                      className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      aria-invalid={Boolean(visitorErrors.email && (visitorTouched.email || visitorForm.email))}
+                      className={`w-full rounded-xl border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 transition-all ${
+                        visitorErrors.email && (visitorTouched.email || visitorForm.email)
+                          ? 'border-destructive focus:ring-destructive/30 bg-destructive/5'
+                          : 'border-border focus:ring-primary'
+                      }`}
                     />
                   </div>
+                  {visitorErrors.email && (visitorTouched.email || visitorForm.email) && (
+                    <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" /> {visitorErrors.email}
+                    </p>
+                  )}
                 </div>
               </div>
 
               {/* Contact & Location */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Phone / WhatsApp Number</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-muted-foreground uppercase">Phone / WhatsApp Number</label>
+                    {(visitorPhoneError || visitorErrors.phone) && (
+                      <span className="text-[10px] font-bold text-destructive flex items-center gap-0.5">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        {visitorPhoneError || visitorErrors.phone}
+                      </span>
+                    )}
+                  </div>
                   <div className="relative">
                     <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                     <input
                       type="tel"
                       value={visitorForm.phone}
                       onChange={(e) => handleVisitorPhoneChange(e.target.value)}
+                      onBlur={() => handleVisitorBlur('phone')}
                       placeholder="+91 98765 43210"
-                      aria-invalid={Boolean(visitorPhoneError)}
-                      className={`w-full rounded-xl border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 ${
-                        visitorPhoneError ? 'border-destructive focus:ring-destructive/30' : 'border-border focus:ring-primary'
+                      aria-invalid={Boolean(visitorPhoneError || visitorErrors.phone)}
+                      className={`w-full rounded-xl border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 transition-all ${
+                        visitorPhoneError || visitorErrors.phone
+                          ? 'border-destructive focus:ring-destructive/30 bg-destructive/5'
+                          : 'border-border focus:ring-primary'
                       }`}
                     />
                   </div>
-                  {visitorPhoneError && <p className="mt-1 text-[11px] font-semibold text-destructive">{visitorPhoneError}</p>}
+                  {(visitorPhoneError || visitorErrors.phone) && (
+                    <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" /> {visitorPhoneError || visitorErrors.phone}
+                    </p>
+                  )}
 
                   {/* Visitor Phone Change OTP Verification Box */}
                   {cleanDigits(visitorForm.phone) !== cleanDigits(initialVisitorPhone) && (
@@ -1252,17 +1458,36 @@ export default function SettingsPage() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">City / Location</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-muted-foreground uppercase">City / Location</label>
+                    {visitorErrors.city && (visitorTouched.city || visitorForm.city) && (
+                      <span className="text-[10px] font-bold text-destructive flex items-center gap-0.5">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        {visitorErrors.city}
+                      </span>
+                    )}
+                  </div>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                     <input
                       type="text"
                       value={visitorForm.city}
-                      onChange={(e) => setVisitorForm((prev) => ({ ...prev, city: e.target.value }))}
+                      onChange={(e) => handleVisitorChange('city', e.target.value)}
+                      onBlur={() => handleVisitorBlur('city')}
                       placeholder="e.g. New Delhi, Mumbai, Bangalore"
-                      className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      aria-invalid={Boolean(visitorErrors.city && (visitorTouched.city || visitorForm.city))}
+                      className={`w-full rounded-xl border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 transition-all ${
+                        visitorErrors.city && (visitorTouched.city || visitorForm.city)
+                          ? 'border-destructive focus:ring-destructive/30 bg-destructive/5'
+                          : 'border-border focus:ring-primary'
+                      }`}
                     />
                   </div>
+                  {visitorErrors.city && (visitorTouched.city || visitorForm.city) && (
+                    <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" /> {visitorErrors.city}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1275,30 +1500,68 @@ export default function SettingsPage() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Organization / Employer</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-muted-foreground uppercase">Organization / Employer</label>
+                      {visitorErrors.company && (visitorTouched.company || visitorForm.company) && (
+                        <span className="text-[10px] font-bold text-destructive flex items-center gap-0.5">
+                          <AlertCircle className="h-3 w-3 shrink-0" />
+                          {visitorErrors.company}
+                        </span>
+                      )}
+                    </div>
                     <div className="relative">
                       <Building className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                       <input
                         type="text"
                         value={visitorForm.company}
-                        onChange={(e) => setVisitorForm((prev) => ({ ...prev, company: e.target.value }))}
+                        onChange={(e) => handleVisitorChange('company', e.target.value)}
+                        onBlur={() => handleVisitorBlur('company')}
                         placeholder="Company or Business Name"
-                        className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                        aria-invalid={Boolean(visitorErrors.company && (visitorTouched.company || visitorForm.company))}
+                        className={`w-full rounded-xl border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 transition-all ${
+                          visitorErrors.company && (visitorTouched.company || visitorForm.company)
+                            ? 'border-destructive focus:ring-destructive/30 bg-destructive/5'
+                            : 'border-border focus:ring-primary'
+                        }`}
                       />
                     </div>
+                    {visitorErrors.company && (visitorTouched.company || visitorForm.company) && (
+                      <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3 shrink-0" /> {visitorErrors.company}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Job Title / Designation</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-muted-foreground uppercase">Job Title / Designation</label>
+                      {visitorErrors.designation && (visitorTouched.designation || visitorForm.designation) && (
+                        <span className="text-[10px] font-bold text-destructive flex items-center gap-0.5">
+                          <AlertCircle className="h-3 w-3 shrink-0" />
+                          {visitorErrors.designation}
+                        </span>
+                      )}
+                    </div>
                     <div className="relative">
                       <Briefcase className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                       <input
                         type="text"
                         value={visitorForm.designation}
-                        onChange={(e) => setVisitorForm((prev) => ({ ...prev, designation: e.target.value }))}
+                        onChange={(e) => handleVisitorChange('designation', e.target.value)}
+                        onBlur={() => handleVisitorBlur('designation')}
                         placeholder="e.g. Procurement Lead, Buyer, Architect"
-                        className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                        aria-invalid={Boolean(visitorErrors.designation && (visitorTouched.designation || visitorForm.designation))}
+                        className={`w-full rounded-xl border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 transition-all ${
+                          visitorErrors.designation && (visitorTouched.designation || visitorForm.designation)
+                            ? 'border-destructive focus:ring-destructive/30 bg-destructive/5'
+                            : 'border-border focus:ring-primary'
+                        }`}
                       />
                     </div>
+                    {visitorErrors.designation && (visitorTouched.designation || visitorForm.designation) && (
+                      <p className="mt-1 text-[11px] font-semibold text-destructive flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3 shrink-0" /> {visitorErrors.designation}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1306,7 +1569,12 @@ export default function SettingsPage() {
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={savingProfile || (cleanDigits(visitorForm.phone) !== cleanDigits(initialVisitorPhone) && !visitorPhoneVerified)}
+                  disabled={
+                    savingProfile ||
+                    Boolean(visitorPhoneError) ||
+                    Boolean(visitorErrors.name || visitorErrors.email || visitorErrors.phone || visitorErrors.city || visitorErrors.company || visitorErrors.designation) ||
+                    (cleanDigits(visitorForm.phone) !== cleanDigits(initialVisitorPhone) && !visitorPhoneVerified)
+                  }
                   className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-md disabled:opacity-50 cursor-pointer active:scale-95"
                 >
                   {savingProfile ? (
@@ -2197,7 +2465,8 @@ export default function SettingsPage() {
                         type={showCurrentPassword ? 'text' : 'password'}
                         value={securityForm.currentPassword}
                         onChange={(e) => {
-                          const val = e.target.value;
+                          const raw = e.target.value;
+                          const val = raw.replace(/[<>]/g, '');
                           setSecurityForm((prev) => ({ ...prev, currentPassword: val }));
                           if (securityErrors.currentPassword) {
                             setSecurityErrors((prev) => ({ ...prev, currentPassword: val ? '' : 'Current password is required.' }));
@@ -2238,12 +2507,13 @@ export default function SettingsPage() {
                         type={showNewPassword ? 'text' : 'password'}
                         value={securityForm.newPassword}
                         onChange={(e) => {
-                          const val = e.target.value;
+                          const raw = e.target.value;
+                          const val = raw.replace(/[<>]/g, '');
                           setSecurityForm((prev) => ({ ...prev, newPassword: val }));
                           const err = validateSecurityField('newPassword', val, { ...securityForm, newPassword: val });
                           setSecurityErrors((prev) => ({
                             ...prev,
-                            newPassword: err,
+                            newPassword: err || (raw !== val ? 'Angle brackets (< and >) are not permitted in passwords.' : ''),
                             confirmPassword: securityForm.confirmPassword && val !== securityForm.confirmPassword ? 'Passwords do not match.' : ''
                           }));
                         }}
@@ -2304,10 +2574,14 @@ export default function SettingsPage() {
                         type={showConfirmPassword ? 'text' : 'password'}
                         value={securityForm.confirmPassword}
                         onChange={(e) => {
-                          const val = e.target.value;
+                          const raw = e.target.value;
+                          const val = raw.replace(/[<>]/g, '');
                           setSecurityForm((prev) => ({ ...prev, confirmPassword: val }));
                           const err = validateSecurityField('confirmPassword', val, { ...securityForm, confirmPassword: val });
-                          setSecurityErrors((prev) => ({ ...prev, confirmPassword: err }));
+                          setSecurityErrors((prev) => ({
+                            ...prev,
+                            confirmPassword: err || (raw !== val ? 'Angle brackets (< and >) are not permitted.' : '')
+                          }));
                         }}
                         placeholder="Re-enter new password"
                         className={`w-full rounded-xl border bg-background py-2 pl-3.5 pr-10 text-xs text-foreground focus:outline-none focus:ring-2 transition-all ${
@@ -2329,38 +2603,55 @@ export default function SettingsPage() {
                     {/* Live Match Feedback */}
                     {securityForm.confirmPassword && (
                       <p className={`text-[10px] mt-1 font-semibold flex items-center gap-1 ${
-                        securityForm.confirmPassword === securityForm.newPassword
+                        securityForm.confirmPassword === securityForm.newPassword && !securityErrors.newPassword && securityForm.newPassword.length >= 6
                           ? 'text-emerald-500'
                           : 'text-red-500'
                       }`}>
-                        {securityForm.confirmPassword === securityForm.newPassword
-                          ? '✓ Passwords match'
-                          : '✕ Passwords do not match'}
+                        {securityForm.confirmPassword !== securityForm.newPassword
+                          ? '✕ Passwords do not match'
+                          : securityErrors.newPassword || securityForm.newPassword.length < 6
+                          ? '✕ Password must meet all requirements above (min 6 characters, letters & numbers)'
+                          : '✓ Passwords match'}
                       </p>
                     )}
                   </div>
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={savingSecurity}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-md mt-4 disabled:opacity-50 cursor-pointer active:scale-95"
-              >
-                {savingSecurity ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Saving Security Settings...
-                  </>
-                ) : isGoogleWithoutPassword ? (
-                  <>
-                    <KeyRound className="h-4 w-4" /> Set Account Password
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4" /> Save Security Credentials
-                  </>
-                )}
-              </button>
+              {(() => {
+                const isSecuritySubmitDisabled =
+                  savingSecurity ||
+                  !securityForm.newPassword ||
+                  !securityForm.confirmPassword ||
+                  securityForm.newPassword.length < 6 ||
+                  securityForm.newPassword !== securityForm.confirmPassword ||
+                  Boolean(securityErrors.currentPassword) ||
+                  Boolean(securityErrors.newPassword) ||
+                  Boolean(securityErrors.confirmPassword) ||
+                  (!isGoogleWithoutPassword && !securityForm.currentPassword);
+
+                return (
+                  <button
+                    type="submit"
+                    disabled={isSecuritySubmitDisabled}
+                    className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-md mt-4 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-95"
+                  >
+                    {savingSecurity ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Saving Security Settings...
+                      </>
+                    ) : isGoogleWithoutPassword ? (
+                      <>
+                        <KeyRound className="h-4 w-4" /> Set Account Password
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4" /> Save Security Credentials
+                      </>
+                    )}
+                  </button>
+                );
+              })()}
             </form>
           )}
 

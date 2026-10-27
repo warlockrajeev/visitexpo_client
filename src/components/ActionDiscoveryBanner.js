@@ -160,12 +160,8 @@ export default function ActionDiscoveryBanner({ onKeywordClick }) {
         {/* ========================================================================= */}
         {/* HEADER & SEGMENTED TABS                                                   */}
         {/* ========================================================================= */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2 border-b border-zinc-200/70">
-          <div className="space-y-2.5 max-w-2xl">
-            {/* <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 border border-amber-200/80 text-amber-800 text-[11px] font-bold tracking-wide uppercase shadow-2xs">
-              <Compass className="h-3.5 w-3.5 text-amber-600 animate-pulse" />
-              <span>Smart Expo Discovery &amp; Action Hub</span>
-            </div> */}
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-3 border-b border-zinc-200/70">
+          <div className="space-y-2.5 max-w-xl">
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-zinc-900 leading-tight">
               Navigate Industry Opportunities.{' '}
               <span className="bg-gradient-to-r from-amber-500 via-[#FF2E63] to-pink-600 bg-clip-text text-transparent">
@@ -178,26 +174,46 @@ export default function ActionDiscoveryBanner({ onKeywordClick }) {
           </div>
 
           {/* Segmented Filter Switcher */}
-          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-zinc-100/90 rounded-2xl border border-zinc-200/80 shadow-2xs">
-            {[
-              { id: 'all', label: 'All Pathways' },
-              { id: 'visitors', label: 'Visitor Tracks' },
-              { id: 'exhibitors', label: 'Exhibitor Floor' },
-              { id: 'organizers', label: 'Organizer Hub' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                  activeTab === tab.id
-                    ? 'bg-white text-zinc-900 shadow-xs font-bold'
-                    : 'text-zinc-600 hover:text-zinc-900 hover:bg-white/50'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+          <div className="shrink-0 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 lg:pb-0">
+            <div className="inline-flex items-center gap-1 p-1.5 bg-zinc-100/90 rounded-2xl border border-zinc-200/80 shadow-2xs">
+              {[
+                { id: 'all', label: 'All Pathways', icon: Layers, count: 8 },
+                { id: 'visitors', label: 'Visitor Tracks', icon: Ticket, count: 4 },
+                { id: 'exhibitors', label: 'Exhibitor Floor', icon: Building2, count: 2 },
+                { id: 'organizers', label: 'Organizer Hub', icon: ShieldCheck, count: 2 }
+              ].map((tab) => {
+                const IconComp = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`group relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer select-none active:scale-[0.98] ${
+                      isActive
+                        ? 'bg-white text-zinc-950 font-bold shadow-xs ring-1 ring-black/5'
+                        : 'text-zinc-600 hover:text-zinc-950 hover:bg-white/60'
+                    }`}
+                  >
+                    <IconComp
+                      className={`h-3.5 w-3.5 transition-colors ${
+                        isActive ? 'text-amber-500' : 'text-zinc-400 group-hover:text-zinc-600'
+                      }`}
+                    />
+                    <span>{tab.label}</span>
+                    <span
+                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${
+                        isActive
+                          ? 'bg-amber-500/15 text-amber-700'
+                          : 'bg-zinc-200/70 text-zinc-500 group-hover:bg-zinc-200'
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 

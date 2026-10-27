@@ -47,7 +47,8 @@ import {
   X,
   Bell,
   LocateFixed,
-  Navigation
+  Navigation,
+  AlertCircle
 } from 'lucide-react';
 import {
   calculateDistanceKm,
@@ -62,6 +63,7 @@ import AdvertiseModal from '../components/AdvertiseModal.js';
 import BrowseByCategory from '../components/BrowseByCategory.js';
 import TopRatedExhibitions from '../components/TopRatedExhibitions.js';
 import BannerSlider from '../components/BannerSlider.js';
+import SearchableSelect from '../components/SearchableSelect.js';
 
 // Lazy load components below the fold for faster initial render
 const RecommendationEngineSection = lazy(() => import('../components/RecommendationEngineSection.js'));
@@ -117,6 +119,30 @@ const FALLBACK_FAQS = [
   }
 ];
 
+const COUNTRY_FLAGS = {
+  india: '🇮🇳',
+  'united states': '🇺🇸',
+  usa: '🇺🇸',
+  germany: '🇩🇪',
+  'united kingdom': '🇬🇧',
+  uk: '🇬🇧',
+  uae: '🇦🇪',
+  'united arab emirates': '🇦🇪',
+  singapore: '🇸🇬',
+  france: '🇫🇷',
+  italy: '🇮🇹',
+  china: '🇨🇳',
+  japan: '🇯🇵',
+  canada: '🇨🇦',
+  australia: '🇦🇺',
+  brazil: '🇧🇷',
+  spain: '🇪🇸',
+  turkey: '🇹🇷',
+  netherlands: '🇳🇱',
+  saudi: '🇸🇦',
+  'saudi arabia': '🇸🇦'
+};
+
 export default function LandingPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -128,12 +154,32 @@ export default function LandingPage() {
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchWarning, setSearchWarning] = useState('');
   const [selectedCountry, setSelectedCountry] = useState('');
   const [selectedState, setSelectedState] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [activeCategoryTab, setActiveCategoryTab] = useState('all');
   const [quickFilter, setQuickFilter] = useState('all');
+
+  const handleSearchKeyDown = (e) => {
+    // Prevent typing disallowed special characters: <>!@#$%^&*()=+~`\|{}[]:;"?
+    if (e.key && e.key.length === 1 && /[<>!@#$%^&*()=+~`\\|{}[\];:"?]/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      setSearchWarning('Special characters are not allowed');
+      setTimeout(() => setSearchWarning(''), 2500);
+    }
+  };
+
+  const handleSearchChange = (e) => {
+    const raw = e.target.value || '';
+    const sanitized = raw.replace(/[<>!@#$%^&*()=+~`\\|{}[\];:"?]/g, '');
+    if (raw !== sanitized) {
+      setSearchWarning('Special characters were removed');
+      setTimeout(() => setSearchWarning(''), 2500);
+    }
+    setSearchQuery(sanitized);
+  };
 
   const [showAdvertiseModal, setShowAdvertiseModal] = useState(false);
   const [savedEventIds, setSavedEventIds] = useState(new Set());
@@ -294,6 +340,31 @@ export default function LandingPage() {
     });
     return Array.from(values.values()).sort((a, b) => a.localeCompare(b));
   }, [events, selectedCountry, selectedState]);
+
+  const countryOptions = useMemo(() => [
+    { value: '', label: 'All Countries', flag: '🌍' },
+    ...availableCountries.map((country) => ({
+      value: country,
+      label: country,
+      flag: COUNTRY_FLAGS[country?.toLowerCase()?.trim()] || '🌐'
+    }))
+  ], [availableCountries]);
+
+  const stateOptions = useMemo(() => [
+    { value: '', label: 'All States / Regions' },
+    ...availableStates.map((state) => ({
+      value: state,
+      label: state
+    }))
+  ], [availableStates]);
+
+  const cityOptions = useMemo(() => [
+    { value: '', label: 'All Cities' },
+    ...availableCities.map((city) => ({
+      value: city,
+      label: city
+    }))
+  ], [availableCities]);
 
   // Distinct categories list from live WordPress events
   const availableCategories = useMemo(() => {
@@ -1018,27 +1089,40 @@ export default function LandingPage() {
                       type="text"
                       placeholder="Search title, venue, city, keyword..."
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={handleSearchChange}
+                      onKeyDown={handleSearchKeyDown}
                       className="w-full pl-8.5 pr-8 py-2 text-xs bg-zinc-50 hover:bg-zinc-100/70 focus:bg-white border border-zinc-200 focus:border-[#FF2E63] rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-[#FF2E63]/20 transition-all font-medium"
                     />
                     {searchQuery && (
                       <button
                         type="button"
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 p-0.5 rounded-full hover:bg-zinc-200 transition-colors"
+                        onClick={() => {
+                          setSearchQuery('');
+                          setSearchWarning('');
+                        }}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 p-0.5 rounded-full hover:bg-zinc-200 transition-colors cursor-pointer"
                         title="Clear search"
                       >
                         <X className="h-3 w-3" />
                       </button>
                     )}
                   </div>
+                  {searchWarning && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 animate-in fade-in duration-150">
+                      <AlertCircle className="h-3 w-3 shrink-0 text-amber-600" />
+                      <span>{searchWarning}</span>
+                    </div>
+                  )}
                   {searchQuery && (
                     <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-0.5 px-0.5">
                       <span className="truncate">Filtering for: <strong className="text-zinc-900 font-bold">"{searchQuery}"</strong></span>
                       <button
                         type="button"
-                        onClick={() => setSearchQuery('')}
-                        className="text-[#FF2E63] hover:underline font-bold ml-1 shrink-0"
+                        onClick={() => {
+                          setSearchQuery('');
+                          setSearchWarning('');
+                        }}
+                        className="text-[#FF2E63] hover:underline font-bold ml-1 shrink-0 cursor-pointer"
                       >
                         Clear
                       </button>
@@ -1052,48 +1136,48 @@ export default function LandingPage() {
                     Filter by Location
                   </label>
                   <div className="space-y-2">
-                    <select
-                      aria-label="Filter events by country"
+                    <SearchableSelect
+                      id="filter-country-select"
+                      options={countryOptions}
                       value={selectedCountry}
-                      onChange={(e) => {
-                        setSelectedCountry(e.target.value);
+                      onChange={(val) => {
+                        setSelectedCountry(val);
                         setSelectedState('');
                         setSelectedCity('');
                       }}
-                      className="w-full px-3 py-2 text-xs bg-zinc-50 hover:bg-zinc-100/70 focus:bg-white border border-zinc-200 focus:border-[#FF2E63] rounded-xl text-zinc-700 focus:outline-none focus:ring-1 focus:ring-[#FF2E63]/20 transition-all font-medium"
-                    >
-                      <option value="">All Countries</option>
-                      {availableCountries.map((country) => (
-                        <option key={country} value={country}>{country}</option>
-                      ))}
-                    </select>
-                    <select
-                      aria-label="Filter events by state or region"
+                      placeholder="All Countries"
+                      searchPlaceholder="Search country..."
+                      allowClear={true}
+                      className="text-xs bg-zinc-50 hover:bg-zinc-100/70 border-zinc-200 rounded-xl text-zinc-800 font-medium py-2"
+                      dropdownClassName="w-full min-w-full shadow-2xl border-zinc-200"
+                    />
+                    <SearchableSelect
+                      id="filter-state-select"
+                      options={stateOptions}
                       value={selectedState}
-                      onChange={(e) => {
-                        setSelectedState(e.target.value);
+                      onChange={(val) => {
+                        setSelectedState(val);
                         setSelectedCity('');
                       }}
                       disabled={availableStates.length === 0}
-                      className="w-full px-3 py-2 text-xs bg-zinc-50 hover:bg-zinc-100/70 focus:bg-white border border-zinc-200 focus:border-[#FF2E63] rounded-xl text-zinc-700 focus:outline-none focus:ring-1 focus:ring-[#FF2E63]/20 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <option value="">All States / Regions</option>
-                      {availableStates.map((state) => (
-                        <option key={state} value={state}>{state}</option>
-                      ))}
-                    </select>
-                    <select
-                      aria-label="Filter events by city"
+                      placeholder="All States / Regions"
+                      searchPlaceholder="Search state or region..."
+                      allowClear={true}
+                      className="text-xs bg-zinc-50 hover:bg-zinc-100/70 border-zinc-200 rounded-xl text-zinc-800 font-medium py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      dropdownClassName="w-full min-w-full shadow-2xl border-zinc-200"
+                    />
+                    <SearchableSelect
+                      id="filter-city-select"
+                      options={cityOptions}
                       value={selectedCity}
-                      onChange={(e) => setSelectedCity(e.target.value)}
+                      onChange={(val) => setSelectedCity(val)}
                       disabled={availableCities.length === 0}
-                      className="w-full px-3 py-2 text-xs bg-zinc-50 hover:bg-zinc-100/70 focus:bg-white border border-zinc-200 focus:border-[#FF2E63] rounded-xl text-zinc-700 focus:outline-none focus:ring-1 focus:ring-[#FF2E63]/20 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <option value="">All Cities</option>
-                      {availableCities.map((city) => (
-                        <option key={city} value={city}>{city}</option>
-                      ))}
-                    </select>
+                      placeholder="All Cities"
+                      searchPlaceholder="Search city..."
+                      allowClear={true}
+                      className="text-xs bg-zinc-50 hover:bg-zinc-100/70 border-zinc-200 rounded-xl text-zinc-800 font-medium py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      dropdownClassName="w-full min-w-full shadow-2xl border-zinc-200"
+                    />
                   </div>
                 </div>
 

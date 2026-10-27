@@ -658,25 +658,9 @@ export default function DashboardLayout({ children }) {
               <NotificationBell />
             )}
 
-            {user?.role === 'visitor' ? (
-              <Link
-                href="/expos"
-                className="group hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-amber-400 hover:brightness-105 active:brightness-95 px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-sm hover:shadow-lg hover:shadow-primary/40 hover:-translate-y-0.5 hover:scale-[1.03] active:translate-y-0 active:scale-95 transition-all duration-200 cursor-pointer"
-              >
-                <Ticket className="h-3.5 w-3.5 transition-transform duration-200 group-hover:scale-125 group-hover:-rotate-12" />
-                <span>Browse Live Expos</span>
-              </Link>
-            ) : user?.role === 'exhibitor' ? (
-              <Link
-                href="/expos"
-                className="group hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-card hover:bg-amber-500/10 hover:border-amber-500/50 hover:text-amber-600 dark:hover:text-amber-400 px-3.5 py-1.5 text-xs font-bold text-foreground transition-all duration-200 shadow-sm hover:shadow-md hover:shadow-amber-500/15 hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-0 active:scale-95 cursor-pointer"
-              >
-                <Ticket className="h-3.5 w-3.5 text-primary transition-transform duration-200 group-hover:scale-125 group-hover:-rotate-12" />
-                <span>Browse Live Expos</span>
-              </Link>
-            ) : (
+            {user?.role === 'organizer' && (
               <>
-                {user?.role === 'organizer' && hasExhibitorProfile && (
+                {hasExhibitorProfile && (
                   <button
                     onClick={handleToggleView}
                     className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all shadow-sm cursor-pointer btn-press active:scale-95 ${

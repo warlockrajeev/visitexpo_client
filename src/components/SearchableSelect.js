@@ -19,6 +19,7 @@ export default function SearchableSelect({
   error = '',
   className = '',
   dropdownClassName = '',
+  allowClear = false,
   allowCustom = false,
   customOptionLabel = '+ Custom Option...',
   customOptionValue = 'CUSTOM',
@@ -118,7 +119,7 @@ export default function SearchableSelect({
   return (
     <div
       ref={containerRef}
-      className="relative w-full text-left"
+      className={`relative w-full text-left ${isOpen ? 'z-30' : ''}`}
       onKeyDown={handleKeyDown}
       id={id ? `${id}-container` : undefined}
     >
@@ -161,11 +162,33 @@ export default function SearchableSelect({
               <span className="text-muted-foreground/60">{placeholder}</span>
             )}
           </span>
-          <ChevronDown
-            className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ml-2 ${
-              isOpen ? 'rotate-180 text-primary' : ''
-            }`}
-          />
+          <div className="flex items-center gap-1 shrink-0 ml-2">
+            {allowClear && value && !disabled && (
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onChange) onChange('', { value: '', label: '' });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation();
+                    if (onChange) onChange('', { value: '', label: '' });
+                  }
+                }}
+                className="p-0.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                title="Clear selection"
+              >
+                <X className="h-3.5 w-3.5" />
+              </span>
+            )}
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${
+                isOpen ? 'rotate-180 text-primary' : ''
+              }`}
+            />
+          </div>
         </button>
       )}
 
@@ -182,7 +205,12 @@ export default function SearchableSelect({
                 ref={searchInputRef}
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => setSearchQuery((e.target.value || '').replace(/[<>!@#$%^&*()=+~`\\|{}[\];:"?]/g, ''))}
+                onKeyDown={(e) => {
+                  if (e.key && e.key.length === 1 && /[<>!@#$%^&*()=+~`\\|{}[\];:"?]/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    e.preventDefault();
+                  }
+                }}
                 placeholder={searchPlaceholder}
                 className="w-full bg-background rounded-lg border border-border pl-8 pr-7 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
               />

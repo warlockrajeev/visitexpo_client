@@ -212,13 +212,21 @@ export default function OrganizersDirectoryPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(12);
 
-  // Load More Events State per Organizer
+  // Load More & Pagination State per Organizer for Exhibitions
   const [expandedEventsMap, setExpandedEventsMap] = useState({});
+  const [expoPages, setExpoPages] = useState({});
 
   const toggleExpandEvents = (orgId) => {
     setExpandedEventsMap((prev) => ({
       ...prev,
       [orgId]: !prev[orgId]
+    }));
+  };
+
+  const setExpoPage = (orgKey, page) => {
+    setExpoPages((prev) => ({
+      ...prev,
+      [orgKey]: page
     }));
   };
 
@@ -926,9 +934,29 @@ export default function OrganizersDirectoryPage() {
                 const isOnline = org.isChatEnabled;
                 const orgUniqueKey = org.id || org.organizerId || org.name;
                 const isExpanded = !!expandedEventsMap[orgUniqueKey];
-                const visibleEvents = isExpanded ? allEvents : allEvents.slice(0, 6);
-                const remainingCount = allEvents.length - 6;
+                const exposPerPage = 6;
+                const totalExpoPages = Math.ceil(allEvents.length / exposPerPage);
+                const currentExpoPage = Math.min(
+                  Math.max(1, expoPages[orgUniqueKey] || 1),
+                  Math.max(1, totalExpoPages)
+                );
+                const startExpoIdx = (currentExpoPage - 1) * exposPerPage;
+                const endExpoIdx = Math.min(startExpoIdx + exposPerPage, allEvents.length);
+                const visibleEvents = isExpanded
+                  ? allEvents
+                  : allEvents.slice(startExpoIdx, endExpoIdx);
+                const remainingCount = Math.max(0, allEvents.length - 6);
                 const metaInfo = getOrganizerMetaInfo(org);
+
+                const handleExpoPageChange = (targetPage) => {
+                  setExpoPage(orgUniqueKey, targetPage);
+                  if (isExpanded) {
+                    setExpandedEventsMap((prev) => ({
+                      ...prev,
+                      [orgUniqueKey]: false
+                    }));
+                  }
+                };
 
                 return (
                   <div
@@ -1169,24 +1197,165 @@ export default function OrganizersDirectoryPage() {
                         </div>
 
                         {allEvents.length > 6 && (
-                          <div className="pt-2 flex items-center justify-center">
-                            <button
-                              type="button"
-                              onClick={() => toggleExpandEvents(orgUniqueKey)}
-                              className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-[11px] font-bold bg-secondary hover:bg-secondary/80 text-foreground border border-border shadow-2xs transition-all cursor-pointer hover:border-primary/40 active:scale-98"
-                            >
-                              {isExpanded ? (
-                                <>
-                                  <ChevronUp className="h-3 w-3 text-primary" />
-                                  <span>Show Less ({allEvents.length} Expos)</span>
-                                </>
-                              ) : (
-                                <>
-                                  <ChevronDown className="h-3 w-3 text-primary" />
-                                  <span>Load More Expos (+{remainingCount} more)</span>
-                                </>
-                              )}
-                            </button>
+                          <div className="pt-2.5 mt-2 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+                            {/* Left: Show All / Show Less Button & Range Summary */}
+                            <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start">
+                              <button
+                                type="button"
+                                onClick={() => toggleExpandEvents(orgUniqueKey)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-secondary hover:bg-secondary/80 text-foreground border border-border shadow-2xs transition-all cursor-pointer hover:border-primary/40 active:scale-98"
+                                title={isExpanded ? 'Switch to paginated view (6 expos per page)' : `Show all ${allEvents.length} expos at once`}
+                              >
+                                {isExpanded ? (
+                                  <>
+                                    <ChevronUp className="h-3.5 w-3.5 text-primary" />
+                                    <span>Show Less ({allEvents.length} Expos)</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <ChevronDown className="h-3.5 w-3.5 text-primary" />
+                                    <span>Show All Expos (+{remainingCount} more)</span>
+                                  </>
+                                )}
+                              </button>
+
+                              <span className="text-[10px] text-muted-foreground font-semibold">
+                                {isExpanded
+                                  ? `Showing all ${allEvents.length} expos`
+                                  : `Page ${currentExpoPage} of ${totalExpoPages} (${startExpoIdx + 1}–${endExpoIdx} of ${allEvents.length})`}
+                              </span>
+                            </div>
+
+                            {/* Right: Pagination Option (First, Prev, Page Numbers, Next, Last) */}
+                            {totalExpoPages > 1 && (
+                              <div className="flex items-center gap-1 flex-wrap justify-center">
+                                {/* First Page */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleExpoPageChange(1)}
+                                  disabled={currentExpoPage === 1 && !isExpanded}
+                                  className="h-7 w-7 rounded-lg border border-border bg-card hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed text-foreground transition-all cursor-pointer flex items-center justify-center shadow-2xs hover:border-primary/40"
+                                  title="First Page of Expos"
+                                >
+                                  <ChevronsLeft className="h-3.5 w-3.5" />
+                                </button>
+
+                                {/* Previous Page */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleExpoPageChange(Math.max(1, currentExpoPage - 1))}
+                                  disabled={currentExpoPage === 1 && !isExpanded}
+                                  className="h-7 px-2 rounded-lg border border-border bg-card hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed text-[10px] font-bold text-foreground transition-all cursor-pointer flex items-center gap-0.5 shadow-2xs hover:border-primary/40"
+                                  title="Previous Page of Expos"
+                                >
+                                  <ChevronLeft className="h-3.5 w-3.5" />
+                                  <span className="hidden sm:inline">Prev</span>
+                                </button>
+
+                                {/* Page Numbers */}
+                                <div className="flex items-center gap-1">
+                                  {(() => {
+                                    const pages = [];
+                                    const maxVisible = 3;
+                                    let start = Math.max(1, currentExpoPage - 1);
+                                    let end = Math.min(totalExpoPages, start + maxVisible - 1);
+                                    if (end - start < maxVisible - 1) {
+                                      start = Math.max(1, end - maxVisible + 1);
+                                    }
+
+                                    if (start > 1) {
+                                      pages.push(
+                                        <button
+                                          key={1}
+                                          type="button"
+                                          onClick={() => handleExpoPageChange(1)}
+                                          className={`h-7 min-w-7 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                                            currentExpoPage === 1 && !isExpanded
+                                              ? 'bg-primary text-primary-foreground shadow-xs font-black'
+                                              : 'border border-border bg-card hover:bg-secondary text-foreground hover:border-primary/40'
+                                          }`}
+                                        >
+                                          1
+                                        </button>
+                                      );
+                                      if (start > 2) {
+                                        pages.push(
+                                          <span key="expo-dots-start" className="px-0.5 text-[10px] text-muted-foreground select-none">
+                                            ...
+                                          </span>
+                                        );
+                                      }
+                                    }
+
+                                    for (let pNum = start; pNum <= end; pNum++) {
+                                      pages.push(
+                                        <button
+                                          key={pNum}
+                                          type="button"
+                                          onClick={() => handleExpoPageChange(pNum)}
+                                          className={`h-7 min-w-7 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                                            currentExpoPage === pNum && !isExpanded
+                                              ? 'bg-primary text-primary-foreground shadow-xs font-black ring-1 ring-primary/40'
+                                              : 'border border-border bg-card hover:bg-secondary text-foreground hover:border-primary/40'
+                                          }`}
+                                        >
+                                          {pNum}
+                                        </button>
+                                      );
+                                    }
+
+                                    if (end < totalExpoPages) {
+                                      if (end < totalExpoPages - 1) {
+                                        pages.push(
+                                          <span key="expo-dots-end" className="px-0.5 text-[10px] text-muted-foreground select-none">
+                                            ...
+                                          </span>
+                                        );
+                                      }
+                                      pages.push(
+                                        <button
+                                          key={totalExpoPages}
+                                          type="button"
+                                          onClick={() => handleExpoPageChange(totalExpoPages)}
+                                          className={`h-7 min-w-7 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                                            currentExpoPage === totalExpoPages && !isExpanded
+                                              ? 'bg-primary text-primary-foreground shadow-xs font-black'
+                                              : 'border border-border bg-card hover:bg-secondary text-foreground hover:border-primary/40'
+                                          }`}
+                                        >
+                                          {totalExpoPages}
+                                        </button>
+                                      );
+                                    }
+
+                                    return pages;
+                                  })()}
+                                </div>
+
+                                {/* Next Page */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleExpoPageChange(Math.min(totalExpoPages, currentExpoPage + 1))}
+                                  disabled={currentExpoPage === totalExpoPages && !isExpanded}
+                                  className="h-7 px-2 rounded-lg border border-border bg-card hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed text-[10px] font-bold text-foreground transition-all cursor-pointer flex items-center gap-0.5 shadow-2xs hover:border-primary/40"
+                                  title="Next Page of Expos"
+                                >
+                                  <span className="hidden sm:inline">Next</span>
+                                  <ChevronRight className="h-3.5 w-3.5" />
+                                </button>
+
+                                {/* Last Page */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleExpoPageChange(totalExpoPages)}
+                                  disabled={currentExpoPage === totalExpoPages && !isExpanded}
+                                  className="h-7 w-7 rounded-lg border border-border bg-card hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed text-foreground transition-all cursor-pointer flex items-center justify-center shadow-2xs hover:border-primary/40"
+                                  title="Last Page of Expos"
+                                >
+                                  <ChevronsRight className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

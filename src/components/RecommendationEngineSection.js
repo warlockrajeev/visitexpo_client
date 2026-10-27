@@ -36,7 +36,8 @@ import {
   Share2,
   RefreshCw,
   Clock,
-  Navigation
+  Navigation,
+  X
 } from 'lucide-react';
 import { detectUserLocation, formatDistance, calculateDistanceKm } from '../utils/geoUtils.js';
 import { useAuth } from '../context/AuthContext.js';
@@ -144,6 +145,25 @@ export default function RecommendationEngineSection({
   const [savingPreferences, setSavingPreferences] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [activeScoreTooltip, setActiveScoreTooltip] = useState(null);
+
+  // Close score breakdown tooltip when clicking outside or pressing Escape
+  useEffect(() => {
+    if (!activeScoreTooltip) return;
+    const handleOutsideClick = (e) => {
+      if (!e.target.closest('[data-tooltip-container="true"]')) {
+        setActiveScoreTooltip(null);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setActiveScoreTooltip(null);
+    };
+    document.addEventListener('click', handleOutsideClick);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('click', handleOutsideClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [activeScoreTooltip]);
 
   // Sync user preferences once when user logs in
   const userSyncedRef = useRef(false);
@@ -537,9 +557,10 @@ export default function RecommendationEngineSection({
                 <button
                   type="button"
                   onClick={() => setSelectedInterests([])}
-                  className="text-[11px] font-bold text-zinc-400 hover:text-zinc-700 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-zinc-600 hover:text-rose-600 bg-zinc-100 hover:bg-rose-50 border border-zinc-200 hover:border-rose-200 shadow-2xs transition-all cursor-pointer active:scale-95"
                 >
-                  Clear all
+                  <X className="h-3 w-3" />
+                  <span>Clear all</span>
                 </button>
               )}
             </div>
@@ -625,10 +646,12 @@ export default function RecommendationEngineSection({
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {events.map((ev) => {
               const imageUrl = resolveImage(ev);
+              const eventId = String(ev._id || ev.id || ev.slug || '');
               const score = ev.matchScore || 85;
               const reasons = ev.matchReasons || [];
               const scoreGradient = getMatchScoreColor(score);
               const breakdown = ev.scoreBreakdown || {};
+              const isTooltipOpen = Boolean(eventId && activeScoreTooltip === eventId);
 
               return (
                 <div
@@ -657,13 +680,13 @@ export default function RecommendationEngineSection({
                     </div>
 
                     {/* Score Breakdown Info Trigger */}
-                    <div className="absolute top-3 right-3">
+                    <div className="absolute top-3 right-3" data-tooltip-container="true">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          setActiveScoreTooltip(activeScoreTooltip === ev.id ? null : ev.id);
+                          setActiveScoreTooltip((prev) => (prev === eventId ? null : eventId));
                         }}
                         className="h-7 w-7 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-xs text-white flex items-center justify-center transition-colors cursor-pointer"
                         title="View Score Breakdown"
@@ -672,7 +695,7 @@ export default function RecommendationEngineSection({
                       </button>
 
                       {/* Tooltip Popover */}
-                      {activeScoreTooltip === ev.id && (
+                      {isTooltipOpen && (
                         <div
                           className="absolute right-0 top-8 z-30 w-64 bg-zinc-950 text-white text-[11px] p-3 rounded-xl shadow-2xl border border-zinc-800 space-y-2 animate-in fade-in zoom-in-95 duration-150"
                           onClick={(e) => e.stopPropagation()}

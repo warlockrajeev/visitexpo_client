@@ -974,7 +974,12 @@ export default function EventsDirectoryPage() {
                 <input
                   type="text"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => setSearchQuery((e.target.value || '').replace(/[<>!@#$%^&*()=+~`\\|{}[\];:"?]/g, ''))}
+                  onKeyDown={(e) => {
+                    if (e.key && e.key.length === 1 && /[<>!@#$%^&*()=+~`\\|{}[\];:"?]/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                      e.preventDefault();
+                    }
+                  }}
                   placeholder="Search by event, keyword, or venue..."
                   className="w-full pl-10 pr-8 py-2.5 rounded-xl bg-white border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#FFCC00] focus:border-amber-400 transition-all shadow-2xs"
                 />

@@ -29,6 +29,7 @@ import {
   LocateFixed,
   Loader2,
   Info,
+  ChevronLeft,
   ChevronRight,
   Building,
   Users,
@@ -42,7 +43,8 @@ import {
   Search,
   Sliders,
   ShieldCheck,
-  Star
+  Star,
+  X
 } from 'lucide-react';
 import { detectUserLocation } from '@/utils/geoUtils.js';
 
@@ -126,6 +128,25 @@ export default function RecommendationsPage() {
   const [activeTooltipId, setActiveTooltipId] = useState(null);
   const [shareToast, setShareToast] = useState(false);
 
+  // Close score breakdown tooltip when clicking outside or pressing Escape
+  useEffect(() => {
+    if (!activeTooltipId) return;
+    const handleOutsideClick = (e) => {
+      if (!e.target.closest('[data-tooltip-container="true"]')) {
+        setActiveTooltipId(null);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setActiveTooltipId(null);
+    };
+    document.addEventListener('click', handleOutsideClick);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('click', handleOutsideClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [activeTooltipId]);
+
   // Sync user profile once when user logs in
   const userSyncedRef = useRef(false);
   useEffect(() => {
@@ -165,7 +186,7 @@ export default function RecommendationsPage() {
       if (timeframe) {
         params.append('timeframe', timeframe);
       }
-      params.append('limit', '24');
+      params.append('limit', '60');
 
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -201,7 +222,7 @@ export default function RecommendationsPage() {
         if (timeframe) {
           params.append('timeframe', timeframe);
         }
-        params.append('limit', '24');
+        params.append('limit', '60');
 
         const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -324,6 +345,24 @@ export default function RecommendationsPage() {
 
     return list;
   }, [events, searchQuery, sortBy]);
+
+  // Pagination State & Controls
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(9); // Default 9 (3x3 grid)
+
+  // Reset page whenever filter or per-page size changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, sortBy, locationsKey, interestsKey, timeframe, itemsPerPage]);
+
+  const totalItems = displayedEvents.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const activePage = Math.min(currentPage, totalPages);
+
+  const paginatedEvents = useMemo(() => {
+    const startIndex = (activePage - 1) * itemsPerPage;
+    return displayedEvents.slice(startIndex, startIndex + itemsPerPage);
+  }, [displayedEvents, activePage, itemsPerPage]);
 
   const formatDates = (startDate, endDate) => {
     if (!startDate) return 'Dates TBA';
@@ -507,9 +546,10 @@ export default function RecommendationsPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedInterests([])}
-                  className="text-[11px] font-bold text-zinc-400 hover:text-zinc-700 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-zinc-600 hover:text-rose-600 bg-zinc-100 hover:bg-rose-50 border border-zinc-200 hover:border-rose-200 shadow-2xs transition-all cursor-pointer active:scale-95"
                 >
-                  Clear all
+                  <X className="h-3 w-3" />
+                  <span>Clear all</span>
                 </button>
               )}
             </div>
@@ -544,7 +584,12 @@ export default function RecommendationsPage() {
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => setSearchQuery((e.target.value || '').replace(/[<>!@#$%^&*()=+~`\\|{}[\];:"?]/g, ''))}
+                onKeyDown={(e) => {
+                  if (e.key && e.key.length === 1 && /[<>!@#$%^&*()=+~`\\|{}[\];:"?]/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    e.preventDefault();
+                  }
+                }}
                 placeholder="Search matching expos by keyword..."
                 className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white text-xs text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
               />
@@ -620,11 +665,13 @@ export default function RecommendationsPage() {
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {displayedEvents.map((ev) => {
+            {paginatedEvents.map((ev) => {
+              const eventId = String(ev._id || ev.id || ev.slug || '');
               const score = ev.matchScore || 85;
               const reasons = ev.matchReasons || [];
               const scoreGradient = getScoreBadgeClass(score);
               const breakdown = ev.scoreBreakdown || {};
+              const isTooltipOpen = Boolean(eventId && activeTooltipId === eventId);
 
               return (
                 <div
@@ -653,18 +700,25 @@ export default function RecommendationsPage() {
                     </div>
 
                     {/* Info Tooltip */}
-                    <div className="absolute top-3 right-3">
+                    <div className="absolute top-3 right-3" data-tooltip-container="true">
                       <button
                         type="button"
-                        onClick={() => setActiveTooltipId(activeTooltipId === ev.id ? null : ev.id)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setActiveTooltipId((prev) => (prev === eventId ? null : eventId));
+                        }}
                         className="h-7 w-7 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-xs text-white flex items-center justify-center transition-colors cursor-pointer"
                         title="Score Breakdown"
                       >
                         <Info className="h-3.5 w-3.5" />
                       </button>
 
-                      {activeTooltipId === ev.id && (
-                        <div className="absolute right-0 top-8 z-30 w-64 bg-zinc-950 text-white text-[11px] p-3 rounded-xl shadow-2xl border border-zinc-800 space-y-2">
+                      {isTooltipOpen && (
+                        <div
+                          className="absolute right-0 top-8 z-30 w-64 bg-zinc-950 text-white text-[11px] p-3 rounded-xl shadow-2xl border border-zinc-800 space-y-2 animate-in fade-in zoom-in-95 duration-150"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <div className="font-extrabold text-amber-400 border-b border-zinc-800 pb-1 flex justify-between items-center">
                             <span>Score Breakdown</span>
                             <span className="text-[10px] text-zinc-400">Max 100</span>
@@ -778,6 +832,118 @@ export default function RecommendationsPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* ===================================================================== */}
+        {/* PAGINATION CONTROLS & PER-PAGE OPTIONS                                */}
+        {/* ===================================================================== */}
+        {!loading && displayedEvents.length > 0 && (
+          <div className="pt-6 border-t border-zinc-200 flex flex-col md:flex-row items-center justify-between gap-4">
+            
+            {/* Left Section: Result Count & Per-Page Selector */}
+            <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+              <div>
+                Showing{' '}
+                <strong className="text-zinc-950 font-bold">
+                  {Math.min((activePage - 1) * itemsPerPage + 1, totalItems)}–{Math.min(activePage * itemsPerPage, totalItems)}
+                </strong>{' '}
+                of <strong className="text-zinc-950 font-bold">{totalItems}</strong> recommendations
+              </div>
+
+              <div className="hidden sm:block text-zinc-300">•</div>
+
+              {/* Per Page Option */}
+              <div className="flex items-center gap-1.5 font-medium">
+                <span>Per page:</span>
+                <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-0.5 shadow-2xs">
+                  {[6, 9, 12, 24].map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => {
+                        setItemsPerPage(size);
+                        setCurrentPage(1);
+                      }}
+                      className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                        itemsPerPage === size
+                          ? 'bg-zinc-950 text-white shadow-2xs'
+                          : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-50'
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Section: Pagination Navigation */}
+            <div className="flex items-center gap-1.5">
+              {totalPages > 1 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentPage((p) => Math.max(p - 1, 1));
+                      window.scrollTo({ top: 380, behavior: 'smooth' });
+                    }}
+                    disabled={activePage === 1}
+                    className="px-3 py-1.5 rounded-xl border border-zinc-200 bg-white text-xs font-bold text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1 shadow-2xs transition-all"
+                    aria-label="Previous Page"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Prev</span>
+                  </button>
+
+                  {/* Page Number Pills */}
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((p) => p === 1 || p === totalPages || Math.abs(p - activePage) <= 1)
+                    .map((pageNum, idx, arr) => {
+                      const prev = arr[idx - 1];
+                      const showEllipsis = prev && pageNum - prev > 1;
+                      return (
+                        <React.Fragment key={pageNum}>
+                          {showEllipsis && <span className="px-1 text-zinc-400 text-xs">...</span>}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCurrentPage(pageNum);
+                              window.scrollTo({ top: 380, behavior: 'smooth' });
+                            }}
+                            className={`h-8 w-8 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                              activePage === pageNum
+                                ? 'bg-zinc-950 text-[#FFCC00] shadow-md shadow-zinc-950/20'
+                                : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        </React.Fragment>
+                      );
+                    })}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentPage((p) => Math.min(p + 1, totalPages));
+                      window.scrollTo({ top: 380, behavior: 'smooth' });
+                    }}
+                    disabled={activePage === totalPages}
+                    className="px-3 py-1.5 rounded-xl border border-zinc-200 bg-white text-xs font-bold text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1 shadow-2xs transition-all"
+                    aria-label="Next Page"
+                  >
+                    <span className="hidden sm:inline">Next</span>
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              ) : (
+                <div className="text-xs font-semibold text-zinc-400 bg-zinc-100/80 px-3 py-1.5 rounded-xl border border-zinc-200/60">
+                  Page 1 of 1
+                </div>
+              )}
+            </div>
+
           </div>
         )}
 

@@ -23,11 +23,16 @@ import {
   QrCode,
   Printer,
   Filter,
-  X
+  X,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown
 } from 'lucide-react';
 import { showSweetConfirm, showSweetSuccess, showSweetError } from '../../../utils/sweetalert.js';
 import { printBadge } from '../../../utils/printBadge.js';
 import ShowCountdownTimer from '../../../components/ShowCountdownTimer.js';
+import SearchableSelect from '../../../components/SearchableSelect.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -44,10 +49,13 @@ export default function ExposPage() {
   const [passes, setPasses] = useState([]);
   const [loadingPasses, setLoadingPasses] = useState(false);
 
-  // Filters State
+  // Filters & Pagination State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('All Cities');
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedCategories, setSelectedCategories] = useState(['All']);
+  const [sortBy, setSortBy] = useState('upcoming'); // 'upcoming' | 'title-asc' | 'title-desc'
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(12);
 
   // Claim Pass State
   const [claimingId, setClaimingId] = useState(null);
@@ -176,9 +184,29 @@ export default function ExposPage() {
     'Trade & Industry'
   ];
 
-  // Filtered Events
+  // Toggle multi-select category
+  const toggleCategory = (cat) => {
+    if (cat === 'All') {
+      setSelectedCategories(['All']);
+      return;
+    }
+
+    setSelectedCategories((prev) => {
+      const withoutAll = prev.filter((c) => c !== 'All');
+      if (withoutAll.includes(cat)) {
+        const remaining = withoutAll.filter((c) => c !== cat);
+        return remaining.length === 0 ? ['All'] : remaining;
+      } else {
+        return [...withoutAll, cat];
+      }
+    });
+  };
+
+  const isAllCategories = selectedCategories.includes('All') || selectedCategories.length === 0;
+
+  // Filtered & Sorted Events
   const filteredEvents = useMemo(() => {
-    return events.filter(e => {
+    let result = events.filter(e => {
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const matchTitle = e.title?.toLowerCase().includes(q);
@@ -192,14 +220,44 @@ export default function ExposPage() {
           return false;
         }
       }
-      if (selectedCategory !== 'All') {
-        if (!e.category?.toLowerCase().includes(selectedCategory.toLowerCase())) {
-          return false;
-        }
+      if (!isAllCategories) {
+        const matchCat = selectedCategories.some(cat =>
+          e.category?.toLowerCase().includes(cat.toLowerCase())
+        );
+        if (!matchCat) return false;
       }
       return true;
     });
-  }, [events, searchQuery, selectedCity, selectedCategory]);
+
+    if (sortBy === 'title-asc') {
+      result.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    } else if (sortBy === 'title-desc') {
+      result.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+    } else {
+      // Upcoming: Sort events with valid startDate first
+      result.sort((a, b) => {
+        const timeA = a.startDate ? new Date(a.startDate).getTime() : Infinity;
+        const timeB = b.startDate ? new Date(b.startDate).getTime() : Infinity;
+        return timeA - timeB;
+      });
+    }
+
+    return result;
+  }, [events, searchQuery, selectedCity, selectedCategories, isAllCategories, sortBy]);
+
+  // Reset pagination when filter criteria change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCity, selectedCategories, sortBy, itemsPerPage]);
+
+  const totalItems = filteredEvents.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const activePage = Math.min(currentPage, totalPages);
+
+  const paginatedEvents = useMemo(() => {
+    const startIndex = (activePage - 1) * itemsPerPage;
+    return filteredEvents.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredEvents, activePage, itemsPerPage]);
 
   // 1-Click Pass Claim
   const handleClaimPass = async (expo) => {
@@ -259,34 +317,41 @@ export default function ExposPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-16 font-sans">
+    <div className="space-y-4 max-w-7xl mx-auto pb-12 font-sans">
       {/* Top Banner Header */}
-      <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+              className="group inline-flex items-center gap-2 px-2.5 py-1 rounded-xl text-xs font-bold text-foreground bg-background hover:bg-muted border border-border hover:border-primary/50 shadow-2xs hover:shadow-xs transition-all duration-200 active:scale-95 cursor-pointer"
             >
-              <ArrowLeft className="h-3.5 w-3.5" /> Back to Passes &amp; Badges
+              <div className="h-4.5 w-4.5 rounded-lg bg-muted group-hover:bg-primary/20 flex items-center justify-center transition-colors">
+                <ArrowLeft className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-transform duration-200 group-hover:-translate-x-0.5" />
+              </div>
+              <span>Back to Passes &amp; Badges</span>
             </Link>
-            <span className="text-muted-foreground">•</span>
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-              <CheckCircle2 className="h-3 w-3" /> Live Directory Feed
+
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-xl border border-emerald-500/20 shadow-2xs">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+              </span>
+              <span>Live Directory Feed</span>
             </span>
           </div>
-          <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
+          <h2 className="text-xl md:text-2xl font-extrabold tracking-tight text-foreground">
             Explore Live Exhibitions &amp; Passes
           </h2>
-          <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
+          <p className="text-xs text-muted-foreground mt-0.5 max-w-2xl">
             Browse verified trade shows directly from visitexpo.in. Claim your digital badges and gate entry passes in 1 click without leaving your dashboard.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 text-xs font-bold transition-all shadow-md shadow-primary/10 cursor-pointer"
+            className="inline-flex items-center gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground px-3.5 py-2 text-xs font-bold transition-all shadow-sm cursor-pointer"
           >
             <Ticket className="h-4 w-4" /> View My Confirmed Badges ({passes.length})
           </Link>
@@ -315,7 +380,7 @@ export default function ExposPage() {
       )}
 
       {/* Search & Filters Toolbar */}
-      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm space-y-4">
+      <div className="bg-card border border-border rounded-2xl p-4 shadow-2xs space-y-3">
         <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
           {/* Keyword Search */}
           <div className="relative w-full md:w-96">
@@ -324,64 +389,181 @@ export default function ExposPage() {
               type="text"
               placeholder="Search expos by title, venue, keywords..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl border border-border bg-background py-2.5 pl-10 pr-4 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-all"
+              onChange={(e) => setSearchQuery((e.target.value || '').replace(/[<>!@#$%^&*()=+~`\\|{}[\];:"?]/g, ''))}
+              onKeyDown={(e) => {
+                if (e.key && e.key.length === 1 && /[<>!@#$%^&*()=+~`\\|{}[\];:"?]/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                  e.preventDefault();
+                }
+              }}
+              className="w-full rounded-xl border border-border bg-background py-2.5 pl-10 pr-9 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-all"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-2.5 p-0.5 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
+                title="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
-          {/* City Dropdown */}
+          {/* City Dropdown (Searchable) */}
           <div className="flex items-center gap-2 w-full md:w-auto">
             <MapPin className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:inline" />
-            <select
-              value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
-              className="w-full md:w-52 rounded-xl border border-border bg-background px-3 py-2.5 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
-            >
-              {availableCities.map(city => (
-                <option key={city} value={city}>{city}</option>
-              ))}
-            </select>
+            <div className="w-full md:w-56">
+              <SearchableSelect
+                options={availableCities}
+                value={selectedCity}
+                onChange={(val) => setSelectedCity(val)}
+                placeholder="All Cities"
+                searchPlaceholder="Search cities..."
+                className="h-10 rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                dropdownClassName="min-w-[220px]"
+                align="right"
+              />
+            </div>
           </div>
         </div>
 
-        {/* Category Pills */}
-        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-border">
-          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mr-1.5 flex items-center gap-1">
-            <Filter className="h-3 w-3" /> Industry:
-          </span>
-          {categoriesList.map(cat => (
+        {/* Category Pills (Multi-Select with Reset) */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border">
+          <div className="flex flex-wrap items-center gap-1.5 flex-1">
+            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mr-1 flex items-center gap-1">
+              <Filter className="h-3 w-3" /> Industry:
+            </span>
+
+            {/* "All" button */}
             <button
-              key={cat}
               type="button"
-              onClick={() => setSelectedCategory(cat)}
+              onClick={() => toggleCategory('All')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
-                selectedCategory === cat
-                  ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black border border-amber-500 shadow-sm ring-2 ring-amber-500/30'
-                  : 'bg-card hover:bg-amber-400 hover:text-black hover:border-amber-500 dark:hover:bg-amber-500 dark:hover:text-black text-foreground/80 border border-border/80 hover:shadow-xs hover:-translate-y-0.5'
+                isAllCategories
+                  ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black border border-amber-500 shadow-sm ring-2 ring-amber-500/30 font-black'
+                  : 'bg-card hover:bg-muted text-foreground/80 border border-border/80 hover:shadow-xs'
               }`}
             >
-              {cat}
+              All
             </button>
-          ))}
+
+            {/* Category Options */}
+            {categoriesList
+              .filter((c) => c !== 'All')
+              .map((cat) => {
+                const isSelected = selectedCategories.includes(cat);
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => toggleCategory(cat)}
+                    className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+                      isSelected
+                        ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black border border-amber-500 shadow-sm ring-2 ring-amber-500/30 scale-102 font-black'
+                        : 'bg-card hover:bg-amber-400 hover:text-black hover:border-amber-500 dark:hover:bg-amber-500 dark:hover:text-black text-foreground/80 border border-border/80 hover:shadow-xs hover:-translate-y-0.5'
+                    }`}
+                  >
+                    <span>{cat}</span>
+                    {isSelected && <Check className="h-3 w-3 stroke-[3] ml-0.5" />}
+                  </button>
+                );
+              })}
+          </div>
+
+          {/* Reset & Count Indicator */}
+          {!isAllCategories && (
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[10px] font-extrabold bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 rounded-full">
+                {selectedCategories.length} selected
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedCategories(['All'])}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold text-muted-foreground hover:text-rose-500 bg-muted/60 hover:bg-rose-500/10 border border-border hover:border-rose-500/30 transition-all cursor-pointer shadow-2xs active:scale-95"
+                title="Reset industry filter"
+              >
+                <X className="h-3 w-3" />
+                <span>Reset</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Exhibitions Grid */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-          <span>Showing <strong className="text-foreground">{filteredEvents.length}</strong> trade exhibitions</span>
-          {(searchQuery || selectedCity !== 'All Cities' || selectedCategory !== 'All') && (
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setSelectedCity('All Cities');
-                setSelectedCategory('All');
-              }}
-              className="text-primary hover:underline font-semibold cursor-pointer"
-            >
-              Reset Filters
-            </button>
-          )}
+      {/* Exhibitions Grid & Controls */}
+      <div className="space-y-4">
+        {/* Sub-Header Bar with Counter, Sort, and Per-Page Controls */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs bg-card/60 border border-border/80 rounded-2xl p-3 px-4 shadow-2xs backdrop-blur-xs">
+          {/* Left: Range and Active Filters */}
+          <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+            <span>
+              Showing{' '}
+              <strong className="text-foreground font-bold">
+                {totalItems === 0
+                  ? 0
+                  : `${Math.min((activePage - 1) * itemsPerPage + 1, totalItems)}–${Math.min(activePage * itemsPerPage, totalItems)}`}
+              </strong>{' '}
+              of <strong className="text-foreground font-bold">{totalItems.toLocaleString()}</strong> trade exhibitions
+            </span>
+
+            {(searchQuery || selectedCity !== 'All Cities' || !isAllCategories) && (
+              <>
+                <span className="text-border">•</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedCity('All Cities');
+                    setSelectedCategories(['All']);
+                  }}
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-500 hover:text-rose-600 bg-rose-500/10 hover:bg-rose-500/20 px-2 py-0.5 rounded-md transition-colors cursor-pointer"
+                >
+                  <X className="h-2.5 w-2.5" />
+                  <span>Reset Filters</span>
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Right: Sort & Per Page Options */}
+          <div className="flex items-center gap-3 self-end sm:self-auto">
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <ArrowUpDown className="h-3.5 w-3.5 shrink-0" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+              >
+                <option value="upcoming">Sort: Date (Earliest)</option>
+                <option value="title-asc">Sort: Title (A–Z)</option>
+                <option value="title-desc">Sort: Title (Z–A)</option>
+              </select>
+            </div>
+
+            <span className="text-border hidden md:inline">•</span>
+
+            {/* Per-Page Pill Group */}
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <span className="hidden md:inline">Per page:</span>
+              <div className="inline-flex rounded-lg border border-border bg-background p-0.5 shadow-2xs">
+                {[12, 24, 48, 96].map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => setItemsPerPage(size)}
+                    className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                      itemsPerPage === size
+                        ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black shadow-2xs font-black'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
 
         {loadingEvents ? (
@@ -396,7 +578,7 @@ export default function ExposPage() {
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredEvents.map((expo) => {
+            {paginatedEvents.map((expo) => {
               const expoId = expo.id || expo._id;
               const isClaimed = registeredEventIds.has(expoId);
               const isClaiming = claimingId === expoId;
@@ -460,25 +642,32 @@ export default function ExposPage() {
                       )}
                     </div>
 
-                    <div className="pt-3 border-t border-border flex items-center gap-2">
+                    <div className="pt-3 border-t border-border flex items-center justify-between gap-2">
+                      <Link
+                        href={`/expo/${encodeURIComponent(expo.slug || expoId)}`}
+                        className="text-xs font-bold text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                      >
+                        Details
+                      </Link>
+
                       {isClaimed ? (
-                        <div className="w-full py-2.5 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-bold flex items-center justify-center gap-1.5">
-                          <CheckCircle2 className="h-4 w-4" /> Pass Confirmed &amp; Active
+                        <div className="py-2 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-bold flex items-center gap-1.5">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Pass Active
                         </div>
                       ) : (
                         <button
                           type="button"
                           onClick={() => handleClaimPass(expo)}
                           disabled={isClaiming}
-                          className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-2.5 text-xs transition-all shadow-md shadow-primary/10 cursor-pointer disabled:opacity-50"
+                          className="flex items-center justify-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-2 px-3.5 text-xs transition-all shadow-md shadow-primary/10 cursor-pointer disabled:opacity-50"
                         >
                           {isClaiming ? (
                             <>
-                              <Loader2 className="h-4 w-4 animate-spin" /> Issuing Digital Badge...
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Issuing...
                             </>
                           ) : (
                             <>
-                              <Ticket className="h-4 w-4" /> Claim Free Visitor Pass
+                              <Ticket className="h-3.5 w-3.5" /> Claim Free Pass
                             </>
                           )}
                         </button>
@@ -488,6 +677,79 @@ export default function ExposPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* ===================================================================== */}
+        {/* BOTTOM PAGINATION CONTROLS                                            */}
+        {/* ===================================================================== */}
+        {!loadingEvents && totalPages > 1 && (
+          <div className="bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
+            {/* Page Count */}
+            <div className="text-xs text-muted-foreground font-medium">
+              Page <strong className="text-foreground font-bold">{activePage}</strong> of{' '}
+              <strong className="text-foreground font-bold">{totalPages}</strong> ({totalItems.toLocaleString()} total exhibitions)
+            </div>
+
+            {/* Numeric Page Navigator */}
+            <div className="flex items-center gap-1.5">
+              {/* Prev Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrentPage((p) => Math.max(p - 1, 1));
+                  window.scrollTo({ top: 320, behavior: 'smooth' });
+                }}
+                disabled={activePage === 1}
+                className="px-3 py-1.5 rounded-xl border border-border bg-background text-xs font-bold text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1 shadow-2xs transition-all"
+                aria-label="Previous Page"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Prev</span>
+              </button>
+
+              {/* Page Number Pills */}
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - activePage) <= 2)
+                .map((pageNum, idx, arr) => {
+                  const prev = arr[idx - 1];
+                  const showEllipsis = prev && pageNum - prev > 1;
+                  return (
+                    <React.Fragment key={pageNum}>
+                      {showEllipsis && <span className="px-1 text-muted-foreground text-xs">...</span>}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCurrentPage(pageNum);
+                          window.scrollTo({ top: 320, behavior: 'smooth' });
+                        }}
+                        className={`h-8 min-w-[32px] px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          activePage === pageNum
+                            ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-black shadow-md border border-amber-500'
+                            : 'bg-background border border-border text-foreground hover:bg-muted hover:border-muted-foreground/30'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    </React.Fragment>
+                  );
+                })}
+
+              {/* Next Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrentPage((p) => Math.min(p + 1, totalPages));
+                  window.scrollTo({ top: 320, behavior: 'smooth' });
+                }}
+                disabled={activePage === totalPages}
+                className="px-3 py-1.5 rounded-xl border border-border bg-background text-xs font-bold text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1 shadow-2xs transition-all"
+                aria-label="Next Page"
+              >
+                <span className="hidden sm:inline">Next</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         )}
       </div>

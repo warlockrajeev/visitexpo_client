@@ -2922,47 +2922,47 @@ function VisitorDashboard() {
   });
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-16 font-sans">
+    <div className="space-y-4 max-w-7xl mx-auto pb-10 font-sans">
       {/* Top Banner Header */}
-      <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary uppercase tracking-wider bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
-              <Ticket className="h-3.5 w-3.5" /> Visitor &amp; Buyer Hub
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-primary uppercase tracking-wider bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20">
+              <Ticket className="h-3 w-3" /> Visitor &amp; Buyer Hub
             </span>
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
               <CheckCircle2 className="h-3 w-3" /> Verified Account
             </span>
           </div>
-          <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
+          <h2 className="text-xl md:text-2xl font-extrabold tracking-tight text-foreground">
             Welcome, {user?.name || 'Visitor'}!
           </h2>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
             Access your confirmed exhibition passes, show your digital QR entry badge at the gate, and discover upcoming trade shows.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0">
           <a
             href="#explore-expos"
-            className="group inline-flex items-center justify-center gap-2 rounded-xl bg-primary hover:bg-amber-400 text-primary-foreground px-4 py-2.5 text-xs font-bold transition-all duration-200 shadow-sm hover:shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer whitespace-nowrap"
+            className="group inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary hover:bg-amber-400 text-primary-foreground px-3.5 py-2 text-xs font-bold transition-all duration-200 shadow-xs hover:shadow-md hover:shadow-primary/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer whitespace-nowrap"
           >
-            <Ticket className="h-4 w-4 shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-12" />
+            <Ticket className="h-3.5 w-3.5 shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-12" />
             <span>Claim Passes Here</span>
           </a>
           <Link
             href="/expos"
-            className="group inline-flex items-center justify-center gap-2 rounded-xl border border-border/80 bg-secondary/80 hover:bg-card hover:border-primary/50 text-foreground hover:text-primary px-4 py-2.5 text-xs font-bold transition-all duration-200 shadow-2xs hover:shadow-md hover:shadow-primary/10 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer whitespace-nowrap"
+            className="group inline-flex items-center justify-center gap-1.5 rounded-xl border border-border/80 bg-secondary/80 hover:bg-card hover:border-primary/50 text-foreground hover:text-primary px-3.5 py-2 text-xs font-bold transition-all duration-200 shadow-2xs hover:shadow-xs hover:shadow-primary/10 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer whitespace-nowrap"
           >
-            <Calendar className="h-4 w-4 shrink-0 transition-transform duration-300 group-hover:scale-110" />
+            <Calendar className="h-3.5 w-3.5 shrink-0 transition-transform duration-300 group-hover:scale-110" />
             <span>Browse Live Expos</span>
-            <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
+            <ArrowRight className="h-3 w-3 shrink-0 transition-transform duration-300 group-hover:translate-x-0.5" />
           </Link>
           <button
             type="button"
             onClick={handleRefreshDashboard}
             disabled={isRefreshing}
-            className={`group inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-bold transition-all duration-200 shadow-2xs hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer whitespace-nowrap ${
+            className={`group inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition-all duration-200 shadow-2xs hover:shadow-xs hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer whitespace-nowrap ${
               refreshSuccess
                 ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 shadow-emerald-500/10'
                 : 'border-border/80 bg-secondary/80 hover:bg-card hover:border-primary/50 text-foreground hover:text-primary hover:shadow-primary/10'
@@ -2971,13 +2971,13 @@ function VisitorDashboard() {
           >
             {refreshSuccess ? (
               <>
-                <Check className="h-4 w-4 shrink-0 text-emerald-500 animate-in zoom-in" />
+                <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500 animate-in zoom-in" />
                 <span>Refreshed!</span>
               </>
             ) : (
               <>
                 <RotateCw
-                  className={`h-4 w-4 shrink-0 transition-transform duration-500 ${
+                  className={`h-3.5 w-3.5 shrink-0 transition-transform duration-500 ${
                     isRefreshing ? 'animate-spin text-primary' : 'group-hover:rotate-180'
                   }`}
                 />
@@ -2989,15 +2989,15 @@ function VisitorDashboard() {
       </div>
 
       {/* Organizers & Live Chat Spotlight Card */}
-      <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-primary/10 border border-emerald-500/20 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-1">
+      <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-primary/10 border border-emerald-500/20 rounded-2xl p-3.5 sm:p-4 px-4 sm:px-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+        <div className="space-y-0.5">
           <div className="flex items-center gap-2">
             <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
               Live Organizer Desk
             </span>
           </div>
-          <h3 className="text-base sm:text-lg font-bold text-foreground">
+          <h3 className="text-sm sm:text-base font-bold text-foreground">
             Explore 500+ Event Organizers &amp; Exhibitions
           </h3>
           <p className="text-xs text-muted-foreground max-w-xl">
@@ -3006,10 +3006,10 @@ function VisitorDashboard() {
         </div>
         <Link
           href="/organizers"
-          className="group inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 shrink-0 transition-all duration-200 hover:shadow-lg hover:shadow-emerald-600/30 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
+          className="group inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm shadow-emerald-600/20 shrink-0 transition-all duration-200 hover:shadow-md hover:shadow-emerald-600/30 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer whitespace-nowrap"
         >
           <Building className="h-4 w-4 shrink-0 transition-transform duration-300 group-hover:scale-110" />
-          <span>Explore Organizers &amp; Exhibitions</span>
+          <span>Explore Organizers &amp; Chat</span>
           <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
         </Link>
       </div>
