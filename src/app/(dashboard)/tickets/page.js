@@ -19,6 +19,9 @@ import {
   Award,
   ChevronRight,
   ChevronDown,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   X,
   Loader2,
   ShieldCheck,
@@ -145,6 +148,8 @@ export default function TicketingPage() {
   const [supportStatusFilter, setSupportStatusFilter] = useState('all');
   const [supportPriorityFilter, setSupportPriorityFilter] = useState('all');
   const [supportSearchTerm, setSupportSearchTerm] = useState('');
+  const [supportSortField, setSupportSortField] = useState('createdAt'); // 'createdAt', 'priority', 'status', 'ticketId'
+  const [supportSortOrder, setSupportSortOrder] = useState('desc'); // 'asc' or 'desc'
 
   // Raise Ticket Modal State
   const [isRaiseTicketModalOpen, setIsRaiseTicketModalOpen] = useState(false);
@@ -659,21 +664,55 @@ export default function TicketingPage() {
 
   const totalTicketsSold = tickets.reduce((sum, t) => sum + (t.soldCount || 0), 0);
 
-  // Filter support tickets
-  const filteredSupportTickets = supportTickets.filter(t => {
-    const matchesSearch =
-      t.title.toLowerCase().includes(supportSearchTerm.toLowerCase()) ||
-      t.ticketId.toLowerCase().includes(supportSearchTerm.toLowerCase()) ||
-      t.category.toLowerCase().includes(supportSearchTerm.toLowerCase());
-    
-    const matchesStatus = supportStatusFilter === 'all' || t.status === supportStatusFilter;
-    const matchesPriority = supportPriorityFilter === 'all' || t.priority === supportPriorityFilter;
+  // Filter and sort support tickets
+  const filteredSupportTickets = supportTickets
+    .filter(t => {
+      const matchesSearch =
+        t.title.toLowerCase().includes(supportSearchTerm.toLowerCase()) ||
+        t.ticketId.toLowerCase().includes(supportSearchTerm.toLowerCase()) ||
+        t.category.toLowerCase().includes(supportSearchTerm.toLowerCase());
+      
+      const matchesStatus =
+        supportStatusFilter === 'all'
+          ? true
+          : supportStatusFilter === 'open_pending'
+          ? t.status === 'open' || t.status === 'in_progress'
+          : supportStatusFilter === 'resolved'
+          ? t.status === 'resolved' || t.status === 'closed'
+          : t.status === supportStatusFilter;
 
-    return matchesSearch && matchesStatus && matchesPriority;
-  });
+      const matchesPriority = supportPriorityFilter === 'all' || t.priority === supportPriorityFilter;
+
+      return matchesSearch && matchesStatus && matchesPriority;
+    })
+    .sort((a, b) => {
+      let comparison = 0;
+      if (supportSortField === 'priority') {
+        const priorityRank = { urgent: 4, high: 3, medium: 2, low: 1 };
+        comparison = (priorityRank[b.priority] || 0) - (priorityRank[a.priority] || 0);
+      } else if (supportSortField === 'status') {
+        const statusRank = { open: 4, in_progress: 3, resolved: 2, closed: 1 };
+        comparison = (statusRank[b.status] || 0) - (statusRank[a.status] || 0);
+      } else if (supportSortField === 'ticketId') {
+        comparison = (a.ticketId || '').localeCompare(b.ticketId || '');
+      } else {
+        // 'createdAt'
+        comparison = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      return supportSortOrder === 'asc' ? -comparison : comparison;
+    });
 
   const pendingSupportCount = supportTickets.filter(t => t.status === 'open' || t.status === 'in_progress').length;
   const resolvedSupportCount = supportTickets.filter(t => t.status === 'resolved' || t.status === 'closed').length;
+
+  const handleSortBy = (field) => {
+    if (supportSortField === field) {
+      setSupportSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSupportSortField(field);
+      setSupportSortOrder('desc');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -958,15 +997,86 @@ export default function TicketingPage() {
         <div className="space-y-6">
           {/* Header Action & Stats Cards */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-card p-4 rounded-xl border border-border shadow-sm">
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Helpdesk Status</span>
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-500 border border-amber-500/20">
-                  <Clock className="h-3 w-3" /> {pendingSupportCount} Open / Pending
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-bold text-emerald-500 border border-emerald-500/20">
-                  <CheckCircle className="h-3 w-3" /> {resolvedSupportCount} Resolved
-                </span>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider select-none">Helpdesk Status:</span>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* All Tickets Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSupportStatusFilter('all');
+                    setSupportSortField('createdAt');
+                    setSupportSortOrder('desc');
+                  }}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition-all cursor-pointer border select-none ${
+                    supportStatusFilter === 'all'
+                      ? 'bg-foreground text-background border-foreground shadow-sm ring-2 ring-foreground/20'
+                      : 'bg-muted/60 text-muted-foreground border-border hover:bg-muted hover:text-foreground'
+                  }`}
+                  title="View all tickets"
+                >
+                  All ({supportTickets.length})
+                </button>
+
+                {/* Open / Pending Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (supportStatusFilter === 'open_pending') {
+                      // Toggle sort order between newest and oldest
+                      setSupportSortOrder(prev => (prev === 'desc' ? 'asc' : 'desc'));
+                      setSupportSortField('createdAt');
+                    } else {
+                      setSupportStatusFilter('open_pending');
+                      setSupportSortField('createdAt');
+                      setSupportSortOrder('desc');
+                    }
+                  }}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition-all cursor-pointer border select-none ${
+                    supportStatusFilter === 'open_pending'
+                      ? 'bg-amber-500 text-white border-amber-600 shadow-md ring-2 ring-amber-500/30 scale-[1.02]'
+                      : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
+                  }`}
+                  title="Filter by Open / Pending tickets (click again to toggle sort order)"
+                >
+                  <Clock className="h-3 w-3" />
+                  <span>{pendingSupportCount} Open / Pending</span>
+                  {supportStatusFilter === 'open_pending' && (
+                    <span className="text-[10px] bg-black/25 text-white font-mono px-1 rounded ml-0.5">
+                      {supportSortOrder === 'desc' ? '↓ Newest' : '↑ Oldest'}
+                    </span>
+                  )}
+                </button>
+
+                {/* Resolved Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (supportStatusFilter === 'resolved') {
+                      // Toggle sort order between newest and oldest
+                      setSupportSortOrder(prev => (prev === 'desc' ? 'asc' : 'desc'));
+                      setSupportSortField('createdAt');
+                    } else {
+                      setSupportStatusFilter('resolved');
+                      setSupportSortField('createdAt');
+                      setSupportSortOrder('desc');
+                    }
+                  }}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition-all cursor-pointer border select-none ${
+                    supportStatusFilter === 'resolved'
+                      ? 'bg-emerald-600 text-white border-emerald-700 shadow-md ring-2 ring-emerald-500/30 scale-[1.02]'
+                      : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+                  }`}
+                  title="Filter by Resolved tickets (click again to toggle sort order)"
+                >
+                  <CheckCircle className="h-3 w-3" />
+                  <span>{resolvedSupportCount} Resolved</span>
+                  {supportStatusFilter === 'resolved' && (
+                    <span className="text-[10px] bg-black/25 text-white font-mono px-1 rounded ml-0.5">
+                      {supportSortOrder === 'desc' ? '↓ Newest' : '↑ Oldest'}
+                    </span>
+                  )}
+                </button>
               </div>
             </div>
 
@@ -1018,6 +1128,7 @@ export default function TicketingPage() {
                   className="appearance-none bg-transparent pl-1.5 pr-8 py-2 text-xs font-semibold text-foreground cursor-pointer focus:outline-none capitalize"
                 >
                   <option value="all">All Statuses</option>
+                  <option value="open_pending">Open / Pending</option>
                   <option value="open">Open</option>
                   <option value="in_progress">In Progress</option>
                   <option value="resolved">Resolved</option>
@@ -1097,11 +1208,53 @@ export default function TicketingPage() {
                 <table className="w-full text-left border-collapse text-sm">
                   <thead>
                     <tr className="border-b border-border bg-muted/20 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      <th className="px-5 py-3.5">Ticket ID & Date</th>
+                      <th className="px-5 py-3.5">
+                        <button
+                          type="button"
+                          onClick={() => handleSortBy('createdAt')}
+                          className="inline-flex items-center gap-1.5 font-bold uppercase hover:text-foreground transition-colors cursor-pointer group select-none"
+                          title="Click to sort by date"
+                        >
+                          <span>Ticket ID & Date</span>
+                          {supportSortField === 'createdAt' ? (
+                            supportSortOrder === 'desc' ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-100 transition-opacity" />
+                          )}
+                        </button>
+                      </th>
                       <th className="px-5 py-3.5">Title & Description</th>
                       <th className="px-5 py-3.5">Category</th>
-                      <th className="px-5 py-3.5">Priority</th>
-                      <th className="px-5 py-3.5">Status</th>
+                      <th className="px-5 py-3.5">
+                        <button
+                          type="button"
+                          onClick={() => handleSortBy('priority')}
+                          className="inline-flex items-center gap-1.5 font-bold uppercase hover:text-foreground transition-colors cursor-pointer group select-none"
+                          title="Click to sort by priority"
+                        >
+                          <span>Priority</span>
+                          {supportSortField === 'priority' ? (
+                            supportSortOrder === 'desc' ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-100 transition-opacity" />
+                          )}
+                        </button>
+                      </th>
+                      <th className="px-5 py-3.5">
+                        <button
+                          type="button"
+                          onClick={() => handleSortBy('status')}
+                          className="inline-flex items-center gap-1.5 font-bold uppercase hover:text-foreground transition-colors cursor-pointer group select-none"
+                          title="Click to sort by status"
+                        >
+                          <span>Status</span>
+                          {supportSortField === 'status' ? (
+                            supportSortOrder === 'desc' ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-100 transition-opacity" />
+                          )}
+                        </button>
+                      </th>
                       <th className="px-5 py-3.5 text-right">Actions</th>
                     </tr>
                   </thead>
