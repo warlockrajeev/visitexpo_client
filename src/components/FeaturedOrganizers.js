@@ -417,9 +417,9 @@ export default function FeaturedOrganizers({ onSelectOrganizer, activeOrganizer 
     async function loadBackendOrganizers() {
       try {
         const [res, delRes, featRes] = await Promise.all([
-          fetch('/api/organizers'),
-          fetch(`${API_URL}/events/deleted-organizers`, { cache: 'no-store' }).catch(() => null),
-          fetch(`${API_URL}/featured-organizers`, { cache: 'no-store' }).catch(() => null)
+          fetch('/api/organizers', { signal: AbortSignal.timeout(3000) }).catch(() => null),
+          fetch(`${API_URL}/events/deleted-organizers`, { signal: AbortSignal.timeout(3000), cache: 'no-store' }).catch(() => null),
+          fetch(`${API_URL}/featured-organizers`, { signal: AbortSignal.timeout(3000), cache: 'no-store' }).catch(() => null)
         ]);
 
         let deletedNames = new Set();

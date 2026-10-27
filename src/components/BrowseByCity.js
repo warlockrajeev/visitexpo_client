@@ -225,7 +225,7 @@ export default function BrowseByCity({ onSelectCity, activeCity, onResetCity }) 
     let isMounted = true;
     async function fetchBackendCities() {
       try {
-        const res = await fetch('/api/cities');
+        const res = await fetch('/api/cities', { signal: AbortSignal.timeout(3000) });
         if (res.ok) {
           const json = await res.json();
           if (json?.success && json.data) {

@@ -230,15 +230,31 @@ export async function GET(request, { params }) {
     const { searchParams } = new URL(request.url);
     const forceRefresh = searchParams.get('refresh') === 'true' || searchParams.has('_t') || searchParams.has('t');
 
-    // 1. Check cache
+    // 1. Check single event memory cache
     const cached = singleEventCache.get(cleanSlug);
     if (!forceRefresh && cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
       return NextResponse.json({ success: true, data: cached.data }, { headers: NO_CACHE_HEADERS });
     }
 
-    // 2. Prioritize Fast MongoDB Database Lookup (Served in < 20ms)
+    // 1.5. Direct in-memory lookup from warm WordPress cache (0ms latency)
+    if (!forceRefresh && globalThis._wpEventsMemoryCache?.events && Array.isArray(globalThis._wpEventsMemoryCache.events)) {
+      const match = globalThis._wpEventsMemoryCache.events.find((e) => {
+        if (!e) return false;
+        const eSlug = String(e.slug || '').toLowerCase().trim();
+        const eId = String(e.id || e._id || '').toLowerCase().trim();
+        const eWpId = String(e.wpPostId || '').toLowerCase().trim();
+        return eSlug === cleanSlug || eId === cleanSlug || eWpId === cleanSlug;
+      });
+      if (match) {
+        singleEventCache.set(cleanSlug, { data: match, timestamp: Date.now() });
+        return NextResponse.json({ success: true, data: match }, { headers: NO_CACHE_HEADERS });
+      }
+    }
+
+    // 2. Prioritize Fast MongoDB Database Lookup (with strict 2s timeout)
     try {
       const mongoRes = await fetch(`${BACKEND_API_URL}/events/${cleanSlug}`, {
+        signal: AbortSignal.timeout(2000),
         cache: 'no-store'
       });
       if (mongoRes.ok) {

@@ -69,6 +69,9 @@ export default function Navbar({ solid = false }) {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const profileDropdownRef = useRef(null);
   const [mounted, setMounted] = useState(false);
+  const [language, setLanguage] = useState('en');
+  const handleLanguageChange = (e) => setLanguage(e.target.value);
+
   useEffect(() => {
     setMounted(true);
   }, []);

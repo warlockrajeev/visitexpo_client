@@ -184,7 +184,7 @@ export default function PeoplesReviews() {
   useEffect(() => {
     const fetchFeaturedReviews = async () => {
       try {
-        const res = await axios.get(`${API_URL}/reviews/featured`);
+        const res = await axios.get(`${API_URL}/reviews/featured`, { timeout: 3000 });
         if (res.data?.success && Array.isArray(res.data?.data) && res.data.data.length > 0) {
           setReviews(res.data.data.map(formatApiReview));
         }

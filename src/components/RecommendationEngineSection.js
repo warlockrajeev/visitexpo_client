@@ -209,7 +209,7 @@ export default function RecommendationEngineSection({
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      const res = await axios.get(`${API_URL}/events/recommendations?${params.toString()}`, { headers });
+      const res = await axios.get(`${API_URL}/events/recommendations?${params.toString()}`, { headers, timeout: 3000 });
       if (res.data && res.data.success) {
         setEvents(res.data.data || []);
         setCriteria(res.data.criteria || null);
@@ -246,7 +246,7 @@ export default function RecommendationEngineSection({
         const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-        const res = await axios.get(`${API_URL}/events/recommendations?${params.toString()}`, { headers });
+        const res = await axios.get(`${API_URL}/events/recommendations?${params.toString()}`, { headers, timeout: 3000 });
         if (!isCancelled && res.data && res.data.success) {
           setEvents(res.data.data || []);
           setCriteria(res.data.criteria || null);

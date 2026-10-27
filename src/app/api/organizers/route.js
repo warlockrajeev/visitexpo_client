@@ -301,11 +301,12 @@ export async function GET(request) {
   const url = new URL(request?.url || `${clientBase}/api/organizers`);
   const forceRefresh = url.searchParams.get('refresh') === 'true' || url.searchParams.has('t');
 
-  // Fetch deleted organizers from Express backend
+  // Fetch deleted organizers from Express backend (strict 2s timeout)
   let deletedNames = new Set();
   let deletedSlugIds = new Set();
   try {
     const delRes = await fetch(`${apiBase}/events/deleted-organizers`, {
+      signal: AbortSignal.timeout(2000),
       cache: 'no-store'
     });
     if (delRes.ok) {
@@ -363,35 +364,26 @@ export async function GET(request) {
 
   let events = [];
 
-  // 1. Fetch internal wordpress-events route
-  try {
-    const res = await fetch(`${clientBase}/api/wordpress-events`, {
-      next: { revalidate: 300 }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.success && Array.isArray(data.events)) {
-        events = data.events;
-      }
-    }
-  } catch (err) {
-    console.warn('[api/organizers] Fetch from internal api/wordpress-events failed:', err.message);
+  // 1. Direct in-memory lookup from warm WordPress cache (0ms latency, zero loopback)
+  if (globalThis._wpEventsMemoryCache?.events && Array.isArray(globalThis._wpEventsMemoryCache.events)) {
+    events = globalThis._wpEventsMemoryCache.events;
   }
 
-  // 2. Fallback to Express backend if needed
+  // 2. Direct Express backend lookup with strict 2s timeout if memory cache is not yet warm
   if (events.length === 0) {
     try {
-      const serverRes = await fetch(`${apiBase}/events?limit=2000`, {
-        signal: AbortSignal.timeout(6000)
+      const serverRes = await fetch(`${apiBase}/events/all-directory`, {
+        signal: AbortSignal.timeout(2000),
+        cache: 'no-store'
       });
       if (serverRes.ok) {
         const sData = await serverRes.json();
-        const docs = sData.data?.docs || sData.data || [];
-        events = docs;
+        const docs = sData.events || sData.data?.docs || sData.data || [];
+        if (Array.isArray(docs) && docs.length > 0) {
+          events = docs;
+        }
       }
-    } catch (sErr) {
-      console.warn('[api/organizers] Fetch from backend fallback note:', sErr.message);
-    }
+    } catch (_) {}
   }
   const activeMetadata = ORGANIZERS_METADATA.filter((org) => !isDeleted(org));
 

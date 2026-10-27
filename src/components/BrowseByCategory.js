@@ -154,7 +154,7 @@ export default function BrowseByCategory({ onSelectCategory, activeCategory, onR
     let isMounted = true;
     async function fetchBackendCategories() {
       try {
-        const res = await fetch('/api/categories');
+        const res = await fetch('/api/categories', { signal: AbortSignal.timeout(3000) });
         if (res.ok) {
           const json = await res.json();
           if (json?.success && Array.isArray(json.data?.categories) && json.data.categories.length > 0) {

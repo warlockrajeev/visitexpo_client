@@ -172,8 +172,8 @@ export default function BannerSlider() {
     const loadData = async () => {
       try {
         const [bannersRes, eventsRes] = await Promise.allSettled([
-          axios.get(`${API_URL}/banners/active`, { timeout: 6000 }),
-          axios.get(`${API_URL}/events?limit=8&status=published`, { timeout: 6000 })
+          axios.get(`${API_URL}/banners/active`, { timeout: 2500 }),
+          axios.get(`${API_URL}/events?limit=8&status=published`, { timeout: 2500 })
         ]);
 
         if (!isMounted) return;

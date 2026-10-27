@@ -294,9 +294,9 @@ export default function LandingPage() {
       try {
         // Parallel API calls using Promise.all()
         const [eventsRes, faqsRes] = await Promise.all([
-          axios.get('/api/wordpress-events', { timeout: 10000 })
+          axios.get('/api/wordpress-events', { timeout: 5000 })
             .catch(err => ({ data: { success: false } })),
-          axios.get(`${API_URL}/faqs`, { timeout: 5000 }).catch(err => ({ data: { success: false } }))
+          axios.get(`${API_URL}/faqs`, { timeout: 3500 }).catch(err => ({ data: { success: false } }))
         ]);
 
         if (isMounted) {
@@ -360,7 +360,7 @@ export default function LandingPage() {
   // DEFERRED: Fetch user-specific data separately (not blocking initial render)
   useEffect(() => {
     if (user?.email) {
-      axios.get(`/api/engagements/user/${encodeURIComponent(user.email)}`, { timeout: 5000 })
+      axios.get(`${API_URL}/engagements/user/${encodeURIComponent(user.email)}`, { timeout: 3000 })
         .then(res => {
           if (res.data?.success && res.data?.data?.followedEvents) {
             const slugs = res.data.data.followedEvents.map(e => (e.eventSlug || e.slug || '').toLowerCase().trim()).filter(Boolean);

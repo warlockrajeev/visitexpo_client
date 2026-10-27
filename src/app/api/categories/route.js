@@ -178,38 +178,31 @@ export async function GET() {
   }
 
   let events = [];
-  const clientBase = process.env.NEXT_PUBLIC_CLIENT_URL || process.env.CLIENT_URL || 'http://localhost:3000';
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://api.visitexpo.in/api';
+  const apiBase =
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.SERVER_URL ||
+    (process.env.NODE_ENV === 'production' ? 'https://api.visitexpo.in/api' : 'http://localhost:5000/api');
 
-  // Try fetching internal wordpress-events route
-  try {
-    const res = await fetch(`${clientBase}/api/wordpress-events`, {
-      next: { revalidate: 300 }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.success && Array.isArray(data.events)) {
-        events = data.events;
-      }
-    }
-  } catch (err) {
-    console.warn('[client-dashboard/api/categories] Fetch from internal api/wordpress-events failed:', err.message);
+  // 1. Direct in-memory lookup from warm WordPress cache (0ms latency, zero loopback)
+  if (globalThis._wpEventsMemoryCache?.events && Array.isArray(globalThis._wpEventsMemoryCache.events)) {
+    events = globalThis._wpEventsMemoryCache.events;
   }
 
-  // Fallback to Express backend
+  // 2. Direct Express backend lookup with strict 2s timeout if memory cache is not yet warm
   if (events.length === 0) {
     try {
-      const serverRes = await fetch(`${apiBase}/events?limit=2000`, {
-        signal: AbortSignal.timeout(6000)
+      const serverRes = await fetch(`${apiBase}/events/all-directory`, {
+        signal: AbortSignal.timeout(2000),
+        cache: 'no-store'
       });
       if (serverRes.ok) {
         const sData = await serverRes.json();
-        const docs = sData.data?.docs || sData.data || [];
-        events = docs;
+        const docs = sData.events || sData.data?.docs || sData.data || [];
+        if (Array.isArray(docs) && docs.length > 0) {
+          events = docs;
+        }
       }
-    } catch (sErr) {
-      console.warn('[client-dashboard/api/categories] Fetch from backend fallback note:', sErr.message);
-    }
+    } catch (_) {}
   }
 
   // Map counts per category
