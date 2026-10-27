@@ -1753,17 +1753,32 @@ export default function LandingPage() {
                 <div className="pt-1 flex items-center gap-2">
                   <a
                     href="#contact"
-                    className="flex-1 text-center py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs transition-colors"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const el = document.getElementById('contact');
+                      if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="flex-1 text-center py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs transition-colors cursor-pointer"
                   >
                     Talk to Concierge
                   </a>
-                  <a
-                    href="mailto:contact@visitexpo.in"
-                    className="py-2 px-3 rounded-lg bg-white border border-amber-300 text-amber-900 font-bold text-xs hover:bg-amber-50 transition-colors"
-                    title="Email Support"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = document.getElementById('contact');
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth' });
+                        const emailInput = el.querySelector('input[type="email"]');
+                        if (emailInput) emailInput.focus();
+                      } else {
+                        window.location.href = 'mailto:contact@visitexpo.in';
+                      }
+                    }}
+                    className="py-2 px-3 rounded-lg bg-white border border-amber-300 text-amber-900 font-bold text-xs hover:bg-amber-50 transition-colors cursor-pointer"
+                    title="Email Concierge Support"
                   >
                     <Mail className="h-3.5 w-3.5" />
-                  </a>
+                  </button>
                 </div>
               </div>
 
