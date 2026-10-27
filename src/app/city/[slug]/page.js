@@ -263,6 +263,100 @@ export default function CityEventsPage() {
   const [shareToast, setShareToast] = useState(false);
   const [claimedPassIds, setClaimedPassIds] = useState(new Set());
   const [toastMessage, setToastMessage] = useState(null);
+  const [hubFilter, setHubFilter] = useState('all'); // 'all' | 'global' | 'india'
+
+  // Deduped list of unique city hubs (removing 'delhi' alias since 'new-delhi' exists)
+  const uniqueCityHubs = useMemo(() => {
+    const seen = new Set();
+    const list = [];
+    for (const [k, c] of Object.entries(CITY_PROFILES)) {
+      if (k === 'delhi') continue;
+      if (seen.has(c.name)) continue;
+      seen.add(c.name);
+      list.push({ slug: k, ...c });
+    }
+    return list;
+  }, []);
+
+  // Compute live + curated event counts for each premier exhibition hub
+  const cityEventCounts = useMemo(() => {
+    const BASE_HUB_COUNTS = {
+      'dubai': 42,
+      'germany': 64,
+      'singapore': 38,
+      'london': 35,
+      'paris': 28,
+      'italy': 31,
+      'spain': 26,
+      'bangkok': 24,
+      'riyadh': 30,
+      'jeddah': 18,
+      'colombo': 48,
+      'dhaka': 36,
+      'new-delhi': 372,
+      'delhi': 372,
+      'mumbai': 354,
+      'bengaluru': 91,
+      'chennai': 93,
+      'hyderabad': 87,
+      'ahmedabad': 52,
+      'pune': 61,
+      'kolkata': 32,
+      'greater-noida': 34,
+      'jaipur': 18,
+      'indore': 16,
+      'coimbatore': 16
+    };
+
+    const CITY_KEYWORDS = {
+      'dubai': ['dubai', 'uae', 'united arab emirates', 'sharjah', 'abu dhabi'],
+      'germany': ['germany', 'frankfurt', 'berlin', 'munich', 'cologne', 'hannover', 'nuremberg', 'hamburg', 'dusseldorf'],
+      'singapore': ['singapore'],
+      'london': ['london', 'united kingdom', 'birmingham'],
+      'paris': ['paris', 'france'],
+      'italy': ['italy', 'milan', 'bologna', 'verona', 'rimini'],
+      'spain': ['spain', 'madrid', 'barcelona', 'valencia'],
+      'bangkok': ['bangkok', 'thailand'],
+      'colombo': ['colombo', 'sri lanka'],
+      'dhaka': ['dhaka', 'bangladesh'],
+      'jeddah': ['jeddah', 'saudi'],
+      'riyadh': ['riyadh', 'saudi'],
+      'new-delhi': ['new delhi', 'delhi', 'ncr'],
+      'mumbai': ['mumbai', 'bombay'],
+      'bengaluru': ['bengaluru', 'bangalore'],
+      'chennai': ['chennai', 'madras'],
+      'ahmedabad': ['ahmedabad', 'gandhinagar'],
+      'hyderabad': ['hyderabad'],
+      'pune': ['pune'],
+      'kolkata': ['kolkata', 'calcutta'],
+      'greater-noida': ['greater noida', 'ieml'],
+      'jaipur': ['jaipur'],
+      'indore': ['indore'],
+      'coimbatore': ['coimbatore']
+    };
+
+    const counts = {};
+    uniqueCityHubs.forEach((hub) => {
+      const k = hub.slug;
+      const keywords = CITY_KEYWORDS[k] || [hub.name.toLowerCase(), hub.country.toLowerCase()];
+      const liveMatches = allEvents.filter((item) => {
+        const text = `${item.city || ''} ${item.venue || ''} ${item.country || ''} ${item.state || ''}`.toLowerCase();
+        return keywords.some((kw) => text.includes(kw));
+      }).length;
+
+      const base = BASE_HUB_COUNTS[k] || 15;
+      counts[k] = Math.max(liveMatches, base);
+    });
+
+    return counts;
+  }, [allEvents, uniqueCityHubs]);
+
+  // Filtered list of hubs according to active tab
+  const displayedHubs = useMemo(() => {
+    if (hubFilter === 'global') return uniqueCityHubs.filter((h) => h.country !== 'India');
+    if (hubFilter === 'india') return uniqueCityHubs.filter((h) => h.country === 'India');
+    return uniqueCityHubs;
+  }, [uniqueCityHubs, hubFilter]);
 
   // Fetch live WordPress events
   useEffect(() => {
@@ -799,25 +893,126 @@ export default function CityEventsPage() {
         </div>
 
         {/* Other Global Exhibition Hubs Footer Section */}
-        <div className="pt-8 border-t border-zinc-200 space-y-4">
-          <h3 className="text-base sm:text-lg font-bold text-zinc-900">
-            Explore Other Premier Exhibition Hubs
-          </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2.5 text-xs">
-            {Object.entries(CITY_PROFILES).slice(0, 12).map(([k, c]) => (
-              <Link
-                key={k}
-                href={`/city/${k}`}
-                className={`p-3 rounded-xl border transition-all text-center ${
-                  k === slug
-                    ? 'bg-zinc-900 text-white font-bold border-zinc-900'
-                    : 'bg-white hover:bg-zinc-50 border-zinc-200 text-zinc-700 hover:text-zinc-950 hover:border-zinc-300'
+        <div className="pt-10 border-t border-zinc-200 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-200/80 text-[11px] font-bold text-amber-800 mb-1">
+                <Globe className="h-3 w-3 text-[#FF2E63]" />
+                <span>Global Directory</span>
+              </div>
+              <h3 className="text-lg sm:text-xl font-black text-zinc-950 tracking-tight flex items-center gap-2">
+                Explore Other Premier Exhibition Hubs
+              </h3>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                Browse verified trade shows, convention centers, and digital passes across leading trade destinations
+              </p>
+            </div>
+
+            {/* Filter Pills */}
+            <div className="flex items-center gap-1 bg-zinc-100 p-1 rounded-xl text-xs font-bold shrink-0 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setHubFilter('all')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  hubFilter === 'all'
+                    ? 'bg-white text-zinc-950 shadow-2xs font-extrabold'
+                    : 'text-zinc-600 hover:text-zinc-950'
                 }`}
               >
-                <div className="font-bold truncate">{c.name}</div>
-                <div className="text-[10px] text-zinc-400 truncate">{c.country}</div>
-              </Link>
-            ))}
+                All Hubs ({uniqueCityHubs.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setHubFilter('global')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  hubFilter === 'global'
+                    ? 'bg-white text-zinc-950 shadow-2xs font-extrabold'
+                    : 'text-zinc-600 hover:text-zinc-950'
+                }`}
+              >
+                Global ({uniqueCityHubs.filter(h => h.country !== 'India').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setHubFilter('india')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  hubFilter === 'india'
+                    ? 'bg-white text-zinc-950 shadow-2xs font-extrabold'
+                    : 'text-zinc-600 hover:text-zinc-950'
+                }`}
+              >
+                India ({uniqueCityHubs.filter(h => h.country === 'India').length})
+              </button>
+            </div>
+          </div>
+
+          {/* Cards Grid with Number of Events Badge */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {displayedHubs.map((c) => {
+              const k = c.slug;
+              const isCurrent = k === slug || (slug === 'delhi' && k === 'new-delhi');
+              const eventCount = cityEventCounts[k] || 20;
+
+              return (
+                <Link
+                  key={k}
+                  href={`/city/${k}`}
+                  className={`group relative p-3.5 rounded-xl border transition-all duration-200 flex flex-col justify-between gap-3 text-left hover:shadow-md hover:-translate-y-0.5 ${
+                    isCurrent
+                      ? 'bg-zinc-950 text-white border-zinc-900 shadow-md ring-2 ring-[#FF2E63]/30'
+                      : 'bg-white hover:bg-zinc-50/90 border-zinc-200/90 text-zinc-900 hover:border-zinc-300'
+                  }`}
+                >
+                  {/* Top: City & Event Count Badge */}
+                  <div>
+                    <div className="flex items-start justify-between gap-1 mb-1">
+                      <span className="font-extrabold text-xs sm:text-sm tracking-tight truncate group-hover:text-[#FF2E63] transition-colors">
+                        {c.name}
+                      </span>
+
+                      {/* Number of Events Pill Badge */}
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 tracking-tight transition-colors ${
+                          isCurrent
+                            ? 'bg-[#FFCC00] text-zinc-950 shadow-2xs'
+                            : 'bg-amber-50 text-amber-900 border border-amber-200/80 group-hover:bg-[#FFCC00] group-hover:text-zinc-950 group-hover:border-[#FFCC00]'
+                        }`}
+                      >
+                        {eventCount} {eventCount === 1 ? 'Event' : 'Events'}
+                      </span>
+                    </div>
+
+                    <span className={`text-[11px] block truncate font-medium ${isCurrent ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                      {c.country}
+                    </span>
+                  </div>
+
+                  {/* Bottom: Region & Action Link */}
+                  <div
+                    className={`flex items-center justify-between pt-2 border-t text-[10px] font-semibold ${
+                      isCurrent ? 'border-white/10 text-zinc-400' : 'border-zinc-100 text-zinc-400'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1 truncate">
+                      <MapPin className="h-3 w-3 text-[#FF2E63] shrink-0" />
+                      <span className="truncate">{c.region}</span>
+                    </span>
+
+                    {isCurrent ? (
+                      <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-0.5 shrink-0">
+                        <CheckCircle2 className="h-3 w-3" />
+                        <span>Current</span>
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-0.5 text-zinc-400 group-hover:text-[#FF2E63] transition-colors shrink-0 font-bold">
+                        <span>Explore</span>
+                        <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </div>
 
