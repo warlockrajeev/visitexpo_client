@@ -28,6 +28,7 @@ import {
   Eye,
   Layers,
   ArrowRight,
+  ArrowLeft,
   Phone,
   Mail,
   Tag,
@@ -336,9 +337,10 @@ export default function FeaturedOrganizerApplicationPage() {
             </Link>
             <Link
               href="/dashboard"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-background hover:bg-secondary/80 text-foreground text-xs sm:text-sm font-medium border border-border/80 transition-all active:scale-[0.98] cursor-pointer"
+              className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-card hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:text-black dark:hover:text-white text-xs sm:text-sm font-semibold border border-border hover:border-zinc-300 dark:hover:border-zinc-600 shadow-2xs hover:shadow-xs transition-all duration-200 hover:scale-[1.01] active:scale-[0.98] cursor-pointer"
             >
-              Back to Dashboard
+              <ArrowLeft className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground group-hover:-translate-x-0.5 transition-transform duration-200" />
+              <span>Back to Dashboard</span>
             </Link>
           </div>
         </div>
@@ -790,7 +792,7 @@ export default function FeaturedOrganizerApplicationPage() {
                     <button
                       type="button"
                       onClick={() => setIsEditing(false)}
-                      className="px-4 py-2.5 rounded-xl bg-background hover:bg-secondary/80 border border-border/80 text-foreground text-xs font-medium transition-colors cursor-pointer active:scale-[0.98]"
+                      className="px-4 py-2.5 rounded-xl bg-card hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-border hover:border-zinc-300 dark:hover:border-zinc-600 text-zinc-700 dark:text-zinc-200 hover:text-black dark:hover:text-white text-xs font-semibold shadow-2xs hover:shadow-xs transition-all active:scale-[0.98] cursor-pointer"
                     >
                       Cancel
                     </button>
