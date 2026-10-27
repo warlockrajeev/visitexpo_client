@@ -84,35 +84,82 @@ const POPULAR_LOCATIONS = [
 
 const DEFAULT_BANNER = 'https://visitexpo.in/wp-content/uploads/2026/08/ET-TECH-X-2026_new.jpg';
 
+function getLocalFallbackEvents(locations = [], interests = [], maxCount = 60) {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = sessionStorage.getItem('visitexpo_home_events');
+    if (!raw) return [];
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list) || list.length === 0) return [];
+
+    const locs = (locations || []).map((l) => l.toLowerCase().trim()).filter((l) => l && l !== 'all');
+    const ints = (interests || []).map((i) => i.toLowerCase().trim()).filter(Boolean);
+
+    const scored = list.map((ev) => {
+      let score = 68;
+      const reasons = [];
+      const city = (ev.city || '').toLowerCase();
+      const title = (ev.title || '').toLowerCase();
+      const cat = (ev.category || '').toLowerCase();
+      const desc = (ev.description || '').toLowerCase();
+
+      const isLocMatch =
+        locs.length === 0 ||
+        locs.some((l) => city.includes(l) || l.includes(city) || (l.includes('delhi') && (city.includes('noida') || city.includes('delhi'))));
+
+      if (isLocMatch && locs.length > 0) {
+        score += 20;
+        reasons.push(`Hosted in ${ev.city || 'your area'}`);
+      }
+
+      const isIntMatch =
+        ints.length === 0 ||
+        ints.some((i) => cat.includes(i) || i.includes(cat) || title.includes(i) || desc.includes(i));
+
+      if (isIntMatch && ints.length > 0) {
+        score += 15;
+        const matched = ints.find((i) => cat.includes(i) || title.includes(i)) || ints[0];
+        reasons.push(`Matches your interest in ${matched.charAt(0).toUpperCase() + matched.slice(1)}`);
+      }
+
+      if (reasons.length === 0) {
+        reasons.push('Popular Industry Exhibition');
+      }
+
+      return {
+        ...ev,
+        matchScore: Math.min(99, score),
+        matchReasons: reasons.slice(0, 3)
+      };
+    });
+
+    scored.sort((a, b) => b.matchScore - a.matchScore);
+    return scored.slice(0, maxCount);
+  } catch (_) {
+    return [];
+  }
+}
+
 export default function RecommendationsPage() {
   const { user } = useAuth();
 
-  // Filters & State with lazy initializers
-  const [selectedLocations, setSelectedLocations] = useState(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = localStorage.getItem('visitexpo_user_preferences');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed.locations) && parsed.locations.length > 0) return parsed.locations;
-        }
-      } catch (err) {}
-    }
-    return ['New Delhi'];
-  });
+  // SSR-safe state initialization (identical on server and client initial render)
+  const [selectedLocations, setSelectedLocations] = useState(() => ['New Delhi']);
+  const [selectedInterests, setSelectedInterests] = useState(() => ['Technology']);
 
-  const [selectedInterests, setSelectedInterests] = useState(() => {
+  // Hydrate preferences on client mount
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
         const cached = localStorage.getItem('visitexpo_user_preferences');
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed.interests) && parsed.interests.length > 0) return parsed.interests;
+          if (Array.isArray(parsed.locations) && parsed.locations.length > 0) setSelectedLocations(parsed.locations);
+          if (Array.isArray(parsed.interests) && parsed.interests.length > 0) setSelectedInterests(parsed.interests);
         }
-      } catch (err) {}
+      } catch (_) {}
     }
-    return ['Technology'];
-  });
+  }, []);
 
   const [userCoords, setUserCoords] = useState(null);
   const [isDetecting, setIsDetecting] = useState(false);
@@ -189,16 +236,24 @@ export default function RecommendationsPage() {
       }
       params.append('limit', '60');
 
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const token = typeof window !== 'undefined'
+        ? (localStorage.getItem('visitexpo_access_token') || localStorage.getItem('token'))
+        : null;
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      const res = await axios.get(`${API_URL}/events/recommendations?${params.toString()}`, { headers });
-      if (res.data?.success) {
-        setEvents(res.data.data || []);
+      const res = await axios.get(`${API_URL}/events/recommendations?${params.toString()}`, { headers, timeout: 8000 });
+      if (res.data?.success && Array.isArray(res.data?.data) && res.data.data.length > 0) {
+        setEvents(res.data.data);
         setCriteria(res.data.criteria || null);
+      } else {
+        const fallback = getLocalFallbackEvents(selectedLocations, selectedInterests, 60);
+        if (fallback.length > 0) setEvents(fallback);
+        else if (res.data?.data) setEvents(res.data.data);
       }
     } catch (err) {
-      console.warn('[RecommendationsPage] Error:', err.message);
+      console.warn('[RecommendationsPage] API error, using verified fallback:', err.message);
+      const fallback = getLocalFallbackEvents(selectedLocations, selectedInterests, 60);
+      if (fallback.length > 0) setEvents(fallback);
     } finally {
       setLoading(false);
     }
@@ -225,17 +280,27 @@ export default function RecommendationsPage() {
         }
         params.append('limit', '60');
 
-        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        const token = typeof window !== 'undefined'
+          ? (localStorage.getItem('visitexpo_access_token') || localStorage.getItem('token'))
+          : null;
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-        const res = await axios.get(`${API_URL}/events/recommendations?${params.toString()}`, { headers });
-        if (!isCancelled && res.data?.success) {
-          setEvents(res.data.data || []);
-          setCriteria(res.data.criteria || null);
+        const res = await axios.get(`${API_URL}/events/recommendations?${params.toString()}`, { headers, timeout: 8000 });
+        if (!isCancelled) {
+          if (res.data?.success && Array.isArray(res.data?.data) && res.data.data.length > 0) {
+            setEvents(res.data.data);
+            setCriteria(res.data.criteria || null);
+          } else {
+            const fallback = getLocalFallbackEvents(selectedLocations, selectedInterests, 60);
+            if (fallback.length > 0) setEvents(fallback);
+            else if (res.data?.data) setEvents(res.data.data);
+          }
         }
       } catch (err) {
         if (!isCancelled) {
-          console.warn('[RecommendationsPage] Error:', err.message);
+          console.warn('[RecommendationsPage] Error, using fallback:', err.message);
+          const fallback = getLocalFallbackEvents(selectedLocations, selectedInterests, 60);
+          if (fallback.length > 0) setEvents(fallback);
         }
       } finally {
         if (!isCancelled) {
@@ -523,7 +588,11 @@ export default function RecommendationsPage() {
                 const isSelected =
                   loc.id === 'all'
                     ? selectedLocations.length === 0 && !userCoords
-                    : selectedLocations.some((l) => loc.query.toLowerCase().includes(l.toLowerCase()));
+                    : selectedLocations.some((l) => {
+                        const low = l.toLowerCase().trim();
+                        if (loc.id === 'delhi') return low === 'delhi ncr' || low === 'new delhi,greater noida';
+                        return low === loc.label.toLowerCase() || low === (loc.query || '').toLowerCase();
+                      });
 
                 return (
                   <button
