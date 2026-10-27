@@ -103,6 +103,17 @@ export default function TicketingPage() {
 
   const isPaidPlan = ['starter', 'enterprise', 'growth'].includes(organizerPlan) || ['super_admin', 'admin'].includes(user?.role);
 
+  // Suppress native HTML5 validation bubbles/tooltips completely across all modals
+  useEffect(() => {
+    const handleInvalid = (e) => {
+      e.preventDefault();
+    };
+    document.addEventListener('invalid', handleInvalid, true);
+    return () => {
+      document.removeEventListener('invalid', handleInvalid, true);
+    };
+  }, []);
+
   // New Ticket Tier Form State
   const [newTier, setNewTier] = useState({
     title: '',
@@ -1238,6 +1249,7 @@ export default function TicketingPage() {
                 </button>
                 <button
                   type="submit"
+                  formNoValidate
                   disabled={raisingTicket}
                   className="rounded-lg bg-primary hover:bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow-md transition-colors flex items-center gap-1.5"
                 >
@@ -1365,6 +1377,7 @@ export default function TicketingPage() {
                 </button>
                 <button
                   type="submit"
+                  formNoValidate
                   disabled={updatingTicket}
                   className="rounded-lg bg-primary hover:bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow-md transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
@@ -1488,6 +1501,7 @@ export default function TicketingPage() {
                   />
                   <button
                     type="submit"
+                    formNoValidate
                     disabled={postingReply}
                     className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all flex items-center gap-1.5 shrink-0"
                   >
@@ -1631,6 +1645,7 @@ export default function TicketingPage() {
                 </button>
                 <button
                   type="submit"
+                  formNoValidate
                   className="rounded-lg bg-primary hover:bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow-md transition-colors"
                 >
                   Save Tier
@@ -1753,6 +1768,7 @@ export default function TicketingPage() {
                 </button>
                 <button
                   type="submit"
+                  formNoValidate
                   disabled={simulating}
                   className="rounded-lg bg-primary hover:bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow-md transition-colors flex items-center gap-1.5"
                 >
