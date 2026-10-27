@@ -720,13 +720,24 @@ export default function CityEventsPage() {
 
         {/* Exhibitions Feed Grid */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-zinc-950">
               Verified Exhibitions in {cityProfile.name}
             </h2>
-            <span className="text-xs font-bold text-zinc-500">
-              {cityEvents.length} {cityEvents.length === 1 ? 'Exhibition' : 'Exhibitions'} Found
-            </span>
+
+            {/* High-Visibility Live Exhibition Count Badge */}
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-950 text-white shadow-sm border border-zinc-800 self-start sm:self-auto">
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-[#FFCC00] text-zinc-950 text-xs font-black shadow-2xs">
+                {cityEvents.length}
+              </span>
+              <span className="text-xs font-bold text-zinc-100 pr-1">
+                {cityEvents.length === 1 ? 'Exhibition' : 'Exhibitions'} Found
+              </span>
+            </div>
           </div>
 
           {loading ? (
