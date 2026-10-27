@@ -49,6 +49,7 @@ import {
 import { CURRENCY_OPTIONS, getCurrencySymbol } from '../events/wizard/page.js';
 import { showSweetAlert, showSweetConfirm, showSweetSuccess, showSweetError, showSweetWarning } from '../../../utils/sweetalert.js';
 import { printOrderReceipt } from '../../../utils/printReceipt.js';
+import { filterTicketInput, validateTicketInput } from '../../../utils/ticketValidation.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -458,8 +459,15 @@ export default function TicketingPage() {
   // 6. Handle Raise Support Ticket
   const handleRaiseSupportTicket = async (e) => {
     e.preventDefault();
-    if (!newSupportTicket.title || !newSupportTicket.description) {
-      showSweetWarning('Ticket title and description are required.');
+    const titleVal = validateTicketInput(newSupportTicket.title, 'Ticket title');
+    if (!titleVal.valid) {
+      showSweetWarning(titleVal.error);
+      return;
+    }
+
+    const descVal = validateTicketInput(newSupportTicket.description, 'Ticket description');
+    if (!descVal.valid) {
+      showSweetWarning(descVal.error);
       return;
     }
 
@@ -469,6 +477,8 @@ export default function TicketingPage() {
         `${API_URL}/support-tickets`,
         {
           ...newSupportTicket,
+          title: newSupportTicket.title.trim(),
+          description: newSupportTicket.description.trim(),
           eventId: newSupportTicket.eventId || selectedEventId || undefined
         },
         { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -490,8 +500,9 @@ export default function TicketingPage() {
   // 7. Handle Reply to Support Ticket Thread
   const handlePostReply = async (e) => {
     e.preventDefault();
-    if (!replyMessage.trim()) {
-      showSweetWarning('Please enter a reply message before sending.');
+    const replyVal = validateTicketInput(replyMessage, 'Reply message');
+    if (!replyVal.valid) {
+      showSweetWarning(replyVal.error);
       return;
     }
     if (!selectedTicketDetail) return;
@@ -566,8 +577,15 @@ export default function TicketingPage() {
   const handleUpdateSupportTicket = async (e) => {
     e.preventDefault();
     if (!editingTicket) return;
-    if (!editTicketForm.title.trim() || !editTicketForm.description.trim()) {
-      showSweetWarning('Ticket title and description are required.');
+    const titleVal = validateTicketInput(editTicketForm.title, 'Ticket title');
+    if (!titleVal.valid) {
+      showSweetWarning(titleVal.error);
+      return;
+    }
+
+    const descVal = validateTicketInput(editTicketForm.description, 'Ticket description');
+    if (!descVal.valid) {
+      showSweetWarning(descVal.error);
       return;
     }
 
@@ -1148,7 +1166,7 @@ export default function TicketingPage() {
                 <input
                   type="text"
                   value={newSupportTicket.title}
-                  onChange={(e) => setNewSupportTicket(prev => ({ ...prev, title: e.target.value }))}
+                  onChange={(e) => setNewSupportTicket(prev => ({ ...prev, title: filterTicketInput(e.target.value, prev.title) }))}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="E.g. WordPress sync webhook timing out"
                 />
@@ -1204,7 +1222,7 @@ export default function TicketingPage() {
                 <textarea
                   rows={4}
                   value={newSupportTicket.description}
-                  onChange={(e) => setNewSupportTicket(prev => ({ ...prev, description: e.target.value }))}
+                  onChange={(e) => setNewSupportTicket(prev => ({ ...prev, description: filterTicketInput(e.target.value, prev.description) }))}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none placeholder:text-muted-foreground text-sm"
                   placeholder="Provide details, steps to reproduce, or specific error messages encountered..."
                 />
@@ -1273,7 +1291,7 @@ export default function TicketingPage() {
                 <input
                   type="text"
                   value={editTicketForm.title}
-                  onChange={(e) => setEditTicketForm({ ...editTicketForm, title: e.target.value })}
+                  onChange={(e) => setEditTicketForm(prev => ({ ...prev, title: filterTicketInput(e.target.value, prev.title) }))}
                   placeholder="e.g., Payment gateway webhook timeout"
                   className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 />
@@ -1331,7 +1349,7 @@ export default function TicketingPage() {
                 <textarea
                   rows={4}
                   value={editTicketForm.description}
-                  onChange={(e) => setEditTicketForm({ ...editTicketForm, description: e.target.value })}
+                  onChange={(e) => setEditTicketForm(prev => ({ ...prev, description: filterTicketInput(e.target.value, prev.description) }))}
                   placeholder="Provide complete steps, expected vs actual behavior, or error messages..."
                   className="w-full rounded-xl border border-border bg-background p-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 />
@@ -1464,7 +1482,7 @@ export default function TicketingPage() {
                   <input
                     type="text"
                     value={replyMessage}
-                    onChange={(e) => setReplyMessage(e.target.value)}
+                    onChange={(e) => setReplyMessage(prev => filterTicketInput(e.target.value, prev))}
                     placeholder="Type your follow-up reply..."
                     className="flex-1 rounded-xl border border-border bg-background px-4 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   />
