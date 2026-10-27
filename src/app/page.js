@@ -215,6 +215,8 @@ export default function LandingPage() {
   const [contactMessage, setContactMessage] = useState('');
   const [contactSubmitting, setContactSubmitting] = useState(false);
   const [contactSubmitted, setContactSubmitted] = useState(false);
+  const [contactErrors, setContactErrors] = useState({});
+  const [contactFieldWarning, setContactFieldWarning] = useState('');
 
   // FAQ State
   const [openFaq, setOpenFaq] = useState(null);
@@ -640,17 +642,173 @@ export default function LandingPage() {
     return events.filter(e => e.title?.toLowerCase().includes(q) || e.venue?.toLowerCase().includes(q)).slice(0, 5);
   }, [events, claimSearch]);
 
+  // Contact Form Field Validation & Real-time Sanitization
+  const handleNameKeyDown = (e) => {
+    // Only allow letters, spaces, dots, hyphens, and apostrophes
+    if (
+      e.key &&
+      e.key.length === 1 &&
+      !/[a-zA-Z\s.'-]/.test(e.key) &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey
+    ) {
+      e.preventDefault();
+      setContactFieldWarning('Name can only contain letters and spaces');
+      setTimeout(() => setContactFieldWarning(''), 2500);
+    }
+  };
+
+  const handleNameChange = (e) => {
+    const raw = e.target.value || '';
+    const sanitized = raw.replace(/[^a-zA-Z\s.'-]/g, '');
+    if (raw !== sanitized) {
+      setContactFieldWarning('Special characters and digits are not allowed in name');
+      setTimeout(() => setContactFieldWarning(''), 2500);
+    }
+    setContactName(sanitized);
+    if (contactErrors.name) {
+      setContactErrors((prev) => ({ ...prev, name: '' }));
+    }
+  };
+
+  const handleEmailKeyDown = (e) => {
+    // Prevent typing special characters that are never valid in email
+    if (
+      e.key &&
+      e.key.length === 1 &&
+      /[!#$%^&*()<>~`\\|{}[\];:"?=\s]/.test(e.key) &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey
+    ) {
+      e.preventDefault();
+      setContactFieldWarning('Invalid character for email address');
+      setTimeout(() => setContactFieldWarning(''), 2500);
+    }
+  };
+
+  const handleEmailChange = (e) => {
+    const raw = e.target.value || '';
+    const sanitized = raw.replace(/[!#$%^&*()<>~`\\|{}[\];:"?=\s]/g, '');
+    if (raw !== sanitized) {
+      setContactFieldWarning('Special characters are not allowed in email');
+      setTimeout(() => setContactFieldWarning(''), 2500);
+    }
+    setContactEmail(sanitized);
+    if (contactErrors.email) {
+      setContactErrors((prev) => ({ ...prev, email: '' }));
+    }
+  };
+
+  const handlePhoneKeyDown = (e) => {
+    // Only allow digits, plus, minus, spaces, parentheses
+    if (
+      e.key &&
+      e.key.length === 1 &&
+      !/[0-9+\s\-()]/.test(e.key) &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey
+    ) {
+      e.preventDefault();
+      setContactFieldWarning('Phone number can only contain digits');
+      setTimeout(() => setContactFieldWarning(''), 2500);
+    }
+  };
+
+  const handlePhoneChange = (e) => {
+    const raw = e.target.value || '';
+    const sanitized = raw.replace(/[^0-9+\s\-()]/g, '');
+    if (raw !== sanitized) {
+      setContactFieldWarning('Special characters are not allowed in phone number');
+      setTimeout(() => setContactFieldWarning(''), 2500);
+    }
+    setContactPhone(sanitized);
+    if (contactErrors.phone) {
+      setContactErrors((prev) => ({ ...prev, phone: '' }));
+    }
+  };
+
+  const handleMessageKeyDown = (e) => {
+    // Prevent typing dangerous injection tags: < >
+    if (
+      e.key &&
+      e.key.length === 1 &&
+      /[<>]/.test(e.key) &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey
+    ) {
+      e.preventDefault();
+      setContactFieldWarning('Angle brackets (< >) are not allowed');
+      setTimeout(() => setContactFieldWarning(''), 2500);
+    }
+  };
+
+  const handleMessageChange = (e) => {
+    const raw = e.target.value || '';
+    const sanitized = raw.replace(/[<>]/g, '');
+    if (raw !== sanitized) {
+      setContactFieldWarning('Angle brackets (< >) are not allowed');
+      setTimeout(() => setContactFieldWarning(''), 2500);
+    }
+    setContactMessage(sanitized);
+    if (contactErrors.message) {
+      setContactErrors((prev) => ({ ...prev, message: '' }));
+    }
+  };
+
   const handleContactSubmit = async (e) => {
     e.preventDefault();
-    if (!contactName || !contactEmail || !contactMessage) return;
+    const errors = {};
+
+    const cleanName = (contactName || '').trim();
+    if (!cleanName) {
+      errors.name = 'Please enter your name';
+    } else if (cleanName.length < 2) {
+      errors.name = 'Name must be at least 2 characters';
+    } else if (!/^[a-zA-Z\s.'-]+$/.test(cleanName)) {
+      errors.name = 'Name can only contain letters and spaces';
+    }
+
+    const cleanEmail = (contactEmail || '').trim();
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!cleanEmail) {
+      errors.email = 'Please enter your email address';
+    } else if (!emailRegex.test(cleanEmail)) {
+      errors.email = 'Please enter a valid email address';
+    }
+
+    const cleanPhone = (contactPhone || '').trim();
+    if (cleanPhone) {
+      const digits = cleanPhone.replace(/\D/g, '');
+      if (digits.length < 7 || digits.length > 15) {
+        errors.phone = 'Please enter a valid phone number (7–15 digits)';
+      }
+    }
+
+    const cleanMessage = (contactMessage || '').trim();
+    if (!cleanMessage) {
+      errors.message = 'Please enter your message or requirements';
+    } else if (cleanMessage.length < 5) {
+      errors.message = 'Message must be at least 5 characters';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setContactErrors(errors);
+      return;
+    }
+
+    setContactErrors({});
     setContactSubmitting(true);
     try {
       await axios.post(`${API_URL}/contact`, {
         role: contactRole,
-        name: contactName,
-        email: contactEmail,
-        phone: contactPhone,
-        message: contactMessage,
+        name: cleanName,
+        email: cleanEmail,
+        phone: cleanPhone,
+        message: cleanMessage,
         source: 'landing_contact'
       });
       setContactSubmitted(true);
@@ -1950,8 +2108,10 @@ export default function LandingPage() {
                           type="button"
                           key={r}
                           onClick={() => setContactRole(r)}
-                          className={`py-1.5 rounded-lg font-bold border transition-colors ${
-                            contactRole === r ? 'bg-[#FF2E63] text-white border-[#FF2E63]' : 'bg-white text-zinc-700 border-zinc-200'
+                          className={`py-2 rounded-lg font-bold text-xs border cursor-pointer transition-all duration-200 ${
+                            contactRole === r
+                              ? 'bg-[#FF2E63] text-white border-[#FF2E63] shadow-sm shadow-[#FF2E63]/25 hover:bg-[#ff1a53] hover:shadow-md hover:shadow-[#FF2E63]/30 hover:-translate-y-0.5 active:translate-y-0 active:scale-98'
+                              : 'bg-white text-zinc-700 border-zinc-200 hover:border-[#FF2E63]/60 hover:text-[#FF2E63] hover:bg-rose-50/50 hover:shadow-xs hover:-translate-y-0.5 active:translate-y-0 active:scale-98'
                           }`}
                         >
                           {r}
@@ -1965,23 +2125,43 @@ export default function LandingPage() {
                       <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Your Name *</label>
                       <input
                         type="text"
-                        required
                         placeholder="Vikram Malhotra"
                         value={contactName}
-                        onChange={(e) => setContactName(e.target.value)}
-                        className="w-full rounded-lg border border-zinc-200 bg-white py-2 px-3 text-xs text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                        onChange={handleNameChange}
+                        onKeyDown={handleNameKeyDown}
+                        className={`w-full rounded-lg border py-2 px-3 text-xs text-zinc-900 focus:outline-none focus:ring-1 transition-all ${
+                          contactErrors.name
+                            ? 'border-red-400 bg-red-50/20 focus:ring-red-400 focus:border-red-400'
+                            : 'border-zinc-200 bg-white focus:ring-zinc-900 focus:border-zinc-400'
+                        }`}
                       />
+                      {contactErrors.name && (
+                        <p className="text-[10px] text-red-500 mt-1 font-semibold flex items-center gap-1 animate-in fade-in duration-150">
+                          <AlertCircle className="h-3 w-3 shrink-0" />
+                          <span>{contactErrors.name}</span>
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Email Address *</label>
                       <input
                         type="email"
-                        required
                         placeholder="vikram@company.com"
                         value={contactEmail}
-                        onChange={(e) => setContactEmail(e.target.value)}
-                        className="w-full rounded-lg border border-zinc-200 bg-white py-2 px-3 text-xs text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                        onChange={handleEmailChange}
+                        onKeyDown={handleEmailKeyDown}
+                        className={`w-full rounded-lg border py-2 px-3 text-xs text-zinc-900 focus:outline-none focus:ring-1 transition-all ${
+                          contactErrors.email
+                            ? 'border-red-400 bg-red-50/20 focus:ring-red-400 focus:border-red-400'
+                            : 'border-zinc-200 bg-white focus:ring-zinc-900 focus:border-zinc-400'
+                        }`}
                       />
+                      {contactErrors.email && (
+                        <p className="text-[10px] text-red-500 mt-1 font-semibold flex items-center gap-1 animate-in fade-in duration-150">
+                          <AlertCircle className="h-3 w-3 shrink-0" />
+                          <span>{contactErrors.email}</span>
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Phone / WhatsApp</label>
@@ -1989,22 +2169,52 @@ export default function LandingPage() {
                         type="tel"
                         placeholder="+91 93236 77688"
                         value={contactPhone}
-                        onChange={(e) => setContactPhone(e.target.value)}
-                        className="w-full rounded-lg border border-zinc-200 bg-white py-2 px-3 text-xs text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                        onChange={handlePhoneChange}
+                        onKeyDown={handlePhoneKeyDown}
+                        className={`w-full rounded-lg border py-2 px-3 text-xs text-zinc-900 focus:outline-none focus:ring-1 transition-all ${
+                          contactErrors.phone
+                            ? 'border-red-400 bg-red-50/20 focus:ring-red-400 focus:border-red-400'
+                            : 'border-zinc-200 bg-white focus:ring-zinc-900 focus:border-zinc-400'
+                        }`}
                       />
+                      {contactErrors.phone && (
+                        <p className="text-[10px] text-red-500 mt-1 font-semibold flex items-center gap-1 animate-in fade-in duration-150">
+                          <AlertCircle className="h-3 w-3 shrink-0" />
+                          <span>{contactErrors.phone}</span>
+                        </p>
+                      )}
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Message / Requirements</label>
+                    <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Message / Requirements *</label>
                     <textarea
                       rows={3}
                       placeholder="How can we assist you with your expo or onboarding?"
                       value={contactMessage}
-                      onChange={(e) => setContactMessage(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 bg-white py-2 px-3 text-xs text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                      onChange={handleMessageChange}
+                      onKeyDown={handleMessageKeyDown}
+                      className={`w-full rounded-lg border py-2 px-3 text-xs text-zinc-900 focus:outline-none focus:ring-1 transition-all ${
+                        contactErrors.message
+                          ? 'border-red-400 bg-red-50/20 focus:ring-red-400 focus:border-red-400'
+                          : 'border-zinc-200 bg-white focus:ring-zinc-900 focus:border-zinc-400'
+                      }`}
                     />
+                    {contactErrors.message && (
+                      <p className="text-[10px] text-red-500 mt-1 font-semibold flex items-center gap-1 animate-in fade-in duration-150">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        <span>{contactErrors.message}</span>
+                      </p>
+                    )}
                   </div>
+
+                  {/* Inline Disallowed Characters Warning */}
+                  {contactFieldWarning && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-amber-800 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200 animate-in fade-in duration-150">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                      <span>{contactFieldWarning}</span>
+                    </div>
+                  )}
 
                   <button
                     type="submit"
@@ -2031,7 +2241,7 @@ export default function LandingPage() {
       {/* ========================================================================= */}
       {/* 7. FAQ ACCORDION (Dynamic from Server / Admin)                            */}
       {/* ========================================================================= */}
-      <section className="py-16 max-w-4xl mx-auto px-4 sm:px-6 space-y-6">
+      <section className="py-8 sm:py-10 max-w-4xl mx-auto px-4 sm:px-6 space-y-5">
         <div className="text-center space-y-2">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
             <HelpCircle className="h-3.5 w-3.5 text-amber-600" />
@@ -2122,56 +2332,56 @@ export default function LandingPage() {
       {/* ========================================================================= */}
       {/* 7.5 ORGANIZER PRICING TEASER SECTION                                      */}
       {/* ========================================================================= */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 my-16">
-        <div className="rounded-3xl border border-zinc-200 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black p-8 sm:p-12 text-white shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-80 h-80 bg-[#FFCC00]/10 rounded-full blur-3xl pointer-events-none" />
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 my-6 sm:my-8">
+        <div className="rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black p-5 sm:p-6 md:p-7 text-white shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-72 h-72 bg-[#FFCC00]/10 rounded-full blur-3xl pointer-events-none" />
           
-          <div className="relative z-10 grid lg:grid-cols-12 gap-8 items-center">
-            <div className="lg:col-span-8 space-y-4">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-[#FFCC00]/20 text-[#FFCC00] border border-[#FFCC00]/30">
-                <Ticket className="h-3.5 w-3.5" />
+          <div className="relative z-10 grid lg:grid-cols-12 gap-5 sm:gap-6 items-center">
+            <div className="lg:col-span-8 space-y-2.5 sm:space-y-3">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-[#FFCC00]/20 text-[#FFCC00] border border-[#FFCC00]/30">
+                <Ticket className="h-3 w-3" />
                 Organizer Pricing &amp; Plans
               </span>
-              <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white leading-tight">
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-white leading-tight">
                 Transparent Pricing Built to Scale Your Exhibitions
               </h2>
-              <p className="text-xs sm:text-sm text-zinc-400 max-w-xl leading-relaxed">
+              <p className="text-xs text-zinc-400 max-w-xl leading-normal">
                 Free for verified corporate domains, ₹14,999/Qtr for Starter operations, and enterprise packages with full CRM, API, and unlimited lead export.
               </p>
               
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                <div className="p-3 rounded-xl bg-zinc-800/60 border border-zinc-700/60">
-                  <span className="text-[10px] text-zinc-400 uppercase font-bold">Free Organizer</span>
-                  <div className="text-base font-extrabold text-white mt-0.5 font-mono">₹0 / ₹1,499</div>
-                  <span className="text-[10px] text-emerald-400">Corp Email Free</span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 pt-1">
+                <div className="p-2.5 rounded-xl bg-zinc-800/60 border border-zinc-700/60">
+                  <span className="text-[9px] text-zinc-400 uppercase font-bold block">Free Organizer</span>
+                  <div className="text-sm sm:text-base font-extrabold text-white mt-0.5 font-mono">₹0 / ₹1,499</div>
+                  <span className="text-[9px] text-emerald-400 font-medium">Corp Email Free</span>
                 </div>
-                <div className="p-3 rounded-xl bg-zinc-800/60 border border-zinc-700/60">
-                  <span className="text-[10px] text-zinc-400 uppercase font-bold">Starter Plan</span>
-                  <div className="text-base font-extrabold text-white mt-0.5 font-mono">₹14,999</div>
-                  <span className="text-[10px] text-[#FFCC00]">Per Quarter</span>
+                <div className="p-2.5 rounded-xl bg-zinc-800/60 border border-zinc-700/60">
+                  <span className="text-[9px] text-zinc-400 uppercase font-bold block">Starter Plan</span>
+                  <div className="text-sm sm:text-base font-extrabold text-white mt-0.5 font-mono">₹14,999</div>
+                  <span className="text-[9px] text-[#FFCC00] font-medium">Per Quarter</span>
                 </div>
-                <div className="p-3 rounded-xl bg-zinc-800/60 border border-zinc-700/60">
-                  <span className="text-[10px] text-zinc-400 uppercase font-bold">Enterprise</span>
-                  <div className="text-base font-extrabold text-white mt-0.5 font-mono">₹39,999</div>
-                  <span className="text-[10px] text-indigo-400">Per Quarter</span>
+                <div className="p-2.5 rounded-xl bg-zinc-800/60 border border-zinc-700/60">
+                  <span className="text-[9px] text-zinc-400 uppercase font-bold block">Enterprise</span>
+                  <div className="text-sm sm:text-base font-extrabold text-white mt-0.5 font-mono">₹39,999</div>
+                  <span className="text-[9px] text-indigo-400 font-medium">Per Quarter</span>
                 </div>
-                <div className="p-3 rounded-xl bg-zinc-800/60 border border-zinc-700/60">
-                  <span className="text-[10px] text-zinc-400 uppercase font-bold">Growth Top-Ups</span>
-                  <div className="text-base font-extrabold text-white mt-0.5 font-mono">From ₹1k</div>
-                  <span className="text-[10px] text-emerald-400">13 Channels</span>
+                <div className="p-2.5 rounded-xl bg-zinc-800/60 border border-zinc-700/60">
+                  <span className="text-[9px] text-zinc-400 uppercase font-bold block">Growth Top-Ups</span>
+                  <div className="text-sm sm:text-base font-extrabold text-white mt-0.5 font-mono">From ₹1k</div>
+                  <span className="text-[9px] text-emerald-400 font-medium">13 Channels</span>
                 </div>
               </div>
             </div>
 
-            <div className="lg:col-span-4 flex flex-col items-start lg:items-end gap-3">
+            <div className="lg:col-span-4 flex flex-col items-start lg:items-end gap-2">
               <Link
                 href="/pricing"
-                className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-[#FFCC00] hover:bg-[#FFCC00]/90 text-black font-extrabold text-xs transition-all shadow-lg text-center cursor-pointer inline-flex items-center justify-center gap-2"
+                className="w-full sm:w-auto px-5 py-2.5 sm:px-6 sm:py-3 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-black text-xs transition-all shadow-md hover:shadow-lg hover:scale-102 active:scale-98 text-center cursor-pointer inline-flex items-center justify-center gap-1.5"
               >
                 <span>View Full Pricing &amp; Comparison</span>
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-3.5 w-3.5" />
               </Link>
-              <span className="text-[11px] text-zinc-400">
+              <span className="text-[10px] text-zinc-400">
                 Proposed Event Validation available at ₹4,999
               </span>
             </div>

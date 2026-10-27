@@ -8,13 +8,13 @@
  * VisitExpo signature yellow (#FFCC00), and crisp interactive elements.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
 import Navbar from '../../components/Navbar.js';
 import Footer from '../../components/Footer.js';
 import { useAuth } from '../../context/AuthContext.js';
-import { isCorporateEmail } from '../../utils/emailValidator.js';
+import { isCorporateEmail, PUBLIC_EMAIL_DOMAINS } from '../../utils/emailValidator.js';
 import {
   Check,
   X,
@@ -47,7 +47,8 @@ import {
   Share2,
   Flame,
   BadgeCheck,
-  Info
+  Info,
+  Lock
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { calculateAnnualDiscountPercent } from '../../utils/pricing.js';
@@ -58,6 +59,26 @@ const API_URL =
     ? 'https://api.visitexpo.in/api'
     : 'http://localhost:5000/api');
 
+// KeyDown helper to check if key is navigation/control
+const isControlKey = (e) => {
+  return (
+    e.key === 'Backspace' ||
+    e.key === 'Tab' ||
+    e.key === 'Enter' ||
+    e.key === 'Escape' ||
+    e.key === 'ArrowLeft' ||
+    e.key === 'ArrowRight' ||
+    e.key === 'ArrowUp' ||
+    e.key === 'ArrowDown' ||
+    e.key === 'Delete' ||
+    e.key === 'Home' ||
+    e.key === 'End' ||
+    e.ctrlKey ||
+    e.metaKey ||
+    e.altKey
+  );
+};
+
 export default function PricingPage() {
   const { user, updateUser } = useAuth();
 
@@ -67,6 +88,16 @@ export default function PricingPage() {
   // Work email domain checker state
   const [emailCheckInput, setEmailCheckInput] = useState('');
   const [emailCheckResult, setEmailCheckResult] = useState(null);
+  const [emailCheckError, setEmailCheckError] = useState('');
+  const emailCheckTimeoutRef = useRef(null);
+
+  const triggerEmailCheckError = (msg) => {
+    if (emailCheckTimeoutRef.current) clearTimeout(emailCheckTimeoutRef.current);
+    setEmailCheckError(msg);
+    emailCheckTimeoutRef.current = setTimeout(() => {
+      setEmailCheckError('');
+    }, 2800);
+  };
 
   // My current plan & Free plan activation state
   const [allPlans, setAllPlans] = useState([]);
@@ -98,6 +129,23 @@ export default function PricingPage() {
   const [formErrors, setFormErrors] = useState({});
   const [formTouched, setFormTouched] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalFieldWarning, setModalFieldWarning] = useState('');
+  const warningTimeoutRef = useRef(null);
+
+  const triggerModalWarning = (msg) => {
+    if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+    setModalFieldWarning(msg);
+    warningTimeoutRef.current = setTimeout(() => {
+      setModalFieldWarning('');
+    }, 2800);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+      if (emailCheckTimeoutRef.current) clearTimeout(emailCheckTimeoutRef.current);
+    };
+  }, []);
 
   // FAQ Accordion State
   const [openFaqIndex, setOpenFaqIndex] = useState(0);
@@ -134,6 +182,16 @@ export default function PricingPage() {
         .catch(() => {});
     }
   }, [user, updateUser]);
+
+  // Synchronize authenticated user details into form state
+  useEffect(() => {
+    if (user) {
+      if (user.name) setFormName(user.name);
+      if (user.email) setFormEmail(user.email);
+      if (user.phone) setFormPhone(user.phone);
+      if (user.organization?.name) setFormOrg(user.organization.name);
+    }
+  }, [user]);
 
   const freePlan = allPlans.find((p) => p.planId === 'free') || publicFreePlan;
   const starterPlan = allPlans.find((p) => p.planId === 'starter');
@@ -198,35 +256,76 @@ export default function PricingPage() {
     }
   };
 
+  // Work email keystroke blocking
+  const handleEmailCheckKeyDown = (e) => {
+    if (isControlKey(e)) return;
+    if (e.key === ' ') {
+      e.preventDefault();
+      triggerEmailCheckError('Spaces are not allowed in work email address.');
+      return;
+    }
+    if (!/^[a-zA-Z0-9@._+-]$/.test(e.key)) {
+      e.preventDefault();
+      triggerEmailCheckError(`Special symbols (${e.key}) are not allowed in email.`);
+      return;
+    }
+  };
+
+  // Work email sanitizer on change
+  const handleEmailCheckChange = (e) => {
+    const rawVal = e.target.value;
+    const sanitized = rawVal.replace(/[^a-zA-Z0-9@._+-]/g, '');
+    setEmailCheckInput(sanitized);
+    if (!sanitized) {
+      setEmailCheckResult(null);
+      setEmailCheckError('');
+    } else if (emailCheckError && /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(sanitized)) {
+      setEmailCheckError('');
+    }
+  };
+
   // Handle corporate email validation checker
   const handleCheckEmail = (e) => {
     e.preventDefault();
-    if (!emailCheckInput.trim()) {
+    const raw = (emailCheckInput || '').trim();
+    if (!raw) {
+      setEmailCheckError('Please enter your work email address (e.g. name@acmeexpos.com).');
       setEmailCheckResult(null);
       return;
     }
-    const email = emailCheckInput.trim().toLowerCase();
-    const domain = email.split('@')[1];
-    if (!domain || !email.includes('.')) {
-      setEmailCheckResult({ valid: false, message: 'Please enter a valid email address.' });
+
+    const email = raw.toLowerCase();
+
+    // Strict email format validation
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      setEmailCheckError('Please enter a valid work email address (e.g. name@acmeexpos.com).');
+      setEmailCheckResult(null);
       return;
     }
 
-    const freeProviders = [
-      'gmail.com',
-      'yahoo.com',
-      'yahoo.co.in',
-      'hotmail.com',
-      'outlook.com',
-      'icloud.com',
-      'rediffmail.com',
-      'zoho.com',
-      'aol.com',
-      'proton.me',
-      'protonmail.com'
-    ];
+    const parts = email.split('@');
+    if (parts.length !== 2) {
+      setEmailCheckError('Please enter a complete email address with domain.');
+      setEmailCheckResult(null);
+      return;
+    }
 
-    if (freeProviders.includes(domain)) {
+    const domain = parts[1].trim();
+    // Validate domain structure: letters/numbers/hyphen, dot, TLD
+    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+    if (!domainRegex.test(domain)) {
+      setEmailCheckError('Please enter a valid company domain (e.g. acmeexpos.com).');
+      setEmailCheckResult(null);
+      return;
+    }
+
+    // Clear error if valid
+    setEmailCheckError('');
+
+    const isPublic = PUBLIC_EMAIL_DOMAINS ? PUBLIC_EMAIL_DOMAINS.has(domain) : !isCorporateEmail(email);
+
+    if (isPublic) {
       if (isGeneralFree) {
         setEmailCheckResult({
           isCorporate: false,
@@ -237,7 +336,7 @@ export default function PricingPage() {
         setEmailCheckResult({
           isCorporate: false,
           domain,
-          message: `Personal email detected. Registration fee is ₹${generalEmailPrice.toLocaleString()} one-time. Use your corporate work domain (@yourcompany.com) for 100% FREE registration!`
+          message: `Personal email detected (@${domain}). Registration fee is ₹${generalEmailPrice.toLocaleString()} one-time. Use your corporate work domain (@yourcompany.com) for 100% FREE registration!`
         });
       }
     } else {
@@ -297,6 +396,7 @@ export default function PricingPage() {
     if (!formOrg && user?.organization?.name) setFormOrg(user.organization.name);
     setFormErrors({});
     setFormTouched({});
+    setModalFieldWarning('');
     setIsModalOpen(true);
   };
 
@@ -311,6 +411,8 @@ export default function PricingPage() {
           error = 'Full Name is required.';
         } else if (trimmed.length < 2) {
           error = 'Full Name must be at least 2 characters.';
+        } else if ((trimmed.match(/[a-zA-Z]/g) || []).length < 2) {
+          error = 'Full Name must contain at least 2 letters.';
         } else if (!/^[a-zA-Z\s\.\'\-]{2,60}$/.test(trimmed)) {
           error = 'Please enter a valid full name (letters only).';
         }
@@ -319,6 +421,8 @@ export default function PricingPage() {
       case 'email':
         if (!trimmed) {
           error = 'Email Address is required.';
+        } else if (/\s/.test(value || '')) {
+          error = 'Email address cannot contain spaces.';
         } else if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(trimmed)) {
           error = 'Please enter a valid email address (e.g. name@company.com).';
         }
@@ -327,40 +431,62 @@ export default function PricingPage() {
       case 'phone': {
         if (!trimmed) {
           error = 'Phone / WhatsApp number is required.';
-        } else if (/[a-zA-Z]/.test(value)) {
+        } else if (/[a-zA-Z]/.test(value || '')) {
           error = 'Phone number cannot contain letters or alphabets.';
+        } else if (/^[-\)]/.test(trimmed)) {
+          error = 'Phone number cannot start with a hyphen or parenthesis.';
+        } else if (/-{2,}/.test(trimmed)) {
+          error = 'Phone number cannot contain consecutive hyphens.';
         } else {
           const digits = trimmed.replace(/\D/g, '');
           if (digits.length < 10) {
             error = 'Phone number must have at least 10 digits.';
           } else if (digits.length > 15) {
             error = 'Phone number cannot exceed 15 digits.';
-          } else if (!/^\+?[0-9\s\-()]{10,20}$/.test(trimmed)) {
-            error = 'Please enter a valid phone number format.';
+          } else if (!/^\+?[0-9][0-9\s\-()]{8,18}[0-9]$/.test(trimmed)) {
+            error = 'Please enter a valid phone number (e.g. +91 98765 43210).';
           }
         }
         break;
       }
 
       case 'org':
-        if (trimmed && trimmed.length < 2) {
-          error = 'Organization name must be at least 2 characters.';
-        } else if (trimmed && trimmed.length > 100) {
-          error = 'Organization name cannot exceed 100 characters.';
+        if (trimmed) {
+          if (trimmed.length < 2) {
+            error = 'Organization name must be at least 2 characters.';
+          } else if (trimmed.length > 100) {
+            error = 'Organization name cannot exceed 100 characters.';
+          } else if ((trimmed.match(/[a-zA-Z0-9]/g) || []).length < 2) {
+            error = 'Organization name must contain at least 2 letters or numbers.';
+          } else if (!/^[a-zA-Z0-9\s&.,'()/-]{2,100}$/.test(trimmed)) {
+            error = 'Special symbols like !@#$%^* are not allowed in organization name.';
+          }
         }
         break;
 
       case 'city':
-        if (trimmed && trimmed.length < 2) {
-          error = 'City / Region must be at least 2 characters.';
-        } else if (trimmed && !/^[a-zA-Z\s\,\.\-]{2,60}$/.test(trimmed)) {
-          error = 'Please enter a valid city or region (letters only).';
+        if (trimmed) {
+          if (trimmed.length < 2) {
+            error = 'City / Region must be at least 2 characters.';
+          } else if (trimmed.length > 60) {
+            error = 'City / Region cannot exceed 60 characters.';
+          } else if ((trimmed.match(/[a-zA-Z]/g) || []).length < 2) {
+            error = 'Please enter a valid city or region (at least 2 letters).';
+          } else if (!/^[a-zA-Z\s,.'-]{2,60}$/.test(trimmed)) {
+            error = 'Please enter a valid city or region (letters only).';
+          }
         }
         break;
 
       case 'message':
-        if (trimmed && trimmed.length > 1000) {
-          error = 'Additional notes cannot exceed 1000 characters.';
+        if (trimmed) {
+          if (trimmed.length > 1000) {
+            error = 'Additional notes cannot exceed 1000 characters.';
+          } else if (/[<>]/.test(trimmed)) {
+            error = 'HTML brackets < and > are not allowed in notes.';
+          } else if ((trimmed.match(/[a-zA-Z0-9]/g) || []).length < 3) {
+            error = 'Please enter meaningful notes (must contain words or numbers).';
+          }
         }
         break;
 
@@ -386,17 +512,151 @@ export default function PricingPage() {
     return errs;
   };
 
-  // Dedicated phone input sanitizer
+  // Full Name Handlers
+  const handleNameKeyDown = (e) => {
+    if (isControlKey(e)) return;
+    if (/[0-9]/.test(e.key)) {
+      e.preventDefault();
+      triggerModalWarning('Numbers are not allowed in Full Name.');
+      return;
+    }
+    if (!/^[a-zA-Z\s\.\'\-]$/.test(e.key)) {
+      e.preventDefault();
+      triggerModalWarning(`Special symbols (${e.key}) are not allowed in Full Name.`);
+      return;
+    }
+  };
+
+  const handleNameChange = (e) => {
+    const sanitized = e.target.value.replace(/[^a-zA-Z\s\.\'\-]/g, '');
+    setFormName(sanitized);
+    if (formTouched.name || formErrors.name) {
+      setFormErrors((prev) => ({ ...prev, name: validateField('name', sanitized) }));
+    }
+  };
+
+  // Organization Handlers
+  const handleOrgKeyDown = (e) => {
+    if (isControlKey(e)) return;
+    if (!/^[a-zA-Z0-9\s&.,'()/-]$/.test(e.key)) {
+      e.preventDefault();
+      triggerModalWarning(`Symbol (${e.key}) is not allowed in Organization name.`);
+      return;
+    }
+  };
+
+  const handleOrgChange = (e) => {
+    const sanitized = e.target.value.replace(/[^a-zA-Z0-9\s&.,'()/-]/g, '');
+    setFormOrg(sanitized);
+    if (formTouched.org || formErrors.org) {
+      setFormErrors((prev) => ({ ...prev, org: validateField('org', sanitized) }));
+    }
+  };
+
+  // Email Handlers
+  const handleEmailKeyDown = (e) => {
+    if (isControlKey(e)) return;
+    if (e.key === ' ') {
+      e.preventDefault();
+      triggerModalWarning('Spaces are not allowed in email address.');
+      return;
+    }
+    if (!/^[a-zA-Z0-9@._+-]$/.test(e.key)) {
+      e.preventDefault();
+      triggerModalWarning(`Symbol (${e.key}) is not allowed in email address.`);
+      return;
+    }
+  };
+
+  const handleEmailChange = (e) => {
+    const sanitized = e.target.value.replace(/[^a-zA-Z0-9@._+-]/g, '');
+    setFormEmail(sanitized);
+    if (formTouched.email || formErrors.email) {
+      setFormErrors((prev) => ({ ...prev, email: validateField('email', sanitized) }));
+    }
+  };
+
+  // Phone Handlers
+  const handlePhoneKeyDown = (e) => {
+    if (isControlKey(e)) return;
+    if (/[a-zA-Z]/.test(e.key)) {
+      e.preventDefault();
+      triggerModalWarning('Letters cannot be entered in phone number.');
+      return;
+    }
+    if (e.key === '+' && (e.target.selectionStart !== 0 || e.target.value.includes('+'))) {
+      e.preventDefault();
+      triggerModalWarning('+ country code can only be at the beginning.');
+      return;
+    }
+    if ((e.key === '-' || e.key === ')') && e.target.selectionStart === 0) {
+      e.preventDefault();
+      triggerModalWarning('Phone number cannot start with a hyphen or parenthesis.');
+      return;
+    }
+    if (!/^[0-9+\s\-()]$/.test(e.key)) {
+      e.preventDefault();
+      triggerModalWarning(`Symbol (${e.key}) is not allowed in phone number.`);
+      return;
+    }
+  };
+
   const handlePhoneChange = (e) => {
-    const val = e.target.value;
-    // Strip letters and disallowed characters in real time
-    const sanitized = val.replace(/[^0-9+\s\-()]/g, '');
-    setFormPhone(sanitized);
-    if (formTouched.phone) {
+    let val = e.target.value;
+    val = val.replace(/[^0-9+\s\-()]/g, '');
+    val = val.replace(/^[-)\s]+/, '');
+    if (val.includes('+')) {
+      const hasLeadingPlus = val.startsWith('+');
+      val = (hasLeadingPlus ? '+' : '') + val.replace(/\+/g, '');
+    }
+    val = val.replace(/-{2,}/g, '-');
+    setFormPhone(val);
+    if (formTouched.phone || formErrors.phone) {
       setFormErrors((prev) => ({
         ...prev,
-        phone: validateField('phone', sanitized)
+        phone: validateField('phone', val)
       }));
+    }
+  };
+
+  // City Handlers
+  const handleCityKeyDown = (e) => {
+    if (isControlKey(e)) return;
+    if (/[0-9]/.test(e.key)) {
+      e.preventDefault();
+      triggerModalWarning('Numbers are not allowed in City / Region.');
+      return;
+    }
+    if (!/^[a-zA-Z\s,.'-]$/.test(e.key)) {
+      e.preventDefault();
+      triggerModalWarning(`Special symbols (${e.key}) are not allowed in City.`);
+      return;
+    }
+  };
+
+  const handleCityChange = (e) => {
+    const sanitized = e.target.value.replace(/[^a-zA-Z\s,.'-]/g, '');
+    setFormCity(sanitized);
+    if (formTouched.city || formErrors.city) {
+      setFormErrors((prev) => ({ ...prev, city: validateField('city', sanitized) }));
+    }
+  };
+
+  // Notes / Message Handlers
+  const handleMessageKeyDown = (e) => {
+    if (isControlKey(e)) return;
+    if (e.key === '<' || e.key === '>') {
+      e.preventDefault();
+      triggerModalWarning('HTML brackets < and > are not allowed in notes.');
+      return;
+    }
+  };
+
+  const handleMessageChange = (e) => {
+    const sanitized = e.target.value.replace(/[<>]/g, '');
+    setFormMessage(sanitized);
+    if (formTouched.message || formErrors.message) {
+      setFormErrors((prev) => ({ ...prev, message: validateField('message', sanitized) }));
     }
   };
 
@@ -1190,20 +1450,50 @@ export default function PricingPage() {
                   </svg>
                 </div>
 
-                {/* Price Block */}
+                {/* Price Block (Dynamically changes with billingCycle) */}
                 <div className="pt-1">
-                  <div className="text-3xl font-black text-zinc-950 font-sans tracking-tight">
-                    ₹{Number(starterQPrice).toLocaleString('en-IN')}
-                  </div>
-                  <div className="text-xs font-medium text-zinc-600 mt-0.5">per quarter</div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs font-semibold text-zinc-600">
-                      ₹{Number(starterYPrice).toLocaleString('en-IN')} per year
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-3xl font-black text-zinc-950 font-sans tracking-tight transition-all">
+                      ₹{billingCycle === 'yearly'
+                        ? Number(starterYPrice).toLocaleString('en-IN')
+                        : Number(starterQPrice).toLocaleString('en-IN')}
                     </span>
-                    {starterDiscount > 0 && (
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                        Save {starterDiscount}%
+                    <span className="text-xs font-bold text-zinc-600">
+                      /{billingCycle === 'yearly' ? 'year' : 'quarter'}
+                    </span>
+                  </div>
+
+                  <div className="text-xs font-semibold text-zinc-600 mt-0.5">
+                    {billingCycle === 'yearly' ? (
+                      <span className="text-emerald-700 font-bold inline-flex items-center gap-1">
+                        <span>Billed annually</span>
+                        {starterDiscount > 0 && (
+                          <span className="text-[10px] font-black px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800">
+                            Save {starterDiscount}%
+                          </span>
+                        )}
                       </span>
+                    ) : (
+                      <span>Billed quarterly</span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-1">
+                    {billingCycle === 'yearly' ? (
+                      <span className="text-xs font-medium text-zinc-500">
+                        Equivalent to ₹{Math.round(starterYPrice / 4).toLocaleString('en-IN')}/quarter
+                      </span>
+                    ) : (
+                      <>
+                        <span className="text-xs font-semibold text-zinc-500">
+                          ₹{Number(starterYPrice).toLocaleString('en-IN')} billed annually
+                        </span>
+                        {starterDiscount > 0 && (
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                            Save {starterDiscount}%
+                          </span>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1229,7 +1519,7 @@ export default function PricingPage() {
                       onClick={() => handleSelectPlan('starter', starterPlan?.name || 'Organizer Starter')}
                       className="w-full py-2.5 px-4 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-black text-xs font-black transition-all text-center flex items-center justify-center gap-1.5 shadow-md shadow-amber-400/25 active:scale-[0.99] cursor-pointer"
                     >
-                      <span>Choose {starterPlan?.name || 'Starter Plan'}</span>
+                      <span>Choose Starter Plan ({billingCycle === 'yearly' ? 'Annual' : 'Quarterly'})</span>
                     </button>
                   )}
                 </div>
@@ -1331,20 +1621,50 @@ export default function PricingPage() {
                   </svg>
                 </div>
 
-                {/* Price Block */}
+                {/* Price Block (Dynamically changes with billingCycle) */}
                 <div className="pt-1">
-                  <div className="text-3xl font-black text-zinc-950 font-sans tracking-tight">
-                    ₹{Number(enterpriseQPrice).toLocaleString('en-IN')}
-                  </div>
-                  <div className="text-xs font-medium text-zinc-600 mt-0.5">per quarter</div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs font-semibold text-zinc-600">
-                      ₹{Number(enterpriseYPrice).toLocaleString('en-IN')} per year
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-3xl font-black text-zinc-950 font-sans tracking-tight transition-all">
+                      ₹{billingCycle === 'yearly'
+                        ? Number(enterpriseYPrice).toLocaleString('en-IN')
+                        : Number(enterpriseQPrice).toLocaleString('en-IN')}
                     </span>
-                    {enterpriseDiscount > 0 && (
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                        Save {enterpriseDiscount}%
+                    <span className="text-xs font-bold text-zinc-600">
+                      /{billingCycle === 'yearly' ? 'year' : 'quarter'}
+                    </span>
+                  </div>
+
+                  <div className="text-xs font-semibold text-zinc-600 mt-0.5">
+                    {billingCycle === 'yearly' ? (
+                      <span className="text-emerald-700 font-bold inline-flex items-center gap-1">
+                        <span>Billed annually</span>
+                        {enterpriseDiscount > 0 && (
+                          <span className="text-[10px] font-black px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800">
+                            Save {enterpriseDiscount}%
+                          </span>
+                        )}
                       </span>
+                    ) : (
+                      <span>Billed quarterly</span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-1">
+                    {billingCycle === 'yearly' ? (
+                      <span className="text-xs font-medium text-zinc-500">
+                        Equivalent to ₹{Math.round(enterpriseYPrice / 4).toLocaleString('en-IN')}/quarter
+                      </span>
+                    ) : (
+                      <>
+                        <span className="text-xs font-semibold text-zinc-500">
+                          ₹{Number(enterpriseYPrice).toLocaleString('en-IN')} billed annually
+                        </span>
+                        {enterpriseDiscount > 0 && (
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                            Save {enterpriseDiscount}%
+                          </span>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1363,7 +1683,7 @@ export default function PricingPage() {
                       onClick={() => handleSelectPlan('enterprise', enterprisePlan?.name || 'Organizer Enterprise')}
                       className="w-full py-2.5 px-4 rounded-xl border-2 border-zinc-950 text-zinc-950 hover:bg-zinc-950 hover:text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
                     >
-                      <span>Choose {enterprisePlan?.name || 'Enterprise Plan'}</span>
+                      <span>Choose {enterprisePlan?.name || 'Enterprise Plan'} ({billingCycle === 'yearly' ? 'Annual' : 'Quarterly'})</span>
                     </button>
                   )}
                 </div>
@@ -1576,24 +1896,35 @@ export default function PricingPage() {
                 Corporate email domains (@yourcompany.com) are free forever. Personal email domains (@gmail, etc) pay a nominal ₹1,499 one-time registration.
               </p>
 
-              <form onSubmit={handleCheckEmail} className="mt-6 flex flex-col sm:flex-row gap-2 max-w-lg mx-auto">
-                <input
-                  type="email"
-                  required
-                  placeholder="Enter your work email (e.g. name@acmeexpos.com)..."
-                  value={emailCheckInput}
-                  onChange={(e) => {
-                    setEmailCheckInput(e.target.value);
-                    if (!e.target.value) setEmailCheckResult(null);
-                  }}
-                  className="flex-1 px-4 py-3 rounded-xl bg-white border border-zinc-300 text-zinc-900 placeholder-zinc-400 text-xs focus:outline-none focus:border-[#FFCC00] shadow-2xs"
-                />
-                <button
-                  type="submit"
-                  className="px-6 py-3 rounded-xl bg-zinc-900 hover:bg-black text-white font-extrabold text-xs transition-all cursor-pointer shrink-0 shadow-sm"
-                >
-                  Verify Eligibility
-                </button>
+              <form onSubmit={handleCheckEmail} noValidate className="mt-6 max-w-lg mx-auto">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="email"
+                    required
+                    placeholder="Enter your work email (e.g. name@acmeexpos.com)..."
+                    value={emailCheckInput}
+                    onKeyDown={handleEmailCheckKeyDown}
+                    onChange={handleEmailCheckChange}
+                    className={`flex-1 px-4 py-3 rounded-xl bg-white border text-zinc-900 placeholder-zinc-400 text-xs focus:outline-none transition-all shadow-2xs ${
+                      emailCheckError
+                        ? 'border-rose-500 focus:border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/10'
+                        : 'border-zinc-300 focus:border-[#FFCC00]'
+                    }`}
+                  />
+                  <button
+                    type="submit"
+                    className="px-6 py-3 rounded-xl bg-zinc-900 hover:bg-black text-white font-extrabold text-xs transition-all cursor-pointer shrink-0 shadow-sm hover:scale-[1.02] active:scale-98"
+                  >
+                    Verify Eligibility
+                  </button>
+                </div>
+
+                {emailCheckError && (
+                  <div className="mt-2.5 p-2 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center justify-center gap-2 animate-fadeIn">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                    <span>{emailCheckError}</span>
+                  </div>
+                )}
               </form>
 
               {emailCheckResult && (
@@ -1959,7 +2290,8 @@ export default function PricingPage() {
               </div>
               <button
                 onClick={() => setIsPayModalOpen(false)}
-                className="p-1 rounded-xl text-zinc-400 hover:text-zinc-700 cursor-pointer"
+                className="p-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900 border border-zinc-200/80 hover:border-zinc-300 transition-all duration-200 cursor-pointer hover:rotate-90 active:scale-95 flex items-center justify-center shadow-xs"
+                title="Close"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -2070,21 +2402,55 @@ export default function PricingPage() {
                 <p className="text-xs text-zinc-500 mt-0.5">
                   {selectedGrowthService
                     ? `Request service: ${selectedGrowthService}`
-                    : `Selected cycle: ${
+                    : `Selected plan pricing: ₹${Number(
                         selectedPlanForModal.cycle === 'yearly'
-                          ? `Annual${
-                              (selectedPlanForModal.id === 'enterprise' ? enterpriseDiscount : starterDiscount) > 0
-                                ? ` (Save ${selectedPlanForModal.id === 'enterprise' ? enterpriseDiscount : starterDiscount}%)`
-                                : ''
-                            }`
-                          : 'Quarterly'
-                      }`}
+                          ? (selectedPlanForModal.id === 'enterprise' ? enterpriseYPrice : starterYPrice)
+                          : (selectedPlanForModal.id === 'enterprise' ? enterpriseQPrice : starterQPrice)
+                      ).toLocaleString('en-IN')} / ${selectedPlanForModal.cycle === 'yearly' ? 'year' : 'quarter'}`}
                 </p>
+
+                {/* Interactive Billing Cycle Toggle inside Modal */}
+                {!selectedGrowthService && selectedPlanForModal.id !== 'free' && (
+                  <div className="flex items-center gap-2 pt-2">
+                    <span className="text-[11px] font-bold text-zinc-500">Billing Cycle:</span>
+                    <div className="inline-flex items-center p-0.5 rounded-lg bg-zinc-100 border border-zinc-200 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedPlanForModal((prev) => ({ ...prev, cycle: 'quarterly' }));
+                          setBillingCycle('quarterly');
+                        }}
+                        className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                          selectedPlanForModal.cycle === 'quarterly'
+                            ? 'bg-white text-zinc-950 shadow-xs'
+                            : 'text-zinc-500 hover:text-zinc-900'
+                        }`}
+                      >
+                        Quarterly (₹{Number(selectedPlanForModal.id === 'enterprise' ? enterpriseQPrice : starterQPrice).toLocaleString('en-IN')})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedPlanForModal((prev) => ({ ...prev, cycle: 'yearly' }));
+                          setBillingCycle('yearly');
+                        }}
+                        className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                          selectedPlanForModal.cycle === 'yearly'
+                            ? 'bg-[#FFCC00] text-black shadow-xs font-black'
+                            : 'text-zinc-500 hover:text-zinc-900'
+                        }`}
+                      >
+                        Annual (Save {selectedPlanForModal.id === 'enterprise' ? enterpriseDiscount : starterDiscount}%)
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-xl text-zinc-400 hover:text-zinc-700 cursor-pointer"
+                className="p-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900 border border-zinc-200/80 hover:border-zinc-300 transition-all duration-200 cursor-pointer hover:rotate-90 active:scale-95 flex items-center justify-center shadow-xs"
+                title="Close dialog"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -2093,29 +2459,35 @@ export default function PricingPage() {
             <form onSubmit={handleSubmitInquiry} noValidate className="space-y-4 text-xs">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block font-semibold text-zinc-800 mb-1">Your Full Name *</label>
+                  <label className="font-semibold text-zinc-800 mb-1 flex items-center justify-between">
+                    <span>Your Full Name *</span>
+                    {Boolean(user?.name) && (
+                      <span className="text-[10px] text-zinc-400 font-normal flex items-center gap-1">
+                        <Lock className="h-2.5 w-2.5 text-zinc-400" /> Account Verified
+                      </span>
+                    )}
+                  </label>
                   <input
                     type="text"
                     required
+                    disabled={Boolean(user?.name)}
                     placeholder="e.g. Rajesh Sharma"
                     value={formName}
-                    onChange={(e) => {
-                      setFormName(e.target.value);
-                      if (formTouched.name) {
-                        setFormErrors((prev) => ({ ...prev, name: validateField('name', e.target.value) }));
-                      }
-                    }}
+                    onKeyDown={handleNameKeyDown}
+                    onChange={handleNameChange}
                     onBlur={() => {
                       setFormTouched((prev) => ({ ...prev, name: true }));
                       setFormErrors((prev) => ({ ...prev, name: validateField('name', formName) }));
                     }}
-                    className={`w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border text-zinc-900 focus:bg-white focus:outline-none transition-colors ${
-                      formErrors.name
-                        ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/20'
-                        : 'border-zinc-300 focus:border-[#FFCC00]'
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-zinc-900 transition-colors ${
+                      Boolean(user?.name)
+                        ? 'bg-zinc-100 text-zinc-600 border-zinc-200 cursor-not-allowed select-none opacity-85'
+                        : formErrors.name
+                        ? 'bg-zinc-50 border-rose-500 focus:bg-white focus:outline-none focus:border-rose-500 ring-1 ring-rose-500/20'
+                        : 'bg-zinc-50 border-zinc-300 focus:bg-white focus:outline-none focus:border-[#FFCC00]'
                     }`}
                   />
-                  {formErrors.name && (
+                  {formErrors.name && !Boolean(user?.name) && (
                     <p className="text-[11px] font-semibold text-rose-600 mt-1 flex items-center gap-1">
                       <AlertCircle className="h-3 w-3 shrink-0" />
                       <span>{formErrors.name}</span>
@@ -2129,12 +2501,8 @@ export default function PricingPage() {
                     type="text"
                     placeholder="e.g. Acme Trade Fairs Pvt Ltd"
                     value={formOrg}
-                    onChange={(e) => {
-                      setFormOrg(e.target.value);
-                      if (formTouched.org) {
-                        setFormErrors((prev) => ({ ...prev, org: validateField('org', e.target.value) }));
-                      }
-                    }}
+                    onKeyDown={handleOrgKeyDown}
+                    onChange={handleOrgChange}
                     onBlur={() => {
                       setFormTouched((prev) => ({ ...prev, org: true }));
                       setFormErrors((prev) => ({ ...prev, org: validateField('org', formOrg) }));
@@ -2156,29 +2524,35 @@ export default function PricingPage() {
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block font-semibold text-zinc-800 mb-1">Email Address *</label>
+                  <label className="font-semibold text-zinc-800 mb-1 flex items-center justify-between">
+                    <span>Email Address *</span>
+                    {Boolean(user?.email) && (
+                      <span className="text-[10px] text-zinc-400 font-normal flex items-center gap-1">
+                        <Lock className="h-2.5 w-2.5 text-zinc-400" /> Account Verified
+                      </span>
+                    )}
+                  </label>
                   <input
                     type="email"
                     required
+                    disabled={Boolean(user?.email)}
                     placeholder="name@company.com"
                     value={formEmail}
-                    onChange={(e) => {
-                      setFormEmail(e.target.value);
-                      if (formTouched.email) {
-                        setFormErrors((prev) => ({ ...prev, email: validateField('email', e.target.value) }));
-                      }
-                    }}
+                    onKeyDown={handleEmailKeyDown}
+                    onChange={handleEmailChange}
                     onBlur={() => {
                       setFormTouched((prev) => ({ ...prev, email: true }));
                       setFormErrors((prev) => ({ ...prev, email: validateField('email', formEmail) }));
                     }}
-                    className={`w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border text-zinc-900 focus:bg-white focus:outline-none transition-colors ${
-                      formErrors.email
-                        ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/20'
-                        : 'border-zinc-300 focus:border-[#FFCC00]'
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-zinc-900 transition-colors ${
+                      Boolean(user?.email)
+                        ? 'bg-zinc-100 text-zinc-600 border-zinc-200 cursor-not-allowed select-none opacity-85'
+                        : formErrors.email
+                        ? 'bg-zinc-50 border-rose-500 focus:bg-white focus:outline-none focus:border-rose-500 ring-1 ring-rose-500/20'
+                        : 'bg-zinc-50 border-zinc-300 focus:bg-white focus:outline-none focus:border-[#FFCC00]'
                     }`}
                   />
-                  {formErrors.email && (
+                  {formErrors.email && !Boolean(user?.email) && (
                     <p className="text-[11px] font-semibold text-rose-600 mt-1 flex items-center gap-1">
                       <AlertCircle className="h-3 w-3 shrink-0" />
                       <span>{formErrors.email}</span>
@@ -2187,24 +2561,35 @@ export default function PricingPage() {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-zinc-800 mb-1">Phone / WhatsApp *</label>
+                  <label className="font-semibold text-zinc-800 mb-1 flex items-center justify-between">
+                    <span>Phone / WhatsApp *</span>
+                    {Boolean(user?.phone) && (
+                      <span className="text-[10px] text-zinc-400 font-normal flex items-center gap-1">
+                        <Lock className="h-2.5 w-2.5 text-zinc-400" /> Account Verified
+                      </span>
+                    )}
+                  </label>
                   <input
                     type="tel"
                     required
+                    disabled={Boolean(user?.phone)}
                     placeholder="+91 98765 43210"
                     value={formPhone}
+                    onKeyDown={handlePhoneKeyDown}
                     onChange={handlePhoneChange}
                     onBlur={() => {
                       setFormTouched((prev) => ({ ...prev, phone: true }));
                       setFormErrors((prev) => ({ ...prev, phone: validateField('phone', formPhone) }));
                     }}
-                    className={`w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border text-zinc-900 focus:bg-white focus:outline-none transition-colors ${
-                      formErrors.phone
-                        ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/20'
-                        : 'border-zinc-300 focus:border-[#FFCC00]'
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-zinc-900 transition-colors ${
+                      Boolean(user?.phone)
+                        ? 'bg-zinc-100 text-zinc-600 border-zinc-200 cursor-not-allowed select-none opacity-85'
+                        : formErrors.phone
+                        ? 'bg-zinc-50 border-rose-500 focus:bg-white focus:outline-none focus:border-rose-500 ring-1 ring-rose-500/20'
+                        : 'bg-zinc-50 border-zinc-300 focus:bg-white focus:outline-none focus:border-[#FFCC00]'
                     }`}
                   />
-                  {formErrors.phone && (
+                  {formErrors.phone && !Boolean(user?.phone) && (
                     <p className="text-[11px] font-semibold text-rose-600 mt-1 flex items-center gap-1">
                       <AlertCircle className="h-3 w-3 shrink-0" />
                       <span>{formErrors.phone}</span>
@@ -2220,12 +2605,8 @@ export default function PricingPage() {
                     type="text"
                     placeholder="e.g. Mumbai, New Delhi, Bengaluru"
                     value={formCity}
-                    onChange={(e) => {
-                      setFormCity(e.target.value);
-                      if (formTouched.city) {
-                        setFormErrors((prev) => ({ ...prev, city: validateField('city', e.target.value) }));
-                      }
-                    }}
+                    onKeyDown={handleCityKeyDown}
+                    onChange={handleCityChange}
                     onBlur={() => {
                       setFormTouched((prev) => ({ ...prev, city: true }));
                       setFormErrors((prev) => ({ ...prev, city: validateField('city', formCity) }));
@@ -2274,12 +2655,8 @@ export default function PricingPage() {
                   maxLength={1000}
                   placeholder="Tell us about your upcoming exhibitions, footfall expectations, or requested top-up channels..."
                   value={formMessage}
-                  onChange={(e) => {
-                    setFormMessage(e.target.value);
-                    if (formTouched.message) {
-                      setFormErrors((prev) => ({ ...prev, message: validateField('message', e.target.value) }));
-                    }
-                  }}
+                  onKeyDown={handleMessageKeyDown}
+                  onChange={handleMessageChange}
                   onBlur={() => {
                     setFormTouched((prev) => ({ ...prev, message: true }));
                     setFormErrors((prev) => ({ ...prev, message: validateField('message', formMessage) }));
@@ -2297,6 +2674,14 @@ export default function PricingPage() {
                   </p>
                 )}
               </div>
+
+              {/* Real-time Field Warning Alert Banner */}
+              {modalFieldWarning && (
+                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] font-semibold flex items-center gap-2 animate-fadeIn transition-all">
+                  <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                  <span>{modalFieldWarning}</span>
+                </div>
+              )}
 
               <div className="p-3 rounded-xl bg-zinc-50 border border-zinc-200 text-[11px] text-zinc-600 flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />

@@ -933,7 +933,7 @@ export default function EventsDirectoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-zinc-900 font-sans antialiased selection:bg-[#FFCC00] selection:text-zinc-950 pb-24">
+    <div className="min-h-screen bg-[#F8F9FA] text-zinc-900 font-sans antialiased selection:bg-[#FFCC00] selection:text-zinc-950 pb-10 sm:pb-12">
       {/* Universal Navbar */}
       <Navbar solid={true} />
 
@@ -1759,7 +1759,7 @@ export default function EventsDirectoryPage() {
         {/* PAGINATION CONTROLS (Modern & Sleek)                                      */}
         {/* ========================================================================= */}
         {totalPages > 1 && (
-          <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-zinc-200">
+          <div className="pt-3.5 sm:pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-zinc-200">
             <div className="text-xs text-zinc-500 font-medium">
               Page <strong className="text-zinc-950 font-bold">{currentPage}</strong> of{' '}
               <strong className="text-zinc-950 font-bold">{totalPages}</strong> ({filteredEvents.length.toLocaleString()} total exhibitions)
@@ -1773,7 +1773,7 @@ export default function EventsDirectoryPage() {
                   window.scrollTo({ top: 380, behavior: 'smooth' });
                 }}
                 disabled={currentPage === 1}
-                className="px-3.5 py-2 rounded-xl border border-zinc-200 bg-white text-xs font-bold text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1 shadow-2xs transition-all"
+                className="px-3 py-1.5 rounded-xl border border-zinc-200 bg-white text-xs font-bold text-zinc-700 hover:bg-[#FFCC00] hover:text-zinc-950 hover:border-[#FFCC00] hover:shadow-md hover:shadow-amber-400/20 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-zinc-700 disabled:hover:border-zinc-200 disabled:hover:translate-y-0 disabled:hover:shadow-none cursor-pointer flex items-center gap-1 shadow-2xs transition-all duration-200"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
                 <span>Prev</span>
@@ -1794,10 +1794,10 @@ export default function EventsDirectoryPage() {
                           setCurrentPage(pageNum);
                           window.scrollTo({ top: 380, behavior: 'smooth' });
                         }}
-                        className={`h-9 w-9 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                        className={`h-8 w-8 rounded-xl text-xs font-black transition-all duration-200 cursor-pointer ${
                           currentPage === pageNum
-                            ? 'bg-zinc-950 text-[#FFCC00] shadow-md shadow-zinc-950/20'
-                            : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300'
+                            ? 'bg-zinc-950 text-[#FFCC00] shadow-md shadow-zinc-950/20 hover:bg-black hover:scale-105 hover:-translate-y-0.5 hover:ring-2 hover:ring-[#FFCC00]/50 active:scale-95'
+                            : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-[#FFCC00] hover:text-zinc-950 hover:border-[#FFCC00] hover:shadow-md hover:shadow-amber-400/20 hover:-translate-y-0.5 active:translate-y-0 active:scale-95'
                         }`}
                       >
                         {pageNum}
@@ -1813,7 +1813,7 @@ export default function EventsDirectoryPage() {
                   window.scrollTo({ top: 380, behavior: 'smooth' });
                 }}
                 disabled={currentPage === totalPages}
-                className="px-3.5 py-2 rounded-xl border border-zinc-200 bg-white text-xs font-bold text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1 shadow-2xs transition-all"
+                className="px-3 py-1.5 rounded-xl border border-zinc-200 bg-white text-xs font-bold text-zinc-700 hover:bg-[#FFCC00] hover:text-zinc-950 hover:border-[#FFCC00] hover:shadow-md hover:shadow-amber-400/20 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-zinc-700 disabled:hover:border-zinc-200 disabled:hover:translate-y-0 disabled:hover:shadow-none cursor-pointer flex items-center gap-1 shadow-2xs transition-all duration-200"
               >
                 <span>Next</span>
                 <ChevronRight className="h-3.5 w-3.5" />
@@ -1825,18 +1825,18 @@ export default function EventsDirectoryPage() {
         {/* ========================================================================= */}
         {/* ORGANIZER CTA CARD (Eye-Catchy Dark Gradient Glass)                       */}
         {/* ========================================================================= */}
-        <div className="relative bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 border border-zinc-800 rounded-3xl p-8 sm:p-10 shadow-2xl text-white overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="relative bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 border border-zinc-800 rounded-2xl p-4 sm:p-5 md:py-4 md:px-6 shadow-xl text-white overflow-hidden flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Ambient Glow */}
-          <div className="absolute -right-24 -top-24 w-80 h-80 bg-[#FFCC00]/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -right-20 -top-20 w-60 h-60 bg-[#FFCC00]/15 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="space-y-2 text-center md:text-left relative z-10 max-w-xl">
-            <span className="px-3 py-1 rounded-full text-xs font-black bg-[#FFCC00] text-zinc-950 inline-block shadow-md">
+          <div className="space-y-1 text-center md:text-left relative z-10 max-w-xl">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[#FFCC00] text-zinc-950 inline-block shadow-xs">
               ★ For Exhibition Organizers &amp; Venue Owners
             </span>
-            <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+            <h3 className="text-base sm:text-lg font-black text-white tracking-tight">
               Are you organizing a trade show or B2B expo?
             </h3>
-            <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed font-normal">
+            <p className="text-xs text-zinc-400 leading-normal font-normal">
               List your exhibition on VisitExpo to showcase your floorplan, capture attendee pre-registrations, and connect directly with verified exhibitors worldwide.
             </p>
           </div>
@@ -1844,10 +1844,10 @@ export default function EventsDirectoryPage() {
           <div className="flex items-center gap-3 shrink-0 relative z-10">
             <Link
               href="/login?role=organizer&signup=true"
-              className="px-6 py-3.5 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-black text-xs sm:text-sm transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-black text-xs sm:text-sm transition-all shadow-md hover:shadow-lg hover:scale-102 active:scale-98 flex items-center gap-1.5 cursor-pointer"
             >
               <span>List or Claim Your Expo</span>
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
         </div>
