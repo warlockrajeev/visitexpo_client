@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 const BACKEND_API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.SERVER_URL ||

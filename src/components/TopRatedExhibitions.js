@@ -98,6 +98,7 @@ export default function TopRatedExhibitions({ events = [] }) {
                       'https://visitexpo.in/wp-content/uploads/2026/08/Refining-India-2026.jpg'
                     }
                     alt={evt.title}
+                    loading="lazy"
                     className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                     onError={(e) => {
                       e.currentTarget.src =

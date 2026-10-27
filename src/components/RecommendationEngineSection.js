@@ -740,6 +740,7 @@ export default function RecommendationEngineSection({
                     <img
                       src={imageUrl}
                       alt={ev.title}
+                      loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       onError={(e) => {
                         e.currentTarget.src = DEFAULT_BANNER;

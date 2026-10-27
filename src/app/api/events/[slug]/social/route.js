@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * @file api/events/[slug]/social/route.js
  * @description API route to manage Interest and Follower systems for exhibitions:

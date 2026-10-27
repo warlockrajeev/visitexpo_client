@@ -42,7 +42,9 @@ let cachedData = null;
 let cacheTime = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-export async function GET() {
+export const dynamic = 'force-dynamic';
+
+export async function GET(request) {
   const now = Date.now();
   if (cachedData && now - cacheTime < CACHE_TTL) {
     return NextResponse.json({ success: true, data: cachedData });

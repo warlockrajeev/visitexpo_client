@@ -39,7 +39,10 @@ import {
   MessageSquare,
   HelpCircle,
   Clock,
-  Check
+  Check,
+  Eye,
+  MapPin,
+  Calendar
 } from 'lucide-react';
 
 const API_URL =
@@ -61,7 +64,7 @@ const FALLBACK_EXHIBITORS = [
     countryFlag: '🇮🇳',
     city: 'Hyderabad, Telangana',
     industry: 'Aerospace, Defence & Security',
-    logo: 'https://images.unsplash.com/photo-1541888946425-d0fbb186156a?w=150&auto=format&fit=crop&q=80',
+    logo: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=150&auto=format&fit=crop&q=80',
     description: 'Premier aerospace and defence manufacturing powerhouse. Specializing in tactical unmanned aerial systems, composite aerostructures, missile integration, and advanced robotics.',
     products: ['Tactical Drones & UAVs', 'Composite Aerostructures', 'Industrial Robotics', 'C4I Command Systems', 'Airframe Assemblies'],
     attendanceType: 'hybrid',
@@ -83,7 +86,7 @@ const FALLBACK_EXHIBITORS = [
     countryFlag: '🇮🇳',
     city: 'Mumbai, Maharashtra',
     industry: 'Manufacturing & Heavy Engineering',
-    logo: 'https://images.unsplash.com/photo-1504917599217-d4dc5ebe6122?w=150&auto=format&fit=crop&q=80',
+    logo: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=150&auto=format&fit=crop&q=80',
     description: 'Global engineering conglomerate delivering custom critical process plant equipment, high-pressure vessels, cryogenic storage, and modular engineering systems.',
     products: ['Pressure Vessels', 'Nuclear Piping Modules', 'Heat Exchangers', 'Cracker Columns', 'Hydroprocessing Reactors'],
     attendanceType: 'hybrid',
@@ -105,7 +108,7 @@ const FALLBACK_EXHIBITORS = [
     countryFlag: '🇮🇳',
     city: 'Jamnagar & Mumbai',
     industry: 'Renewable Energy, Solar & CleanTech',
-    logo: 'https://images.unsplash.com/photo-1509391365360-2e959784a276?w=150&auto=format&fit=crop&q=80',
+    logo: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=150&auto=format&fit=crop&q=80',
     description: 'Giga-factory producer of ultra-efficient heterojunction solar photovoltaic panels, utility-scale battery energy storage systems (BESS), and green hydrogen electrolysers.',
     products: ['Heterojunction Solar PV', 'BESS Grid Batteries', 'Green Hydrogen Electrolysers', 'Smart Solar Inverters'],
     attendanceType: 'hybrid',
@@ -459,7 +462,7 @@ const FALLBACK_EXHIBITORS = [
     countryFlag: '🇦🇪',
     city: 'Dubai, UAE',
     industry: 'Building, Construction & Smart Infrastructure',
-    logo: 'https://images.unsplash.com/photo-1541888946425-d0fbb186156a?w=150&auto=format&fit=crop&q=80',
+    logo: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=150&auto=format&fit=crop&q=80',
     description: 'Largest industrial enterprise in the UAE outside oil & gas. Manufacturer of ultra-pure primary aluminium, CelestiAL solar-powered alloys, and architectural extrusion billets.',
     products: ['CelestiAL Solar Aluminium', 'Architectural Extrusion Billets', 'EV Chassis Foundry Alloys', 'High-Conductivity Busbars'],
     attendanceType: 'hybrid',
@@ -566,21 +569,149 @@ const COUNTRY_OPTIONS = [
   'Japan',
   'France',
   'Switzerland',
-  'South Korea'
 ];
 
+// Exhibitor Logo component with corrected text size and elegant fallback when image is not visible
+function ExhibitorLogo({ src, name, className = 'h-12 w-12' }) {
+  const [imgFailed, setImgFailed] = useState(false);
+
+  useEffect(() => {
+    setImgFailed(false);
+  }, [src]);
+
+  // Extract short legible initials or brand name to fit cleanly inside the logo container
+  const getShortLabel = (fullName) => {
+    if (!fullName) return 'EX';
+    // Match common acronym in parentheses e.g. (TASL), (L&T), (BHEL), (KBL)
+    const parenMatch = fullName.match(/\(([^)]+)\)/);
+    if (parenMatch && parenMatch[1] && parenMatch[1].length <= 6) {
+      return parenMatch[1];
+    }
+    // Otherwise use first word of company name (e.g. Tata, Larsen, Reliance, Siemens)
+    const firstWord = fullName.trim().split(/\s+/)[0];
+    return firstWord;
+  };
+
+  const shortLabel = getShortLabel(name);
+
+  // Determine ideal text size based on character count so it never overflows or looks oversized
+  const getTextSizeClass = (str) => {
+    const len = str?.length || 0;
+    if (len <= 4) return 'text-[11px] font-black tracking-wide';
+    if (len <= 6) return 'text-[10px] font-black tracking-tight leading-3';
+    return 'text-[9px] font-bold tracking-tight leading-[11px]';
+  };
+
+  if (imgFailed || !src) {
+    return (
+      <div
+        className={`${className} rounded-xl bg-secondary/90 border border-border/80 shadow-xs shrink-0 flex items-center justify-center p-1 text-center select-none overflow-hidden`}
+        title={name}
+      >
+        <span className={`${getTextSizeClass(shortLabel)} uppercase text-foreground/85 line-clamp-2 break-all text-center`}>
+          {shortLabel}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={shortLabel}
+      onError={() => setImgFailed(true)}
+      loading="lazy"
+      className={`${className} rounded-xl object-cover border border-border shadow-xs shrink-0 text-[9px] leading-[11px] font-bold text-center text-muted-foreground overflow-hidden p-0.5`}
+    />
+  );
+}
+
+// Validate B2B inquiry message content, characters, and spam protection
+function validateInquiryMessage(text) {
+  if (!text || typeof text !== 'string') {
+    return { isValid: false, error: 'Message is required.', code: 'EMPTY' };
+  }
+  const trimmed = text.trim();
+  const len = trimmed.length;
+
+  if (len === 0) {
+    return { isValid: false, error: 'Message cannot be empty.', code: 'EMPTY' };
+  }
+
+  // 1. Check for HTML tags or script injection
+  if (/<[a-z][\s\S]*>/i.test(trimmed)) {
+    return { isValid: false, error: 'HTML tags and script code are not allowed.', code: 'HTML_TAGS' };
+  }
+
+  // 2. Check for excessive repeated characters (e.g. aaaaa, ......, !!!!!!!)
+  if (/(.)\1{4,}/.test(trimmed)) {
+    return { isValid: false, error: 'Excessive repeated characters detected. Please enter genuine text.', code: 'REPEATED_CHARS' };
+  }
+
+  // 3. Check for pure symbols or gibberish (must have at least 60% alphabetic of non-space chars)
+  const nonSpace = trimmed.replace(/\s+/g, '');
+  const letters = trimmed.match(/[a-zA-Z]/g) || [];
+  if (letters.length === 0 || (letters.length / nonSpace.length) < 0.6) {
+    return {
+      isValid: false,
+      error: 'Message must consist of genuine text and words, not symbols or random characters.',
+      code: 'SYMBOL_SPAM'
+    };
+  }
+
+  // 4. Check character count bounds
+  if (len < 100) {
+    return {
+      isValid: false,
+      error: `Add at least ${100 - len} more character${100 - len === 1 ? '' : 's'} to reach 100.`,
+      code: 'TOO_SHORT'
+    };
+  }
+  if (len > 300) {
+    return {
+      isValid: false,
+      error: `Exceeds 300-character maximum limit by ${len - 300} characters.`,
+      code: 'TOO_LONG'
+    };
+  }
+
+  // 5. Check for word count (minimum 10 words)
+  const words = trimmed.split(/\s+/).filter((w) => /[a-zA-Z]{2,}/.test(w));
+  if (words.length < 10) {
+    return {
+      isValid: false,
+      error: `Please write a complete enquiry with at least 10 words (currently ${words.length}).`,
+      code: 'FEW_WORDS'
+    };
+  }
+
+  // 6. Check for repetitive words spam (e.g. "quote quote quote quote...")
+  const uniqueWords = new Set(words.map((w) => w.toLowerCase()));
+  if (uniqueWords.size < Math.min(6, Math.floor(words.length * 0.4))) {
+    return {
+      isValid: false,
+      error: 'Please avoid repetitive words and write a meaningful B2B enquiry.',
+      code: 'REPETITIVE_WORDS'
+    };
+  }
+
+  return { isValid: true, error: null, code: 'VALID' };
+}
+
 export default function ExhibitorDiscoveryPage() {
-  const { user, accessToken } = useAuth();
+  const { user, accessToken, updateUser } = useAuth();
 
   // All exhibitors loaded from API (fallback to curated list)
   const [exhibitors, setExhibitors] = useState(FALLBACK_EXHIBITORS);
   const [loading, setLoading] = useState(true);
 
-  // User credits (default to 100 or user.credits)
+  // User credits (default to saved localStorage credits, user.credits, or 100)
   const [userCredits, setUserCredits] = useState(() => {
     if (typeof window !== 'undefined') {
       const savedCredits = localStorage.getItem('visitexpo_organizer_credits');
-      if (savedCredits !== null) return parseInt(savedCredits, 10);
+      if (savedCredits !== null && !isNaN(parseInt(savedCredits, 10))) {
+        return parseInt(savedCredits, 10);
+      }
     }
     return user?.credits !== undefined ? user.credits : 100;
   });
@@ -607,6 +738,10 @@ export default function ExhibitorDiscoveryPage() {
   const [inquiryType, setInquiryType] = useState('B2B Trade Partnership');
   const [sendingInquiry, setSendingInquiry] = useState(false);
 
+  // Details Modal State
+  const [detailsExhibitor, setDetailsExhibitor] = useState(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+
   // Toast / Feedback State
   const [toastMessage, setToastMessage] = useState(null);
   const [toastType, setToastType] = useState('success');
@@ -622,13 +757,113 @@ export default function ExhibitorDiscoveryPage() {
     return [];
   });
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
+  const [historyFilter, setHistoryFilter] = useState('all'); // 'all', 'india', 'global'
+
+  // Summary Metrics & Filtered Inquiries for History Modal
+  const totalSentCount = sentInquiries.length;
+  const totalCreditsSpent = totalSentCount * 10;
+  const indianInquiriesCount = useMemo(
+    () => sentInquiries.filter((inq) => inq.country?.toLowerCase().includes('india') || inq.countryFlag === '🇮🇳').length,
+    [sentInquiries]
+  );
+  const globalInquiriesCount = totalSentCount - indianInquiriesCount;
+
+  const filteredSentInquiries = useMemo(() => {
+    return sentInquiries.filter((inq) => {
+      // 1. Keyword search filter
+      if (historySearchQuery.trim()) {
+        const q = historySearchQuery.toLowerCase().trim();
+        const matchesName = inq.exhibitorName?.toLowerCase().includes(q);
+        const matchesEmail = inq.exhibitorEmail?.toLowerCase().includes(q);
+        const matchesIndustry = inq.industry?.toLowerCase().includes(q);
+        const matchesMsg = inq.message?.toLowerCase().includes(q);
+        if (!matchesName && !matchesEmail && !matchesIndustry && !matchesMsg) return false;
+      }
+      // 2. Origin scope filter
+      if (historyFilter === 'india') {
+        const isIndia = inq.country?.toLowerCase().includes('india') || inq.countryFlag === '🇮🇳';
+        if (!isIndia) return false;
+      } else if (historyFilter === 'global') {
+        const isIndia = inq.country?.toLowerCase().includes('india') || inq.countryFlag === '🇮🇳';
+        if (isIndia) return false;
+      }
+      return true;
+    });
+  }, [sentInquiries, historySearchQuery, historyFilter]);
+
+  // Helper to dynamically resolve exhibitor logo for sent inquiries (supports legacy saved records)
+  const getInquiryLogo = (inq) => {
+    if (inq?.exhibitorLogo) return inq.exhibitorLogo;
+    if (inq?.logo) return inq.logo;
+    const norm = (s) => (s || '').toLowerCase().trim();
+    const inqName = norm(inq?.exhibitorName);
+    const inqId = inq?.exhibitorId;
+    const found =
+      exhibitors.find((e) => {
+        if (inqId && e._id === inqId) return true;
+        const eName = norm(e.name);
+        return eName && inqName && (eName === inqName || eName.includes(inqName) || inqName.includes(eName));
+      }) ||
+      FALLBACK_EXHIBITORS.find((e) => {
+        if (inqId && e._id === inqId) return true;
+        const eName = norm(e.name);
+        return eName && inqName && (eName === inqName || eName.includes(inqName) || inqName.includes(eName));
+      });
+    return found?.logo || '';
+  };
+
+  // Auto-backfill logos on sent inquiries in local storage if they were saved before logo tracking
+  useEffect(() => {
+    if (sentInquiries && sentInquiries.length > 0) {
+      let changed = false;
+      const updated = sentInquiries.map((inq) => {
+        if (!inq.exhibitorLogo && !inq.logo) {
+          const matchedLogo = getInquiryLogo(inq);
+          if (matchedLogo) {
+            changed = true;
+            return { ...inq, exhibitorLogo: matchedLogo, logo: matchedLogo };
+          }
+        }
+        return inq;
+      });
+      if (changed) {
+        setSentInquiries(updated);
+        try {
+          localStorage.setItem('visitexpo_sent_inquiries', JSON.stringify(updated));
+        } catch (_) {}
+      }
+    }
+  }, [exhibitors]);
 
   // Sync user credits on session load
   useEffect(() => {
     if (user?.credits !== undefined) {
-      setUserCredits(user.credits);
+      let activeCredits = user.credits;
       if (typeof window !== 'undefined') {
-        localStorage.setItem('visitexpo_organizer_credits', String(user.credits));
+        const savedCredits = localStorage.getItem('visitexpo_organizer_credits');
+        if (savedCredits !== null && !isNaN(parseInt(savedCredits, 10))) {
+          const parsedLocal = parseInt(savedCredits, 10);
+          // If local storage has higher test credits from prior top-up, preserve it and sync to backend
+          if (parsedLocal > user.credits) {
+            activeCredits = parsedLocal;
+            const diff = parsedLocal - user.credits;
+            const token = accessToken || localStorage.getItem('visitexpo_access_token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            axios
+              .post(`${API_URL}/exhibitors/topup`, { amount: diff, email: user.email }, { headers })
+              .then((res) => {
+                if (res.data?.data?.credits !== undefined && updateUser) {
+                  updateUser({ ...user, credits: res.data.data.credits });
+                }
+              })
+              .catch((err) => console.warn('Could not auto-sync local credits to server:', err));
+          }
+        }
+      }
+      setUserCredits(activeCredits);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('visitexpo_organizer_credits', String(activeCredits));
       }
     }
   }, [user]);
@@ -646,15 +881,37 @@ export default function ExhibitorDiscoveryPage() {
   const fetchExhibitors = async () => {
     setLoading(true);
     try {
-      const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
-      const res = await axios.get(`${API_URL}/exhibitors/discovery`, { headers });
+      const token = accessToken || (typeof window !== 'undefined' ? localStorage.getItem('visitexpo_access_token') : null);
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const savedUserStr = typeof window !== 'undefined' ? localStorage.getItem('visitexpo_user') : null;
+      let effectiveEmail = user?.email;
+      if (!effectiveEmail && savedUserStr) {
+        try {
+          effectiveEmail = JSON.parse(savedUserStr)?.email;
+        } catch (_) {}
+      }
+      const queryParam = effectiveEmail ? `?email=${encodeURIComponent(effectiveEmail)}` : '';
+      const res = await axios.get(`${API_URL}/exhibitors/discovery${queryParam}`, { headers });
       if (res.data && res.data.success && res.data.data?.exhibitors) {
         setExhibitors(res.data.data.exhibitors);
         setCurrentPage(1);
         if (res.data.data.userCredits !== undefined) {
-          setUserCredits(res.data.data.userCredits);
+          const serverCredits = res.data.data.userCredits;
+          let finalCredits = serverCredits;
           if (typeof window !== 'undefined') {
-            localStorage.setItem('visitexpo_organizer_credits', String(res.data.data.userCredits));
+            const localVal = localStorage.getItem('visitexpo_organizer_credits');
+            if (localVal !== null && !isNaN(parseInt(localVal, 10))) {
+              const parsedLocal = parseInt(localVal, 10);
+              // If local storage has higher test credits, preserve it
+              if (parsedLocal > serverCredits) {
+                finalCredits = parsedLocal;
+              }
+            }
+            localStorage.setItem('visitexpo_organizer_credits', String(finalCredits));
+          }
+          setUserCredits(finalCredits);
+          if (user && updateUser && user.credits !== finalCredits) {
+            updateUser({ ...user, credits: finalCredits });
           }
         }
       }
@@ -759,6 +1016,12 @@ export default function ExhibitorDiscoveryPage() {
     setIsConnectModalOpen(true);
   };
 
+  // Open Details Modal
+  const handleOpenDetails = (exhibitor) => {
+    setDetailsExhibitor(exhibitor);
+    setIsDetailsModalOpen(true);
+  };
+
   // Quick message template inserter
   const handleInsertTemplate = (type) => {
     if (type === 'rfq') {
@@ -777,20 +1040,23 @@ export default function ExhibitorDiscoveryPage() {
     e.preventDefault();
     if (!selectedExhibitor) return;
 
-    const trimmed = message.trim();
-    if (trimmed.length < 100) {
-      showToast(`The message must contain a minimum of 100 characters (currently ${trimmed.length}).`, 'error');
+    if (!inquiryType || !inquiryType.trim()) {
+      showToast('Please select an enquiry purpose.', 'error');
       return;
     }
-    if (trimmed.length > 300) {
-      showToast(`The message cannot exceed 300 characters (currently ${trimmed.length}).`, 'error');
+
+    const validationCheck = validateInquiryMessage(message);
+    if (!validationCheck.isValid) {
+      showToast(validationCheck.error, 'error');
       return;
     }
+
     if (userCredits < 10) {
       showToast(`Insufficient credits! 10 credits required to connect. Please top up your balance.`, 'error');
       return;
     }
 
+    const trimmed = message.trim();
     setSendingInquiry(true);
 
     try {
@@ -799,6 +1065,7 @@ export default function ExhibitorDiscoveryPage() {
         exhibitorId: selectedExhibitor._id,
         exhibitorName: selectedExhibitor.name,
         exhibitorEmail: selectedExhibitor.contactEmail,
+        exhibitorLogo: selectedExhibitor.logo,
         country: selectedExhibitor.country,
         industry: selectedExhibitor.industry,
         products: selectedExhibitor.products,
@@ -820,12 +1087,18 @@ export default function ExhibitorDiscoveryPage() {
       if (typeof window !== 'undefined') {
         localStorage.setItem('visitexpo_organizer_credits', String(newCredits));
       }
+      if (user && updateUser) {
+        updateUser({ ...user, credits: newCredits });
+      }
 
       // Record in sent inquiries list
       const newInquiryRecord = {
         id: res.data?.data?.inquiryId || Date.now().toString(),
+        exhibitorId: selectedExhibitor._id,
         exhibitorName: selectedExhibitor.name,
         exhibitorEmail: selectedExhibitor.contactEmail,
+        exhibitorLogo: selectedExhibitor.logo,
+        logo: selectedExhibitor.logo,
         country: selectedExhibitor.country,
         countryFlag: selectedExhibitor.countryFlag,
         industry: selectedExhibitor.industry,
@@ -852,24 +1125,66 @@ export default function ExhibitorDiscoveryPage() {
     }
   };
 
-  // Instant Top-Up for testing / organizer ease
-  const handleTopUpCredits = () => {
-    const updated = userCredits + 50;
+  // Instant Top-Up for testing / organizer ease (persisted to server DB and session)
+  const handleTopUpCredits = async () => {
+    const updated = (userCredits || 0) + 50;
+    // 1. Snappy UI response
     setUserCredits(updated);
     if (typeof window !== 'undefined') {
       localStorage.setItem('visitexpo_organizer_credits', String(updated));
     }
+    if (user && updateUser) {
+      updateUser({ ...user, credits: updated });
+    }
     showToast(`+50 Credits added successfully! Total balance: ${updated} credits.`);
+
+    // 2. Persist to server database
+    try {
+      const token = accessToken || (typeof window !== 'undefined' ? localStorage.getItem('visitexpo_access_token') : null);
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const savedUserStr = typeof window !== 'undefined' ? localStorage.getItem('visitexpo_user') : null;
+      let effectiveEmail = user?.email;
+      if (!effectiveEmail && savedUserStr) {
+        try {
+          effectiveEmail = JSON.parse(savedUserStr)?.email;
+        } catch (_) {}
+      }
+
+      const res = await axios.post(
+        `${API_URL}/exhibitors/topup`,
+        {
+          amount: 50,
+          email: effectiveEmail,
+          currentCredits: userCredits
+        },
+        { headers }
+      );
+      if (res.data?.success && res.data.data?.credits !== undefined) {
+        const confirmedCredits = res.data.data.credits;
+        setUserCredits(confirmedCredits);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('visitexpo_organizer_credits', String(confirmedCredits));
+        }
+        if (user && updateUser) {
+          updateUser({ ...user, credits: confirmedCredits });
+        }
+      }
+    } catch (err) {
+      console.warn('Backend test credit sync note (local balance preserved):', err);
+    }
   };
 
-  // Character Count Validation Calculations
+  // Message Field Validation Calculations
+  const validation = useMemo(() => validateInquiryMessage(message), [message]);
   const charCount = message.length;
-  const isTooShort = charCount > 0 && charCount < 100;
-  const isTooLong = charCount > 300;
-  const isValidLength = charCount >= 100 && charCount <= 300;
+  const hasContent = message.trim().length > 0;
+  const isContentInvalid = hasContent && (validation.code === 'SYMBOL_SPAM' || validation.code === 'REPEATED_CHARS' || validation.code === 'HTML_TAGS' || validation.code === 'REPETITIVE_WORDS' || validation.code === 'FEW_WORDS');
+  const isTooShort = validation.code === 'TOO_SHORT';
+  const isTooLong = validation.code === 'TOO_LONG';
+  const isValidLength = validation.isValid;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 sm:pb-24">
       
       {/* 1. Header & Live Credits Status Bar */}
       <div className="rounded-2xl border border-border bg-card p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1158,23 +1473,23 @@ export default function ExhibitorDiscoveryPage() {
                 {/* Card Header & Country Badge */}
                 <div className="p-5 space-y-3.5 flex-1">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={exhibitor.logo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=150&auto=format&fit=crop&q=80'}
-                        alt={exhibitor.name}
-                        className="h-12 w-12 rounded-xl object-cover border border-border shadow-xs shrink-0"
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <ExhibitorLogo
+                        src={exhibitor.logo}
+                        name={exhibitor.name}
+                        className="h-12 w-12 shrink-0"
                       />
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-base">{exhibitor.countryFlag || (isIndian ? '🇮🇳' : '🌍')}</span>
-                          <span className="text-xs font-bold text-muted-foreground">{exhibitor.country}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-base shrink-0">{exhibitor.countryFlag || (isIndian ? '🇮🇳' : '🌍')}</span>
+                          <span className="text-xs font-bold text-muted-foreground truncate">{exhibitor.country}</span>
                           {exhibitor.verified && (
-                            <span title="Verified Exhibitor">
-                              <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                            <span title="Verified Exhibitor" className="shrink-0">
+                              <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
                             </span>
                           )}
                         </div>
-                        <h3 className="text-sm font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                        <h3 className="text-sm font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1 break-words">
                           {exhibitor.name}
                         </h3>
                       </div>
@@ -1242,20 +1557,31 @@ export default function ExhibitorDiscoveryPage() {
                   </div>
                 </div>
 
-                {/* Card Footer: Connect Action Button */}
-                <div className="px-5 py-3.5 bg-muted/20 border-t border-border flex items-center justify-between gap-3">
+                {/* Card Footer: Details & Connect Action Buttons */}
+                <div className="px-5 py-3.5 bg-muted/20 border-t border-border flex items-center justify-between gap-2">
                   <div className="text-[11px] text-muted-foreground">
-                    Enquiry Fee: <strong className="text-amber-600 dark:text-amber-400 font-bold">10 Credits</strong>
+                    Enquiry: <strong className="text-amber-600 dark:text-amber-400 font-bold">10 Credits</strong>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleOpenConnect(exhibitor)}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground px-3.5 py-1.5 text-xs font-bold shadow-xs transition-all cursor-pointer group-hover:scale-[1.02]"
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                    <span>Connect</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenDetails(exhibitor)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-background hover:bg-secondary text-foreground px-3 py-1.5 text-xs font-bold shadow-xs transition-all cursor-pointer hover:border-primary/40"
+                    >
+                      <Eye className="h-3.5 w-3.5 text-primary" />
+                      <span>Details</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenConnect(exhibitor)}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground px-3.5 py-1.5 text-xs font-bold shadow-xs transition-all cursor-pointer group-hover:scale-[1.02]"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      <span>Connect</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -1264,21 +1590,21 @@ export default function ExhibitorDiscoveryPage() {
       )}
 
       {!loading && filteredExhibitors.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between sm:pr-20">
           <p className="text-xs font-semibold text-muted-foreground">
             Showing <strong className="text-foreground">{firstExhibitorIndex + 1}-{Math.min(firstExhibitorIndex + EXHIBITORS_PER_PAGE, filteredExhibitors.length)}</strong> of {filteredExhibitors.length} exhibitors
           </p>
 
-          <nav className="flex items-center justify-between gap-1.5 sm:justify-end" aria-label="Exhibitor directory pagination">
+          <nav className="flex items-center justify-between gap-1.5 sm:justify-end pr-16 sm:pr-0" aria-label="Exhibitor directory pagination">
             <button
               type="button"
               onClick={() => handlePageChange(activePage - 1)}
               disabled={activePage === 1}
-              className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
               aria-label="Previous page"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Previous</span>
+              <span>Previous</span>
             </button>
 
             <div className="flex items-center gap-1" aria-label={`Page ${activePage} of ${totalPages}`}>
@@ -1288,7 +1614,7 @@ export default function ExhibitorDiscoveryPage() {
                   type="button"
                   onClick={() => handlePageChange(page)}
                   aria-current={page === activePage ? 'page' : undefined}
-                  className={`h-8 min-w-8 rounded-lg px-2 text-xs font-bold transition-colors ${
+                  className={`h-8 min-w-8 rounded-lg px-2 text-xs font-bold transition-colors cursor-pointer ${
                     page === activePage
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'border border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground'
@@ -1303,10 +1629,10 @@ export default function ExhibitorDiscoveryPage() {
               type="button"
               onClick={() => handlePageChange(activePage + 1)}
               disabled={activePage === totalPages}
-              className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
               aria-label="Next page"
             >
-              <span className="hidden sm:inline">Next</span>
+              <span>Next</span>
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </nav>
@@ -1328,24 +1654,24 @@ export default function ExhibitorDiscoveryPage() {
             </button>
 
             {/* Modal Header */}
-            <div className="flex items-start gap-3">
-              <img
-                src={selectedExhibitor.logo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=150&auto=format&fit=crop&q=80'}
-                alt={selectedExhibitor.name}
-                className="h-12 w-12 rounded-xl object-cover border border-border shrink-0"
+            <div className="flex items-start gap-3.5 pr-8">
+              <ExhibitorLogo
+                src={selectedExhibitor.logo}
+                name={selectedExhibitor.name}
+                className="h-12 w-12 shrink-0 mt-0.5"
               />
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm">{selectedExhibitor.countryFlag || '🌍'}</span>
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-sm shrink-0">{selectedExhibitor.countryFlag || '🌍'}</span>
                   <span className="text-xs font-bold text-muted-foreground">{selectedExhibitor.country}</span>
-                  <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-primary/10 text-primary">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
                     Verified Partner
                   </span>
                 </div>
-                <h3 className="text-base font-bold text-foreground">
+                <h3 className="text-base font-bold text-foreground leading-snug break-words">
                   Connect with {selectedExhibitor.name}
                 </h3>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[11px] text-muted-foreground break-words line-clamp-1">
                   Representative: {selectedExhibitor.contactPerson || 'Exhibitor Delegate'} ({selectedExhibitor.contactEmail})
                 </p>
               </div>
@@ -1397,8 +1723,8 @@ export default function ExhibitorDiscoveryPage() {
                   
                   {/* Live Character Counter & Status Badge */}
                   <span
-                    className={`text-xs font-bold px-2 py-0.5 rounded-md ${
-                      isTooLong
+                    className={`text-xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1 ${
+                      isContentInvalid || isTooLong
                         ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-extrabold'
                         : isTooShort
                         ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
@@ -1407,7 +1733,26 @@ export default function ExhibitorDiscoveryPage() {
                         : 'bg-muted text-muted-foreground'
                     }`}
                   >
-                    {charCount} / 300 characters
+                    {isContentInvalid ? (
+                      <>
+                        <AlertTriangle className="h-3 w-3 shrink-0" />
+                        <span>Invalid Content ({charCount}/300)</span>
+                      </>
+                    ) : isTooLong ? (
+                      <>
+                        <AlertTriangle className="h-3 w-3 shrink-0" />
+                        <span>{charCount} / 300 (Too Long)</span>
+                      </>
+                    ) : isTooShort ? (
+                      <span>{charCount} / 300 characters</span>
+                    ) : isValidLength ? (
+                      <>
+                        <Check className="h-3 w-3 shrink-0" />
+                        <span>{charCount} / 300 (Valid)</span>
+                      </>
+                    ) : (
+                      <span>0 / 300 characters</span>
+                    )}
                   </span>
                 </div>
 
@@ -1418,7 +1763,7 @@ export default function ExhibitorDiscoveryPage() {
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="Introduce your organization, explain your procurement interest, product specifications, or proposed event collaboration (minimum 100 characters, maximum 300 characters)..."
                   className={`w-full rounded-xl border p-3 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 transition-all ${
-                    isTooLong
+                    isContentInvalid || isTooLong
                       ? 'border-rose-500 focus:ring-rose-500 bg-rose-500/5'
                       : isTooShort
                       ? 'border-amber-500/60 focus:ring-amber-500 bg-amber-500/5'
@@ -1428,21 +1773,16 @@ export default function ExhibitorDiscoveryPage() {
                   }`}
                 />
 
-                {/* Character Count Helper Status Message */}
+                {/* Character Count & Content Validation Status Message */}
                 <div className="text-[11px] flex items-center justify-between gap-2">
-                  {charCount === 0 ? (
+                  {!hasContent ? (
                     <span className="text-muted-foreground">
-                      * Message must contain a minimum of 100 characters and a maximum of 300 characters.
+                      * Message must contain 100–300 characters of meaningful business text (no symbols or spam).
                     </span>
-                  ) : isTooShort ? (
-                    <span className="text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
+                  ) : isContentInvalid || isTooLong || isTooShort ? (
+                    <span className={`font-semibold flex items-center gap-1 ${isContentInvalid || isTooLong ? 'text-rose-600 dark:text-rose-400' : 'text-amber-600 dark:text-amber-400'}`}>
                       <AlertTriangle className="h-3 w-3 shrink-0" />
-                      Add at least {100 - charCount} more character{100 - charCount === 1 ? '' : 's'} to reach 100.
-                    </span>
-                  ) : isTooLong ? (
-                    <span className="text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1">
-                      <AlertTriangle className="h-3 w-3 shrink-0" />
-                      Exceeds 300-character maximum limit by {charCount - 300} characters.
+                      {validation.error}
                     </span>
                   ) : (
                     <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
@@ -1455,7 +1795,7 @@ export default function ExhibitorDiscoveryPage() {
                   <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden shrink-0">
                     <div
                       className={`h-full transition-all ${
-                        isTooLong
+                        isContentInvalid || isTooLong
                           ? 'bg-rose-500'
                           : isTooShort
                           ? 'bg-amber-500'
@@ -1537,53 +1877,491 @@ export default function ExhibitorDiscoveryPage() {
         </div>
       )}
 
-      {/* 6. Sent Enquiries History Modal */}
-      {showHistoryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-2xl rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
+      {/* 5.5. Exhibitor Full Details Modal */}
+      {isDetailsModalOpen && detailsExhibitor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="relative w-full max-w-2xl rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            
+            {/* Close Button */}
             <button
               type="button"
-              onClick={() => setShowHistoryModal(false)}
-              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground cursor-pointer"
+              onClick={() => setIsDetailsModalOpen(false)}
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground cursor-pointer p-1 rounded-lg hover:bg-secondary transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
 
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-bold text-foreground">Sent Exhibitor Enquiries</h3>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Review messages you have sent to trade exhibitors.
-            </p>
-
-            <div className="divide-y divide-border border border-border rounded-xl overflow-hidden">
-              {sentInquiries.map((inq) => (
-                <div key={inq.id} className="p-4 space-y-2 bg-card hover:bg-muted/10 transition-colors">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">{inq.countryFlag || '🌍'}</span>
-                      <strong className="text-sm font-bold text-foreground">{inq.exhibitorName}</strong>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-secondary text-foreground">
-                        {inq.industry}
-                      </span>
-                    </div>
-                    <span className="text-[11px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">
-                      -10 Credits
+            {/* Header: Logo, Badges, Title */}
+            <div className="flex items-start gap-4 pr-8">
+              <ExhibitorLogo
+                src={detailsExhibitor.logo}
+                name={detailsExhibitor.name}
+                className="h-16 w-16 shrink-0 mt-0.5"
+              />
+              <div className="space-y-1.5 flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-base shrink-0">{detailsExhibitor.countryFlag || (detailsExhibitor.origin === 'india' ? '🇮🇳' : '🌍')}</span>
+                  <span className="text-xs font-bold text-muted-foreground">{detailsExhibitor.country}</span>
+                  {detailsExhibitor.verified && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
+                      <CheckCircle className="h-3 w-3" /> Verified Exhibitor
                     </span>
-                  </div>
-
-                  <p className="text-xs text-muted-foreground bg-muted/20 p-2.5 rounded-lg border border-border/60">
-                    &quot;{inq.message}&quot;
-                  </p>
-
-                  <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1">
-                    <span>Recipient: {inq.exhibitorEmail}</span>
-                    <span>{new Date(inq.sentAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                  )}
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary text-foreground capitalize shrink-0">
+                    <Globe className="h-3 w-3 text-primary" /> {detailsExhibitor.origin || 'Global'} Scope
+                  </span>
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full ml-auto shrink-0">
+                    <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+                    <span>{detailsExhibitor.rating || '4.9'}</span>
                   </div>
                 </div>
-              ))}
+
+                <h2 className="text-lg font-black text-foreground leading-snug break-words">
+                  {detailsExhibitor.name}
+                </h2>
+
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary">
+                    <Building className="h-3.5 w-3.5" />
+                    {detailsExhibitor.industry}
+                  </span>
+                  {detailsExhibitor.city && (
+                    <>
+                      <span>•</span>
+                      <span className="inline-flex items-center gap-1 text-[11px]">
+                        <MapPin className="h-3 w-3 text-muted-foreground" />
+                        {detailsExhibitor.city}
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
+
+            {/* Expo Event & Booth Location Banner */}
+            <div className="p-3.5 rounded-xl border border-primary/20 bg-primary/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="space-y-1">
+                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Associated Exhibition &amp; Stand
+                </div>
+                <div className="font-bold text-foreground flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <span>{detailsExhibitor.eventTitle || 'VisitExpo Verified Partner'}</span>
+                </div>
+              </div>
+
+              <div className="sm:text-right shrink-0">
+                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Booth Location
+                </div>
+                <div className="font-extrabold text-foreground bg-background px-2.5 py-1 rounded-lg border border-border inline-block mt-0.5">
+                  {detailsExhibitor.boothNumber || 'Hall Stand Available'}
+                </div>
+              </div>
+            </div>
+
+            {/* Company Full Description */}
+            <div className="space-y-1.5">
+              <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                About the Exhibitor
+              </h4>
+              <p className="text-xs text-foreground/90 leading-relaxed bg-muted/10 p-3.5 rounded-xl border border-border/60">
+                {detailsExhibitor.description}
+              </p>
+            </div>
+
+            {/* Featured Products & Solutions Grid */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                Featured Products &amp; Solutions Catalogue ({Array.isArray(detailsExhibitor.products) ? detailsExhibitor.products.length : 0})
+              </h4>
+              <div className="flex flex-wrap gap-1.5">
+                {Array.isArray(detailsExhibitor.products) && detailsExhibitor.products.map((prod, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-lg bg-secondary text-foreground border border-border/80 shadow-xs"
+                  >
+                    <Tag className="h-3 w-3 mr-1.5 text-primary" />
+                    {prod}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Key Representative & Contact Information */}
+            <div className="p-4 bg-muted/20 rounded-xl border border-border space-y-2.5 text-xs">
+              <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                Executive Representative &amp; Lead Contact
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
+                <div>
+                  <span className="text-muted-foreground block text-[10px]">Lead Representative:</span>
+                  <strong className="text-foreground text-xs">{detailsExhibitor.contactPerson || 'Exhibitor Delegate'}</strong>
+                  {detailsExhibitor.contactDesignation && (
+                    <div className="text-muted-foreground text-[10px]">{detailsExhibitor.contactDesignation}</div>
+                  )}
+                </div>
+
+                <div>
+                  <span className="text-muted-foreground block text-[10px]">Official Email:</span>
+                  <strong className="text-foreground font-mono">{detailsExhibitor.contactEmail || 'Available on connect'}</strong>
+                </div>
+
+                {detailsExhibitor.contactPhone && (
+                  <div>
+                    <span className="text-muted-foreground block text-[10px]">Direct Phone:</span>
+                    <strong className="text-foreground font-mono">{detailsExhibitor.contactPhone}</strong>
+                  </div>
+                )}
+
+                {detailsExhibitor.virtualBoothUrl && (
+                  <div>
+                    <span className="text-muted-foreground block text-[10px]">Virtual 3D Booth:</span>
+                    <a
+                      href={detailsExhibitor.virtualBoothUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline font-bold inline-flex items-center gap-1"
+                    >
+                      <span>Explore Virtual Stand</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-border">
+              <div className="text-xs text-muted-foreground">
+                Connect fee: <strong className="text-amber-600 dark:text-amber-400 font-bold">10 Credits</strong> • Your Balance: <strong className="text-foreground">{userCredits} Credits</strong>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsDetailsModalOpen(false)}
+                  className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-foreground hover:bg-secondary transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDetailsModalOpen(false);
+                    handleOpenConnect(detailsExhibitor);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 text-xs font-bold shadow-md hover:shadow-lg transition-all cursor-pointer"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  <span>Connect &amp; Send Enquiry</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* 6. Sent Enquiries History Modal */}
+      {showHistoryModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => setShowHistoryModal(false)}
+        >
+          <div
+            className="relative w-full max-w-3xl my-auto rounded-3xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 6.1. Sticky Modal Header */}
+            <div className="p-5 sm:p-6 border-b border-border bg-muted/20 space-y-4 shrink-0">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-amber-500/20 to-primary/20 border border-primary/30 flex items-center justify-center text-primary shadow-xs shrink-0">
+                    <Clock className="h-6 w-6" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xl font-black text-foreground tracking-tight truncate">
+                        Sent Exhibitor Enquiries
+                      </h3>
+                      <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                        <ShieldCheck className="h-3 w-3" /> Live History
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                      Review all direct partnership requests, messages, and credit usage.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowHistoryModal(false)}
+                  className="rounded-xl p-2 text-muted-foreground hover:text-foreground hover:bg-secondary border border-transparent hover:border-border transition-all cursor-pointer shrink-0"
+                  title="Close Modal"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Summary Stats Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+                <div className="p-2.5 rounded-xl bg-background/80 border border-border flex items-center gap-2.5 shadow-2xs">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <Send className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Enquiries</div>
+                    <div className="text-sm font-black text-foreground">{totalSentCount} Sent</div>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-background/80 border border-border flex items-center gap-2.5 shadow-2xs">
+                  <div className="h-8 w-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+                    <Coins className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Credits Spent</div>
+                    <div className="text-sm font-black text-amber-600 dark:text-amber-400">-{totalCreditsSpent} Credits</div>
+                  </div>
+                </div>
+
+                <div className="col-span-2 sm:col-span-1 p-2.5 rounded-xl bg-background/80 border border-border flex items-center gap-2.5 shadow-2xs">
+                  <div className="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                    <CheckCircle className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Delivery Rate</div>
+                    <div className="text-sm font-black text-foreground">100% Delivered</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 6.2. Interactive Search & Scope Filter Sub-Bar */}
+            {totalSentCount > 0 && (
+              <div className="px-5 sm:px-6 py-2.5 border-b border-border bg-muted/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={historySearchQuery}
+                    onChange={(e) => setHistorySearchQuery(e.target.value)}
+                    placeholder="Filter by exhibitor name, email, or message..."
+                    className="w-full rounded-xl border border-border bg-background pl-8.5 pr-8 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
+                  />
+                  {historySearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setHistorySearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1 bg-secondary/80 p-0.5 rounded-xl border border-border text-[11px] self-start sm:self-auto shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setHistoryFilter('all')}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                      historyFilter === 'all'
+                        ? 'bg-background text-foreground shadow-xs'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    All ({totalSentCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHistoryFilter('india')}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer inline-flex items-center gap-1 ${
+                      historyFilter === 'india'
+                        ? 'bg-background text-foreground shadow-xs'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <span>🇮🇳</span>
+                    <span>India ({indianInquiriesCount})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHistoryFilter('global')}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer inline-flex items-center gap-1 ${
+                      historyFilter === 'global'
+                        ? 'bg-background text-foreground shadow-xs'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <span>🌍</span>
+                    <span>Global ({globalInquiriesCount})</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 6.3. Scrollable Enquiries List */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
+              {totalSentCount === 0 ? (
+                <div className="p-12 text-center text-muted-foreground space-y-3.5 border border-dashed border-border rounded-2xl bg-muted/5">
+                  <div className="h-14 w-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto shadow-xs">
+                    <Clock className="h-7 w-7" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-foreground">No sent enquiries yet</h4>
+                    <p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1 leading-relaxed">
+                      Discover verified Indian and Global trade exhibitors on the platform and connect directly with their representatives.
+                    </p>
+                  </div>
+                </div>
+              ) : filteredSentInquiries.length === 0 ? (
+                <div className="p-10 text-center text-muted-foreground space-y-2 border border-dashed border-border rounded-2xl bg-muted/5">
+                  <Search className="h-8 w-8 text-muted-foreground/40 mx-auto" />
+                  <h4 className="text-sm font-bold text-foreground">No enquiries match your search</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Try clearing the keyword search or changing the origin filter.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHistorySearchQuery('');
+                      setHistoryFilter('all');
+                    }}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline cursor-pointer mt-1"
+                  >
+                    <span>Clear Filter</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredSentInquiries.map((inq) => {
+                    const logoSrc = getInquiryLogo(inq);
+                    return (
+                      <div
+                        key={inq.id}
+                        className="group p-5 rounded-2xl border border-border bg-card hover:border-primary/40 transition-all duration-200 space-y-3.5 shadow-2xs hover:shadow-md"
+                      >
+                        {/* Header Row */}
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3.5">
+                          <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                            <ExhibitorLogo
+                              src={logoSrc}
+                              name={inq.exhibitorName}
+                              className="h-12 w-12 rounded-xl shrink-0 mt-0.5 shadow-xs"
+                            />
+
+                            <div className="min-w-0 flex-1 space-y-1.5">
+                              {/* Metadata Badges */}
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-sm shrink-0" title={inq.country || 'Global'}>
+                                  {inq.countryFlag || '🌍'}
+                                </span>
+                                {inq.country && (
+                                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider shrink-0">
+                                    {inq.country}
+                                  </span>
+                                )}
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-secondary text-foreground/85 border border-border/70 max-w-full break-words">
+                                  <Building className="h-2.5 w-2.5 text-primary shrink-0" />
+                                  <span className="break-words">{inq.industry}</span>
+                                </span>
+                                <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 shrink-0">
+                                  {inq.inquiryType || 'B2B Trade Partnership'}
+                                </span>
+                              </div>
+
+                              {/* Company Name */}
+                              <h4 className="text-base font-bold text-foreground leading-snug break-words group-hover:text-primary transition-colors">
+                                {inq.exhibitorName}
+                              </h4>
+
+                              {/* Recipient Email */}
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+                                <Mail className="h-3 w-3 text-muted-foreground/70 shrink-0" />
+                                <span className="text-[11px] truncate">
+                                  Recipient: <span className="font-mono text-foreground font-medium">{inq.exhibitorEmail}</span>
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Credits Pill & Status */}
+                          <div className="flex items-center sm:flex-col sm:items-end justify-between sm:justify-start gap-1.5 shrink-0 pt-0.5">
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/25 whitespace-nowrap shadow-2xs">
+                              <Coins className="h-3.5 w-3.5 shrink-0" />
+                              <span>-10 Credits</span>
+                            </span>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
+                              <CheckCircle className="h-3 w-3 shrink-0" />
+                              <span>Delivered to Exhibitor</span>
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Inquiry Message Box */}
+                        <div className="rounded-xl bg-muted/25 border border-border/70 p-4 space-y-1.5">
+                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            <MessageSquare className="h-3 w-3 text-primary shrink-0" />
+                            <span>Your Inquiry Message</span>
+                          </div>
+                          <p className="text-xs text-foreground/90 leading-relaxed whitespace-pre-wrap break-words italic pl-3.5 border-l-2 border-primary/50">
+                            &ldquo;{inq.message}&rdquo;
+                          </p>
+                        </div>
+
+                        {/* Card Footer */}
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t border-border/40">
+                          <span className="text-[10px] text-muted-foreground/80 font-mono">
+                            Ref ID: {inq.id ? String(inq.id).slice(-10) : 'N/A'}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-[11px] font-mono text-muted-foreground">
+                            <Calendar className="h-3 w-3 shrink-0" />
+                            <span>{new Date(inq.sentAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 6.4. Sticky Modal Footer */}
+            <div className="p-4 sm:px-6 border-t border-border bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>Available Balance:</span>
+                <span className="inline-flex items-center gap-1 text-xs font-black text-foreground bg-primary/20 px-2.5 py-0.5 rounded-full border border-primary/30">
+                  <Coins className="h-3 w-3 text-primary shrink-0" />
+                  <span>{userCredits} Credits</span>
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowHistoryModal(false)}
+                  className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-foreground hover:bg-secondary transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowHistoryModal(false);
+                    const el = document.getElementById('exhibitor-search-input');
+                    if (el) el.focus();
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-4 py-2 text-xs shadow-md transition-all cursor-pointer"
+                >
+                  <Compass className="h-3.5 w-3.5" />
+                  <span>Discover More Exhibitors</span>
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       )}

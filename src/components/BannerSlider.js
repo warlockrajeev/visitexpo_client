@@ -21,12 +21,12 @@ const API_URL =
 
 // Curated high-resolution fallback exhibition photos matching cinematic banner lighting
 const FALLBACK_IMAGES = [
-  'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1600&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1511578314322-379afb476865?w=1600&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1600&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=1600&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1515187029135-18ee286d815b?w=1600&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=1600&auto=format&fit=crop&q=80'
+  'https://visitexpo.in/wp-content/uploads/2025/05/IT-OT-in-oil-gas-1.jpg',
+  'https://visitexpo.in/wp-content/uploads/2025/05/a-1.jpg',
+  'https://visitexpo.in/wp-content/uploads/2025/05/images-2-11.jpeg',
+  'https://visitexpo.in/wp-content/uploads/2025/05/images-2-10.jpeg',
+  'https://visitexpo.in/wp-content/uploads/2025/05/download-1-1.png',
+  'https://visitexpo.in/wp-content/uploads/2025/05/qww-1.jpg'
 ];
 
 // Badge styles matching reference screenshot (NEWS = Red, GALLERY = Orange, EXPO = Amber, etc.)
@@ -55,7 +55,7 @@ const DEFAULT_SIX_EVENTS = [
     title: 'World Education Fair 2025',
     city: 'Mumbai',
     dates: '18 May 2025',
-    banner: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1600&auto=format&fit=crop&q=80',
+    banner: 'https://visitexpo.in/wp-content/uploads/2025/05/download-1-1.png',
     slug: 'world-education-fair-world-education-fair-2025',
     organizer: 'Edwise Overseas Education Consultants'
   },
@@ -82,7 +82,7 @@ const DEFAULT_SIX_EVENTS = [
     title: 'Electric Expo Ahmedabad 2025',
     city: 'Ahmedabad',
     dates: '08-10 Jul 2025',
-    banner: 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=1600&auto=format&fit=crop&q=80',
+    banner: 'https://visitexpo.in/wp-content/uploads/2025/05/images-2-11.jpeg',
     slug: 'electric-expo-ahemdabad',
     organizer: 'Gujarat Electrical Association'
   },
@@ -91,7 +91,7 @@ const DEFAULT_SIX_EVENTS = [
     title: 'Dubai Real Estate Investment Conclave',
     city: 'Ahmedabad',
     dates: '15-16 Aug 2025',
-    banner: 'https://images.unsplash.com/photo-1515187029135-18ee286d815b?w=1600&auto=format&fit=crop&q=80',
+    banner: 'https://visitexpo.in/wp-content/uploads/2025/05/images-2-10.jpeg',
     slug: 'dubai-real-estate-event-in-ahmedabad-2025',
     organizer: 'Global Realty Advisory'
   },
@@ -100,7 +100,7 @@ const DEFAULT_SIX_EVENTS = [
     title: 'International Clean Energy & Solar Expo',
     city: 'Madurai',
     dates: '20-22 Sep 2025',
-    banner: 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=1600&auto=format&fit=crop&q=80',
+    banner: 'https://visitexpo.in/wp-content/uploads/2025/05/qww-1.jpg',
     slug: 'dubai-real-estate-event-in-madurai-2025',
     organizer: 'CleanEnergy Trade Council'
   }
@@ -426,6 +426,7 @@ export default function BannerSlider() {
                   <img
                     src={slide.image}
                     alt={slide.title}
+                    loading="lazy"
                     onError={(e) => {
                       e.currentTarget.onerror = null;
                       e.currentTarget.src = FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length];

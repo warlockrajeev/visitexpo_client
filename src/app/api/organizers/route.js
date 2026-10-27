@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * @file api/organizers/route.js
  * @description Next.js API route to aggregate and serve verified exhibition organizers,

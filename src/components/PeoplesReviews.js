@@ -34,7 +34,7 @@ const FALLBACK_REVIEWS = [
     role: 'Verified Trade Buyer',
     title: 'VP Procurement & Supply Chain',
     company: 'Tata Steel B2B Division',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=140&auto=format&fit=crop',
+    avatar: null,
     eventTitle: 'Automation Expo Asia 2026',
     venue: 'Bombay Exhibition Centre (BEC), Mumbai',
     rating: 5,
@@ -51,7 +51,7 @@ const FALLBACK_REVIEWS = [
     role: 'VIP Clinical Delegate',
     title: 'Chief Medical Officer',
     company: 'Apollo Diagnostic Network',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=140&auto=format&fit=crop',
+    avatar: null,
     eventTitle: 'India International Medical Expo',
     venue: 'Bharat Mandapam (IECC), New Delhi',
     rating: 5,
@@ -68,7 +68,7 @@ const FALLBACK_REVIEWS = [
     role: 'Verified Exhibitor',
     title: 'Managing Director',
     company: 'AeroTech Hydraulics Ltd.',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=140&auto=format&fit=crop',
+    avatar: null,
     eventTitle: 'Aero & Defense Conclave 2026',
     venue: 'Hitex Exhibition Center, Hyderabad',
     rating: 5,
@@ -85,7 +85,7 @@ const FALLBACK_REVIEWS = [
     role: 'International Trade Buyer',
     title: 'Global Sourcing Director',
     company: 'GlobalTex Trade (Frankfurt)',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=140&auto=format&fit=crop',
+    avatar: null,
     eventTitle: 'Tex-Styles & Apparel World',
     venue: 'Jio World Convention Centre, Mumbai',
     rating: 5,
@@ -102,7 +102,7 @@ const FALLBACK_REVIEWS = [
     role: 'Verified Exhibitor',
     title: 'Co-Founder & CEO',
     company: 'GreenPack Eco Solutions',
-    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=140&auto=format&fit=crop',
+    avatar: null,
     eventTitle: 'Sustainable Packaging Expo 2026',
     venue: 'Bangalore Intl Exhibition Centre (BIEC)',
     rating: 5,
@@ -119,7 +119,7 @@ const FALLBACK_REVIEWS = [
     role: 'Verified Trade Buyer',
     title: 'Senior Sourcing Specialist',
     company: 'Renewable Power Consortium',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=140&auto=format&fit=crop',
+    avatar: null,
     eventTitle: 'Renewable Energy India Expo (REI)',
     venue: 'YASHOBHOOMI (IICC), New Delhi',
     rating: 5,
@@ -157,6 +157,47 @@ function formatApiReview(r) {
     helpfulCount: r.helpfulCount || 0,
     tags: Array.isArray(r.tags) && r.tags.length > 0 ? r.tags : ['Verified Attendee']
   };
+}
+
+const AVATAR_GRADIENTS = [
+  'from-blue-600 to-indigo-600',
+  'from-emerald-600 to-teal-600',
+  'from-amber-500 to-orange-600',
+  'from-purple-600 to-pink-600',
+  'from-rose-500 to-red-600',
+  'from-cyan-600 to-blue-600'
+];
+
+function ReviewAvatar({ name, avatar }) {
+  const [error, setError] = useState(false);
+  const initials = (name || '')
+    .split(' ')
+    .map((n) => n[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
+  const charSum = (name || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  const bgGrad = AVATAR_GRADIENTS[charSum % AVATAR_GRADIENTS.length];
+
+  if (!avatar || error || avatar.includes('unsplash') || avatar.includes('ui-avatars.com')) {
+    return (
+      <div className={`h-10 w-10 rounded-full bg-gradient-to-tr ${bgGrad} flex items-center justify-center text-white font-extrabold text-xs shadow-2xs shrink-0 select-none border border-white/20`}>
+        {initials || 'VP'}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={avatar}
+      alt={name}
+      loading="lazy"
+      onError={() => setError(true)}
+      className="h-10 w-10 rounded-full object-cover border border-zinc-200 shadow-2xs shrink-0"
+    />
+  );
 }
 
 export default function PeoplesReviews() {
@@ -338,11 +379,7 @@ export default function PeoplesReviews() {
                 {/* Header: Avatar, Name, Role & Star Rating */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2.5">
-                    <img
-                      src={item.avatar}
-                      alt={item.name}
-                      className="h-10 w-10 rounded-full object-cover border border-zinc-200 shadow-2xs shrink-0"
-                    />
+                    <ReviewAvatar name={item.name} avatar={item.avatar} />
                     <div>
                       <div className="flex items-center gap-1">
                         <h4 className="text-xs sm:text-sm font-bold text-zinc-900 leading-snug">

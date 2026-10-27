@@ -1743,6 +1743,7 @@ export default function LandingPage() {
                       <img
                         src={tr.image}
                         alt={tr.title}
+                        loading="lazy"
                         className="h-12 w-12 rounded-lg object-cover shrink-0 border border-zinc-200 group-hover:scale-103 transition-transform"
                       />
                       <div className="min-w-0 flex-1 space-y-0.5">
@@ -2025,6 +2026,7 @@ export default function LandingPage() {
                           <img
                             src={expo.image}
                             alt={expo.title}
+                            loading="lazy"
                             className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
                             onError={(e) => {
                               if (expo.fallbackImage && e.currentTarget.src !== expo.fallbackImage) {

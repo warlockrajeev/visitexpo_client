@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import wpEventImages from '@/data/wordpress-event-images.json';
 
+export const dynamic = 'force-dynamic';
+
 const WORDPRESS_URL = process.env.WORDPRESS_URL || 'https://visitexpo.in';
 const WORDPRESS_API_KEY = process.env.WORDPRESS_API_KEY || '';
 const BACKEND_API_URL =
