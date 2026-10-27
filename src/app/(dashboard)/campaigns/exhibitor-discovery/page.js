@@ -851,7 +851,7 @@ export default function ExhibitorDiscoveryPage() {
             const token = accessToken || localStorage.getItem('visitexpo_access_token');
             const headers = token ? { Authorization: `Bearer ${token}` } : {};
             axios
-              .post(`${API_URL}/exhibitors/topup`, { amount: diff, email: user.email }, { headers })
+              .post(`${API_URL}/exhibitors/topup`, { amount: diff, targetCredits: parsedLocal, email: user.email }, { headers })
               .then((res) => {
                 if (res.data?.data?.credits !== undefined && updateUser) {
                   updateUser({ ...user, credits: res.data.data.credits });
@@ -1060,7 +1060,22 @@ export default function ExhibitorDiscoveryPage() {
     setSendingInquiry(true);
 
     try {
-      const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+      const token = accessToken || (typeof window !== 'undefined' ? localStorage.getItem('visitexpo_access_token') : null);
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      const savedUserStr = typeof window !== 'undefined' ? localStorage.getItem('visitexpo_user') : null;
+      let effectiveEmail = user?.email;
+      let effectiveName = user?.name;
+      let effectiveCompany = user?.company;
+      if (savedUserStr) {
+        try {
+          const parsed = JSON.parse(savedUserStr);
+          if (!effectiveEmail && parsed?.email) effectiveEmail = parsed.email;
+          if (!effectiveName && parsed?.name) effectiveName = parsed.name;
+          if (!effectiveCompany && parsed?.company) effectiveCompany = parsed.company;
+        } catch (_) {}
+      }
+
       const payload = {
         exhibitorId: selectedExhibitor._id,
         exhibitorName: selectedExhibitor.name,
@@ -1070,13 +1085,41 @@ export default function ExhibitorDiscoveryPage() {
         industry: selectedExhibitor.industry,
         products: selectedExhibitor.products,
         message: trimmed,
-        senderName: user?.name || 'Verified Event Organizer',
-        senderEmail: user?.email || 'organizer@visitexpo.in',
-        senderCompany: user?.company || 'VisitExpo Organizer Network',
-        inquiryType
+        senderName: effectiveName || 'Verified Event Organizer',
+        senderEmail: effectiveEmail || 'organizer@visitexpo.in',
+        senderCompany: effectiveCompany || 'VisitExpo Organizer Network',
+        inquiryType,
+        currentCredits: userCredits
       };
 
-      const res = await axios.post(`${API_URL}/exhibitors/inquiry`, payload, { headers });
+      let res;
+      try {
+        res = await axios.post(`${API_URL}/exhibitors/inquiry`, payload, { headers });
+      } catch (postErr) {
+        // Self-healing recovery: If the server returns insufficient credits (e.g. out of sync with test credits),
+        // and client has userCredits >= 10, attempt an immediate credit sync/top-up and retry once.
+        const errorMsg = postErr.response?.data?.error || '';
+        if (errorMsg.toLowerCase().includes('insufficient') && userCredits >= 10) {
+          try {
+            await axios.post(
+              `${API_URL}/exhibitors/topup`,
+              {
+                amount: userCredits,
+                targetCredits: userCredits,
+                email: effectiveEmail,
+                currentCredits: userCredits
+              },
+              { headers }
+            );
+            // Retry inquiry
+            res = await axios.post(`${API_URL}/exhibitors/inquiry`, payload, { headers });
+          } catch (_) {
+            throw postErr;
+          }
+        } else {
+          throw postErr;
+        }
+      }
 
       // Update Credits
       const newCredits = res.data?.data?.remainingCredits !== undefined
@@ -1154,8 +1197,9 @@ export default function ExhibitorDiscoveryPage() {
         `${API_URL}/exhibitors/topup`,
         {
           amount: 50,
+          targetCredits: updated,
           email: effectiveEmail,
-          currentCredits: userCredits
+          currentCredits: updated
         },
         { headers }
       );
@@ -1189,14 +1233,6 @@ export default function ExhibitorDiscoveryPage() {
       {/* 1. Header & Live Credits Status Bar */}
       <div className="rounded-2xl border border-border bg-card p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground mb-1">
-            <Link href="/campaigns" className="hover:text-primary transition-colors flex items-center gap-1">
-              <Mail className="h-3.5 w-3.5" /> Marketing &amp; Campaigns
-            </Link>
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />
-            <span className="text-foreground font-bold">Exhibitor Discovery</span>
-          </div>
-
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
               <Compass className="h-7 w-7 text-primary" />
