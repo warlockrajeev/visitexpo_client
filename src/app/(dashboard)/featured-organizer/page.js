@@ -242,15 +242,8 @@ export default function FeaturedOrganizerApplicationPage() {
   if (!isEnterprise) {
     return (
       <div className="max-w-5xl mx-auto space-y-8 p-4 sm:p-6 lg:p-8">
-        {/* Breadcrumb & Header */}
+        {/* Header */}
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-            <Link href="/dashboard" className="hover:text-foreground transition-colors">
-              Dashboard
-            </Link>
-            <span>/</span>
-            <span className="text-foreground">Featured Organizer</span>
-          </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2.5">
             <Award className="h-7 w-7 text-amber-500" />
             Homepage Featured Organizer Showcase
@@ -367,13 +360,6 @@ export default function FeaturedOrganizerApplicationPage() {
       {/* Header with Enterprise Status Badge */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-            <Link href="/dashboard" className="hover:text-foreground transition-colors">
-              Dashboard
-            </Link>
-            <span>/</span>
-            <span className="text-foreground">Featured Organizer</span>
-          </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2.5">
             <Award className="h-7 w-7 text-amber-500" />
             Featured Organizer Showcase
