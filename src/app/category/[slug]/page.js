@@ -57,9 +57,29 @@ export default function CategoryEventsPage() {
   const [shareToast, setShareToast] = useState(false);
   const [selectedFormat, setSelectedFormat] = useState('all');
   const [selectedCountry, setSelectedCountry] = useState('all');
+  const [selectedDateFilter, setSelectedDateFilter] = useState('all');
+  const [customDate, setCustomDate] = useState('');
   const [categorySearchQuery, setCategorySearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [showMoreAbout, setShowMoreAbout] = useState(false);
+
+  const getDateFilterLabel = () => {
+    if (customDate) {
+      try {
+        const d = new Date(customDate);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      } catch (_) {
+        return customDate;
+      }
+    }
+    switch (selectedDateFilter) {
+      case 'this_month': return 'This Month';
+      case 'next_month': return 'Next Month';
+      case 'next_3_months': return 'Next 3 Months';
+      case '2026': return '2026 - 2027';
+      default: return 'Select Date';
+    }
+  };
 
   // Filter expanders
   const [openSections, setOpenSections] = useState({
@@ -165,9 +185,22 @@ export default function CategoryEventsPage() {
       if (selectedFormat === 'tradeshows' && !evt.tags?.includes('Tradeshow')) return false;
       if (selectedFormat === 'conferences' && !evt.tags?.includes('Conference')) return false;
       if (selectedCountry !== 'all' && (evt.country || '').toLowerCase() !== selectedCountry.toLowerCase()) return false;
+
+      // Date filtering
+      if (customDate) {
+        const evtDates = (evt.dates || '').toLowerCase();
+        const customYear = customDate.split('-')[0];
+        if (customYear && !evtDates.includes(customYear)) return false;
+      } else if (selectedDateFilter === 'this_month') {
+        const currentMonthName = new Date().toLocaleString('en-US', { month: 'short' }).toLowerCase();
+        if (!(evt.dates || '').toLowerCase().includes(currentMonthName)) return false;
+      } else if (selectedDateFilter === '2026') {
+        if (!(evt.dates || '').includes('2026')) return false;
+      }
+
       return true;
     });
-  }, [category, liveEvents, slug, selectedFormat, selectedCountry]);
+  }, [category, liveEvents, slug, selectedFormat, selectedCountry, selectedDateFilter, customDate]);
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-zinc-900 font-sans antialiased selection:bg-[#FF2E63] selection:text-white">
@@ -364,20 +397,93 @@ export default function CategoryEventsPage() {
                 <button
                   type="button"
                   onClick={() => toggleSection('calendar')}
-                  className="w-full flex items-center justify-between font-bold text-zinc-900 cursor-pointer"
+                  className="w-full flex items-center justify-between font-bold text-zinc-900 cursor-pointer group"
                 >
-                  <span>Calendar</span>
-                  <span className="text-zinc-400 text-[11px] font-normal">Select Date</span>
+                  <div className="flex items-center gap-2">
+                    <CalendarIcon className="h-4 w-4 text-[#FF2E63]" />
+                    <span className="text-xs font-bold text-zinc-900">Calendar</span>
+                  </div>
+
+                  {/* Prominently Highlighted, High-Contrast Select Date Badge */}
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all duration-200 shadow-xs cursor-pointer group-hover:scale-103 ${
+                    selectedDateFilter !== 'all' || customDate
+                      ? 'bg-[#FF2E63] text-white border border-[#FF2E63] ring-2 ring-rose-500/20 shadow-rose-500/25'
+                      : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 border border-amber-400 ring-2 ring-amber-300/40'
+                  }`}>
+                    <CalendarIcon className={`h-3.5 w-3.5 ${selectedDateFilter !== 'all' || customDate ? 'text-white' : 'text-zinc-950'}`} />
+                    <span className="tracking-tight">{getDateFilterLabel()}</span>
+                    <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openSections.calendar ? 'rotate-180' : ''}`} />
+                  </span>
                 </button>
 
                 {openSections.calendar && (
-                  <div className="mt-3 space-y-1.5 pt-2 border-t border-zinc-100">
-                    {['Any Date', 'This Month', 'Next 3 Months', '2026 - 2027'].map((d, i) => (
-                      <label key={i} className="flex items-center gap-2 cursor-pointer text-zinc-600 hover:text-zinc-900">
-                        <input type="radio" name="calDate" defaultChecked={i === 0} className="accent-[#FF2E63] text-[#FF2E63] focus:ring-[#FF2E63]" />
-                        <span>{d}</span>
+                  <div className="mt-3 space-y-2.5 pt-2 border-t border-zinc-100 animate-in fade-in duration-150">
+                    <div className="space-y-1.5">
+                      {[
+                        { id: 'all', label: 'Any Date (All Upcoming)' },
+                        { id: 'this_month', label: 'This Month' },
+                        { id: 'next_month', label: 'Next Month' },
+                        { id: 'next_3_months', label: 'Next 3 Months' },
+                        { id: '2026', label: 'Later in 2026 - 2027' }
+                      ].map((item) => {
+                        const isSelected = selectedDateFilter === item.id && !customDate;
+                        return (
+                          <label
+                            key={item.id}
+                            className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer text-xs font-medium transition-colors ${
+                              isSelected
+                                ? 'bg-amber-50 text-amber-950 font-bold border border-amber-300'
+                                : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="calDate"
+                                checked={isSelected}
+                                onChange={() => {
+                                  setSelectedDateFilter(item.id);
+                                  setCustomDate('');
+                                }}
+                                className="accent-[#FF2E63] text-[#FF2E63] focus:ring-[#FF2E63]"
+                              />
+                              <span>{item.label}</span>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    {/* Specific Date Picker Input */}
+                    <div className="pt-2 border-t border-zinc-100">
+                      <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">
+                        Or Pick Specific Date
                       </label>
-                    ))}
+                      <input
+                        type="date"
+                        value={customDate}
+                        onChange={(e) => {
+                          setCustomDate(e.target.value);
+                          if (e.target.value) {
+                            setSelectedDateFilter('custom');
+                          }
+                        }}
+                        className="w-full rounded-lg border border-zinc-200 bg-zinc-50 p-2 text-xs text-zinc-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#FF2E63]"
+                      />
+                    </div>
+
+                    {(selectedDateFilter !== 'all' || customDate) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedDateFilter('all');
+                          setCustomDate('');
+                        }}
+                        className="w-full text-center text-[11px] font-bold text-[#FF2E63] hover:underline pt-0.5 cursor-pointer"
+                      >
+                        Reset Date Filter ✕
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
