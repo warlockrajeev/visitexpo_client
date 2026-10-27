@@ -18,6 +18,7 @@ import {
   Users,
   Award,
   ChevronRight,
+  ChevronDown,
   X,
   Loader2,
   ShieldCheck,
@@ -977,47 +978,98 @@ export default function TicketingPage() {
             </button>
           </div>
 
-          {/* Filter Bar */}
-          <div className="grid gap-3 md:grid-cols-3 bg-card p-4 rounded-xl border border-border shadow-sm">
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          {/* Enhanced Filter & Search Toolbar */}
+          <div className="bg-card/90 backdrop-blur-sm p-3 rounded-2xl border border-border/80 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+            {/* Search Input Box */}
+            <div className="relative flex-1 flex items-center gap-2.5 px-3.5 py-2 rounded-xl border border-border/80 bg-background/90 hover:bg-background focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20 transition-all group">
+              <Search className="h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors shrink-0" />
               <input
                 type="text"
-                placeholder="Search ticket ID, title..."
+                placeholder="Search ticket ID (e.g. TKT-6796), title, category..."
                 value={supportSearchTerm}
                 onChange={(e) => setSupportSearchTerm(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full bg-transparent text-xs font-medium text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
               />
+              {supportSearchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSupportSearchTerm('')}
+                  className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0"
+                  title="Clear search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
 
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold text-muted-foreground shrink-0">Status:</label>
-              <select
-                value={supportStatusFilter}
-                onChange={(e) => setSupportStatusFilter(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary capitalize"
-              >
-                <option value="all">All Statuses</option>
-                <option value="open">Open</option>
-                <option value="in_progress">In Progress</option>
-                <option value="resolved">Resolved</option>
-                <option value="closed">Closed</option>
-              </select>
-            </div>
+            {/* Filter Controls Row */}
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              {/* Status Filter Dropdown */}
+              <div className="relative inline-flex items-center rounded-xl border border-border/80 bg-background/90 hover:bg-background hover:border-primary/40 focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-xs group">
+                <span className="pl-3 text-primary/80 flex items-center shrink-0">
+                  <Filter className="h-3.5 w-3.5" />
+                </span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80 pl-1.5 select-none shrink-0">
+                  Status:
+                </span>
+                <select
+                  value={supportStatusFilter}
+                  onChange={(e) => setSupportStatusFilter(e.target.value)}
+                  className="appearance-none bg-transparent pl-1.5 pr-8 py-2 text-xs font-semibold text-foreground cursor-pointer focus:outline-none capitalize"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="open">Open</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="closed">Closed</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2.5 h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </div>
 
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold text-muted-foreground shrink-0">Priority:</label>
-              <select
-                value={supportPriorityFilter}
-                onChange={(e) => setSupportPriorityFilter(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary capitalize"
-              >
-                <option value="all">All Priorities</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
+              {/* Priority Filter Dropdown */}
+              <div className="relative inline-flex items-center rounded-xl border border-border/80 bg-background/90 hover:bg-background hover:border-primary/40 focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-xs group">
+                <span className="pl-3 text-amber-500/80 flex items-center shrink-0">
+                  <Tag className="h-3.5 w-3.5" />
+                </span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80 pl-1.5 select-none shrink-0">
+                  Priority:
+                </span>
+                <select
+                  value={supportPriorityFilter}
+                  onChange={(e) => setSupportPriorityFilter(e.target.value)}
+                  className="appearance-none bg-transparent pl-1.5 pr-8 py-2 text-xs font-semibold text-foreground cursor-pointer focus:outline-none capitalize"
+                >
+                  <option value="all">All Priorities</option>
+                  <option value="low">Low Priority</option>
+                  <option value="medium">Medium Priority</option>
+                  <option value="high">High Priority</option>
+                  <option value="urgent">Urgent Escalation</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2.5 h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </div>
+
+              {/* Reset Filters Button */}
+              {(supportSearchTerm || supportStatusFilter !== 'all' || supportPriorityFilter !== 'all') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSupportSearchTerm('');
+                    setSupportStatusFilter('all');
+                    setSupportPriorityFilter('all');
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-destructive bg-destructive/10 hover:bg-destructive/20 border border-destructive/20 rounded-xl transition-all cursor-pointer shadow-xs animate-in fade-in zoom-in-95 duration-150"
+                  title="Reset all active filters"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  <span>Reset</span>
+                </button>
+              )}
+
+              {/* Counter Badge */}
+              <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-muted/40 border border-border/60 text-[11px] font-medium text-muted-foreground select-none">
+                <span className="font-bold text-foreground">{filteredSupportTickets.length}</span>
+                <span>/ {supportTickets.length} tickets</span>
+              </div>
             </div>
           </div>
 
