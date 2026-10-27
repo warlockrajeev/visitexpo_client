@@ -10,6 +10,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '../../../components/Navbar.js';
+import ShareModal from '../../../components/ShareModal.js';
 import { useAuth } from '../../../context/AuthContext.js';
 import { getCategoryBySlug, CATEGORIES_CONFIG } from '../../../data/categoryEventsData.js';
 import { renderCardDescription } from '../../../utils/textFormatters.js';
@@ -73,11 +74,27 @@ export default function CategoryEventsPage() {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handleShare = () => {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
-      setShareToast(true);
-      setTimeout(() => setShareToast(false), 3000);
+  const [shareModalData, setShareModalData] = useState(null);
+
+  const handleShare = (eventData = null) => {
+    if (eventData) {
+      setShareModalData({
+        title: eventData.title,
+        text: `Check out ${eventData.title} on VisitExpo! Dates: ${eventData.dates}${eventData.city ? `, ${eventData.city}` : ''}`,
+        url: typeof window !== 'undefined' ? `${window.location.origin}/expo/${eventData.slug}` : `https://visitexpo.in/expo/${eventData.slug}`,
+        image: eventData.logo || eventData.image,
+        dates: eventData.dates,
+        city: eventData.city,
+        venue: eventData.venue
+      });
+    } else {
+      setShareModalData({
+        title: `${category.name} Expos & Trade Shows`,
+        text: `Explore top ${category.name} conferences, trade exhibitions and industrial expos on VisitExpo!`,
+        url: typeof window !== 'undefined' ? window.location.href : `https://visitexpo.in/category/${category.slug}`,
+        image: category.heroBanner,
+        category: category.name
+      });
     }
   };
 
@@ -786,7 +803,7 @@ export default function CategoryEventsPage() {
 
                         <button
                           type="button"
-                          onClick={handleShare}
+                          onClick={() => handleShare(evt)}
                           className="p-1 text-zinc-400 hover:text-zinc-800 transition-colors cursor-pointer"
                           title="Share event"
                         >
@@ -897,6 +914,13 @@ export default function CategoryEventsPage() {
 
         </div>
       </div>
+
+      {/* Share Platform Options Modal */}
+      <ShareModal
+        isOpen={Boolean(shareModalData)}
+        onClose={() => setShareModalData(null)}
+        data={shareModalData}
+      />
     </div>
   );
 }

@@ -27,6 +27,7 @@ import InterestedAttendeesModal from '../../../components/InterestedAttendeesMod
 import OrganizerChatWidget from '../../../components/OrganizerChatWidget.js';
 import GoogleCalendarButton from '../../../components/GoogleCalendarButton.js';
 import GoogleCalendarModal from '../../../components/GoogleCalendarModal.js';
+import ShareModal from '../../../components/ShareModal.js';
 import { slugifyVenue } from '../../../data/venuesData.js';
 import { showSweetAlert, showSweetConfirm, showSweetSuccess } from '../../../utils/sweetalert.js';
 import {
@@ -1538,28 +1539,10 @@ export default function ExpoDetailsPage() {
     return Array.from(tags);
   }, [event]);
 
-  const handleShare = async () => {
-    if (typeof window === 'undefined' || isSharing) return;
-    if (!navigator.share) {
-      showToast('Sharing is not supported by this browser.');
-      return;
-    }
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
-    setIsSharing(true);
-    try {
-      await navigator.share({
-        title: event?.title || 'VisitExpo Event',
-        text: `Check out ${event?.title || 'this event'} on VisitExpo`,
-        url: window.location.href
-      });
-      showToast('Event shared successfully!');
-    } catch (error) {
-      if (error.name === 'AbortError') return;
-      console.error('Could not share event:', error);
-      showToast('Could not share the event. Please try again.');
-    } finally {
-      setIsSharing(false);
-    }
+  const handleShare = () => {
+    setIsShareModalOpen(true);
   };
 
   const redirectToLogin = () => {
@@ -5959,6 +5942,21 @@ export default function ExpoDetailsPage() {
         onOpen={() => setIsChatOpen(true)}
         onClose={() => setIsChatOpen(false)}
         onStatusChange={(enabled) => setIsChatEnabled(enabled)}
+      />
+
+      {/* Share Platform Options Modal */}
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        data={{
+          title: event?.title || 'VisitExpo Event',
+          text: `Check out ${event?.title || 'this trade show'} on VisitExpo! Dates: ${event?.dates || ''}, Venue: ${event?.venue || ''}, ${event?.city || ''}`,
+          url: typeof window !== 'undefined' ? window.location.href : `https://visitexpo.in/expo/${slug}`,
+          image: event?.image || event?.logo,
+          dates: event?.dates,
+          city: event?.city,
+          venue: event?.venue
+        }}
       />
 
       {/* Footer */}

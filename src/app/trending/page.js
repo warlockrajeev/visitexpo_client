@@ -11,6 +11,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar.js';
+import ShareModal from '@/components/ShareModal.js';
 import { useAuth } from '@/context/AuthContext.js';
 import { renderCardDescription } from '@/utils/textFormatters.js';
 import {
@@ -136,11 +137,25 @@ export default function TrendingEventsPage() {
     return list;
   }, [events, searchQuery, selectedCategory, sortBy]);
 
-  const handleShare = () => {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
-      setShareToast(true);
-      setTimeout(() => setShareToast(false), 3000);
+  const [shareModalData, setShareModalData] = useState(null);
+
+  const handleShare = (eventData = null) => {
+    if (eventData) {
+      setShareModalData({
+        title: eventData.title,
+        text: `Check out ${eventData.title} on VisitExpo! Dates: ${eventData.dates || ''}${eventData.city ? `, ${eventData.city}` : ''}`,
+        url: typeof window !== 'undefined' ? `${window.location.origin}/expo/${eventData.slug}` : `https://visitexpo.in/expo/${eventData.slug}`,
+        image: eventData.logo || eventData.image,
+        dates: eventData.dates,
+        city: eventData.city,
+        venue: eventData.venue
+      });
+    } else {
+      setShareModalData({
+        title: 'Trending Expos & Trade Shows on VisitExpo',
+        text: 'Discover high-demand trade shows, trending business expos, and international exhibitions on VisitExpo!',
+        url: typeof window !== 'undefined' ? window.location.href : 'https://visitexpo.in/trending'
+      });
     }
   };
 
@@ -505,6 +520,13 @@ export default function TrendingEventsPage() {
           </div>
         </section>
       </main>
+
+      {/* Share Platform Options Modal */}
+      <ShareModal
+        isOpen={Boolean(shareModalData)}
+        onClose={() => setShareModalData(null)}
+        data={shareModalData}
+      />
     </div>
   );
 }

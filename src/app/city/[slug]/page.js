@@ -15,6 +15,7 @@ import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
 import { showSweetAlert, showSweetConfirm, showSweetSuccess } from '../../../utils/sweetalert.js';
 import Navbar from '../../../components/Navbar.js';
+import ShareModal from '../../../components/ShareModal.js';
 import {
   MapPin,
   Calendar,
@@ -304,12 +305,16 @@ export default function CityEventsPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  const [shareModalData, setShareModalData] = useState(null);
+
   const handleShare = () => {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
-      setShareToast(true);
-      setTimeout(() => setShareToast(false), 3000);
-    }
+    setShareModalData({
+      title: `Exhibitions & Trade Shows in ${cityProfile.name}`,
+      text: `Discover verified trade shows and upcoming business exhibitions in ${cityProfile.name} on VisitExpo!`,
+      url: typeof window !== 'undefined' ? window.location.href : `https://visitexpo.in/city/${slug}`,
+      image: cityProfile.banner,
+      city: cityProfile.name
+    });
   };
 
   const handleClaimPass = async (evt) => {
@@ -817,6 +822,13 @@ export default function CityEventsPage() {
         </div>
 
       </main>
+
+      {/* Share Platform Options Modal */}
+      <ShareModal
+        isOpen={Boolean(shareModalData)}
+        onClose={() => setShareModalData(null)}
+        data={shareModalData}
+      />
     </div>
   );
 }
