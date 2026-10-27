@@ -8,7 +8,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Mail, ArrowRight, Check } from 'lucide-react';
+import { Mail, ArrowRight, Check, AlertCircle } from 'lucide-react';
 import { Logo } from './Navbar.js';
 
 const LinkedInIcon = ({ className = "h-4 w-4" }) => (
@@ -46,10 +46,65 @@ const YouTubeIcon = ({ className = "h-4 w-4" }) => (
 export default function Footer({ className = '' }) {
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleKeyDown = (e) => {
+    // Allow control / navigation keys
+    if (
+      e.key === 'Backspace' ||
+      e.key === 'Tab' ||
+      e.key === 'Enter' ||
+      e.key === 'Escape' ||
+      e.key === 'ArrowLeft' ||
+      e.key === 'ArrowRight' ||
+      e.key === 'ArrowUp' ||
+      e.key === 'ArrowDown' ||
+      e.key === 'Delete' ||
+      e.key === 'Home' ||
+      e.key === 'End' ||
+      e.ctrlKey ||
+      e.metaKey ||
+      e.altKey
+    ) {
+      return;
+    }
+    if (e.key === ' ') {
+      e.preventDefault();
+      setError('Spaces are not allowed in email address.');
+      return;
+    }
+    // Block special characters: < > ( ) * & ^ % $ # ! / \ ~ = ? ; : " ' , etc.
+    if (!/^[a-zA-Z0-9@._+-]$/.test(e.key)) {
+      e.preventDefault();
+      setError(`Special symbols (${e.key}) are not allowed in email.`);
+      return;
+    }
+  };
+
+  const handleChange = (e) => {
+    const sanitized = e.target.value.replace(/[^a-zA-Z0-9@._+-]/g, '');
+    setEmail(sanitized);
+    if (!sanitized) {
+      setError('');
+    } else if (error && /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(sanitized)) {
+      setError('');
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!email.trim()) return;
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed) {
+      setError('Please enter your email address.');
+      return;
+    }
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(trimmed)) {
+      setError('Please enter a valid email address (e.g. name@company.com).');
+      return;
+    }
+
+    setError('');
     setSubscribed(true);
     setTimeout(() => {
       setEmail('');
@@ -76,25 +131,44 @@ export default function Footer({ className = '' }) {
 
             {/* Newsletter Subscription */}
             <div className="pt-1 max-w-sm">
-              <form onSubmit={handleSubmit} className="flex items-center gap-1.5">
-                <input
-                  type="email"
-                  required
-                  placeholder="Get expo updates (enter email)..."
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600 transition-colors"
-                />
-                <button
-                  type="submit"
-                  className="px-3.5 py-2 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 font-semibold text-xs shrink-0 transition-colors cursor-pointer"
-                >
-                  {subscribed ? <Check className="h-3.5 w-3.5 text-zinc-950" /> : 'Subscribe'}
-                </button>
+              <form onSubmit={handleSubmit} noValidate className="space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    inputMode="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck="false"
+                    placeholder="Get expo updates (enter email)..."
+                    value={email}
+                    onKeyDown={handleKeyDown}
+                    onChange={handleChange}
+                    className={`flex-1 bg-zinc-900 border rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none transition-colors ${
+                      error
+                        ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/20'
+                        : 'border-zinc-800 focus:border-zinc-600'
+                    }`}
+                  />
+                  <button
+                    type="submit"
+                    className="px-3.5 py-2 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 font-semibold text-xs shrink-0 transition-colors cursor-pointer active:scale-95"
+                  >
+                    {subscribed ? <Check className="h-3.5 w-3.5 text-zinc-950" /> : 'Subscribe'}
+                  </button>
+                </div>
+                {error && (
+                  <p className="text-[11px] font-medium text-rose-400 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3 shrink-0 text-rose-400" />
+                    <span>{error}</span>
+                  </p>
+                )}
+                {subscribed && (
+                  <p className="text-[11px] text-emerald-400 flex items-center gap-1">
+                    <Check className="h-3 w-3 shrink-0" />
+                    <span>Thank you for subscribing to expo updates.</span>
+                  </p>
+                )}
               </form>
-              {subscribed && (
-                <p className="text-[11px] text-zinc-400 mt-1">Thank you for subscribing.</p>
-              )}
             </div>
 
             <div className="pt-1 text-[11px] text-zinc-500 space-y-0.5">

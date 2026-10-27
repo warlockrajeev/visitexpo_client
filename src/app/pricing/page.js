@@ -372,12 +372,22 @@ export default function PricingPage() {
           cancelButtonText: 'Cancel'
         }).then((result) => {
           if (result.isConfirmed) {
-            const el = document.getElementById('official-plans');
-            if (el) {
-              el.scrollIntoView({ behavior: 'smooth' });
-            } else {
-              window.scrollTo({ top: 350, behavior: 'smooth' });
-            }
+            setTimeout(() => {
+              const starterCard = document.getElementById('plan-card-starter');
+              const plansSection = document.getElementById('official-plans');
+              const target = starterCard || plansSection;
+              if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (starterCard) {
+                  starterCard.classList.add('ring-8', 'ring-[#FFCC00]');
+                  setTimeout(() => {
+                    starterCard.classList.remove('ring-8', 'ring-[#FFCC00]');
+                  }, 2200);
+                }
+              } else {
+                window.scrollTo({ top: 550, behavior: 'smooth' });
+              }
+            }, 150);
           }
         });
         return;
@@ -390,14 +400,28 @@ export default function PricingPage() {
       cycle: billingCycle
     });
     setSelectedGrowthService(serviceName);
-    if (!formName && user?.name) setFormName(user.name);
-    if (!formEmail && user?.email) setFormEmail(user.email);
-    if (!formPhone && user?.phone) setFormPhone(user.phone);
-    if (!formOrg && user?.organization?.name) setFormOrg(user.organization.name);
+    resetFormFields();
+    setIsModalOpen(true);
+  };
+
+  // Reset all inquiry modal fields to initial/clean state
+  const resetFormFields = () => {
+    setFormName(user?.name || '');
+    setFormEmail(user?.email || '');
+    setFormPhone(user?.phone || '');
+    setFormOrg(user?.organization?.name || '');
+    setFormCity('');
+    setFormEventType('Trade Show / B2B');
+    setFormMessage('');
     setFormErrors({});
     setFormTouched({});
     setModalFieldWarning('');
-    setIsModalOpen(true);
+  };
+
+  // Handle closing modal with full state cleanup
+  const handleCloseModal = () => {
+    resetFormFields();
+    setIsModalOpen(false);
   };
 
   // Field-level Validator
@@ -715,9 +739,7 @@ export default function PricingPage() {
       const res = await axios.post(`${API_URL}/plans/inquire`, payload);
 
       if (res.data?.success) {
-        setIsModalOpen(false);
-        setFormErrors({});
-        setFormTouched({});
+        handleCloseModal();
         Swal.fire({
           icon: 'success',
           title: 'Inquiry Received!',
@@ -725,7 +747,6 @@ export default function PricingPage() {
           confirmButtonColor: '#FFCC00',
           confirmButtonText: '<span style="color: #000; font-weight: bold;">Great, Thank You</span>'
         });
-        setFormMessage('');
       }
     } catch (err) {
       console.error('Inquiry submission error', err);
@@ -1135,9 +1156,9 @@ export default function PricingPage() {
     <div className="min-h-screen bg-white text-zinc-900 font-sans selection:bg-[#FFCC00] selection:text-black flex flex-col justify-between">
       <Navbar />
 
-      <main className="flex-1 pt-24 sm:pt-28 pb-20">
+      <main className="flex-1 pt-16 sm:pt-20 pb-16">
         {/* Breadcrumb Navigation */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-2 sm:mb-2.5">
           <nav className="flex items-center gap-2 text-xs font-medium text-zinc-500">
             <Link href="/" className="hover:text-zinc-900 transition-colors">
               Home
@@ -1150,25 +1171,25 @@ export default function PricingPage() {
         {/* ========================================================= */}
         {/* HERO SECTION (CLEAN WHITE CANVAS) */}
         {/* ========================================================= */}
-        <section className="relative px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center pt-4 pb-12">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-amber-300 bg-amber-50 text-amber-900 text-xs font-bold uppercase tracking-wider mb-4 shadow-2xs">
+        <section className="relative px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center pt-1 sm:pt-1.5 pb-6 sm:pb-7">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-amber-300 bg-amber-50 text-amber-900 text-[11px] font-bold uppercase tracking-wider mb-2.5 shadow-2xs">
             <ShieldCheck className="h-3.5 w-3.5 text-amber-600" />
             <span>VisitExpo Official Organizer Ecosystem</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-zinc-950 max-w-4xl mx-auto leading-[1.15]">
+          <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-zinc-950 max-w-3xl mx-auto leading-tight sm:leading-[1.18]">
             Predictable, High-ROI Plans Built for Every Stage of Expo Organizing
           </h1>
 
-          <p className="mt-5 text-sm sm:text-base text-zinc-600 max-w-2xl mx-auto leading-relaxed">
+          <p className="mt-3 text-xs sm:text-sm text-zinc-600 max-w-2xl mx-auto leading-relaxed">
             From initial idea validation and token demand testing to multi-city enterprise trade shows. Pay for what you need, unlock actionable leads, and scale when you grow.
           </p>
 
           {/* Billing Switcher Toggle */}
-          <div className="mt-8 inline-flex items-center p-1.5 rounded-2xl bg-zinc-100 border border-zinc-200 shadow-inner">
+          <div className="mt-4 sm:mt-5 inline-flex items-center p-1 rounded-2xl bg-zinc-100 border border-zinc-200 shadow-inner">
             <button
               onClick={() => setBillingCycle('quarterly')}
-              className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 billingCycle === 'quarterly'
                   ? 'bg-white text-zinc-950 shadow-sm border border-zinc-200/80'
                   : 'text-zinc-600 hover:text-zinc-900'
@@ -1179,7 +1200,7 @@ export default function PricingPage() {
 
             <button
               onClick={() => setBillingCycle('yearly')}
-              className={`relative px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`relative px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 billingCycle === 'yearly'
                   ? 'bg-[#FFCC00] text-black shadow-md font-extrabold'
                   : 'text-zinc-600 hover:text-zinc-900'
@@ -1204,7 +1225,7 @@ export default function PricingPage() {
         {/* ========================================================= */}
         {/* 4 CORE PRICING CARDS (PURE WHITE WITH CRISP BORDERS) */}
         {/* ========================================================= */}
-        <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <section id="official-plans" className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto scroll-mt-24">
           {/* Current Active Plan Status Banner for Logged-in Organizers */}
           {user?.role === 'organizer' && (
             <div className="mb-6 p-4 rounded-2xl border bg-gradient-to-r from-amber-500/10 via-primary/10 to-amber-500/10 border-primary/40 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
@@ -1404,7 +1425,7 @@ export default function PricingPage() {
             </div>
 
             {/* ---------------- CARD 2: ORGANIZER STARTER ---------------- */}
-            <div className="rounded-3xl border-2 border-[#FFCC00] bg-white p-6 sm:p-7 shadow-xl shadow-amber-500/10 ring-4 ring-amber-400/20 relative flex flex-col justify-between space-y-5 transition-all hover:shadow-2xl">
+            <div id="plan-card-starter" className="rounded-3xl border-2 border-[#FFCC00] bg-white p-6 sm:p-7 shadow-xl shadow-amber-500/10 ring-4 ring-amber-400/20 relative flex flex-col justify-between space-y-5 transition-all duration-300 hover:shadow-2xl scroll-mt-28">
               <div className="space-y-4">
                 {/* Top Badge: Most Popular with VisitExpo signature styling */}
                 <div>
@@ -1899,8 +1920,11 @@ export default function PricingPage() {
               <form onSubmit={handleCheckEmail} noValidate className="mt-6 max-w-lg mx-auto">
                 <div className="flex flex-col sm:flex-row gap-2">
                   <input
-                    type="email"
-                    required
+                    type="text"
+                    inputMode="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck="false"
                     placeholder="Enter your work email (e.g. name@acmeexpos.com)..."
                     value={emailCheckInput}
                     onKeyDown={handleEmailCheckKeyDown}
@@ -2389,8 +2413,14 @@ export default function PricingPage() {
       {/* INQUIRY / UPGRADE MODAL (WHITE CLEAN MODAL) */}
       {/* ========================================================= */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-          <div className="relative w-full max-w-lg bg-white border border-zinc-200 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto animate-fade-in text-zinc-900">
+        <div 
+          onClick={handleCloseModal}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-lg bg-white border border-zinc-200 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto animate-fade-in text-zinc-900"
+          >
             <div className="flex items-start justify-between border-b border-zinc-200 pb-4">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
@@ -2448,7 +2478,7 @@ export default function PricingPage() {
               </div>
 
               <button
-                onClick={() => setIsModalOpen(false)}
+                onClick={handleCloseModal}
                 className="p-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900 border border-zinc-200/80 hover:border-zinc-300 transition-all duration-200 cursor-pointer hover:rotate-90 active:scale-95 flex items-center justify-center shadow-xs"
                 title="Close dialog"
               >
@@ -2469,7 +2499,6 @@ export default function PricingPage() {
                   </label>
                   <input
                     type="text"
-                    required
                     disabled={Boolean(user?.name)}
                     placeholder="e.g. Rajesh Sharma"
                     value={formName}
@@ -2533,8 +2562,11 @@ export default function PricingPage() {
                     )}
                   </label>
                   <input
-                    type="email"
-                    required
+                    type="text"
+                    inputMode="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck="false"
                     disabled={Boolean(user?.email)}
                     placeholder="name@company.com"
                     value={formEmail}
@@ -2571,7 +2603,7 @@ export default function PricingPage() {
                   </label>
                   <input
                     type="tel"
-                    required
+                    inputMode="tel"
                     disabled={Boolean(user?.phone)}
                     placeholder="+91 98765 43210"
                     value={formPhone}
@@ -2693,7 +2725,7 @@ export default function PricingPage() {
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-zinc-200">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={handleCloseModal}
                   className="px-4 py-2.5 rounded-xl border border-zinc-200 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-semibold cursor-pointer"
                 >
                   Cancel
