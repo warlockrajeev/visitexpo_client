@@ -41,7 +41,10 @@ import {
   Printer,
   Download,
   Mail,
-  Phone
+  Phone,
+  Edit,
+  Trash2,
+  Pencil
 } from 'lucide-react';
 import { CURRENCY_OPTIONS, getCurrencySymbol } from '../events/wizard/page.js';
 import { showSweetAlert, showSweetConfirm, showSweetSuccess, showSweetError, showSweetWarning } from '../../../utils/sweetalert.js';
@@ -145,6 +148,18 @@ export default function TicketingPage() {
   const [selectedTicketDetail, setSelectedTicketDetail] = useState(null);
   const [replyMessage, setReplyMessage] = useState('');
   const [postingReply, setPostingReply] = useState(false);
+
+  // Edit Support Ticket Modal State
+  const [isEditTicketModalOpen, setIsEditTicketModalOpen] = useState(false);
+  const [editingTicket, setEditingTicket] = useState(null);
+  const [updatingTicket, setUpdatingTicket] = useState(false);
+  const [editTicketForm, setEditTicketForm] = useState({
+    title: '',
+    description: '',
+    category: 'technical',
+    priority: 'medium',
+    eventId: ''
+  });
 
   // Helper reset & modal handlers to ensure form fields are always fresh/clean on open/close
   const resetSimulateForm = () => {
@@ -515,6 +530,96 @@ export default function TicketingPage() {
     } catch (err) {
       console.error('Error marking resolved', err);
       showSweetError('Failed to update ticket status');
+    }
+  };
+
+  // 9. Handle Open / Close Edit Ticket Modal
+  const handleOpenEditTicketModal = (ticket) => {
+    setEditingTicket(ticket);
+    setEditTicketForm({
+      title: ticket.title || '',
+      description: ticket.description || '',
+      category: ticket.category || 'technical',
+      priority: ticket.priority || 'medium',
+      eventId: ticket.event?._id || ticket.event || ''
+    });
+    setIsEditTicketModalOpen(true);
+  };
+
+  const handleCloseEditTicketModal = () => {
+    setIsEditTicketModalOpen(false);
+    setEditingTicket(null);
+    setEditTicketForm({
+      title: '',
+      description: '',
+      category: 'technical',
+      priority: 'medium',
+      eventId: ''
+    });
+  };
+
+  // 10. Handle Save Edit Support Ticket
+  const handleUpdateSupportTicket = async (e) => {
+    e.preventDefault();
+    if (!editingTicket) return;
+    if (!editTicketForm.title.trim() || !editTicketForm.description.trim()) {
+      showSweetWarning('Ticket title and description are required.');
+      return;
+    }
+
+    setUpdatingTicket(true);
+    try {
+      const token = accessToken || (typeof window !== 'undefined' ? localStorage.getItem('visitexpo_access_token') : null);
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await axios.put(
+        `${API_URL}/support-tickets/${editingTicket._id}`,
+        {
+          title: editTicketForm.title.trim(),
+          description: editTicketForm.description.trim(),
+          category: editTicketForm.category,
+          priority: editTicketForm.priority,
+          eventId: editTicketForm.eventId || undefined
+        },
+        { headers }
+      );
+
+      if (res.data && res.data.success) {
+        showSweetSuccess(`Support Ticket ${editingTicket.ticketId} updated successfully!`);
+        handleCloseEditTicketModal();
+        fetchSupportTickets();
+      }
+    } catch (err) {
+      console.error('Error updating support ticket', err);
+      showSweetError(err.response?.data?.error || 'Failed to update support ticket.');
+    } finally {
+      setUpdatingTicket(false);
+    }
+  };
+
+  // 11. Handle Delete Support Ticket
+  const handleDeleteSupportTicket = async (ticketId, displayId) => {
+    const isConfirmed = await showSweetConfirm(
+      `Delete Ticket ${displayId || ''}?`,
+      'This action will permanently delete this support ticket and discussion history.',
+      'Yes, delete ticket'
+    );
+
+    if (!isConfirmed) return;
+
+    try {
+      const token = accessToken || (typeof window !== 'undefined' ? localStorage.getItem('visitexpo_access_token') : null);
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await axios.delete(`${API_URL}/support-tickets/${ticketId}`, { headers });
+      if (res.data && res.data.success) {
+        showSweetSuccess(`Ticket ${displayId || ''} deleted successfully.`);
+        if (selectedTicketDetail && selectedTicketDetail._id === ticketId) {
+          setSelectedTicketDetail(null);
+        }
+        fetchSupportTickets();
+      }
+    } catch (err) {
+      console.error('Error deleting support ticket', err);
+      showSweetError(err.response?.data?.error || 'Failed to delete support ticket.');
     }
   };
 
@@ -968,12 +1073,34 @@ export default function TicketingPage() {
                           </td>
 
                           <td className="px-5 py-3.5 text-right whitespace-nowrap">
-                            <button
-                              onClick={() => setSelectedTicketDetail(t)}
-                              className="inline-flex items-center gap-1 text-xs font-bold text-primary bg-primary/10 border border-primary/20 hover:bg-primary/20 px-3 py-1.5 rounded-lg transition-all"
-                            >
-                              <MessageSquare className="h-3.5 w-3.5" /> Discussion ({t.responses?.length || 0})
-                            </button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedTicketDetail(t)}
+                                className="inline-flex items-center gap-1 text-xs font-bold text-primary bg-primary/10 border border-primary/20 hover:bg-primary/20 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                                title="Open discussion thread and replies"
+                              >
+                                <MessageSquare className="h-3.5 w-3.5" /> Discussion ({t.responses?.length || 0})
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditTicketModal(t)}
+                                className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
+                                title="Edit ticket details"
+                              >
+                                <Edit className="h-3.5 w-3.5" /> Edit
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSupportTicket(t._id, t.ticketId)}
+                                className="inline-flex items-center gap-1 text-xs font-bold text-destructive bg-destructive/10 border border-destructive/20 hover:bg-destructive/20 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
+                                title="Delete this support ticket"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" /> Delete
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1101,6 +1228,135 @@ export default function TicketingPage() {
                   ) : (
                     <>
                       <Send className="h-4 w-4" /> Submit Support Ticket
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: EDIT SUPPORT TICKET ================= */}
+      {isEditTicketModalOpen && editingTicket && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={handleCloseEditTicketModal}
+        >
+          <div 
+            className="relative w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={handleCloseEditTicketModal}
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <div className="flex items-center gap-2">
+              <Edit className="h-6 w-6 text-primary" />
+              <div>
+                <h3 className="text-xl font-bold text-foreground">Edit Support Ticket</h3>
+                <p className="text-xs font-mono text-muted-foreground">{editingTicket.ticketId}</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Modify the issue description, category, priority, or associated event.
+            </p>
+
+            <form onSubmit={handleUpdateSupportTicket} className="space-y-4 pt-2">
+              <div>
+                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Ticket Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={editTicketForm.title}
+                  onChange={(e) => setEditTicketForm({ ...editTicketForm, title: e.target.value })}
+                  placeholder="e.g., Payment gateway webhook timeout"
+                  className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Category *</label>
+                  <select
+                    value={editTicketForm.category}
+                    onChange={(e) => setEditTicketForm({ ...editTicketForm, category: e.target.value })}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary capitalize"
+                  >
+                    <option value="technical">Technical Support</option>
+                    <option value="billing">Billing &amp; Payouts</option>
+                    <option value="event_setup">Event Setup / Onboarding</option>
+                    <option value="exhibitor_issue">Exhibitor Management</option>
+                    <option value="other">General Inquiries</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Priority *</label>
+                  <select
+                    value={editTicketForm.priority}
+                    onChange={(e) => setEditTicketForm({ ...editTicketForm, priority: e.target.value })}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary capitalize"
+                  >
+                    <option value="low">Low Priority</option>
+                    <option value="medium">Medium Priority</option>
+                    <option value="high">High Priority</option>
+                    <option value="urgent">Urgent Escalation</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Related Event (Optional)</label>
+                <select
+                  value={editTicketForm.eventId}
+                  onChange={(e) => setEditTicketForm({ ...editTicketForm, eventId: e.target.value })}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">No specific event (Platform inquiry)</option>
+                  {events.map((ev) => (
+                    <option key={ev._id} value={ev._id}>
+                      {ev.title} ({ev.city || 'Online'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Description / Details *</label>
+                <textarea
+                  required
+                  rows={4}
+                  value={editTicketForm.description}
+                  onChange={(e) => setEditTicketForm({ ...editTicketForm, description: e.target.value })}
+                  placeholder="Provide complete steps, expected vs actual behavior, or error messages..."
+                  className="w-full rounded-xl border border-border bg-background p-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                <button
+                  type="button"
+                  onClick={handleCloseEditTicketModal}
+                  className="rounded-lg border border-border hover:bg-secondary px-4 py-2 text-sm font-semibold text-foreground transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={updatingTicket}
+                  className="rounded-lg bg-primary hover:bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow-md transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {updatingTicket ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Saving Changes...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4" /> Save Changes
                     </>
                   )}
                 </button>
