@@ -326,17 +326,17 @@ export default function FeaturedOrganizerApplicationPage() {
           </div>
 
           {/* Upgrade Call to Action */}
-          <div className="pt-4 flex flex-col sm:flex-row items-center gap-4">
+          <div className="pt-2 flex flex-col sm:flex-row items-center gap-2.5">
             <Link
               href="/pricing"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-black text-sm font-extrabold shadow-lg transition-all hover:scale-[1.02] cursor-pointer"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-black text-xs sm:text-sm font-semibold shadow-xs hover:shadow-sm transition-all hover:scale-[1.01] active:scale-[0.98] cursor-pointer"
             >
               <span>Upgrade to Enterprise Plan</span>
-              <ArrowRight className="h-4 w-4 text-black" />
+              <ArrowRight className="h-3.5 w-3.5 text-black" />
             </Link>
             <Link
               href="/dashboard"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground text-sm font-bold border border-border transition-colors"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-background hover:bg-secondary/80 text-foreground text-xs sm:text-sm font-medium border border-border/80 transition-all active:scale-[0.98] cursor-pointer"
             >
               Back to Dashboard
             </Link>
@@ -765,20 +765,20 @@ export default function FeaturedOrganizerApplicationPage() {
 
               {/* Action Buttons */}
               {showForm && (
-                <div className="pt-4 flex items-center gap-3">
+                <div className="pt-2 flex items-center gap-2.5">
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="flex-1 py-3.5 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-black text-xs font-extrabold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    className="flex-1 py-2.5 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-black text-xs font-semibold shadow-xs hover:shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-[0.98]"
                   >
                     {submitting ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin text-black" />
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-black" />
                         <span>Submitting Application...</span>
                       </>
                     ) : (
                       <>
-                        <Award className="h-4 w-4 text-black" />
+                        <Award className="h-3.5 w-3.5 text-black" />
                         <span>
                           {hasApplication ? 'Update & Re-submit for Review' : 'Submit Application to Super Admin'}
                         </span>
@@ -790,7 +790,7 @@ export default function FeaturedOrganizerApplicationPage() {
                     <button
                       type="button"
                       onClick={() => setIsEditing(false)}
-                      className="px-5 py-3.5 rounded-xl bg-secondary hover:bg-secondary/80 border border-border text-foreground text-xs font-bold transition-colors cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl bg-background hover:bg-secondary/80 border border-border/80 text-foreground text-xs font-medium transition-colors cursor-pointer active:scale-[0.98]"
                     >
                       Cancel
                     </button>
