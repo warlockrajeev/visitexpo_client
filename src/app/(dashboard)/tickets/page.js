@@ -490,7 +490,11 @@ export default function TicketingPage() {
   // 7. Handle Reply to Support Ticket Thread
   const handlePostReply = async (e) => {
     e.preventDefault();
-    if (!replyMessage.trim() || !selectedTicketDetail) return;
+    if (!replyMessage.trim()) {
+      showSweetWarning('Please enter a reply message before sending.');
+      return;
+    }
+    if (!selectedTicketDetail) return;
 
     setPostingReply(true);
     try {
@@ -1138,12 +1142,11 @@ export default function TicketingPage() {
               Describe the issue or technical assistance required. Our Super Admin team will review and respond directly.
             </p>
 
-            <form onSubmit={handleRaiseSupportTicket} className="space-y-4 pt-2">
+            <form onSubmit={handleRaiseSupportTicket} noValidate className="space-y-4 pt-2">
               <div>
                 <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Ticket Title *</label>
                 <input
                   type="text"
-                  required
                   value={newSupportTicket.title}
                   onChange={(e) => setNewSupportTicket(prev => ({ ...prev, title: e.target.value }))}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
@@ -1200,7 +1203,6 @@ export default function TicketingPage() {
                 <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Detailed Problem Description *</label>
                 <textarea
                   rows={4}
-                  required
                   value={newSupportTicket.description}
                   onChange={(e) => setNewSupportTicket(prev => ({ ...prev, description: e.target.value }))}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none placeholder:text-muted-foreground text-sm"
@@ -1265,12 +1267,11 @@ export default function TicketingPage() {
               Modify the issue description, category, priority, or associated event.
             </p>
 
-            <form onSubmit={handleUpdateSupportTicket} className="space-y-4 pt-2">
+            <form onSubmit={handleUpdateSupportTicket} noValidate className="space-y-4 pt-2">
               <div>
                 <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Ticket Title *</label>
                 <input
                   type="text"
-                  required
                   value={editTicketForm.title}
                   onChange={(e) => setEditTicketForm({ ...editTicketForm, title: e.target.value })}
                   placeholder="e.g., Payment gateway webhook timeout"
@@ -1328,7 +1329,6 @@ export default function TicketingPage() {
               <div>
                 <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Description / Details *</label>
                 <textarea
-                  required
                   rows={4}
                   value={editTicketForm.description}
                   onChange={(e) => setEditTicketForm({ ...editTicketForm, description: e.target.value })}
@@ -1460,10 +1460,9 @@ export default function TicketingPage() {
                   <span className="text-[11px] text-muted-foreground">Resolution Notes: {selectedTicketDetail.resolutionNotes || 'Resolved'}</span>
                 </div>
               ) : (
-                <form onSubmit={handlePostReply} className="flex gap-2">
+                <form onSubmit={handlePostReply} noValidate className="flex gap-2">
                   <input
                     type="text"
-                    required
                     value={replyMessage}
                     onChange={(e) => setReplyMessage(e.target.value)}
                     placeholder="Type your follow-up reply..."
@@ -1510,12 +1509,11 @@ export default function TicketingPage() {
             </button>
             <h3 className="text-xl font-bold text-foreground mb-4">Add Ticket Tier</h3>
 
-            <form onSubmit={handleCreateTier} className="space-y-4">
+            <form onSubmit={handleCreateTier} noValidate className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Tier Name *</label>
                 <input
                   type="text"
-                  required
                   value={newTier.title}
                   onChange={(e) => setNewTier(prev => ({ ...prev, title: e.target.value }))}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
@@ -1551,7 +1549,6 @@ export default function TicketingPage() {
                   <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Capacity Limit *</label>
                   <input
                     type="number"
-                    required
                     value={newTier.capacity}
                     onChange={(e) => setNewTier(prev => ({ ...prev, capacity: parseInt(e.target.value) || 0 }))}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
@@ -1585,7 +1582,6 @@ export default function TicketingPage() {
                       </span>
                       <input
                         type="number"
-                        required
                         min="1"
                         max={isPaidPlan ? undefined : 10}
                         step="any"
@@ -1646,7 +1642,7 @@ export default function TicketingPage() {
             </button>
             <h3 className="text-xl font-bold text-foreground mb-4">Simulate Ticket Purchase</h3>
 
-            <form onSubmit={handleSimulateCheckout} className="space-y-4">
+            <form onSubmit={handleSimulateCheckout} noValidate className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Select Ticket Tier *</label>
                 <SearchableSelect
@@ -1668,7 +1664,6 @@ export default function TicketingPage() {
                     type="number"
                     min="1"
                     max="10"
-                    required
                     value={simulateForm.quantity}
                     onChange={(e) => setSimulateForm(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
@@ -1689,7 +1684,6 @@ export default function TicketingPage() {
                 <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Buyer Name *</label>
                 <input
                   type="text"
-                  required
                   value={simulateForm.buyer.name}
                   onChange={(e) => setSimulateForm(prev => ({ ...prev, buyer: { ...prev.buyer, name: e.target.value } }))}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
@@ -1701,7 +1695,6 @@ export default function TicketingPage() {
                 <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Buyer Email *</label>
                 <input
                   type="email"
-                  required
                   value={simulateForm.buyer.email}
                   onChange={(e) => setSimulateForm(prev => ({ ...prev, buyer: { ...prev.buyer, email: e.target.value } }))}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
