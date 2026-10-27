@@ -333,12 +333,12 @@ export default function CategoryEventsPage() {
               </div>
             </div>
 
-            {/* Follow & Share buttons - Compact & Aligned */}
-            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+            {/* Follow button */}
+            <div className="flex items-center self-start sm:self-auto shrink-0">
               <button
                 type="button"
                 onClick={() => setIsFollowing(!isFollowing)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs ${
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs ${
                   isFollowing
                     ? 'bg-emerald-600 text-white hover:bg-emerald-700'
                     : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-extrabold'
@@ -352,15 +352,6 @@ export default function CategoryEventsPage() {
                 ) : (
                   <span>Follow</span>
                 )}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleShare}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-xs transition-colors cursor-pointer flex items-center gap-1.5"
-              >
-                <Share2 className="h-3.5 w-3.5" />
-                <span>Share</span>
               </button>
             </div>
           </div>
