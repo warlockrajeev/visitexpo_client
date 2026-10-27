@@ -241,14 +241,14 @@ export default function FeaturedOrganizerApplicationPage() {
   // ==========================================
   if (!isEnterprise) {
     return (
-      <div className="max-w-5xl mx-auto space-y-8 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-5xl mx-auto space-y-6 pt-1 sm:pt-2 px-2 sm:px-4 lg:px-6 pb-8">
         {/* Header */}
         <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2.5">
-            <Award className="h-7 w-7 text-amber-500" />
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <Award className="h-6 w-6 text-amber-500 shrink-0" />
             Homepage Featured Organizer Showcase
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Premier brand positioning for leading exhibition organizers across VisitExpo.
           </p>
         </div>
@@ -356,15 +356,15 @@ export default function FeaturedOrganizerApplicationPage() {
   const showForm = !hasApplication || isEditing;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 p-4 sm:p-6 lg:p-8">
+    <div className="max-w-6xl mx-auto space-y-6 pt-1 sm:pt-2 px-2 sm:px-4 lg:px-6 pb-8">
       {/* Header with Enterprise Status Badge */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-5">
         <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2.5">
-            <Award className="h-7 w-7 text-amber-500" />
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <Award className="h-6 w-6 text-amber-500 shrink-0" />
             Featured Organizer Showcase
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Submit your corporate branding for homepage carousel placement and global directory spotlight.
           </p>
         </div>
