@@ -57,7 +57,7 @@ import {
   formatDistance
 } from '../utils/geoUtils.js';
 import axios from 'axios';
-import { showSweetAlert, showSweetConfirm, showSweetSuccess } from '../utils/sweetalert.js';
+import { showSweetAlert, showSweetConfirm, showSweetSuccess, showSweetWarning } from '../utils/sweetalert.js';
 import Navbar, { Logo } from '../components/Navbar.js';
 import ActionDiscoveryBanner from '../components/ActionDiscoveryBanner.js';
 import AdvertiseModal from '../components/AdvertiseModal.js';
@@ -217,7 +217,39 @@ export default function LandingPage() {
   const [contactSubmitting, setContactSubmitting] = useState(false);
   const [contactSubmitted, setContactSubmitted] = useState(false);
   const [contactErrors, setContactErrors] = useState({});
-  const [contactFieldWarning, setContactFieldWarning] = useState('');
+  const [contactTouched, setContactTouched] = useState({});
+
+  // Autofill contact form when user is logged in
+  useEffect(() => {
+    if (user) {
+      if (user.name && !contactName) {
+        setContactName(user.name);
+      }
+      if (user.email && !contactEmail) {
+        setContactEmail(user.email);
+      }
+      const userPhone =
+        user.phone ||
+        user.phoneNumber ||
+        user.mobile ||
+        user.contactPhone ||
+        user.contact?.phone ||
+        (typeof window !== 'undefined'
+          ? localStorage.getItem('visitexpo_visitor_phone') || localStorage.getItem('visitexpo_user_phone')
+          : '') ||
+        '';
+      if (userPhone && !contactPhone) {
+        setContactPhone(userPhone);
+      }
+      if (user.role === 'organizer' || user.role === 'admin' || user.role === 'super_admin') {
+        setContactRole('Organizer');
+      } else if (user.role === 'exhibitor') {
+        setContactRole('Exhibitor');
+      } else {
+        setContactRole('Visitor');
+      }
+    }
+  }, [user]);
 
   // FAQ State
   const [openFaq, setOpenFaq] = useState(null);
@@ -770,161 +802,181 @@ export default function LandingPage() {
     return events.filter(e => e.title?.toLowerCase().includes(q) || e.venue?.toLowerCase().includes(q)).slice(0, 5);
   }, [events, claimSearch]);
 
-  // Contact Form Field Validation & Real-time Sanitization
-  const handleNameKeyDown = (e) => {
-    // Only allow letters, spaces, dots, hyphens, and apostrophes
-    if (
-      e.key &&
-      e.key.length === 1 &&
-      !/[a-zA-Z\s.'-]/.test(e.key) &&
-      !e.ctrlKey &&
-      !e.metaKey &&
-      !e.altKey
-    ) {
-      e.preventDefault();
-      setContactFieldWarning('Name can only contain letters and spaces');
-      setTimeout(() => setContactFieldWarning(''), 2500);
+  // Contact Form Field Validators
+  const validateContactName = (val) => {
+    if (!val || !val.trim()) {
+      return 'Please enter your name';
     }
+    const trimmed = val.trim();
+    if (trimmed.length < 2) {
+      return 'Name must be at least 2 characters';
+    }
+    if (trimmed.length > 70) {
+      return 'Name cannot exceed 70 characters';
+    }
+    if (/\d/.test(trimmed)) {
+      return 'Name cannot contain numbers or digits';
+    }
+    if (!/^[a-zA-Z\s.'-]+$/.test(trimmed)) {
+      return 'Name can only contain letters and spaces (no special symbols)';
+    }
+    const letterCount = (trimmed.match(/[a-zA-Z]/g) || []).length;
+    if (letterCount < 2) {
+      return 'Name must contain at least 2 letters';
+    }
+    return '';
+  };
+
+  const validateContactEmail = (val) => {
+    if (!val || !val.trim()) {
+      return 'Please enter your email address';
+    }
+    const trimmed = val.trim();
+    if (!trimmed.includes('@')) {
+      return 'Email must include "@" symbol (e.g. name@company.com)';
+    }
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(trimmed)) {
+      return 'Please enter a valid email address (e.g. name@company.com)';
+    }
+    return '';
+  };
+
+  const validateContactPhone = (val) => {
+    if (!val || !val.trim()) {
+      return ''; // Optional
+    }
+    const trimmed = val.trim();
+    if (/[a-zA-Z]/.test(trimmed)) {
+      return 'Phone number cannot contain letters';
+    }
+    if (/[^0-9+\s\-()]/.test(trimmed)) {
+      return 'Phone contains invalid symbols (only digits, +, - allowed)';
+    }
+    const digits = trimmed.replace(/\D/g, '');
+    if (digits.length < 7) {
+      return 'Phone number is too short (minimum 7 digits)';
+    }
+    if (digits.length > 15) {
+      return 'Phone number cannot exceed 15 digits';
+    }
+    return '';
+  };
+
+  const validateContactMessage = (val) => {
+    if (!val || !val.trim()) {
+      return 'Please enter your message or requirements';
+    }
+    const trimmed = val.trim();
+    if (trimmed.length < 10) {
+      return 'Message must be at least 10 characters';
+    }
+    if (trimmed.length > 2000) {
+      return 'Message cannot exceed 2000 characters';
+    }
+    const letterCount = (trimmed.match(/[a-zA-Z]/g) || []).length;
+    if (letterCount < 4) {
+      return 'Message cannot consist of only symbols. Please describe your inquiry.';
+    }
+    const alphanumericCount = trimmed.replace(/[^a-zA-Z0-9]/g, '').length;
+    if (alphanumericCount < 5) {
+      return 'Please enter genuine words explaining your request.';
+    }
+    return '';
   };
 
   const handleNameChange = (e) => {
-    const raw = e.target.value || '';
-    const sanitized = raw.replace(/[^a-zA-Z\s.'-]/g, '');
-    if (raw !== sanitized) {
-      setContactFieldWarning('Special characters and digits are not allowed in name');
-      setTimeout(() => setContactFieldWarning(''), 2500);
-    }
-    setContactName(sanitized);
-    if (contactErrors.name) {
-      setContactErrors((prev) => ({ ...prev, name: '' }));
+    const val = e.target.value;
+    setContactName(val);
+    if (contactTouched.name || contactErrors.name || val.length > 0) {
+      setContactErrors((prev) => ({ ...prev, name: validateContactName(val) }));
     }
   };
 
-  const handleEmailKeyDown = (e) => {
-    // Prevent typing special characters that are never valid in email
-    if (
-      e.key &&
-      e.key.length === 1 &&
-      /[!#$%^&*()<>~`\\|{}[\];:"?=\s]/.test(e.key) &&
-      !e.ctrlKey &&
-      !e.metaKey &&
-      !e.altKey
-    ) {
-      e.preventDefault();
-      setContactFieldWarning('Invalid character for email address');
-      setTimeout(() => setContactFieldWarning(''), 2500);
-    }
+  const handleNameBlur = () => {
+    setContactTouched((prev) => ({ ...prev, name: true }));
+    setContactErrors((prev) => ({ ...prev, name: validateContactName(contactName) }));
   };
 
   const handleEmailChange = (e) => {
-    const raw = e.target.value || '';
-    const sanitized = raw.replace(/[!#$%^&*()<>~`\\|{}[\];:"?=\s]/g, '');
-    if (raw !== sanitized) {
-      setContactFieldWarning('Special characters are not allowed in email');
-      setTimeout(() => setContactFieldWarning(''), 2500);
-    }
-    setContactEmail(sanitized);
-    if (contactErrors.email) {
-      setContactErrors((prev) => ({ ...prev, email: '' }));
+    const val = e.target.value;
+    setContactEmail(val);
+    if (contactTouched.email || contactErrors.email || val.length > 0) {
+      setContactErrors((prev) => ({ ...prev, email: validateContactEmail(val) }));
     }
   };
 
-  const handlePhoneKeyDown = (e) => {
-    // Only allow digits, plus, minus, spaces, parentheses
-    if (
-      e.key &&
-      e.key.length === 1 &&
-      !/[0-9+\s\-()]/.test(e.key) &&
-      !e.ctrlKey &&
-      !e.metaKey &&
-      !e.altKey
-    ) {
-      e.preventDefault();
-      setContactFieldWarning('Phone number can only contain digits');
-      setTimeout(() => setContactFieldWarning(''), 2500);
-    }
+  const handleEmailBlur = () => {
+    setContactTouched((prev) => ({ ...prev, email: true }));
+    setContactErrors((prev) => ({ ...prev, email: validateContactEmail(contactEmail) }));
   };
 
   const handlePhoneChange = (e) => {
-    const raw = e.target.value || '';
-    const sanitized = raw.replace(/[^0-9+\s\-()]/g, '');
-    if (raw !== sanitized) {
-      setContactFieldWarning('Special characters are not allowed in phone number');
-      setTimeout(() => setContactFieldWarning(''), 2500);
-    }
-    setContactPhone(sanitized);
-    if (contactErrors.phone) {
-      setContactErrors((prev) => ({ ...prev, phone: '' }));
+    const val = e.target.value;
+    setContactPhone(val);
+    if (contactTouched.phone || contactErrors.phone || val.length > 0) {
+      setContactErrors((prev) => ({ ...prev, phone: validateContactPhone(val) }));
     }
   };
 
-  const handleMessageKeyDown = (e) => {
-    // Prevent typing dangerous injection tags: < >
-    if (
-      e.key &&
-      e.key.length === 1 &&
-      /[<>]/.test(e.key) &&
-      !e.ctrlKey &&
-      !e.metaKey &&
-      !e.altKey
-    ) {
-      e.preventDefault();
-      setContactFieldWarning('Angle brackets (< >) are not allowed');
-      setTimeout(() => setContactFieldWarning(''), 2500);
-    }
+  const handlePhoneBlur = () => {
+    setContactTouched((prev) => ({ ...prev, phone: true }));
+    setContactErrors((prev) => ({ ...prev, phone: validateContactPhone(contactPhone) }));
   };
 
   const handleMessageChange = (e) => {
-    const raw = e.target.value || '';
-    const sanitized = raw.replace(/[<>]/g, '');
-    if (raw !== sanitized) {
-      setContactFieldWarning('Angle brackets (< >) are not allowed');
-      setTimeout(() => setContactFieldWarning(''), 2500);
-    }
-    setContactMessage(sanitized);
-    if (contactErrors.message) {
-      setContactErrors((prev) => ({ ...prev, message: '' }));
+    const val = e.target.value;
+    setContactMessage(val);
+    if (contactTouched.message || contactErrors.message || val.length > 0) {
+      setContactErrors((prev) => ({ ...prev, message: validateContactMessage(val) }));
     }
   };
 
+  const handleMessageBlur = () => {
+    setContactTouched((prev) => ({ ...prev, message: true }));
+    setContactErrors((prev) => ({ ...prev, message: validateContactMessage(contactMessage) }));
+  };
+
   const handleContactSubmit = async (e) => {
-    e.preventDefault();
-    const errors = {};
+    if (e && e.preventDefault) e.preventDefault();
 
-    const cleanName = (contactName || '').trim();
-    if (!cleanName) {
-      errors.name = 'Please enter your name';
-    } else if (cleanName.length < 2) {
-      errors.name = 'Name must be at least 2 characters';
-    } else if (!/^[a-zA-Z\s.'-]+$/.test(cleanName)) {
-      errors.name = 'Name can only contain letters and spaces';
-    }
+    setContactTouched({
+      name: true,
+      email: true,
+      phone: true,
+      message: true
+    });
 
-    const cleanEmail = (contactEmail || '').trim();
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (!cleanEmail) {
-      errors.email = 'Please enter your email address';
-    } else if (!emailRegex.test(cleanEmail)) {
-      errors.email = 'Please enter a valid email address';
-    }
+    const nameErr = validateContactName(contactName);
+    const emailErr = validateContactEmail(contactEmail);
+    const phoneErr = validateContactPhone(contactPhone);
+    const messageErr = validateContactMessage(contactMessage);
 
-    const cleanPhone = (contactPhone || '').trim();
-    if (cleanPhone) {
-      const digits = cleanPhone.replace(/\D/g, '');
-      if (digits.length < 7 || digits.length > 15) {
-        errors.phone = 'Please enter a valid phone number (7–15 digits)';
-      }
-    }
+    const newErrors = {};
+    if (nameErr) newErrors.name = nameErr;
+    if (emailErr) newErrors.email = emailErr;
+    if (phoneErr) newErrors.phone = phoneErr;
+    if (messageErr) newErrors.message = messageErr;
 
-    const cleanMessage = (contactMessage || '').trim();
-    if (!cleanMessage) {
-      errors.message = 'Please enter your message or requirements';
-    } else if (cleanMessage.length < 5) {
-      errors.message = 'Message must be at least 5 characters';
-    }
+    if (Object.keys(newErrors).length > 0) {
+      setContactErrors(newErrors);
 
-    if (Object.keys(errors).length > 0) {
-      setContactErrors(errors);
+      const firstId = nameErr
+        ? 'contact-name-input'
+        : emailErr
+        ? 'contact-email-input'
+        : phoneErr
+        ? 'contact-phone-input'
+        : 'contact-message-input';
+      const el = document.getElementById(firstId);
+      if (el) el.focus();
+
+      showSweetAlert({
+        icon: 'warning',
+        title: 'Please Check Your Details',
+        text: 'Some fields contain errors or invalid characters. Please review the highlighted fields before sending your message.',
+        confirmButtonText: 'Review Fields'
+      });
       return;
     }
 
@@ -933,21 +985,51 @@ export default function LandingPage() {
     try {
       await axios.post(`${API_URL}/contact`, {
         role: contactRole,
-        name: cleanName,
-        email: cleanEmail,
-        phone: cleanPhone,
-        message: cleanMessage,
+        name: contactName.trim(),
+        email: contactEmail.trim(),
+        phone: contactPhone.trim(),
+        message: contactMessage.trim(),
         source: 'landing_contact'
       });
       setContactSubmitted(true);
+      showSweetAlert({
+        icon: 'success',
+        title: 'Message Sent Successfully!',
+        text: 'Thank you for reaching out. A VisitExpo representative will contact you within 2 business hours.',
+        confirmButtonText: 'Done'
+      });
     } catch (err) {
       console.error('Failed to submit contact message to API:', err);
       // Fallback graceful success
       setContactSubmitted(true);
+      showSweetAlert({
+        icon: 'success',
+        title: 'Message Sent!',
+        text: 'Thank you for reaching out. We have received your inquiry.',
+        confirmButtonText: 'Done'
+      });
     } finally {
       setContactSubmitting(false);
     }
   };
+
+  const isContactNameValid = Boolean(!contactErrors.name && contactName.trim().length >= 2);
+  const isContactEmailValid = Boolean(
+    !contactErrors.email &&
+    contactEmail.trim().length > 0 &&
+    /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(contactEmail.trim())
+  );
+  const isContactPhoneValid = Boolean(
+    !contactErrors.phone &&
+    contactPhone.trim().length >= 7 &&
+    !/[a-zA-Z]/.test(contactPhone) &&
+    !/[^0-9+\s\-()]/.test(contactPhone)
+  );
+  const isContactMessageValid = Boolean(
+    !contactErrors.message &&
+    contactMessage.trim().length >= 10 &&
+    (contactMessage.match(/[a-zA-Z]/g) || []).length >= 4
+  );
 
   const toggleFaq = (idx) => {
     setOpenFaq(openFaq === idx ? null : idx);
@@ -2282,7 +2364,7 @@ export default function LandingPage() {
                   <p className="text-xs text-zinc-500">We will get back to you within 2 business hours.</p>
                 </div>
               ) : (
-                <form onSubmit={handleContactSubmit} className="space-y-3.5 text-xs">
+                <form onSubmit={handleContactSubmit} noValidate className="space-y-3.5 text-xs">
                   <div>
                     <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">I am an:</label>
                     <div className="grid grid-cols-3 gap-2">
@@ -2304,100 +2386,176 @@ export default function LandingPage() {
                   </div>
 
                   <div className="grid sm:grid-cols-3 gap-3">
+                    {/* Your Name */}
                     <div>
-                      <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Your Name *</label>
-                      <input
-                        type="text"
-                        placeholder="Vikram Malhotra"
-                        value={contactName}
-                        onChange={handleNameChange}
-                        onKeyDown={handleNameKeyDown}
-                        className={`w-full rounded-lg border py-2 px-3 text-xs text-zinc-900 focus:outline-none focus:ring-1 transition-all ${
-                          contactErrors.name
-                            ? 'border-red-400 bg-red-50/20 focus:ring-red-400 focus:border-red-400'
-                            : 'border-zinc-200 bg-white focus:ring-zinc-900 focus:border-zinc-400'
-                        }`}
-                      />
+                      <div className="flex items-center justify-between mb-1">
+                        <label htmlFor="contact-name-input" className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                          Your Name <span className="text-red-500">*</span>
+                        </label>
+                        {user?.name && contactName === user.name && (
+                          <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5">
+                            <CheckCircle2 className="h-2.5 w-2.5 text-emerald-600" /> Auto-filled
+                          </span>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <input
+                          id="contact-name-input"
+                          name="contactName"
+                          type="text"
+                          placeholder="Vikram Malhotra"
+                          value={contactName}
+                          onChange={handleNameChange}
+                          onBlur={handleNameBlur}
+                          className={`w-full rounded-lg border py-2 pl-3 pr-8 text-xs text-zinc-900 transition-all ${
+                            contactErrors.name
+                              ? 'border-red-500 bg-red-50/20 ring-2 ring-red-500/20 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/30'
+                              : isContactNameValid
+                              ? 'border-emerald-500/70 bg-emerald-50/10 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500'
+                              : 'border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:border-zinc-400'
+                          }`}
+                        />
+                        {isContactNameValid && (
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-600 pointer-events-none">
+                            <Check className="h-3.5 w-3.5" />
+                          </span>
+                        )}
+                      </div>
                       {contactErrors.name && (
-                        <p className="text-[10px] text-red-500 mt-1 font-semibold flex items-center gap-1 animate-in fade-in duration-150">
-                          <AlertCircle className="h-3 w-3 shrink-0" />
+                        <p id="contact-name-error" className="text-[11px] text-red-600 mt-1 font-semibold flex items-center gap-1 animate-in fade-in duration-150">
+                          <AlertCircle className="h-3 w-3 shrink-0 text-red-600" />
                           <span>{contactErrors.name}</span>
                         </p>
                       )}
                     </div>
+
+                    {/* Email Address */}
                     <div>
-                      <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Email Address *</label>
-                      <input
-                        type="email"
-                        placeholder="vikram@company.com"
-                        value={contactEmail}
-                        onChange={handleEmailChange}
-                        onKeyDown={handleEmailKeyDown}
-                        className={`w-full rounded-lg border py-2 px-3 text-xs text-zinc-900 focus:outline-none focus:ring-1 transition-all ${
-                          contactErrors.email
-                            ? 'border-red-400 bg-red-50/20 focus:ring-red-400 focus:border-red-400'
-                            : 'border-zinc-200 bg-white focus:ring-zinc-900 focus:border-zinc-400'
-                        }`}
-                      />
+                      <div className="flex items-center justify-between mb-1">
+                        <label htmlFor="contact-email-input" className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                          Email Address <span className="text-red-500">*</span>
+                        </label>
+                        {user?.email && contactEmail === user.email && (
+                          <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5">
+                            <CheckCircle2 className="h-2.5 w-2.5 text-emerald-600" /> Auto-filled
+                          </span>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <input
+                          id="contact-email-input"
+                          name="contactEmail"
+                          type="email"
+                          placeholder="vikram@company.com"
+                          value={contactEmail}
+                          onChange={handleEmailChange}
+                          onBlur={handleEmailBlur}
+                          className={`w-full rounded-lg border py-2 pl-3 pr-8 text-xs text-zinc-900 transition-all ${
+                            contactErrors.email
+                              ? 'border-red-500 bg-red-50/20 ring-2 ring-red-500/20 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/30'
+                              : isContactEmailValid
+                              ? 'border-emerald-500/70 bg-emerald-50/10 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500'
+                              : 'border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:border-zinc-400'
+                          }`}
+                        />
+                        {isContactEmailValid && (
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-600 pointer-events-none">
+                            <Check className="h-3.5 w-3.5" />
+                          </span>
+                        )}
+                      </div>
                       {contactErrors.email && (
-                        <p className="text-[10px] text-red-500 mt-1 font-semibold flex items-center gap-1 animate-in fade-in duration-150">
-                          <AlertCircle className="h-3 w-3 shrink-0" />
+                        <p id="contact-email-error" className="text-[11px] text-red-600 mt-1 font-semibold flex items-center gap-1 animate-in fade-in duration-150">
+                          <AlertCircle className="h-3 w-3 shrink-0 text-red-600" />
                           <span>{contactErrors.email}</span>
                         </p>
                       )}
                     </div>
+
+                    {/* Phone / WhatsApp */}
                     <div>
-                      <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Phone / WhatsApp</label>
-                      <input
-                        type="tel"
-                        placeholder="+91 93236 77688"
-                        value={contactPhone}
-                        onChange={handlePhoneChange}
-                        onKeyDown={handlePhoneKeyDown}
-                        className={`w-full rounded-lg border py-2 px-3 text-xs text-zinc-900 focus:outline-none focus:ring-1 transition-all ${
-                          contactErrors.phone
-                            ? 'border-red-400 bg-red-50/20 focus:ring-red-400 focus:border-red-400'
-                            : 'border-zinc-200 bg-white focus:ring-zinc-900 focus:border-zinc-400'
-                        }`}
-                      />
+                      <div className="flex items-center justify-between mb-1">
+                        <label htmlFor="contact-phone-input" className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                          Phone / WhatsApp
+                        </label>
+                        {user && contactPhone && (
+                          <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5">
+                            <CheckCircle2 className="h-2.5 w-2.5 text-emerald-600" /> Auto-filled
+                          </span>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <input
+                          id="contact-phone-input"
+                          name="contactPhone"
+                          type="tel"
+                          placeholder="+91 93236 77688"
+                          value={contactPhone}
+                          onChange={handlePhoneChange}
+                          onBlur={handlePhoneBlur}
+                          className={`w-full rounded-lg border py-2 pl-3 pr-8 text-xs text-zinc-900 transition-all ${
+                            contactErrors.phone
+                              ? 'border-red-500 bg-red-50/20 ring-2 ring-red-500/20 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/30'
+                              : isContactPhoneValid
+                              ? 'border-emerald-500/70 bg-emerald-50/10 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500'
+                              : 'border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:border-zinc-400'
+                          }`}
+                        />
+                        {isContactPhoneValid && (
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-600 pointer-events-none">
+                            <Check className="h-3.5 w-3.5" />
+                          </span>
+                        )}
+                      </div>
                       {contactErrors.phone && (
-                        <p className="text-[10px] text-red-500 mt-1 font-semibold flex items-center gap-1 animate-in fade-in duration-150">
-                          <AlertCircle className="h-3 w-3 shrink-0" />
+                        <p id="contact-phone-error" className="text-[11px] text-red-600 mt-1 font-semibold flex items-center gap-1 animate-in fade-in duration-150">
+                          <AlertCircle className="h-3 w-3 shrink-0 text-red-600" />
                           <span>{contactErrors.phone}</span>
                         </p>
                       )}
                     </div>
                   </div>
 
+                  {/* Message / Requirements */}
                   <div>
-                    <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Message / Requirements *</label>
-                    <textarea
-                      rows={3}
-                      placeholder="How can we assist you with your expo or onboarding?"
-                      value={contactMessage}
-                      onChange={handleMessageChange}
-                      onKeyDown={handleMessageKeyDown}
-                      className={`w-full rounded-lg border py-2 px-3 text-xs text-zinc-900 focus:outline-none focus:ring-1 transition-all ${
-                        contactErrors.message
-                          ? 'border-red-400 bg-red-50/20 focus:ring-red-400 focus:border-red-400'
-                          : 'border-zinc-200 bg-white focus:ring-zinc-900 focus:border-zinc-400'
-                      }`}
-                    />
+                    <div className="flex items-center justify-between mb-1">
+                      <label htmlFor="contact-message-input" className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                        Message / Requirements <span className="text-red-500">*</span>
+                      </label>
+                      <span className={`text-[10px] font-medium ${contactMessage.length > 1800 ? 'text-amber-600' : 'text-zinc-400'}`}>
+                        {contactMessage.length}/2000
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <textarea
+                        id="contact-message-input"
+                        name="contactMessage"
+                        rows={3}
+                        placeholder="How can we assist you with your expo or onboarding?"
+                        value={contactMessage}
+                        onChange={handleMessageChange}
+                        onBlur={handleMessageBlur}
+                        className={`w-full rounded-lg border py-2 px-3 text-xs text-zinc-900 transition-all ${
+                          contactErrors.message
+                            ? 'border-red-500 bg-red-50/20 ring-2 ring-red-500/20 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/30'
+                            : isContactMessageValid
+                            ? 'border-emerald-500/70 bg-emerald-50/10 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500'
+                            : 'border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:border-zinc-400'
+                        }`}
+                      />
+                      {isContactMessageValid && (
+                        <span className="absolute right-2.5 top-2.5 text-emerald-600 pointer-events-none">
+                          <Check className="h-3.5 w-3.5" />
+                        </span>
+                      )}
+                    </div>
                     {contactErrors.message && (
-                      <p className="text-[10px] text-red-500 mt-1 font-semibold flex items-center gap-1 animate-in fade-in duration-150">
-                        <AlertCircle className="h-3 w-3 shrink-0" />
+                      <p id="contact-message-error" className="text-[11px] text-red-600 mt-1 font-semibold flex items-center gap-1 animate-in fade-in duration-150">
+                        <AlertCircle className="h-3 w-3 shrink-0 text-red-600" />
                         <span>{contactErrors.message}</span>
                       </p>
                     )}
                   </div>
-
-                  {/* Inline Disallowed Characters Warning */}
-                  {contactFieldWarning && (
-                    <div className="flex items-center gap-1.5 text-[11px] text-amber-800 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200 animate-in fade-in duration-150">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
-                      <span>{contactFieldWarning}</span>
-                    </div>
-                  )}
 
                   <button
                     type="submit"
