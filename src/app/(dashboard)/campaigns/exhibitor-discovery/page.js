@@ -2402,21 +2402,35 @@ export default function ExhibitorDiscoveryPage() {
         </div>
       )}
 
-      {/* 7. Toast Feedback Message */}
+      {/* 7. Toast Feedback Message (Top Right Corner) */}
       {toastMessage && (
         <div
-          className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 py-3 px-4 rounded-xl shadow-2xl border text-xs font-bold animate-in slide-in-from-bottom-4 duration-200 ${
+          role="status"
+          aria-live="polite"
+          className={`fixed top-6 right-6 z-[100] max-w-md flex items-center gap-3 py-3 px-4 rounded-2xl shadow-2xl border text-xs font-bold backdrop-blur-md transition-all animate-in fade-in slide-in-from-top-4 duration-200 ${
             toastType === 'error'
-              ? 'bg-rose-900/90 text-white border-rose-700'
-              : 'bg-zinc-900 text-white border-zinc-700'
+              ? 'bg-rose-950/95 text-rose-100 border-rose-800/80 shadow-rose-950/40'
+              : 'bg-zinc-900/95 text-zinc-100 border-zinc-700/80 shadow-zinc-950/40'
           }`}
         >
           {toastType === 'error' ? (
-            <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0" />
+            <div className="h-7 w-7 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
+              <AlertTriangle className="h-4 w-4" />
+            </div>
           ) : (
-            <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
+            <div className="h-7 w-7 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+              <CheckCircle className="h-4 w-4" />
+            </div>
           )}
-          <span>{toastMessage}</span>
+          <span className="leading-snug flex-1">{toastMessage}</span>
+          <button
+            type="button"
+            onClick={() => setToastMessage(null)}
+            className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors ml-1 cursor-pointer shrink-0"
+            aria-label="Close notification"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
       )}
 
