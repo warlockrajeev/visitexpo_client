@@ -141,12 +141,32 @@ export default function CategoryEventsPage() {
     return () => { isMounted = false; };
   }, []);
 
-  // Filter events based on selected format/country, merging static and live WordPress events
+  const parseEventDateTimestamp = (evt) => {
+    if (evt.startDate) {
+      const t = new Date(evt.startDate).getTime();
+      if (!isNaN(t)) return t;
+    }
+    const datesStr = evt.dates || '';
+    if (!datesStr) return Number.MAX_SAFE_INTEGER;
+
+    const withoutDay = datesStr.replace(/^[A-Za-z]+,\s*/, '');
+    const startPart = withoutDay.split('-')[0].trim();
+    const yearMatch = datesStr.match(/\b(202[4-9]|203[0-9])\b/);
+    const year = yearMatch ? yearMatch[1] : '2026';
+
+    let toParse = startPart;
+    if (!startPart.includes(year)) {
+      toParse = `${startPart} ${year}`;
+    }
+    const parsed = Date.parse(toParse);
+    if (!isNaN(parsed)) return parsed;
+    return Number.MAX_SAFE_INTEGER;
+  };
+
+  // Filter and sort events based on selected format, country, date, and activeSort
   const filteredEvents = useMemo(() => {
-    // If static events exist, use them
     let baseEvents = (category.events && category.events.length > 0) ? category.events : [];
 
-    // If static events are empty, adapt live events from WordPress
     if (baseEvents.length === 0 && liveEvents.length > 0) {
       const catNameLower = (category.name || '').toLowerCase();
       const shortNameLower = (category.shortName || '').toLowerCase();
@@ -181,7 +201,7 @@ export default function CategoryEventsPage() {
         }));
     }
 
-    return baseEvents.filter((evt) => {
+    const filtered = baseEvents.filter((evt) => {
       if (selectedFormat === 'tradeshows' && !evt.tags?.includes('Tradeshow')) return false;
       if (selectedFormat === 'conferences' && !evt.tags?.includes('Conference')) return false;
       if (selectedCountry !== 'all' && (evt.country || '').toLowerCase() !== selectedCountry.toLowerCase()) return false;
@@ -200,7 +220,37 @@ export default function CategoryEventsPage() {
 
       return true;
     });
-  }, [category, liveEvents, slug, selectedFormat, selectedCountry, selectedDateFilter, customDate]);
+
+    // Active Sorting: 'date' vs 'trending'
+    if (activeSort === 'date') {
+      filtered.sort((a, b) => parseEventDateTimestamp(a) - parseEventDateTimestamp(b));
+    } else {
+      // Trending: highest turnout / demand first, tie-break by rating
+      filtered.sort((a, b) => {
+        const countA = typeof a.interestedCount === 'number' ? a.interestedCount : parseInt(a.interestedCount, 10) || 0;
+        const countB = typeof b.interestedCount === 'number' ? b.interestedCount : parseInt(b.interestedCount, 10) || 0;
+        if (countB !== countA) return countB - countA;
+        return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
+      });
+    }
+
+    return filtered;
+  }, [category, liveEvents, slug, selectedFormat, selectedCountry, selectedDateFilter, customDate, activeSort]);
+
+  const EVENTS_PER_PAGE = 5;
+  const totalPages = Math.max(1, Math.ceil(filteredEvents.length / EVENTS_PER_PAGE));
+
+  // Auto-clamp page if filter changes
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
+
+  const paginatedEvents = useMemo(() => {
+    const start = (currentPage - 1) * EVENTS_PER_PAGE;
+    return filteredEvents.slice(start, start + EVENTS_PER_PAGE);
+  }, [filteredEvents, currentPage]);
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-zinc-900 font-sans antialiased selection:bg-[#FF2E63] selection:text-white">
@@ -768,158 +818,206 @@ export default function CategoryEventsPage() {
             
             {/* Sort Controls & Pagination Top Bar (Screenshot 1) */}
             <div className="flex items-center justify-between bg-white border border-zinc-200 rounded-xl p-2.5 px-4 shadow-2xs text-xs">
-              <div className="flex items-center gap-4 font-bold">
+              <div className="flex items-center gap-2 font-bold">
                 <button
                   type="button"
-                  onClick={() => setActiveSort('trending')}
-                  className={`cursor-pointer transition-colors ${
-                    activeSort === 'trending' ? 'text-[#FF2E63] font-extrabold' : 'text-zinc-600 hover:text-zinc-900'
+                  onClick={() => {
+                    setActiveSort('trending');
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeSort === 'trending'
+                      ? 'bg-zinc-900 text-white shadow-xs font-extrabold'
+                      : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
                   }`}
                 >
-                  Trending ⇅
+                  <span>Trending ⇅</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveSort('date')}
-                  className={`cursor-pointer transition-colors ${
-                    activeSort === 'date' ? 'text-[#FF2E63] font-extrabold' : 'text-zinc-600 hover:text-zinc-900'
+                  onClick={() => {
+                    setActiveSort('date');
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeSort === 'date'
+                      ? 'bg-[#FF2E63] text-white shadow-xs font-extrabold'
+                      : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
                   }`}
                 >
-                  Date
+                  <span>Date 📅</span>
                 </button>
               </div>
 
               {/* Quick Pagination */}
               <div className="flex items-center gap-1 font-bold text-xs">
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage(1)}
-                  className={`h-7 w-7 rounded flex items-center justify-center transition-colors cursor-pointer ${
-                    currentPage === 1 ? 'bg-zinc-900 text-white' : 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50'
-                  }`}
-                >
-                  1
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage(2)}
-                  className={`h-7 w-7 rounded flex items-center justify-center transition-colors cursor-pointer ${
-                    currentPage === 2 ? 'bg-zinc-900 text-white' : 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50'
-                  }`}
-                >
-                  2
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage(prev => (prev === 1 ? 2 : 1))}
-                  className="h-7 w-7 rounded border border-zinc-200 text-zinc-700 hover:bg-zinc-50 flex items-center justify-center transition-colors cursor-pointer"
-                >
-                  »
-                </button>
+                {totalPages > 1 && (
+                  <button
+                    type="button"
+                    disabled={currentPage === 1}
+                    onClick={() => {
+                      setCurrentPage(prev => Math.max(1, prev - 1));
+                    }}
+                    className="h-7 w-7 rounded border border-zinc-200 text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors cursor-pointer"
+                    title="Previous page"
+                  >
+                    «
+                  </button>
+                )}
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
+                  <button
+                    key={pg}
+                    type="button"
+                    onClick={() => setCurrentPage(pg)}
+                    className={`h-7 w-7 rounded flex items-center justify-center transition-colors cursor-pointer text-xs font-bold ${
+                      currentPage === pg ? 'bg-zinc-900 text-white shadow-xs' : 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50'
+                    }`}
+                  >
+                    {pg}
+                  </button>
+                ))}
+                {totalPages > 1 && (
+                  <button
+                    type="button"
+                    disabled={currentPage === totalPages}
+                    onClick={() => {
+                      setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                    }}
+                    className="h-7 w-7 rounded border border-zinc-200 text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors cursor-pointer"
+                    title="Next page"
+                  >
+                    »
+                  </button>
+                )}
               </div>
             </div>
 
             {/* Event Cards List matching Screenshots 1, 2, 3 */}
             <div className="space-y-4">
-              {filteredEvents.map((evt) => {
-                const isInterested = Boolean(interestedMap[evt.id]);
+              {paginatedEvents.length > 0 ? (
+                paginatedEvents.map((evt) => {
+                  const isInterested = Boolean(interestedMap[evt.id]);
 
-                return (
-                  <div
-                    key={evt.id}
-                    className="bg-white border border-zinc-200 hover:border-zinc-300 rounded-xl p-5 shadow-2xs hover:shadow-md transition-all duration-200 space-y-3 group"
-                  >
-                    {/* Top Row: Date Line & Logo/Icon */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <span className="text-xs font-bold text-zinc-700 block">
-                          {evt.dates}
-                        </span>
-                        <Link
-                          href={`/expo/${evt.slug}`}
-                          className="text-base sm:text-lg font-bold text-[#0B4EA2] hover:text-[#083b7a] transition-colors leading-snug mt-0.5 block"
-                        >
-                          {evt.title}
-                        </Link>
-                        <p className="text-xs text-blue-600 font-medium mt-0.5">
-                          {evt.daysToGo} • {evt.edition}
-                        </p>
-                        <p className="text-xs text-zinc-500 font-normal mt-0.5">
-                          {evt.venue ? `${evt.venue}, ` : ''}{evt.city}, {evt.country}
-                        </p>
-                      </div>
-
-                      {/* Event Logo Thumbnail */}
-                      <div className="w-12 h-12 rounded-lg bg-zinc-50 border border-zinc-200 overflow-hidden shrink-0 flex items-center justify-center">
-                        <img
-                          src={evt.logo}
-                          alt={evt.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Description Snippet */}
+                  return (
                     <div
-                      className="text-xs text-zinc-600 leading-relaxed line-clamp-2 [&_strong]:font-semibold [&_strong]:text-zinc-900 [&_b]:font-semibold [&_b]:text-zinc-900 [&_em]:italic"
-                      dangerouslySetInnerHTML={{
-                        __html: renderCardDescription(evt.description)
-                      }}
-                    />
-
-                    {/* Tags */}
-                    <div className="flex flex-wrap gap-1.5 pt-0.5">
-                      {evt.tags.map((tag, idx) => (
-                        <span
-                          key={idx}
-                          className="text-[10px] font-semibold bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded border border-zinc-200/60"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-
-                    {/* Card Action Footer matching reference */}
-                    <div className="pt-3 border-t border-zinc-150 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        {/* Interested button */}
-                        <button
-                          type="button"
-                          onClick={() => toggleInterested(evt.id)}
-                          className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer border flex items-center gap-1.5 ${
-                            isInterested
-                              ? 'bg-amber-50 text-amber-800 border-amber-300'
-                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
-                          }`}
-                        >
-                          <Star className={`h-3 w-3 ${isInterested ? 'fill-amber-500 text-amber-500' : 'text-zinc-400'}`} />
-                          <span>Interested</span>
-                          <span className="text-zinc-400 font-normal ml-0.5">
-                            {isInterested ? evt.interestedCount + 1 : evt.interestedCount}
+                      key={evt.id}
+                      className="bg-white border border-zinc-200 hover:border-zinc-300 rounded-xl p-5 shadow-2xs hover:shadow-md transition-all duration-200 space-y-3 group"
+                    >
+                      {/* Top Row: Date Line & Logo/Icon */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <span className="text-xs font-bold text-zinc-700 block">
+                            {evt.dates}
                           </span>
-                        </button>
+                          <Link
+                            href={`/expo/${evt.slug}`}
+                            className="text-base sm:text-lg font-bold text-[#0B4EA2] hover:text-[#083b7a] transition-colors leading-snug mt-0.5 block"
+                          >
+                            {evt.title}
+                          </Link>
+                          <p className="text-xs text-blue-600 font-medium mt-0.5">
+                            {evt.daysToGo} • {evt.edition}
+                          </p>
+                          <p className="text-xs text-zinc-500 font-normal mt-0.5">
+                            {evt.venue ? `${evt.venue}, ` : ''}{evt.city}, {evt.country}
+                          </p>
+                        </div>
+
+                        {/* Event Logo Thumbnail */}
+                        <div className="w-12 h-12 rounded-lg bg-zinc-50 border border-zinc-200 overflow-hidden shrink-0 flex items-center justify-center">
+                          <img
+                            src={evt.logo}
+                            alt={evt.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                        </div>
                       </div>
 
-                      {/* Right: Green Rating Pill & Share Icon */}
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center gap-0.5 bg-emerald-700 text-white text-[11px] font-bold px-1.5 py-0.5 rounded">
-                          <span>{evt.rating}</span>
-                          <Star className="h-2.5 w-2.5 fill-current" />
-                        </span>
+                      {/* Description Snippet */}
+                      <div
+                        className="text-xs text-zinc-600 leading-relaxed line-clamp-2 [&_strong]:font-semibold [&_strong]:text-zinc-900 [&_b]:font-semibold [&_b]:text-zinc-900 [&_em]:italic"
+                        dangerouslySetInnerHTML={{
+                          __html: renderCardDescription(evt.description)
+                        }}
+                      />
 
-                        <button
-                          type="button"
-                          onClick={() => handleShare(evt)}
-                          className="p-1 text-zinc-400 hover:text-zinc-800 transition-colors cursor-pointer"
-                          title="Share event"
-                        >
-                          <Share2 className="h-4 w-4" />
-                        </button>
+                      {/* Tags */}
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                        {evt.tags.map((tag, idx) => (
+                          <span
+                            key={idx}
+                            className="text-[10px] font-semibold bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded border border-zinc-200/60"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Card Action Footer matching reference */}
+                      <div className="pt-3 border-t border-zinc-150 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          {/* Interested button */}
+                          <button
+                            type="button"
+                            onClick={() => toggleInterested(evt.id)}
+                            className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer border flex items-center gap-1.5 ${
+                              isInterested
+                                ? 'bg-amber-50 text-amber-800 border-amber-300'
+                                : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                            }`}
+                          >
+                            <Star className={`h-3 w-3 ${isInterested ? 'fill-amber-500 text-amber-500' : 'text-zinc-400'}`} />
+                            <span>Interested</span>
+                            <span className="text-zinc-400 font-normal ml-0.5">
+                              {isInterested ? evt.interestedCount + 1 : evt.interestedCount}
+                            </span>
+                          </button>
+                        </div>
+
+                        {/* Right: Green Rating Pill & Share Icon */}
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-0.5 bg-emerald-700 text-white text-[11px] font-bold px-1.5 py-0.5 rounded">
+                            <span>{evt.rating}</span>
+                            <Star className="h-2.5 w-2.5 fill-current" />
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => handleShare(evt)}
+                            className="p-1 text-zinc-400 hover:text-zinc-800 transition-colors cursor-pointer"
+                            title="Share event"
+                          >
+                            <Share2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
+                  );
+                })
+              ) : (
+                <div className="bg-white border border-zinc-200 rounded-xl p-8 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 mx-auto flex items-center justify-center">
+                    <CalendarIcon className="h-6 w-6" />
                   </div>
-                );
-              })}
+                  <h4 className="font-bold text-zinc-900 text-sm">No Events Found</h4>
+                  <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+                    No exhibitions match your current filter selection. Try selecting a different format, date, or reset filters.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedFormat('all');
+                      setSelectedCountry('all');
+                      setSelectedDateFilter('all');
+                      setCustomDate('');
+                      setCurrentPage(1);
+                    }}
+                    className="px-4 py-2 rounded-lg bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    Reset All Filters
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Bottom Sign-In / Dashboard CTA Banner */}
@@ -966,33 +1064,47 @@ export default function CategoryEventsPage() {
             </div>
 
             {/* Bottom Pagination */}
-            <div className="flex items-center justify-end gap-1.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setCurrentPage(1)}
-                className={`h-8 w-8 rounded-lg flex items-center justify-center font-bold text-xs transition-colors cursor-pointer ${
-                  currentPage === 1 ? 'bg-zinc-900 text-white' : 'border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
-                }`}
-              >
-                1
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentPage(2)}
-                className={`h-8 w-8 rounded-lg flex items-center justify-center font-bold text-xs transition-colors cursor-pointer ${
-                  currentPage === 2 ? 'bg-zinc-900 text-white' : 'border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
-                }`}
-              >
-                2
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentPage(prev => (prev === 1 ? 2 : 1))}
-                className="h-8 w-8 rounded-lg border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 flex items-center justify-center font-bold text-xs transition-colors cursor-pointer"
-              >
-                »
-              </button>
-            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-end gap-1.5 pt-2">
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => {
+                    setCurrentPage(prev => Math.max(1, prev - 1));
+                    window.scrollTo({ top: 400, behavior: 'smooth' });
+                  }}
+                  className="h-8 px-2.5 rounded-lg border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center font-bold text-xs transition-colors cursor-pointer"
+                >
+                  « Prev
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
+                  <button
+                    key={pg}
+                    type="button"
+                    onClick={() => {
+                      setCurrentPage(pg);
+                      window.scrollTo({ top: 400, behavior: 'smooth' });
+                    }}
+                    className={`h-8 w-8 rounded-lg flex items-center justify-center font-bold text-xs transition-colors cursor-pointer ${
+                      currentPage === pg ? 'bg-zinc-900 text-white shadow-xs' : 'border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+                    }`}
+                  >
+                    {pg}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => {
+                    setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                    window.scrollTo({ top: 400, behavior: 'smooth' });
+                  }}
+                  className="h-8 px-2.5 rounded-lg border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Next »
+                </button>
+              </div>
+            )}
 
             {/* "More about Category" Accordion */}
             <div className="pt-4 border-t border-zinc-200">
