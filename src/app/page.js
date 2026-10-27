@@ -147,6 +147,11 @@ const COUNTRY_FLAGS = {
 export default function LandingPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // WordPress Events State
   const [events, setEvents] = useState([]);
@@ -1170,7 +1175,7 @@ export default function LandingPage() {
           {/* Hero CTAs */}
           <div className="pt-2 flex flex-wrap items-center justify-center gap-3.5">
             <Link
-              href={user ? '/events' : '/login?role=visitor&redirect=/events'}
+              href={mounted && user ? '/events' : '/login?role=visitor&redirect=/events'}
               className="inline-flex items-center gap-2 rounded-full bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold px-8 py-3.5 text-xs sm:text-sm transition-all shadow-lg hover:scale-105 cursor-pointer"
             >
               <span>Explore Exhibitions</span>
@@ -2222,7 +2227,7 @@ export default function LandingPage() {
               {/* Dedicated View All Events CTA */}
               <div className="pt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link
-                  href={user ? '/events' : '/login?role=visitor&redirect=/events'}
+                  href={mounted && user ? '/events' : '/login?role=visitor&redirect=/events'}
                   className="inline-flex items-center gap-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold px-8 py-3.5 text-xs sm:text-sm transition-all shadow-md hover:scale-102 cursor-pointer group"
                 >
                   <span>Explore All Events ({events.length || 100}+)</span>

@@ -68,75 +68,10 @@ export default function Navbar({ solid = false }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const profileDropdownRef = useRef(null);
-  const [language, setLanguage] = useState(() => {
-    if (typeof window === 'undefined') return 'en';
-    const savedLanguage = window.localStorage.getItem('visitexpo-language');
-    return LANGUAGES.some((item) => item.code === savedLanguage) ? savedLanguage : 'en';
-  });
-  const [translateReady, setTranslateReady] = useState(false);
-  const translateInitialized = useRef(false);
-  const translateMounted = useRef(false);
-
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
-    translateMounted.current = true;
-
-    const initializeGoogleTranslate = () => {
-      const TranslateElement = window.google?.translate?.TranslateElement;
-      if (!TranslateElement || !translateMounted.current || translateInitialized.current) return;
-
-      translateInitialized.current = true;
-      new TranslateElement(
-        {
-          pageLanguage: 'en',
-          includedLanguages: LANGUAGES.map((item) => item.code).join(','),
-          autoDisplay: false
-        },
-        'google_translate_element'
-      );
-      setTranslateReady(true);
-    };
-
-    window.googleTranslateElementInit = initializeGoogleTranslate;
-
-    if (window.google?.translate?.TranslateElement) {
-      initializeGoogleTranslate();
-    } else if (!document.getElementById('google-translate-script')) {
-      const script = document.createElement('script');
-      script.id = 'google-translate-script';
-      script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
-      script.async = true;
-      document.body.appendChild(script);
-    }
-
-    return () => {
-      translateMounted.current = false;
-    };
+    setMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (!translateReady) return undefined;
-
-    let attempts = 0;
-    const timer = window.setInterval(() => {
-      const languageSelect = document.querySelector('.goog-te-combo');
-      if (languageSelect) {
-        languageSelect.value = language;
-        languageSelect.dispatchEvent(new Event('change', { bubbles: true }));
-        window.clearInterval(timer);
-      }
-
-      attempts += 1;
-      if (attempts >= 30) window.clearInterval(timer);
-    }, 100);
-
-    return () => window.clearInterval(timer);
-  }, [language, translateReady]);
-
-  const handleLanguageChange = (event) => {
-    const nextLanguage = event.target.value;
-    setLanguage(nextLanguage);
-    window.localStorage.setItem('visitexpo-language', nextLanguage);
-  };
 
   const renderLanguageSelector = (id) => (
     <label
@@ -201,7 +136,7 @@ export default function Navbar({ solid = false }) {
     {
       id: 'explore',
       label: 'Explore Events',
-      href: user ? '/events' : '/login?role=visitor&redirect=/events',
+      href: mounted && user ? '/events' : '/login?role=visitor&redirect=/events',
       isAnchor: false
     },
     {
@@ -370,8 +305,7 @@ export default function Navbar({ solid = false }) {
 
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-3">
-          {/* {renderLanguageSelector('desktop-language-selector')} */}
-          {loading && !user ? (
+          {!mounted || (loading && !user) ? (
             <div className="h-8 w-20 rounded-full bg-zinc-850/80 border border-zinc-700/60 animate-pulse" />
           ) : user ? (
             /* Logged In User Profile Pill & Dropdown */
@@ -688,7 +622,7 @@ export default function Navbar({ solid = false }) {
             {/* <div className="mb-3">
               {renderLanguageSelector('mobile-language-selector')}
             </div> */}
-            {loading && !user ? (
+            {!mounted || (loading && !user) ? (
               <div className="h-9 w-full rounded-full bg-zinc-850/80 border border-zinc-700/60 animate-pulse" />
             ) : user ? (
               <div className="space-y-2">

@@ -152,39 +152,11 @@ if (typeof window !== 'undefined' && !window.__visitexpo_interceptors_attached) 
 }
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('visitexpo_user');
-        if (saved) return JSON.parse(saved);
-      } catch (e) {}
-    }
-    return null;
-  });
-
-  const [accessToken, setAccessTokenState] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('visitexpo_access_token') || null;
-    }
-    return null;
-  });
-
+  // SSR-safe state initialization: server and initial client render must match 100%
+  const [user, setUser] = useState(null);
+  const [accessToken, setAccessTokenState] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isExhibitorView, setIsExhibitorViewState] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('visitexpo_view_mode');
-      if (saved === 'exhibitor') return true;
-      if (saved === 'organizer') return false;
-      try {
-        const savedUser = localStorage.getItem('visitexpo_user');
-        if (savedUser) {
-          const parsed = JSON.parse(savedUser);
-          return parsed.role === 'exhibitor';
-        }
-      } catch (_) {}
-    }
-    return false;
-  });
+  const [isExhibitorView, setIsExhibitorViewState] = useState(false);
   const [hasExhibitorProfile, setHasExhibitorProfile] = useState(false);
 
   // Synchronize access token across state, module variable, and localStorage
@@ -298,8 +270,32 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  // Initial Auth Hydration
+  // Initial Auth Hydration (Runs only in browser after mount to guarantee 0 hydration errors)
   useEffect(() => {
+    // 1. Immediately hydrate cached user and view mode on client mount
+    if (typeof window !== 'undefined') {
+      try {
+        const cachedUser = localStorage.getItem('visitexpo_user');
+        if (cachedUser) {
+          setUser(JSON.parse(cachedUser));
+        }
+        const cachedToken = localStorage.getItem('visitexpo_access_token');
+        if (cachedToken) {
+          setAccessTokenState(cachedToken);
+          activeAccessToken = cachedToken;
+        }
+        const cachedMode = localStorage.getItem('visitexpo_view_mode');
+        if (cachedMode === 'exhibitor') {
+          setIsExhibitorViewState(true);
+        } else if (cachedMode === 'organizer') {
+          setIsExhibitorViewState(false);
+        } else if (cachedUser) {
+          const parsed = JSON.parse(cachedUser);
+          if (parsed.role === 'exhibitor') setIsExhibitorViewState(true);
+        }
+      } catch (_) {}
+    }
+
     const initializeAuth = async () => {
       try {
         const storedAccessToken =
@@ -317,7 +313,8 @@ export const AuthProvider = ({ children }) => {
         if (storedAccessToken) {
           try {
             const userRes = await axios.get(`${API_URL}/auth/me`, {
-              headers: { Authorization: `Bearer ${storedAccessToken}` }
+              headers: { Authorization: `Bearer ${storedAccessToken}` },
+              timeout: 4000
             });
             if (userRes.data?.user) {
               setUser(userRes.data.user);
@@ -342,7 +339,7 @@ export const AuthProvider = ({ children }) => {
         if (storedRefreshToken) {
           const res = await axios.post(`${API_URL}/auth/refresh`, {
             refreshToken: storedRefreshToken
-          });
+          }, { timeout: 4000 });
 
           if (res.data && res.data.accessToken) {
             const token = res.data.accessToken;
@@ -353,7 +350,8 @@ export const AuthProvider = ({ children }) => {
 
             // Get user details
             const userRes = await axios.get(`${API_URL}/auth/me`, {
-              headers: { Authorization: `Bearer ${token}` }
+              headers: { Authorization: `Bearer ${token}` },
+              timeout: 4000
             });
 
             setUser(userRes.data.user);
