@@ -268,7 +268,7 @@ export default function CategoryEventsPage() {
       {/* ========================================================================= */}
       {/* 1. TOP SUB-NAV BAR (Events | Companies | People) (VisitExpo Theme)        */}
       {/* ========================================================================= */}
-      <div className="bg-white border-b border-zinc-200 pt-24 sm:pt-28">
+      <div className="bg-white border-b border-zinc-200 pt-20 sm:pt-22">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-6 text-xs sm:text-sm font-bold -mb-px">
           {[
             { id: 'events', label: 'Events', icon: CalendarIcon },
@@ -282,7 +282,7 @@ export default function CategoryEventsPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`relative py-3 flex items-center gap-1.5 transition-colors cursor-pointer select-none font-bold ${
+                className={`relative py-2.5 flex items-center gap-1.5 transition-colors cursor-pointer select-none font-bold ${
                   isActive
                     ? 'text-[#FF2E63] font-black'
                     : 'text-zinc-600 hover:text-zinc-900'
@@ -300,47 +300,47 @@ export default function CategoryEventsPage() {
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. CATEGORY HERO BANNER (Screenshot 1 Match)                              */}
+      {/* 2. CATEGORY HERO BANNER (Compact, Space-Efficient Design)                 */}
       {/* ========================================================================= */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
-        <div className="relative rounded-2xl overflow-hidden bg-zinc-950 text-white shadow-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-3">
+        <div className="relative rounded-xl overflow-hidden bg-zinc-950 text-white shadow-xs">
           {/* Background Auditorium Crowd Image with Dark Overlay */}
           <img
             src={category.heroBanner}
             alt={category.name}
-            className="absolute inset-0 w-full h-full object-cover opacity-35"
+            className="absolute inset-0 w-full h-full object-cover opacity-25"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-black/40" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/80 to-black/55" />
 
-          {/* Banner Content & Controls */}
-          <div className="relative z-10 p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-5">
-            <div className="space-y-2">
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight">
+          {/* Banner Content & Controls - Sleek & Compact */}
+          <div className="relative z-10 px-4 py-3 sm:px-6 sm:py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-0.5 min-w-0">
+              <h1 className="text-lg sm:text-xl md:text-2xl font-extrabold tracking-tight text-white leading-tight truncate">
                 {category.name}
               </h1>
 
               {/* Stats line */}
-              <div className="flex items-center gap-4 text-xs sm:text-sm text-zinc-300 font-medium">
+              <div className="flex items-center gap-3 text-[11px] sm:text-xs text-zinc-300 font-medium">
                 <div className="flex items-center gap-1.5">
-                  <Users className="h-3.5 w-3.5 text-zinc-400" />
+                  <Users className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
                   <span>{category.followersCount}</span>
                 </div>
-                <span>•</span>
+                <span className="text-zinc-500">•</span>
                 <div className="flex items-center gap-1.5">
-                  <Globe className="h-3.5 w-3.5 text-zinc-400" />
+                  <Globe className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
                   <span>{category.eventsCount}</span>
                 </div>
               </div>
             </div>
 
-            {/* Follow & Share buttons matching VisitExpo Theme */}
-            <div className="flex items-center gap-2.5 self-start md:self-auto shrink-0">
+            {/* Follow & Share buttons - Compact & Aligned */}
+            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
               <button
                 type="button"
                 onClick={() => setIsFollowing(!isFollowing)}
-                className={`px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs ${
                   isFollowing
-                    ? 'bg-emerald-600 text-white'
+                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
                     : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-extrabold'
                 }`}
               >
@@ -357,7 +357,7 @@ export default function CategoryEventsPage() {
               <button
                 type="button"
                 onClick={handleShare}
-                className="px-4 py-2 rounded-lg text-xs font-bold bg-white/15 hover:bg-white/25 text-white border border-white/20 backdrop-blur-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-xs transition-colors cursor-pointer flex items-center gap-1.5"
               >
                 <Share2 className="h-3.5 w-3.5" />
                 <span>Share</span>
@@ -370,7 +370,7 @@ export default function CategoryEventsPage() {
       {/* ========================================================================= */}
       {/* 3. TWO-COLUMN MAIN CONTAINER (LEFT FILTERS, RIGHT EVENTS FEED)            */}
       {/* ========================================================================= */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* ===================================================================== */}
