@@ -128,6 +128,7 @@ export default function TicketingPage() {
     currency: 'INR',
     capacity: 500
   });
+  const [tierFormErrors, setTierFormErrors] = useState({});
 
   // Simulated Checkout Form State
   const [simulateForm, setSimulateForm] = useState({
@@ -221,12 +222,14 @@ export default function TicketingPage() {
 
   const handleOpenTierModal = () => {
     resetTierForm();
+    setTierFormErrors({});
     setIsTierModalOpen(true);
   };
 
   const handleCloseTierModal = () => {
     setIsTierModalOpen(false);
     resetTierForm();
+    setTierFormErrors({});
   };
 
   const resetSupportTicketForm = () => {
@@ -410,27 +413,48 @@ export default function TicketingPage() {
   // 4. Handle Create Ticket Tier
   const handleCreateTier = async (e) => {
     e.preventDefault();
-    if (!newTier.title || newTier.capacity === undefined) {
-      showSweetWarning('Ticket name and Capacity are required');
-      return;
+    const errors = {};
+    if (!selectedEventId) {
+      errors.eventId = 'Select an event.';
+    }
+    const title = newTier.title.trim();
+    const description = newTier.description.trim();
+    const capacity = Number(newTier.capacity);
+    const price = Number(newTier.price);
+    const tierTextPattern = /^[\p{L}\p{N}][\p{L}\p{M}\p{N}\s.,&'()\-/#]*$/u;
+
+    if (!title) {
+      errors.title = 'Ticket name is required.';
+    } else if (title.length < 3 || title.length > 100 || !/[\p{L}]/u.test(title) || !tierTextPattern.test(title)) {
+      errors.title = 'Enter a valid ticket name (3–100 characters, starting with a letter or number).';
+    }
+
+    if (description && (description.length < 3 || description.length > 500 || !/[\p{L}]/u.test(description))) {
+      errors.description = 'Description must contain readable text and be no more than 500 characters.';
+    }
+
+    if (!Number.isInteger(capacity) || capacity < 1) {
+      errors.capacity = 'Capacity must be a whole number greater than 0.';
     }
 
     if (newTier.type === 'paid') {
-      const p = parseFloat(newTier.price);
-      if (isNaN(p) || p <= 0) {
-        showSweetWarning('Price must be greater than 0');
-        return;
+      if (!newTier.currency) {
+        errors.currency = 'Select a currency.';
       }
-      if (!isPaidPlan && (p < 1 || p > 10)) {
-        showSweetWarning('Free plan organizers can create token tickets priced between ₹1 and ₹10 only. Upgrade to Starter or Enterprise to set custom ticket prices.');
-        return;
+      if (!Number.isFinite(price) || price <= 0) {
+        errors.price = 'Price must be greater than 0.';
+      } else if (!isPaidPlan && (price < 1 || price > 10)) {
+        errors.price = 'Free plan ticket prices must be between ₹1 and ₹10.';
       }
     }
+
+    setTierFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
 
     try {
       const res = await axios.post(
         `${API_URL}/tickets`,
-        { ...newTier, eventId: selectedEventId },
+        { ...newTier, title, description, capacity, price, eventId: selectedEventId },
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       if (res.data && res.data.success) {
@@ -533,7 +557,7 @@ export default function TicketingPage() {
 
   // 6. Handle Raise Support Ticket
   const handleRaiseSupportTicket = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     const titleVal = validateTicketInput(newSupportTicket.title, 'Ticket title');
     if (!titleVal.valid) {
       showSweetWarning(titleVal.error);
@@ -1250,11 +1274,11 @@ export default function TicketingPage() {
                     setSupportStatusFilter('all');
                     setSupportPriorityFilter('all');
                   }}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-destructive bg-destructive/10 hover:bg-destructive/20 border border-destructive/20 rounded-xl transition-all cursor-pointer shadow-xs animate-in fade-in zoom-in-95 duration-150"
+                  className="inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap px-3 py-2 text-xs font-semibold text-foreground bg-background hover:bg-secondary border border-border rounded-xl transition-colors cursor-pointer"
                   title="Reset all active filters"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
-                  <span>Reset</span>
+                  <span>Reset Filter</span>
                 </button>
               )}
 
@@ -1535,8 +1559,8 @@ export default function TicketingPage() {
                   Cancel
                 </button>
                 <button
-                  type="submit"
-                  formNoValidate
+                  type="button"
+                  onClick={() => handleRaiseSupportTicket()}
                   disabled={raisingTicket}
                   className="rounded-lg bg-primary hover:bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow-md transition-colors flex items-center gap-1.5"
                 >
@@ -1816,7 +1840,7 @@ export default function TicketingPage() {
           onClick={handleCloseTierModal}
         >
           <div 
-            className="relative w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200"
+            className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -1830,14 +1854,39 @@ export default function TicketingPage() {
 
             <form onSubmit={handleCreateTier} noValidate className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Tier Name *</label>
+                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">
+                  Event ID <span className="text-red-500">*</span>
+                </label>
+                <SearchableSelect
+                  options={events.map((event) => ({ value: event._id, label: event.title }))}
+                  value={selectedEventId}
+                  onChange={(value) => {
+                    setSelectedEventId(value);
+                    setTierFormErrors((prev) => ({ ...prev, eventId: '' }));
+                  }}
+                  placeholder="Select an event..."
+                  searchPlaceholder="Search events..."
+                />
+                {tierFormErrors.eventId && <p className="mt-1 text-xs text-destructive">{tierFormErrors.eventId}</p>}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">
+                  Ticket Name <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={newTier.title}
-                  onChange={(e) => setNewTier(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  onChange={(e) => {
+                    setNewTier(prev => ({ ...prev, title: e.target.value }));
+                    setTierFormErrors(prev => ({ ...prev, title: '' }));
+                  }}
+                  aria-invalid={Boolean(tierFormErrors.title)}
+                  aria-describedby={tierFormErrors.title ? 'tier-title-error' : undefined}
+                  className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary ${tierFormErrors.title ? 'border-destructive' : 'border-border'}`}
                   placeholder="E.g. Conference Regular Pass"
                 />
+                {tierFormErrors.title && <p id="tier-title-error" className="mt-1 text-xs text-destructive">{tierFormErrors.title}</p>}
               </div>
 
               <div>
@@ -1845,10 +1894,16 @@ export default function TicketingPage() {
                 <textarea
                   rows={2}
                   value={newTier.description}
-                  onChange={(e) => setNewTier(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none placeholder:text-muted-foreground"
+                  onChange={(e) => {
+                    setNewTier(prev => ({ ...prev, description: e.target.value }));
+                    setTierFormErrors(prev => ({ ...prev, description: '' }));
+                  }}
+                  aria-invalid={Boolean(tierFormErrors.description)}
+                  aria-describedby={tierFormErrors.description ? 'tier-description-error' : undefined}
+                  className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none placeholder:text-muted-foreground ${tierFormErrors.description ? 'border-destructive' : 'border-border'}`}
                   placeholder="Briefly state pass access rights..."
                 />
+                {tierFormErrors.description && <p id="tier-description-error" className="mt-1 text-xs text-destructive">{tierFormErrors.description}</p>}
               </div>
 
               <div className="grid gap-4 grid-cols-2">
@@ -1865,13 +1920,24 @@ export default function TicketingPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Capacity Limit *</label>
+                  <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">
+                    Capacity Limit <span className="text-red-500">*</span>
+                  </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={newTier.capacity}
-                    onChange={(e) => setNewTier(prev => ({ ...prev, capacity: parseInt(e.target.value) || 0 }))}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value !== '' && Number(value) < 0) return;
+                      setNewTier(prev => ({ ...prev, capacity: value === '' ? '' : Number(value) }));
+                      setTierFormErrors(prev => ({ ...prev, capacity: '' }));
+                    }}
+                    aria-invalid={Boolean(tierFormErrors.capacity)}
+                    aria-describedby={tierFormErrors.capacity ? 'tier-capacity-error' : undefined}
+                    className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary ${tierFormErrors.capacity ? 'border-destructive' : 'border-border'}`}
                   />
+                  {tierFormErrors.capacity && <p id="tier-capacity-error" className="mt-1 text-xs text-destructive">{tierFormErrors.capacity}</p>}
                 </div>
               </div>
 
@@ -1886,10 +1952,14 @@ export default function TicketingPage() {
                         flag: c.flag
                       }))}
                       value={newTier.currency || 'INR'}
-                      onChange={(val) => setNewTier(prev => ({ ...prev, currency: val }))}
+                      onChange={(val) => {
+                        setNewTier(prev => ({ ...prev, currency: val }));
+                        setTierFormErrors(prev => ({ ...prev, currency: '' }));
+                      }}
                       placeholder="Select currency..."
                       searchPlaceholder="Search currency (e.g. USD, EUR, INR)..."
                     />
+                    {tierFormErrors.currency && <p className="mt-1 text-xs text-destructive">{tierFormErrors.currency}</p>}
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">
@@ -1900,15 +1970,19 @@ export default function TicketingPage() {
                         {getCurrencySymbol(newTier.currency)}
                       </span>
                       <input
-                        type="number"
-                        min="1"
-                        max={isPaidPlan ? undefined : 10}
-                        step="any"
+                        type="text"
+                        inputMode="decimal"
                         value={newTier.price}
-                        onChange={(e) => setNewTier(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                        className="w-full rounded-r-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+                        onChange={(e) => {
+                          setNewTier(prev => ({ ...prev, price: e.target.value === '' ? '' : Number(e.target.value) }));
+                          setTierFormErrors(prev => ({ ...prev, price: '' }));
+                        }}
+                        aria-invalid={Boolean(tierFormErrors.price)}
+                        aria-describedby={tierFormErrors.price ? 'tier-price-error' : undefined}
+                        className={`w-full rounded-r-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono ${tierFormErrors.price ? 'border-destructive' : 'border-border'}`}
                       />
                     </div>
+                    {tierFormErrors.price && <p id="tier-price-error" className="mt-1 text-xs text-destructive">{tierFormErrors.price}</p>}
                     {!isPaidPlan ? (
                       <p className="mt-1 text-[11px] text-amber-500 font-medium">
                         Free plan token ticket limit: <strong>₹1 to ₹10</strong>. Upgrade to Starter or Enterprise for custom ticket pricing.
@@ -1964,17 +2038,42 @@ export default function TicketingPage() {
 
             <form onSubmit={handleSimulateCheckout} noValidate className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Select Ticket Tier *</label>
-                <SearchableSelect
-                  options={tickets.map(t => ({
-                    value: t._id,
-                    label: `${t.title} (${t.price === 0 ? 'FREE' : `${getCurrencySymbol(t.currency)}${t.price.toLocaleString()}`})`
-                  }))}
-                  value={simulateForm.ticketId}
-                  onChange={(val) => setSimulateForm(prev => ({ ...prev, ticketId: val }))}
-                  placeholder="Select ticket tier..."
-                  searchPlaceholder="Search ticket tier..."
-                />
+                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">
+                  Select Ticket Tier <span className="text-red-500">*</span>
+                </label>
+                {tickets.length > 0 ? (
+                  <SearchableSelect
+                    options={tickets.map(t => ({
+                      value: t._id,
+                      label: `${t.title} (${t.price === 0 ? 'FREE' : `${getCurrencySymbol(t.currency)}${t.price.toLocaleString()}`})`
+                    }))}
+                    value={simulateForm.ticketId}
+                    onChange={(val) => {
+                      setSimulateForm(prev => ({ ...prev, ticketId: val }));
+                      setSimulateFormErrors(prev => ({ ...prev, ticketId: '' }));
+                    }}
+                    placeholder="Select ticket tier..."
+                    searchPlaceholder="Search ticket tier..."
+                  />
+                ) : (
+                  <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4 text-center">
+                    <p className="text-sm font-semibold text-foreground">No ticket tiers for this event yet</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Create a ticket tier before simulating a purchase.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleCloseSimulateModal();
+                        handleOpenTierModal();
+                      }}
+                      className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Ticket Tier
+                    </button>
+                  </div>
+                )}
                 {simulateFormErrors.ticketId && (
                   <p className="mt-1 text-xs text-destructive">{simulateFormErrors.ticketId}</p>
                 )}
@@ -1982,11 +2081,12 @@ export default function TicketingPage() {
 
               <div className="grid gap-4 grid-cols-2">
                 <div>
-                  <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Quantity *</label>
+                  <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">
+                    Quantity <span className="text-red-500">*</span>
+                  </label>
                   <input
-                    type="number"
-                    min="1"
-                    max="10"
+                    type="text"
+                    inputMode="numeric"
                     value={simulateForm.quantity}
                     onChange={(e) => {
                       setSimulateForm(prev => ({ ...prev, quantity: e.target.value }));
@@ -2018,7 +2118,9 @@ export default function TicketingPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Buyer Name *</label>
+                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">
+                  Buyer Name <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={simulateForm.buyer.name}
@@ -2036,9 +2138,13 @@ export default function TicketingPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Buyer Email *</label>
+                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">
+                  Buyer Email <span className="text-red-500">*</span>
+                </label>
                 <input
-                  type="email"
+                  type="text"
+                  inputMode="email"
+                  autoComplete="email"
                   value={simulateForm.buyer.email}
                   onChange={(e) => {
                     setSimulateForm(prev => ({ ...prev, buyer: { ...prev.buyer, email: e.target.value } }));
@@ -2101,7 +2207,7 @@ export default function TicketingPage() {
                 <button
                   type="submit"
                   formNoValidate
-                  disabled={simulating}
+                  disabled={simulating || tickets.length === 0}
                   className="rounded-lg bg-primary hover:bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow-md transition-colors flex items-center gap-1.5"
                 >
                   {simulating ? (
