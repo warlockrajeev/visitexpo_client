@@ -596,7 +596,7 @@ export default function InterestedEventsPage() {
         {(interestedEvents.length > 0 || interestedSlugs.size > 0) && (
           <div className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row items-center gap-3">
-              <div className="relative flex-1 w-full">
+              <div className="relative w-full sm:w-2/3 sm:flex-none">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                 <input
                   type="text"

@@ -13,6 +13,7 @@ import Navbar from '@/components/Navbar.js';
 import Footer from '@/components/Footer.js';
 import { useAuth } from '@/context/AuthContext.js';
 import axios from 'axios';
+import { showSweetConfirm } from '@/utils/sweetalert.js';
 import {
   Bell,
   BellRing,
@@ -26,6 +27,7 @@ import {
   Filter,
   CheckCircle2,
   ExternalLink,
+  ChevronLeft,
   ChevronRight,
   MessageSquare,
   ShieldCheck,
@@ -50,7 +52,9 @@ export default function FollowingPage() {
   const [savedDetailsMap, setSavedDetailsMap] = useState({});
   const [activeTab, setActiveTab] = useState('expos'); // 'expos' | 'organizers'
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [toastMessage, setToastMessage] = useState(null);
+  const itemsPerPage = 6;
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -176,6 +180,17 @@ export default function FollowingPage() {
   const handleUnfollow = async (evt) => {
     const slug = (evt.slug || evt.id || '').toLowerCase().trim();
     if (!slug) return;
+
+    const confirmed = await showSweetConfirm({
+      title: 'Unfollow this expo?',
+      text: `Are you sure you want to unfollow "${evt.title || 'this exhibition'}"? You will no longer receive its updates.`,
+      icon: 'warning',
+      confirmButtonText: 'Yes, unfollow',
+      cancelButtonText: 'Keep following',
+      isDanger: true
+    });
+
+    if (!confirmed) return;
 
     setFollowedSlugs((prev) => {
       const next = new Set(prev);
@@ -386,6 +401,13 @@ export default function FollowingPage() {
     return Array.from(map.values());
   }, [followedExposWithOrganizers]);
 
+  const activeItems = activeTab === 'expos' ? followedExposWithOrganizers : followedOrganizersGrouped;
+  const totalPages = Math.ceil(activeItems.length / itemsPerPage);
+  const safeCurrentPage = Math.min(currentPage, Math.max(totalPages, 1));
+  const pageStartIndex = (safeCurrentPage - 1) * itemsPerPage;
+  const paginatedExpos = followedExposWithOrganizers.slice(pageStartIndex, pageStartIndex + itemsPerPage);
+  const paginatedOrganizers = followedOrganizersGrouped.slice(pageStartIndex, pageStartIndex + itemsPerPage);
+
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-zinc-900 font-sans antialiased selection:bg-[#FFCC00] selection:text-zinc-950 flex flex-col">
       <Navbar solid={true} />
@@ -401,19 +423,6 @@ export default function FollowingPage() {
       )}
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-20 space-y-8">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-xs text-zinc-500 font-medium">
-          <Link href="/" className="hover:text-zinc-950 transition-colors">
-            Home
-          </Link>
-          <ChevronRight className="h-3 w-3" />
-          <Link href="/events" className="hover:text-zinc-950 transition-colors">
-            Events
-          </Link>
-          <ChevronRight className="h-3 w-3" />
-          <span className="text-zinc-950 font-bold">Followed Expos &amp; Organizers</span>
-        </div>
-
         {/* Hero Header Banner */}
         <div className="relative overflow-hidden rounded-3xl bg-white border border-zinc-200/90 p-8 sm:p-10 shadow-xs">
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -471,7 +480,10 @@ export default function FollowingPage() {
               <div className="flex items-center gap-1.5 p-1 bg-zinc-100 rounded-xl w-full sm:w-auto">
                 <button
                   type="button"
-                  onClick={() => setActiveTab('expos')}
+                  onClick={() => {
+                    setActiveTab('expos');
+                    setCurrentPage(1);
+                  }}
                   className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
                     activeTab === 'expos'
                       ? 'bg-white text-zinc-950 shadow-xs'
@@ -484,7 +496,10 @@ export default function FollowingPage() {
 
                 <button
                   type="button"
-                  onClick={() => setActiveTab('organizers')}
+                  onClick={() => {
+                    setActiveTab('organizers');
+                    setCurrentPage(1);
+                  }}
                   className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
                     activeTab === 'organizers'
                       ? 'bg-white text-zinc-950 shadow-xs'
@@ -503,7 +518,10 @@ export default function FollowingPage() {
                   type="text"
                   placeholder="Search expos or organizers..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="w-full pl-10 pr-4 py-2 text-sm rounded-xl border border-zinc-200 bg-[#F8F9FA] text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
                 />
               </div>
@@ -551,7 +569,7 @@ export default function FollowingPage() {
           /* TAB 1: FOLLOWED EXPOS WITH ORGANIZER CONNECTION CARDS          */
           /* ============================================================== */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
-            {followedExposWithOrganizers.map((evt) => {
+            {paginatedExpos.map((evt) => {
               const eventSlug = evt.slug || evt.id;
               const org = evt.organizer;
 
@@ -690,37 +708,40 @@ export default function FollowingPage() {
           /* TAB 2: GROUPED ORGANIZERS VIEW                                 */
           /* ============================================================== */
           <div className="space-y-6">
-            {followedOrganizersGrouped.map((group, idx) => {
+            {paginatedOrganizers.map((group, idx) => {
               const org = group.organizer;
 
               return (
                 <div
                   key={idx}
-                  className="rounded-3xl border border-zinc-200 bg-white p-6 sm:p-8 shadow-xs space-y-6"
+                  className="overflow-hidden rounded-3xl border border-zinc-200/80 bg-white shadow-sm transition-shadow hover:shadow-md"
                 >
                   {/* Organizer Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 pb-6">
-                    <div className="flex items-center gap-4">
-                      <div className="h-14 w-14 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center font-black text-xl text-blue-900 shrink-0 shadow-xs">
+                  <div className="flex flex-col gap-5 border-b border-blue-100 bg-gradient-to-r from-blue-50/80 via-white to-white px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+                    <div className="flex min-w-0 items-center gap-4">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-white text-xl font-black text-blue-800 shadow-sm ring-4 ring-blue-50">
                         {(org?.name || 'O').charAt(0).toUpperCase()}
                       </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-xl font-bold text-zinc-950">{org?.name}</h3>
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-lg font-extrabold tracking-tight text-zinc-950 sm:text-xl">{org?.name}</h3>
                           {org?.isVerified && (
-                            <ShieldCheck className="h-5 w-5 text-emerald-500 shrink-0" />
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-100">
+                              <ShieldCheck className="h-3.5 w-3.5" />
+                              Verified
+                            </span>
                           )}
                         </div>
-                        <p className="text-xs text-zinc-500 font-medium">
+                        <p className="truncate text-xs font-medium text-zinc-500 sm:text-sm">
                           {org?.company || 'Verified Trade Fair Organizer'}
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                       <Link
                         href="/organizers"
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-zinc-200 bg-[#F8F9FA] hover:bg-zinc-100 text-xs font-semibold text-zinc-900 transition"
+                        className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-xs font-bold text-zinc-700 shadow-xs transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-800"
                       >
                         <Building2 className="h-3.5 w-3.5" />
                         <span>All Organizer Expos</span>
@@ -729,7 +750,7 @@ export default function FollowingPage() {
                       {org?.isChatEnabled && (
                         <Link
                           href="/organizers"
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-black text-xs transition shadow-xs active:scale-95"
+                          className="inline-flex items-center gap-2 rounded-xl bg-[#FFCC00] px-3.5 py-2.5 text-xs font-black text-zinc-950 shadow-xs transition hover:bg-[#FFB703] active:scale-95"
                         >
                           <MessageSquare className="h-3.5 w-3.5" />
                           <span>Chat with Organizer</span>
@@ -739,47 +760,78 @@ export default function FollowingPage() {
                   </div>
 
                   {/* Followed Expos under this Organizer */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-                        You Are Following {group.expos.length} Expo{group.expos.length > 1 ? 's' : ''} by {org?.name}
-                      </h4>
+                  <div className="space-y-4 px-5 py-5 sm:px-7 sm:py-6">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-sm font-bold text-zinc-900">Followed exhibitions</h4>
+                        <p className="mt-0.5 text-xs text-zinc-500">Events managed by this organizer</p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-800 ring-1 ring-blue-100">
+                        {group.expos.length} {group.expos.length === 1 ? 'expo' : 'expos'}
+                      </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                       {group.expos.map((evt) => (
                         <div
                           key={evt.id}
-                          className="rounded-2xl border border-zinc-200 bg-zinc-50/80 p-4 space-y-3 hover:border-blue-400 transition"
+                          className="group flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md sm:flex-row"
                         >
-                          <div className="space-y-1.5">
-                            <span className="text-[10px] font-bold text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-full">
+                          <div className="relative h-36 shrink-0 overflow-hidden bg-blue-50 sm:h-auto sm:min-h-44 sm:w-36">
+                            <img
+                              src={evt.image || 'https://visitexpo.in/wp-content/uploads/2026/08/Refining-India-2026.jpg'}
+                              alt={evt.title}
+                              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              onError={(e) => {
+                                e.currentTarget.src = 'https://visitexpo.in/wp-content/uploads/2026/08/Refining-India-2026.jpg';
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/50 via-transparent to-transparent sm:bg-gradient-to-r" />
+                            <span className="absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] truncate rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold text-blue-800 shadow-sm backdrop-blur">
                               {evt.category || 'Exhibition'}
                             </span>
-                            <h5 className="font-bold text-zinc-950 text-sm line-clamp-1">
-                              {evt.title}
-                            </h5>
-                            <p className="text-xs text-zinc-500 flex items-center gap-1">
-                              <Calendar className="h-3 w-3 text-zinc-400" />
-                              <span>{evt.dates || 'Upcoming'}</span>
-                            </p>
                           </div>
 
-                          <div className="pt-2 border-t border-zinc-200/80 flex items-center justify-between text-xs">
-                            <button
-                              type="button"
-                              onClick={() => handleUnfollow(evt)}
-                              className="text-zinc-400 hover:text-rose-600 font-semibold cursor-pointer"
-                            >
-                              Unfollow
-                            </button>
+                          <div className="flex min-w-0 flex-1 flex-col justify-between p-4">
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-700">
+                                <Bell className="h-3 w-3 fill-blue-600" />
+                                Following
+                              </div>
+                              <h5 className="line-clamp-2 text-base font-extrabold leading-snug text-zinc-950 transition-colors group-hover:text-blue-800">
+                                {evt.title}
+                              </h5>
+                              <div className="space-y-2">
+                                <p className="flex items-center gap-2 text-xs font-medium text-zinc-600">
+                                  <Calendar className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                                  <span className="line-clamp-1">{evt.dates || 'Upcoming'}</span>
+                                </p>
+                                {(evt.venue || evt.city) && (
+                                  <p className="flex items-center gap-2 text-xs text-zinc-500">
+                                    <MapPin className="h-3.5 w-3.5 shrink-0 text-rose-500" />
+                                    <span className="line-clamp-1">{evt.venue || evt.city}</span>
+                                  </p>
+                                )}
+                              </div>
+                            </div>
 
-                            <Link
-                              href={`/expo/${evt.slug || evt.id}`}
-                              className="text-amber-600 hover:text-amber-700 font-bold hover:underline"
-                            >
-                              View Details →
-                            </Link>
+                            <div className="mt-4 flex items-center justify-between gap-3 border-t border-zinc-100 pt-3 text-xs">
+                              <button
+                                type="button"
+                                onClick={() => handleUnfollow(evt)}
+                                className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 font-semibold text-zinc-600 shadow-xs transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-2 cursor-pointer"
+                              >
+                                Unfollow
+                              </button>
+
+                              <Link
+                                href={`/expo/${evt.slug || evt.id}`}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-2 font-bold text-[#FFCC00] transition hover:bg-[#FFCC00] hover:text-zinc-950"
+                              >
+                                View details
+                                <ArrowRight className="h-3 w-3" />
+                              </Link>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -788,6 +840,39 @@ export default function FollowingPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {totalPages > 1 && (
+          <div className="flex flex-col items-center justify-between gap-3 border-t border-zinc-200 pt-4 sm:flex-row">
+            <p className="text-xs font-medium text-zinc-500">
+              Showing <strong className="text-zinc-900">{pageStartIndex + 1}</strong>–<strong className="text-zinc-900">{Math.min(pageStartIndex + itemsPerPage, activeItems.length)}</strong> of{' '}
+              <strong className="text-zinc-900">{activeItems.length}</strong> {activeTab === 'expos' ? 'expos' : 'organizers'}
+            </p>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+                disabled={safeCurrentPage === 1}
+                className="inline-flex items-center gap-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700 transition hover:border-[#FFCC00] hover:bg-[#FFCC00] hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Previous
+              </button>
+              <span className="px-2 text-xs font-semibold text-zinc-600">
+                Page {safeCurrentPage} of {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+                disabled={safeCurrentPage === totalPages}
+                className="inline-flex items-center gap-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700 transition hover:border-[#FFCC00] hover:bg-[#FFCC00] hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         )}
       </main>
