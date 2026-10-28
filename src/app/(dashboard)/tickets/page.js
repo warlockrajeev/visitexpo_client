@@ -163,6 +163,7 @@ export default function TicketingPage() {
     priority: 'medium',
     eventId: ''
   });
+  const [supportFormErrors, setSupportFormErrors] = useState({});
 
   // Ticket Detail & Reply Thread Modal State
   const [selectedTicketDetail, setSelectedTicketDetail] = useState(null);
@@ -240,6 +241,7 @@ export default function TicketingPage() {
       priority: 'medium',
       eventId: ''
     });
+    setSupportFormErrors({});
   };
 
   const handleOpenRaiseTicketModal = () => {
@@ -255,6 +257,16 @@ export default function TicketingPage() {
   const handleCloseTicketDetailModal = () => {
     setSelectedTicketDetail(null);
     setReplyMessage('');
+  };
+
+  const validateSupportField = (field, value) => {
+    const label = field === 'title' ? 'Ticket title' : 'Ticket description';
+    const maxLength = field === 'title' ? 120 : 2000;
+    if (value.trim().length > maxLength) {
+      return `${label} cannot exceed ${maxLength} characters.`;
+    }
+    const result = validateTicketInput(value, label);
+    return result.valid ? '' : result.error;
   };
 
   // 1. Fetch Events with instant sessionStorage caching
@@ -558,15 +570,12 @@ export default function TicketingPage() {
   // 6. Handle Raise Support Ticket
   const handleRaiseSupportTicket = async (e) => {
     e?.preventDefault();
-    const titleVal = validateTicketInput(newSupportTicket.title, 'Ticket title');
-    if (!titleVal.valid) {
-      showSweetWarning(titleVal.error);
-      return;
-    }
-
-    const descVal = validateTicketInput(newSupportTicket.description, 'Ticket description');
-    if (!descVal.valid) {
-      showSweetWarning(descVal.error);
+    const errors = {
+      title: validateSupportField('title', newSupportTicket.title),
+      description: validateSupportField('description', newSupportTicket.description)
+    };
+    setSupportFormErrors(errors);
+    if (Object.values(errors).some(Boolean)) {
       return;
     }
 
@@ -1484,14 +1493,31 @@ export default function TicketingPage() {
 
             <form onSubmit={handleRaiseSupportTicket} noValidate className="space-y-4 pt-2">
               <div>
-                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Ticket Title *</label>
+                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">
+                  Ticket Title <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={newSupportTicket.title}
-                  onChange={(e) => setNewSupportTicket(prev => ({ ...prev, title: filterTicketInput(e.target.value, prev.title) }))}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  onChange={(e) => {
+                    const title = filterTicketInput(e.target.value, newSupportTicket.title);
+                    setNewSupportTicket(prev => ({ ...prev, title }));
+                    if (supportFormErrors.title) {
+                      setSupportFormErrors(prev => ({ ...prev, title: validateSupportField('title', title) }));
+                    }
+                  }}
+                  onBlur={() => setSupportFormErrors(prev => ({
+                    ...prev,
+                    title: validateSupportField('title', newSupportTicket.title)
+                  }))}
+                  aria-invalid={Boolean(supportFormErrors.title)}
+                  aria-describedby={supportFormErrors.title ? 'support-title-error' : undefined}
+                  className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary ${supportFormErrors.title ? 'border-destructive' : 'border-border'}`}
                   placeholder="E.g. WordPress sync webhook timing out"
                 />
+                {supportFormErrors.title && (
+                  <p id="support-title-error" className="mt-1 text-xs text-destructive">{supportFormErrors.title}</p>
+                )}
               </div>
 
               <div className="grid gap-4 grid-cols-2">
@@ -1540,14 +1566,31 @@ export default function TicketingPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Detailed Problem Description *</label>
+                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">
+                  Detailed Problem Description <span className="text-red-500">*</span>
+                </label>
                 <textarea
                   rows={4}
                   value={newSupportTicket.description}
-                  onChange={(e) => setNewSupportTicket(prev => ({ ...prev, description: filterTicketInput(e.target.value, prev.description) }))}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none placeholder:text-muted-foreground text-sm"
+                  onChange={(e) => {
+                    const description = filterTicketInput(e.target.value, newSupportTicket.description);
+                    setNewSupportTicket(prev => ({ ...prev, description }));
+                    if (supportFormErrors.description) {
+                      setSupportFormErrors(prev => ({ ...prev, description: validateSupportField('description', description) }));
+                    }
+                  }}
+                  onBlur={() => setSupportFormErrors(prev => ({
+                    ...prev,
+                    description: validateSupportField('description', newSupportTicket.description)
+                  }))}
+                  aria-invalid={Boolean(supportFormErrors.description)}
+                  aria-describedby={supportFormErrors.description ? 'support-description-error' : undefined}
+                  className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none placeholder:text-muted-foreground ${supportFormErrors.description ? 'border-destructive' : 'border-border'}`}
                   placeholder="Provide details, steps to reproduce, or specific error messages encountered..."
                 />
+                {supportFormErrors.description && (
+                  <p id="support-description-error" className="mt-1 text-xs text-destructive">{supportFormErrors.description}</p>
+                )}
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-border">

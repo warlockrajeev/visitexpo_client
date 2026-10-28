@@ -1531,6 +1531,22 @@ export default function ExpoDetailsPage() {
     return Array.from(tags);
   }, [event]);
 
+  const getListedInHref = (tag) => {
+    const normalizeTag = (value) => String(value || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    const tagValue = normalizeTag(tag);
+    const eventCategories = [event?.category, ...(Array.isArray(event?.categories) ? event.categories : [])].filter(Boolean);
+    const category = eventCategories.find((value) => normalizeTag(`#${value}`) === tagValue);
+
+    if (category) return `/events?search=${encodeURIComponent(category)}`;
+    if (event?.city && tagValue === `${normalizeTag(event.city)}expos`) {
+      return `/events?city=${encodeURIComponent(event.city)}`;
+    }
+    if (event?.country && tagValue === `${normalizeTag(event.country)}trade`) {
+      return `/events?country=${encodeURIComponent(event.country)}`;
+    }
+    return '/events';
+  };
+
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   const handleShare = () => {
@@ -3039,7 +3055,7 @@ export default function ExpoDetailsPage() {
                       href={mapDirectionsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold inline-flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold inline-flex items-center gap-2 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 active:translate-y-0 cursor-pointer"
                     >
                       <Navigation className="h-3.5 w-3.5" />
                       <span>Get Directions on Google Maps</span>
@@ -3050,7 +3066,7 @@ export default function ExpoDetailsPage() {
                       href={`https://www.google.com/travel/hotels?q=hotels+near+${encodeURIComponent(event?.venue || event?.city)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-3.5 py-2 rounded-xl bg-white border border-zinc-300 hover:bg-zinc-50 text-zinc-800 text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                      className="px-3.5 py-2 rounded-xl bg-white border border-zinc-300 hover:bg-zinc-50 hover:border-zinc-400 text-zinc-800 text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 active:translate-y-0 cursor-pointer"
                     >
                       <span>Nearby Hotels</span>
                       <ExternalLink className="h-3 w-3 text-zinc-400" />
@@ -3276,12 +3292,13 @@ export default function ExpoDetailsPage() {
                     {event?.category || 'Trade Show'}
                   </span>
                   {listedInTags.map((tag, idx) => (
-                    <span
+                    <Link
                       key={idx}
-                      className="px-2.5 py-1 rounded-lg bg-white border border-zinc-200 text-xs text-zinc-600 font-medium hover:border-zinc-300 cursor-pointer"
+                      href={getListedInHref(tag)}
+                      className="px-2.5 py-1 rounded-lg bg-white border border-zinc-200 text-xs text-zinc-600 font-medium hover:border-amber-400 hover:bg-amber-50 hover:text-zinc-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
                     >
                       {tag}
-                    </span>
+                    </Link>
                   ))}
                 </div>
               </div>

@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { renderCardDescription } from '../../utils/textFormatters.js';
 import Navbar from '../../components/Navbar.js';
+import Footer from '../../components/Footer.js';
 import { useAuth } from '../../context/AuthContext.js';
 import wpEventImages from '@/data/wordpress-event-images.json';
 import {
@@ -1207,7 +1208,7 @@ export default function EventsDirectoryPage() {
                 }`}
               >
                 <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
-                <span>⭐ 4.5+ Rating</span>
+                <span>4.5+ Rating</span>
               </button>
 
               {/* Toggle Advanced Filters Button */}
@@ -1759,7 +1760,7 @@ export default function EventsDirectoryPage() {
         {/* PAGINATION CONTROLS (Modern & Sleek)                                      */}
         {/* ========================================================================= */}
         {totalPages > 1 && (
-          <div className="pt-3.5 sm:pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-zinc-200">
+          <div className="flex flex-col items-center justify-between gap-2 border-t border-zinc-200 pt-3 sm:flex-row">
             <div className="text-xs text-zinc-500 font-medium">
               Page <strong className="text-zinc-950 font-bold">{currentPage}</strong> of{' '}
               <strong className="text-zinc-950 font-bold">{totalPages}</strong> ({filteredEvents.length.toLocaleString()} total exhibitions)
@@ -1822,38 +1823,29 @@ export default function EventsDirectoryPage() {
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* ORGANIZER CTA CARD (Eye-Catchy Dark Gradient Glass)                       */}
-        {/* ========================================================================= */}
-        <div className="relative bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 border border-zinc-800 rounded-2xl p-4 sm:p-5 md:py-4 md:px-6 shadow-xl text-white overflow-hidden flex flex-col md:flex-row items-center justify-between gap-4">
-          {/* Ambient Glow */}
-          <div className="absolute -right-20 -top-20 w-60 h-60 bg-[#FFCC00]/15 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="space-y-1 text-center md:text-left relative z-10 max-w-xl">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[#FFCC00] text-zinc-950 inline-block shadow-xs">
-              ★ For Exhibition Organizers &amp; Venue Owners
-            </span>
-            <h3 className="text-base sm:text-lg font-black text-white tracking-tight">
-              Are you organizing a trade show or B2B expo?
+        <div className="flex flex-col items-start justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 sm:flex-row sm:items-center">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-zinc-900">
+              Organizing an expo?
             </h3>
-            <p className="text-xs text-zinc-400 leading-normal font-normal">
-              List your exhibition on VisitExpo to showcase your floorplan, capture attendee pre-registrations, and connect directly with verified exhibitors worldwide.
+            <p className="text-xs text-zinc-500">
+              List or claim your event on VisitExpo.
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0 relative z-10">
+          <div className="shrink-0">
             <Link
               href="/login?role=organizer&signup=true"
-              className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-black text-xs sm:text-sm transition-all shadow-md hover:shadow-lg hover:scale-102 active:scale-98 flex items-center gap-1.5 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#FFCC00] px-3.5 py-2 text-xs font-semibold text-zinc-950 transition-colors hover:bg-[#FFB703] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
             >
-              <span>List or Claim Your Expo</span>
+              <span>List or claim an expo</span>
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
         </div>
       </main>
 
-
+      <Footer />
 
       {/* Floating Toast Notification */}
       {toastMessage && (

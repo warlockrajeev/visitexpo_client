@@ -10,16 +10,12 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar.js';
 import Footer from '@/components/Footer.js';
 import {
-  CreditCard,
   Clock,
   ChevronRight,
-  AlertCircle,
   CheckCircle2,
   Mail,
   Phone,
   ShieldCheck,
-  RefreshCw,
-  HelpCircle
 } from 'lucide-react';
 
 export default function RefundPolicyPage() {
@@ -29,32 +25,26 @@ export default function RefundPolicyPage() {
         <Navbar solid={true} />
 
         {/* Hero Header */}
-        <section className="bg-zinc-950 text-white pt-32 pb-16 px-4 sm:px-6 border-b border-zinc-800">
-          <div className="max-w-4xl mx-auto space-y-4">
+        <section className="border-b border-zinc-200 bg-zinc-50 px-4 pb-8 pt-28 sm:px-6 sm:pb-10">
+          <div className="mx-auto max-w-3xl space-y-4">
             {/* Breadcrumb */}
-            <div className="flex items-center gap-2 text-xs text-zinc-400 font-medium">
-              <Link href="/" className="hover:text-white transition-colors">Home</Link>
+            <div className="flex items-center gap-2 text-xs font-medium text-zinc-500">
+              <Link href="/" className="transition-colors hover:text-zinc-900">Home</Link>
               <ChevronRight className="h-3 w-3" />
-              <span className="text-[#FFCC00]">Refund Policy</span>
+              <span className="text-zinc-900">Refund Policy</span>
             </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#FFCC00]/10 text-[#FFCC00] border border-[#FFCC00]/20">
-              <RefreshCw className="h-3.5 w-3.5" />
-              <span>Financial Guidelines &amp; Cancellations</span>
-            </div>
-
-            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-950 sm:text-3xl">
               Refund Policy &ndash; VisitExpo.in
             </h1>
 
-            <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-400 pt-1">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-zinc-500">
               <span className="flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5 text-zinc-500" />
+                <Clock className="h-3.5 w-3.5" />
                 Updated &amp; Effective
               </span>
-              <span>•</span>
               <span className="flex items-center gap-1.5">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
                 Credited within 7–10 Business Days
               </span>
             </div>
@@ -62,18 +52,18 @@ export default function RefundPolicyPage() {
         </section>
 
         {/* Content Container */}
-        <main className="max-w-4xl mx-auto px-4 sm:px-6 py-14 space-y-10 leading-relaxed text-zinc-700 text-sm">
+        <main className="mx-auto max-w-3xl px-4 py-10 text-sm leading-7 text-zinc-600 sm:px-6 sm:py-12">
           
           {/* Introduction Card */}
-          <div className="p-5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-700 space-y-2">
-            <p className="text-xs sm:text-sm leading-relaxed">
+          <div className="mb-10 border-l-2 border-[#FFCC00] pl-4 text-zinc-600">
+            <p className="text-sm leading-7">
               At <strong>VisitExpo.in</strong>, we are committed to delivering a high-quality, immersive virtual event experience. However, we understand that unforeseen circumstances may arise, and this policy outlines how refund requests are handled for various services offered on our platform.
             </p>
           </div>
 
           {/* Section: Refund Eligibility */}
-          <section className="space-y-4">
-            <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
+          <section className="mb-10 space-y-4">
+            <h2 className="border-b border-zinc-200 pb-2 text-lg font-semibold text-zinc-900">
               Refund Eligibility
             </h2>
 
@@ -103,8 +93,8 @@ export default function RefundPolicyPage() {
           </section>
 
           {/* Section: Provision and Nature of Services */}
-          <section className="space-y-4">
-            <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
+          <section className="mb-10 space-y-4">
+            <h2 className="border-b border-zinc-200 pb-2 text-lg font-semibold text-zinc-900">
               Provision and Nature of Services
             </h2>
             <p>VisitExpo.in is a dynamic and evolving platform. You acknowledge and agree that:</p>
@@ -118,8 +108,8 @@ export default function RefundPolicyPage() {
           </section>
 
           {/* Section: Specific Conditions for On-Site Virtual Tour or Broadcast Services */}
-          <section className="space-y-4">
-            <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
+          <section className="mb-10 space-y-4">
+            <h2 className="border-b border-zinc-200 pb-2 text-lg font-semibold text-zinc-900">
               Specific Conditions for On-Site Virtual Tour or Broadcast Services
             </h2>
             <p>
@@ -132,14 +122,14 @@ export default function RefundPolicyPage() {
               <li><strong>Access Denial:</strong> Entry denial or restrictions by venue organizers or authorities.</li>
               <li><strong>Force Majeure Events:</strong> Unforeseen natural, governmental, or systemic disruptions.</li>
             </ol>
-            <p className="text-xs text-zinc-600 bg-zinc-50 p-4 rounded-xl border border-zinc-200">
+            <p className="border-l-2 border-zinc-300 bg-zinc-50 px-4 py-3 text-xs text-zinc-600">
               While VisitExpo.in will make every reasonable effort to fulfill On-Site Services, we do not guarantee flawless delivery. If services are significantly impaired or not rendered, any related refund or compensation will be assessed on a case-by-case basis, at the sole discretion of VisitExpo.in.
             </p>
           </section>
 
           {/* Section: Communications Policy */}
-          <section className="space-y-4">
-            <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
+          <section className="mb-10 space-y-4">
+            <h2 className="border-b border-zinc-200 pb-2 text-lg font-semibold text-zinc-900">
               Communications Policy
             </h2>
             <p>By using our services, you agree to receive communication via calls, SMS, email, and app notifications. You:</p>
@@ -151,8 +141,8 @@ export default function RefundPolicyPage() {
           </section>
 
           {/* Section: Mobile Software and SDK Policy (If Applicable) */}
-          <section className="space-y-4">
-            <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
+          <section className="mb-10 space-y-4">
+            <h2 className="border-b border-zinc-200 pb-2 text-lg font-semibold text-zinc-900"> 
               Mobile Software and SDK Policy (If Applicable)
             </h2>
             <p>
@@ -171,31 +161,31 @@ export default function RefundPolicyPage() {
           </section>
 
           {/* Section: Refund Request Process */}
-          <section className="space-y-4">
-            <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
+          <section className="mb-10 space-y-4">
+            <h2 className="border-b border-zinc-200 pb-2 text-lg font-semibold text-zinc-900">
               Refund Request Process
             </h2>
             <p>
               Send all refund requests to <a href="mailto:support@visitexpo.in" className="text-[#FF2E63] font-bold hover:underline">support@visitexpo.in</a> within <strong>7 days</strong> of the scheduled event.
             </p>
-            <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200 space-y-2">
-              <p className="font-bold text-xs text-zinc-900 uppercase tracking-wider">Please Include in Your Request:</p>
-              <ul className="list-disc pl-5 space-y-1 text-xs text-zinc-700">
+            <div className="space-y-2 border-l-2 border-zinc-200 pl-4">
+              <p className="font-semibold text-sm text-zinc-900">Please include in your request:</p>
+              <ul className="list-disc pl-5 space-y-1 text-sm text-zinc-600">
                 <li>Full Name</li>
                 <li>Booking Email</li>
                 <li>Transaction ID</li>
                 <li>Reason for Request</li>
               </ul>
             </div>
-            <div className="flex items-center gap-2 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-medium">
+            <div className="flex items-start gap-2 text-sm text-emerald-800">
               <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
               <span>Refunds, once approved, will be credited within <strong>7–10 business days</strong> to the original payment method.</span>
             </div>
           </section>
 
           {/* Section: No-Show Policy */}
-          <section className="space-y-4">
-            <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
+          <section className="mb-10 space-y-4">
+            <h2 className="border-b border-zinc-200 pb-2 text-lg font-semibold text-zinc-900">
               No-Show Policy
             </h2>
             <p>
@@ -204,8 +194,8 @@ export default function RefundPolicyPage() {
           </section>
 
           {/* Section: Cancellation by VisitExpo.in */}
-          <section className="space-y-4">
-            <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
+          <section className="mb-10 space-y-4">
+            <h2 className="border-b border-zinc-200 pb-2 text-lg font-semibold text-zinc-900">
               Cancellation by VisitExpo.in
             </h2>
             <p>
@@ -214,8 +204,8 @@ export default function RefundPolicyPage() {
           </section>
 
           {/* Section: Policy Updates */}
-          <section className="space-y-4">
-            <h2 className="text-xl font-bold text-zinc-900 border-b border-zinc-200 pb-2">
+          <section className="mb-10 space-y-4">
+            <h2 className="border-b border-zinc-200 pb-2 text-lg font-semibold text-zinc-900">
               Policy Updates
             </h2>
             <p>
@@ -224,21 +214,21 @@ export default function RefundPolicyPage() {
           </section>
 
           {/* Section: Questions or Concerns */}
-          <section className="space-y-4 pt-4 border-t border-zinc-200">
-            <h2 className="text-xl font-bold text-zinc-900">
+          <section className="space-y-4 border-t border-zinc-200 pt-8">
+            <h2 className="text-lg font-semibold text-zinc-900">
               Questions or Concerns?
             </h2>
-            <div className="p-5 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="space-y-1.5 text-xs sm:text-sm">
+            <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+              <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-[#FF2E63]" />
+                  <Mail className="h-4 w-4 text-zinc-500" />
                   <span className="font-semibold text-zinc-900">Email:</span>
                   <a href="mailto:support@visitexpo.in" className="text-[#FF2E63] font-bold hover:underline">
                     support@visitexpo.in
                   </a>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-emerald-600" />
+                  <Phone className="h-4 w-4 text-zinc-500" />
                   <span className="font-semibold text-zinc-900">Phone:</span>
                   <a href="tel:+919323677688" className="text-zinc-900 font-bold hover:underline">
                     +91-9323677688
@@ -247,7 +237,7 @@ export default function RefundPolicyPage() {
               </div>
               <Link
                 href="/contact"
-                className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-semibold text-xs transition-colors shrink-0"
+                className="shrink-0 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00] focus-visible:ring-offset-2"
               >
                 Go to Contact Us
               </Link>
