@@ -74,6 +74,11 @@ const CATEGORIES = [
 ];
 
 const ITEMS_PER_PAGE = 12;
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== 'undefined' && window.location.hostname.includes('visitexpo.in')
+    ? 'https://api.visitexpo.in/api'
+    : 'http://localhost:5000/api');
 
 function DirectoryDropdown({ value, options, onChange, searchable = false, icon: Icon }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -301,7 +306,7 @@ export default function EventsDirectoryPage() {
     }
 
     if (user?.email) {
-      axios.get(`/api/engagements/user/${encodeURIComponent(user.email)}`)
+      axios.get(`${API_URL}/engagements/user/${encodeURIComponent(user.email)}`, { timeout: 3000 })
         .then(res => {
           if (res.data?.success && res.data?.data) {
             const followedList = res.data.data.followedEvents || [];
@@ -342,7 +347,9 @@ export default function EventsDirectoryPage() {
             }
           }
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.warn('Could not load user event engagements:', err);
+        });
     }
   }, [user]);
 
