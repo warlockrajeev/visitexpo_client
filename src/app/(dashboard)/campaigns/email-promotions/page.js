@@ -474,35 +474,10 @@ export default function EmailPromotionsPage() {
   if (!hasGrowthPlan) {
     return (
       <div className="space-y-6">
-        {/* Navigation Breadcrumb Tabs */}
-        <div className="flex items-center gap-2 border-b border-border pb-1">
-          <Link
-            href="/campaigns"
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground rounded-lg transition-colors"
-          >
-            <Mail className="h-4 w-4" />
-            <span>Broadcast Simulator</span>
-          </Link>
-          <div className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-primary border-b-2 border-primary -mb-1.5">
-            <Send className="h-4 w-4" />
-            <span>Email Promotions (Growth Plan)</span>
-          </div>
-          <Link
-            href="/campaigns/exhibitor-discovery"
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground rounded-lg transition-colors"
-          >
-            <Target className="h-4 w-4" />
-            <span>Exhibitor Discovery</span>
-          </Link>
-        </div>
-
         {/* Growth Plan Lock Hero Card */}
-        <div className="relative overflow-hidden rounded-3xl border border-indigo-500/30 bg-gradient-to-br from-indigo-950/40 via-card to-purple-950/20 p-8 sm:p-12 shadow-2xl">
-          <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
-
+        <div className="relative overflow-hidden rounded-3xl border border-border bg-card p-8 sm:p-12 shadow-sm">
           <div className="max-w-2xl mx-auto text-center space-y-6 relative z-10">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-extrabold uppercase tracking-wider">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-xs font-extrabold uppercase tracking-wider">
               <Sparkles className="h-3.5 w-3.5" />
               <span>Exclusive Growth Plan Add-on</span>
             </div>
@@ -512,14 +487,14 @@ export default function EmailPromotionsPage() {
                 Unlock High-Impact Email Promotions to Leads, Visitors &amp; Followers
               </h1>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Reach verified high-intent exhibition attendees directly in their inbox with high deliverability via VisitExpo&apos;s authenticated email relay (<code className="text-xs bg-indigo-500/10 text-indigo-300 px-1.5 py-0.5 rounded font-mono">promotion@client.visitexpo.in</code>).
+                Reach verified high-intent exhibition attendees directly in their inbox with high deliverability via VisitExpo&apos;s authenticated email relay (<code className="text-xs bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded font-mono">promotion@client.visitexpo.in</code>).
               </p>
             </div>
 
             {/* Feature Highlights Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left pt-2">
               <div className="p-4 rounded-2xl bg-secondary/50 border border-border space-y-2">
-                <div className="h-8 w-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold">
+                <div className="h-8 w-8 rounded-xl bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-bold">
                   🎯
                 </div>
                 <h3 className="text-xs font-bold text-foreground">Target 4 High-Intent Audiences</h3>
@@ -586,28 +561,6 @@ export default function EmailPromotionsPage() {
   // --------------------------------------------------------------------------
   return (
     <div className="space-y-6 pb-12">
-      {/* Sub-Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-border pb-1">
-        <Link
-          href="/campaigns"
-          className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground rounded-lg transition-colors"
-        >
-          <Mail className="h-4 w-4" />
-          <span>Broadcast Simulator</span>
-        </Link>
-        <div className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-primary border-b-2 border-primary -mb-1.5">
-          <Send className="h-4 w-4" />
-          <span>Email Promotions (Growth Plan)</span>
-        </div>
-        <Link
-          href="/campaigns/exhibitor-discovery"
-          className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground rounded-lg transition-colors"
-        >
-          <Target className="h-4 w-4" />
-          <span>Exhibitor Discovery</span>
-        </Link>
-      </div>
-
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card border border-border p-6 rounded-3xl shadow-sm">
         <div className="space-y-1">

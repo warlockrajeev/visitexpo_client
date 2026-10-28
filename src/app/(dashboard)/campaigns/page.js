@@ -12,6 +12,13 @@ import { useAuth } from '../../../context/AuthContext.js';
 import { buildDashboardEventsUrl } from '../../../utils/dashboardEvents.js';
 import SearchableSelect from '../../../components/SearchableSelect.js';
 import {
+  showSweetAlert,
+  showSweetConfirm,
+  showSweetSuccess,
+  showSweetError,
+  showSweetWarning
+} from '../../../utils/sweetalert.js';
+import {
   Mail,
   Send,
   Plus,
@@ -27,7 +34,8 @@ import {
   Compass,
   Globe,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  AlertCircle
 } from 'lucide-react';
 
 const API_URL =
@@ -47,6 +55,8 @@ export default function CampaignsPage() {
   // Modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [broadcastingId, setBroadcastingId] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
 
   // Form State
   const [newCampaign, setNewCampaign] = useState({
@@ -63,6 +73,7 @@ export default function CampaignsPage() {
       subject: '',
       body: ''
     });
+    setFormErrors({});
   };
 
   const handleOpenCreateModal = () => {
@@ -138,39 +149,112 @@ export default function CampaignsPage() {
   }, [user, accessToken]);
 
   // 2. Fetch Campaigns
-  const fetchCampaigns = async () => {
-    if (!selectedEventId) return;
+  const fetchCampaigns = async (signal) => {
+    if (!selectedEventId) {
+      setCampaigns([]);
+      setError('');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
       const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
       const res = await axios.get(`${API_URL}/campaigns`, {
         params: { eventId: selectedEventId },
-        headers
+        headers,
+        signal,
+        timeout: 15000
       });
       if (res.data && res.data.success) {
         setCampaigns(res.data.data || []);
+      } else {
+        setError('Could not retrieve campaigns. Please try again.');
       }
     } catch (err) {
+      if (signal?.aborted || axios.isCancel(err)) return;
       console.error('Error fetching campaigns', err);
-      setError('Could not retrieve campaigns. Verify backend setup.');
+      setError(
+        err.code === 'ECONNABORTED'
+          ? 'Loading campaigns timed out. Check your connection and try again.'
+          : 'Could not retrieve campaigns. Check your connection and try again.'
+      );
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCampaigns();
+    const controller = new AbortController();
+    fetchCampaigns(controller.signal);
+    return () => controller.abort();
   }, [selectedEventId, accessToken]);
+
+  // Field validation for Campaign Draft
+  const validateCampaignForm = (data) => {
+    const errors = {};
+
+    // 1. Campaign Title Validation
+    const trimmedTitle = (data.title || '').trim();
+    if (!trimmedTitle) {
+      errors.title = 'Campaign Title is required.';
+    } else if (trimmedTitle.length < 3) {
+      errors.title = 'Campaign Title must be at least 3 characters.';
+    } else if (trimmedTitle.length > 100) {
+      errors.title = 'Campaign Title cannot exceed 100 characters.';
+    } else if (!/[a-zA-Z0-9]/.test(trimmedTitle)) {
+      errors.title = 'Campaign Title must contain letters or numbers (cannot be only special characters).';
+    }
+
+    // 2. Email Subject Line Validation (when channel is email)
+    if (data.channel === 'email') {
+      const trimmedSubject = (data.subject || '').trim();
+      if (trimmedSubject) {
+        if (trimmedSubject.length < 3) {
+          errors.subject = 'Subject Line must be at least 3 characters.';
+        } else if (trimmedSubject.length > 150) {
+          errors.subject = 'Subject Line cannot exceed 150 characters.';
+        } else if (!/[a-zA-Z0-9]/.test(trimmedSubject)) {
+          errors.subject = 'Subject Line must contain letters or numbers (cannot be only special characters).';
+        }
+      }
+    }
+
+    // 3. Message Body Validation
+    const trimmedBody = (data.body || '').trim();
+    if (!trimmedBody) {
+      errors.body = 'Message Body content is required.';
+    } else if (trimmedBody.length < 10) {
+      errors.body = 'Message Body must be at least 10 characters.';
+    } else if (trimmedBody.length > 3000) {
+      errors.body = 'Message Body cannot exceed 3000 characters.';
+    } else if (!/[a-zA-Z0-9]/.test(trimmedBody)) {
+      errors.body = 'Message Body must contain readable text (cannot be only special characters).';
+    }
+
+    return {
+      isValid: Object.keys(errors).length === 0,
+      errors
+    };
+  };
 
   // 3. Create Campaign Draft
   const handleCreateCampaign = async (e) => {
     e.preventDefault();
-    if (!newCampaign.title || !newCampaign.body) {
-      alert('Campaign Title and Body content are required.');
+
+    if (!selectedEventId) {
+      showSweetWarning('Please select an active expo event before creating a campaign draft.');
       return;
     }
 
+    const { isValid, errors } = validateCampaignForm(newCampaign);
+    if (!isValid) {
+      setFormErrors(errors);
+      showSweetWarning('Please fix the validation errors in the form.');
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
       const res = await axios.post(
         `${API_URL}/campaigns`,
@@ -179,11 +263,15 @@ export default function CampaignsPage() {
       );
       if (res.data && res.data.success) {
         setCampaigns(prev => [res.data.campaign, ...prev]);
+        showSweetSuccess('Campaign draft saved successfully!');
         handleCloseCreateModal();
       }
     } catch (err) {
       console.error('Create campaign failed', err);
-      alert('Failed to save campaign draft');
+      const serverMsg = err.response?.data?.error || err.response?.data?.message || 'Failed to save campaign draft.';
+      showSweetError(serverMsg);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -198,10 +286,11 @@ export default function CampaignsPage() {
       );
       if (res.data && res.data.success) {
         setCampaigns(prev => prev.map(c => (c._id === campaignId ? res.data.campaign : c)));
+        showSweetSuccess('Campaign broadcast simulation initiated!');
       }
     } catch (err) {
       console.error('Send broadcast failed', err);
-      alert('Simulated broadcast failed');
+      showSweetError('Simulated broadcast failed.');
     } finally {
       setBroadcastingId(null);
     }
@@ -209,17 +298,23 @@ export default function CampaignsPage() {
 
   // 5. Delete Campaign
   const handleDeleteCampaign = async (campaignId) => {
-    if (!window.confirm('Are you sure you want to delete this campaign?')) return;
+    const confirmed = await showSweetConfirm(
+      'Delete Campaign?',
+      'Are you sure you want to delete this campaign? This action cannot be undone.'
+    );
+    if (!confirmed) return;
+
     try {
       const res = await axios.delete(`${API_URL}/campaigns/${campaignId}`, {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
       if (res.data && res.data.success) {
         setCampaigns(prev => prev.filter(c => c._id !== campaignId));
+        showSweetSuccess('Campaign deleted successfully.');
       }
     } catch (err) {
       console.error('Delete campaign failed', err);
-      alert('Failed to delete campaign');
+      showSweetError('Failed to delete campaign.');
     }
   };
 
@@ -234,106 +329,130 @@ export default function CampaignsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Sub-Navigation Tabs: Marketing Campaigns, Email Promotions & Exhibitor Discovery */}
-      <div className="flex items-center gap-2 border-b border-border pb-1">
-        <div className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-primary border-b-2 border-primary -mb-1.5">
-          <Mail className="h-4 w-4" />
-          <span>Broadcast Simulator &amp; Channels</span>
-        </div>
-        <Link
-          href="/campaigns/email-promotions"
-          className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground rounded-lg transition-colors group"
-        >
-          <Send className="h-4 w-4 text-indigo-400 group-hover:scale-110 transition-transform" />
-          <span>Email Promotions</span>
-          <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-            Growth
-          </span>
-        </Link>
-        <Link
-          href="/campaigns/exhibitor-discovery"
-          className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground rounded-lg transition-colors group"
-        >
-          <Compass className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" />
-          <span>Exhibitor Discovery</span>
-        </Link>
-      </div>
-
-      {/* Organizer Email Promotion Growth Spotlight Banner */}
-      <div className="rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 via-purple-950/20 to-card p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300">
-              New Growth Plan Feature
-            </span>
-            <span className="text-xs font-mono text-muted-foreground">
-              promotion@client.visitexpo.in
-            </span>
+      {/* Feature Spotlights (2-Column Responsive Grid) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Spotlight 1: Promotional Email Broadcasting */}
+        <div className="rounded-2xl border border-indigo-200/80 dark:border-indigo-500/30 bg-gradient-to-br from-indigo-50/70 via-card to-purple-50/40 dark:from-indigo-950/40 dark:via-card dark:to-purple-950/20 p-5 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between gap-3.5">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 flex items-center justify-center shrink-0">
+                  <Send className="h-4 w-4" />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20">
+                  Growth Plan Feature
+                </span>
+              </div>
+              <span className="text-[11px] font-mono text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-md border border-border/50">
+                promotion@client.visitexpo.in
+              </span>
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-foreground">
+                Promotional Email Broadcasting
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">
+                Dispatch authenticated, high-deliverability promotional emails to your CRM leads, registered trade visitors, and followers directly via VisitExpo&apos;s verified cPanel relay.
+              </p>
+            </div>
           </div>
-          <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-            <Send className="h-4 w-4 text-indigo-400" />
-            Promotional Email Broadcasting to Leads, Visitors &amp; Followers
-          </h3>
-          <p className="text-xs text-muted-foreground max-w-2xl">
-            Dispatch authenticated, high-deliverability promotional emails to your CRM leads, registered trade visitors, event followers, and interested attendees directly using VisitExpo&apos;s verified cPanel relay.
-          </p>
+          <div>
+            <Link
+              href="/campaigns/email-promotions"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 text-xs font-bold shadow-xs hover:shadow transition-all cursor-pointer group"
+            >
+              <span>Launch Email Promotion</span>
+              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </Link>
+          </div>
         </div>
-        <Link
-          href="/campaigns/email-promotions"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 text-xs font-bold shadow-md shadow-indigo-600/30 transition-all shrink-0 cursor-pointer"
-        >
-          <span>Launch Email Promotion</span>
-          <ArrowRight className="h-4 w-4" />
-        </Link>
+
+        {/* Spotlight 2: Exhibitor Discovery Directory */}
+        <div className="rounded-2xl border border-amber-200/80 dark:border-amber-500/30 bg-gradient-to-br from-amber-50/70 via-card to-orange-50/40 dark:from-amber-950/30 dark:via-card dark:to-orange-950/15 p-5 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between gap-3.5">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center shrink-0">
+                  <Compass className="h-4 w-4" />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/20">
+                  B2B Directory
+                </span>
+              </div>
+              <span className="text-[11px] font-semibold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-md border border-border/50">
+                Verified Indian &amp; Global Booths
+              </span>
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-foreground">
+                Exhibitor Discovery Directory
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">
+                Explore verified Indian and Global exhibitors across major industries. Filter by industry, search products, and connect directly with booth contacts via credit-based inquiries.
+              </p>
+            </div>
+          </div>
+          <div>
+            <Link
+              href="/campaigns/exhibitor-discovery"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 px-4 py-2 text-xs font-bold shadow-xs hover:shadow transition-all cursor-pointer group"
+            >
+              <Compass className="h-3.5 w-3.5" />
+              <span>Go to Exhibitor Discovery</span>
+              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </Link>
+          </div>
+        </div>
       </div>
 
-      {/* Exhibitor Discovery Spotlight Banner */}
-      <div className="rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-            <Compass className="h-4 w-4 text-primary" /> Exhibitor Discovery Directory
-          </h3>
-          <p className="text-xs text-muted-foreground max-w-2xl">
-            Explore verified Indian and Global exhibitors across major industries. Filter by Preferred Industry, Search Products, and Preferred Country, then connect directly with booth contacts via credit-based inquiries.
-          </p>
+      {/* Header Dropdown & Actions Card */}
+      <div className="bg-card p-5 sm:p-6 rounded-2xl border border-border shadow-xs flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+        <div className="flex items-start gap-3.5">
+          <div className="h-11 w-11 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+            <Mail className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
+                Marketing Campaigns
+              </h2>
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                Multi-Channel Broadcasts
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1 max-w-xl leading-relaxed">
+              Dispatch announcements across Email, WhatsApp, or SMS, and track engagement statistics in real time.
+            </p>
+          </div>
         </div>
-        <Link
-          href="/campaigns/exhibitor-discovery"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 text-xs font-bold shadow-md hover:shadow-lg transition-all shrink-0 cursor-pointer"
-        >
-          <Compass className="h-4 w-4" />
-          <span>Go to Exhibitor Discovery</span>
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
-      </div>
 
-      {/* Header Dropdown & Actions */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-6 rounded-2xl border border-border shadow-sm">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Mail className="h-6 w-6 text-primary" /> Marketing Campaigns
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Dispatch announcements via email, WhatsApp, or SMS, and track engagement statistics.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex flex-col min-w-[280px]">
-            <label className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Active Event</label>
+        {/* Right Controls: Event Selector & Create Campaign Button */}
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3 shrink-0">
+          <div className="w-full sm:w-[260px] md:w-[280px]">
+            <label className="text-[11px] font-bold text-muted-foreground mb-1.5 uppercase tracking-wider flex items-center justify-between">
+              <span>Active Expo Edition</span>
+              {events.length > 0 && (
+                <span className="text-[10px] text-muted-foreground/80 font-normal">
+                  {events.length} edition{events.length > 1 ? 's' : ''}
+                </span>
+              )}
+            </label>
             <SearchableSelect
               options={events.map((evt) => ({ value: evt._id, label: evt.title }))}
               value={selectedEventId}
               onChange={(val) => setSelectedEventId(val)}
-              placeholder="Select active event..."
+              placeholder={events.length === 0 ? 'No Active Editions' : 'Select active event...'}
               searchPlaceholder="Search active event..."
-              className="w-full"
+              className="h-10 text-xs font-medium rounded-xl"
             />
           </div>
           <button
+            type="button"
             onClick={handleOpenCreateModal}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-md mt-4 sm:mt-0"
+            className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition-all shadow-xs hover:shadow cursor-pointer btn-press active:scale-95 shrink-0"
           >
-            <Plus className="h-4 w-4" /> Create Campaign
+            <Plus className="h-4 w-4" />
+            <span>Create Campaign</span>
           </button>
         </div>
       </div>
@@ -367,6 +486,27 @@ export default function CampaignsPage() {
           <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-sm">Fetching campaigns list...</p>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-16 px-6 text-center gap-3">
+            <AlertCircle className="h-10 w-10 text-destructive/70" />
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-foreground">Campaigns couldn&apos;t be loaded</p>
+              <p className="text-sm text-muted-foreground">{error}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => fetchCampaigns()}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+            >
+              Try again
+            </button>
+          </div>
+        ) : !selectedEventId ? (
+          <div className="flex flex-col items-center justify-center py-16 px-6 text-center gap-2 text-muted-foreground">
+            <Mail className="h-10 w-10 text-muted-foreground/40" />
+            <p className="text-sm font-semibold text-foreground">Select an active expo edition</p>
+            <p className="text-sm">Choose an event above to view its campaign history.</p>
           </div>
         ) : campaigns.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center text-muted-foreground gap-2">
@@ -497,17 +637,40 @@ export default function CampaignsPage() {
             </button>
             <h3 className="text-xl font-bold text-foreground mb-4">Create Campaign Draft</h3>
 
-            <form onSubmit={handleCreateCampaign} className="space-y-4">
+            <form onSubmit={handleCreateCampaign} noValidate className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Campaign Title *</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-muted-foreground uppercase">
+                    Campaign Title <span className="text-rose-500">*</span>
+                  </label>
+                  <span className={`text-[10px] font-mono ${newCampaign.title.length > 100 ? 'text-rose-500 font-bold' : 'text-muted-foreground'}`}>
+                    {newCampaign.title.length}/100
+                  </span>
+                </div>
                 <input
                   type="text"
-                  required
                   value={newCampaign.title}
-                  onChange={(e) => setNewCampaign(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  maxLength={100}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNewCampaign(prev => ({ ...prev, title: val }));
+                    if (formErrors.title) {
+                      setFormErrors(prev => ({ ...prev, title: '' }));
+                    }
+                  }}
+                  className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none transition-all ${
+                    formErrors.title
+                      ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-500/5'
+                      : 'border-border focus:ring-2 focus:ring-primary'
+                  }`}
                   placeholder="E.g. Keynote Speaker Announcement"
                 />
+                {formErrors.title && (
+                  <p className="text-xs text-rose-500 mt-1.5 flex items-center gap-1 font-medium">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{formErrors.title}</span>
+                  </p>
+                )}
               </div>
 
               <div className="grid gap-4 grid-cols-2">
@@ -520,7 +683,12 @@ export default function CampaignsPage() {
                       { value: 'sms', label: 'SMS Text' }
                     ]}
                     value={newCampaign.channel}
-                    onChange={(val) => setNewCampaign(prev => ({ ...prev, channel: val }))}
+                    onChange={(val) => {
+                      setNewCampaign(prev => ({ ...prev, channel: val }));
+                      if (val !== 'email' && formErrors.subject) {
+                        setFormErrors(prev => ({ ...prev, subject: '' }));
+                      }
+                    }}
                     placeholder="Select broadcast channel..."
                     searchPlaceholder="Search channel..."
                   />
@@ -529,43 +697,99 @@ export default function CampaignsPage() {
 
               {newCampaign.channel === 'email' && (
                 <div>
-                  <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Subject Line</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-muted-foreground uppercase">
+                      Subject Line
+                    </label>
+                    <span className={`text-[10px] font-mono ${newCampaign.subject.length > 150 ? 'text-rose-500 font-bold' : 'text-muted-foreground'}`}>
+                      {newCampaign.subject.length}/150
+                    </span>
+                  </div>
                   <input
                     type="text"
                     value={newCampaign.subject}
-                    onChange={(e) => setNewCampaign(prev => ({ ...prev, subject: e.target.value }))}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    maxLength={150}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewCampaign(prev => ({ ...prev, subject: val }));
+                      if (formErrors.subject) {
+                        setFormErrors(prev => ({ ...prev, subject: '' }));
+                      }
+                    }}
+                    className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none transition-all ${
+                      formErrors.subject
+                        ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-500/5'
+                        : 'border-border focus:ring-2 focus:ring-primary'
+                    }`}
                     placeholder="E.g. Meet our keynote speakers at CP!"
                   />
+                  {formErrors.subject && (
+                    <p className="text-xs text-rose-500 mt-1.5 flex items-center gap-1 font-medium">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span>{formErrors.subject}</span>
+                    </p>
+                  )}
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Message Body *</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-muted-foreground uppercase">
+                    Message Body <span className="text-rose-500">*</span>
+                  </label>
+                  <span className={`text-[10px] font-mono ${newCampaign.body.length > 3000 ? 'text-rose-500 font-bold' : 'text-muted-foreground'}`}>
+                    {newCampaign.body.length}/3000
+                  </span>
+                </div>
                 <textarea
                   rows={4}
-                  required
                   value={newCampaign.body}
-                  onChange={(e) => setNewCampaign(prev => ({ ...prev, body: e.target.value }))}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none placeholder:text-muted-foreground"
+                  maxLength={3000}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNewCampaign(prev => ({ ...prev, body: val }));
+                    if (formErrors.body) {
+                      setFormErrors(prev => ({ ...prev, body: '' }));
+                    }
+                  }}
+                  className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none resize-none transition-all placeholder:text-muted-foreground ${
+                    formErrors.body
+                      ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-500/5'
+                      : 'border-border focus:ring-2 focus:ring-primary'
+                  }`}
                   placeholder="Enter details or announcements body content..."
                 />
+                {formErrors.body && (
+                  <p className="text-xs text-rose-500 mt-1.5 flex items-center gap-1 font-medium">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{formErrors.body}</span>
+                  </p>
+                )}
               </div>
 
               {/* Action buttons */}
               <div className="flex justify-end gap-3 pt-4 border-t border-border">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={handleCloseCreateModal}
-                  className="rounded-lg border border-border hover:bg-secondary px-4 py-2 text-sm font-semibold text-foreground transition-colors"
+                  className="rounded-lg border border-border hover:bg-secondary px-4 py-2 text-sm font-semibold text-foreground transition-colors cursor-pointer disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-primary hover:bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow-md transition-colors"
+                  disabled={isSubmitting}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold px-4 py-2 text-sm transition-all shadow-sm cursor-pointer btn-press active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Save Draft
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Saving Draft...</span>
+                    </>
+                  ) : (
+                    <span>Save Draft</span>
+                  )}
                 </button>
               </div>
             </form>

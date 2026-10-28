@@ -1312,14 +1312,14 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
     return colors[sum % colors.length];
   };
 
-  // Filter active state for dynamic Reset button styling and contextual feedback
+  // Filter active state for dynamic Reset button visibility and contextual feedback
   const hasActiveFilters = Boolean(
     searchTerm.trim() ||
-    (isEnterprisePlan && searchField !== 'all') ||
+    searchField !== 'all' ||
     statusFilter !== 'all' ||
-    (isEnterprisePlan && sourceFilter !== 'all') ||
-    (isEnterprisePlan && dateFilter) ||
-    (isEnterprisePlan && intentScoreFilter !== 'all') ||
+    sourceFilter !== 'all' ||
+    dateFilter ||
+    intentScoreFilter !== 'all' ||
     activeTab !== 'all'
   );
 
@@ -1875,22 +1875,19 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                   <ChevronDown className="h-3 w-3 text-muted-foreground absolute right-2 top-3 pointer-events-none" />
                 </div>
 
-                {/* Reset Button */}
-                <button
-                  onClick={handleResetFilters}
-                  className={`inline-flex items-center justify-center gap-1.5 h-9 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
-                    hasActiveFilters
-                      ? 'text-amber-600 dark:text-amber-400 hover:text-amber-700 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30'
-                      : 'text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/70 border border-border/60'
-                  }`}
-                  title="Reset all filters and search"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  <span>Reset</span>
-                  {hasActiveFilters && (
+                {/* Reset Button (visible only when filters are active) */}
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="inline-flex items-center justify-center gap-1.5 h-9 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer btn-press active:scale-95 select-none shrink-0 text-amber-600 dark:text-amber-400 hover:text-amber-700 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 animate-in fade-in zoom-in-95 duration-150"
+                    title="Reset all filters and search"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    <span>Reset</span>
                     <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                  )}
-                </button>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -2078,22 +2075,19 @@ Vikram Malhotra, vikram@zenithexpo.in, +91 98450 67890, Zenith Industrial Corp, 
                 </span>
               </button>
 
-              {/* Reset Button */}
-              <button
-                onClick={handleResetFilters}
-                className={`inline-flex items-center justify-center gap-1.5 h-9 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer btn-press active:scale-95 select-none shrink-0 ${
-                  hasActiveFilters
-                    ? 'text-amber-600 dark:text-amber-400 hover:text-amber-700 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30'
-                    : 'text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/70 border border-border/60'
-                }`}
-                title="Reset basic search and status"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                <span>Reset</span>
-                {hasActiveFilters && (
+              {/* Reset Button (visible only when filters are active) */}
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="inline-flex items-center justify-center gap-1.5 h-9 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer btn-press active:scale-95 select-none shrink-0 text-amber-600 dark:text-amber-400 hover:text-amber-700 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 animate-in fade-in zoom-in-95 duration-150"
+                  title="Reset basic search and status"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>Reset</span>
                   <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                )}
-              </button>
+                </button>
+              )}
             </div>
           </div>
         )}
