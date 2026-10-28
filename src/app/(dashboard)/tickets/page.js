@@ -81,6 +81,7 @@ export default function TicketingPage() {
   const [isTierModalOpen, setIsTierModalOpen] = useState(false);
   const [isSimulateModalOpen, setIsSimulateModalOpen] = useState(false);
   const [simulating, setSimulating] = useState(false);
+  const [simulateFormErrors, setSimulateFormErrors] = useState({});
   const [organizerPlan, setOrganizerPlan] = useState(() => (user?.plan || 'free').toLowerCase());
 
   // Detect active plan tier for ticket monetization limits
@@ -197,12 +198,14 @@ export default function TicketingPage() {
 
   const handleOpenSimulateModal = () => {
     resetSimulateForm();
+    setSimulateFormErrors({});
     setIsSimulateModalOpen(true);
   };
 
   const handleCloseSimulateModal = () => {
     setIsSimulateModalOpen(false);
     resetSimulateForm();
+    setSimulateFormErrors({});
   };
 
   const resetTierForm = () => {
@@ -444,8 +447,40 @@ export default function TicketingPage() {
   // 5. Handle Simulate checkout
   const handleSimulateCheckout = async (e) => {
     e.preventDefault();
-    if (!simulateForm.ticketId || !simulateForm.buyer.name || !simulateForm.buyer.email) {
-      showSweetWarning('Please select a ticket tier and fill name/email.');
+    const errors = {};
+    const buyerName = simulateForm.buyer.name.trim();
+    const buyerEmail = simulateForm.buyer.email.trim();
+    const quantity = Number(simulateForm.quantity);
+    const optionalTextPattern = /^[\p{L}\p{N}][\p{L}\p{M}\p{N}\s.,&'()\-+/#]*$/u;
+
+    if (!simulateForm.ticketId) {
+      errors.ticketId = 'Select a ticket tier.';
+    }
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 10) {
+      errors.quantity = 'Enter a whole number between 1 and 10.';
+    }
+    if (!buyerName) {
+      errors.name = 'Buyer name is required.';
+    } else if (buyerName.length < 2 || buyerName.length > 80 || !/[\p{L}]/u.test(buyerName) || !/^[\p{L}][\p{L}\p{M}\s.'-]*$/u.test(buyerName)) {
+      errors.name = 'Enter a valid name (2–80 characters; letters, spaces, apostrophes, or hyphens).';
+    }
+    if (!buyerEmail) {
+      errors.email = 'Buyer email is required.';
+    } else if (buyerEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(buyerEmail)) {
+      errors.email = 'Enter a valid email address.';
+    }
+    if (simulateForm.buyer.country.trim() && (simulateForm.buyer.country.length > 80 || !optionalTextPattern.test(simulateForm.buyer.country.trim()))) {
+      errors.country = 'Enter a valid country name.';
+    }
+    if (simulateForm.buyer.company.trim() && (simulateForm.buyer.company.length > 100 || !optionalTextPattern.test(simulateForm.buyer.company.trim()))) {
+      errors.company = 'Enter a valid company name.';
+    }
+    if (simulateForm.buyer.designation.trim() && (simulateForm.buyer.designation.length > 80 || !optionalTextPattern.test(simulateForm.buyer.designation.trim()))) {
+      errors.designation = 'Enter a valid designation.';
+    }
+
+    setSimulateFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
       return;
     }
 
@@ -455,8 +490,8 @@ export default function TicketingPage() {
       const res = await axios.post(`${API_URL}/orders/checkout`, {
         eventId: selectedEventId,
         ticketId: simulateForm.ticketId,
-        quantity: parseInt(simulateForm.quantity, 10) || 1,
-        buyer: simulateForm.buyer
+        quantity,
+        buyer: { ...simulateForm.buyer, name: buyerName, email: buyerEmail }
       }, { headers });
 
       if (res.data && res.data.success) {
@@ -1940,6 +1975,9 @@ export default function TicketingPage() {
                   placeholder="Select ticket tier..."
                   searchPlaceholder="Search ticket tier..."
                 />
+                {simulateFormErrors.ticketId && (
+                  <p className="mt-1 text-xs text-destructive">{simulateFormErrors.ticketId}</p>
+                )}
               </div>
 
               <div className="grid gap-4 grid-cols-2">
@@ -1950,18 +1988,32 @@ export default function TicketingPage() {
                     min="1"
                     max="10"
                     value={simulateForm.quantity}
-                    onChange={(e) => setSimulateForm(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    onChange={(e) => {
+                      setSimulateForm(prev => ({ ...prev, quantity: e.target.value }));
+                      setSimulateFormErrors(prev => ({ ...prev, quantity: '' }));
+                    }}
+                    aria-invalid={Boolean(simulateFormErrors.quantity)}
+                    className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary ${simulateFormErrors.quantity ? 'border-destructive' : 'border-border'}`}
                   />
+                  {simulateFormErrors.quantity && (
+                    <p className="mt-1 text-xs text-destructive">{simulateFormErrors.quantity}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Country</label>
                   <input
                     type="text"
                     value={simulateForm.buyer.country}
-                    onChange={(e) => setSimulateForm(prev => ({ ...prev, buyer: { ...prev.buyer, country: e.target.value } }))}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    onChange={(e) => {
+                      setSimulateForm(prev => ({ ...prev, buyer: { ...prev.buyer, country: e.target.value } }));
+                      setSimulateFormErrors(prev => ({ ...prev, country: '' }));
+                    }}
+                    aria-invalid={Boolean(simulateFormErrors.country)}
+                    className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary ${simulateFormErrors.country ? 'border-destructive' : 'border-border'}`}
                   />
+                  {simulateFormErrors.country && (
+                    <p className="mt-1 text-xs text-destructive">{simulateFormErrors.country}</p>
+                  )}
                 </div>
               </div>
 
@@ -1970,10 +2022,17 @@ export default function TicketingPage() {
                 <input
                   type="text"
                   value={simulateForm.buyer.name}
-                  onChange={(e) => setSimulateForm(prev => ({ ...prev, buyer: { ...prev.buyer, name: e.target.value } }))}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  onChange={(e) => {
+                    setSimulateForm(prev => ({ ...prev, buyer: { ...prev.buyer, name: e.target.value } }));
+                    setSimulateFormErrors(prev => ({ ...prev, name: '' }));
+                  }}
+                  aria-invalid={Boolean(simulateFormErrors.name)}
+                  className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary ${simulateFormErrors.name ? 'border-destructive' : 'border-border'}`}
                   placeholder="E.g. Sarah Connor"
                 />
+                {simulateFormErrors.name && (
+                  <p className="mt-1 text-xs text-destructive">{simulateFormErrors.name}</p>
+                )}
               </div>
 
               <div>
@@ -1981,10 +2040,17 @@ export default function TicketingPage() {
                 <input
                   type="email"
                   value={simulateForm.buyer.email}
-                  onChange={(e) => setSimulateForm(prev => ({ ...prev, buyer: { ...prev.buyer, email: e.target.value } }))}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  onChange={(e) => {
+                    setSimulateForm(prev => ({ ...prev, buyer: { ...prev.buyer, email: e.target.value } }));
+                    setSimulateFormErrors(prev => ({ ...prev, email: '' }));
+                  }}
+                  aria-invalid={Boolean(simulateFormErrors.email)}
+                  className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary ${simulateFormErrors.email ? 'border-destructive' : 'border-border'}`}
                   placeholder="sarah@skynet.com"
                 />
+                {simulateFormErrors.email && (
+                  <p className="mt-1 text-xs text-destructive">{simulateFormErrors.email}</p>
+                )}
               </div>
 
               <div className="grid gap-4 grid-cols-2">
@@ -1993,20 +2059,34 @@ export default function TicketingPage() {
                   <input
                     type="text"
                     value={simulateForm.buyer.company}
-                    onChange={(e) => setSimulateForm(prev => ({ ...prev, buyer: { ...prev.buyer, company: e.target.value } }))}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    onChange={(e) => {
+                      setSimulateForm(prev => ({ ...prev, buyer: { ...prev.buyer, company: e.target.value } }));
+                      setSimulateFormErrors(prev => ({ ...prev, company: '' }));
+                    }}
+                    aria-invalid={Boolean(simulateFormErrors.company)}
+                    className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary ${simulateFormErrors.company ? 'border-destructive' : 'border-border'}`}
                     placeholder="SkyNet Systems"
                   />
+                  {simulateFormErrors.company && (
+                    <p className="mt-1 text-xs text-destructive">{simulateFormErrors.company}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground mb-1 uppercase">Designation</label>
                   <input
                     type="text"
                     value={simulateForm.buyer.designation}
-                    onChange={(e) => setSimulateForm(prev => ({ ...prev, buyer: { ...prev.buyer, designation: e.target.value } }))}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    onChange={(e) => {
+                      setSimulateForm(prev => ({ ...prev, buyer: { ...prev.buyer, designation: e.target.value } }));
+                      setSimulateFormErrors(prev => ({ ...prev, designation: '' }));
+                    }}
+                    aria-invalid={Boolean(simulateFormErrors.designation)}
+                    className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary ${simulateFormErrors.designation ? 'border-destructive' : 'border-border'}`}
                     placeholder="Chief Tech Engineer"
                   />
+                  {simulateFormErrors.designation && (
+                    <p className="mt-1 text-xs text-destructive">{simulateFormErrors.designation}</p>
+                  )}
                 </div>
               </div>
 

@@ -545,7 +545,7 @@ export default function EmailPromotionsPage() {
               </Link>
               <Link
                 href="/chat"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-xs bg-secondary hover:bg-secondary/80 text-foreground border border-border transition-all"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-xs bg-secondary hover:bg-secondary/80 text-foreground border border-border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:translate-y-0"
               >
                 <span>Inquire With VisitExpo Team</span>
               </Link>

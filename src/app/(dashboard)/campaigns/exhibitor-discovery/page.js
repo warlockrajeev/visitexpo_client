@@ -571,6 +571,17 @@ const COUNTRY_OPTIONS = [
   'Switzerland',
 ];
 
+const getExhibitorOrigin = (exhibitor) => {
+  const origin = String(exhibitor.origin || '').toLowerCase();
+  if (origin === 'india' || exhibitor.countryFlag === '🇮🇳' || String(exhibitor.country || '').toLowerCase() === 'india') {
+    return 'india';
+  }
+  if (origin === 'global' || origin === 'international' || exhibitor.country) {
+    return 'global';
+  }
+  return '';
+};
+
 // Exhibitor Logo component with corrected text size and elegant fallback when image is not visible
 function ExhibitorLogo({ src, name, className = 'h-12 w-12' }) {
   const [imgFailed, setImgFailed] = useState(false);
@@ -939,6 +950,12 @@ export default function ExhibitorDiscoveryPage() {
     showToast(`Filters applied! Exploring verified exhibitors.`);
   };
 
+  const handleOriginFilterChange = (origin) => {
+    setOriginFilter(origin);
+    setAppliedFilters((current) => ({ ...current, origin }));
+    setCurrentPage(1);
+  };
+
   // Handle Reset Filters
   const handleResetFilters = () => {
     setSelectedIndustry('All Industries');
@@ -959,7 +976,7 @@ export default function ExhibitorDiscoveryPage() {
   const filteredExhibitors = useMemo(() => {
     return exhibitors.filter((ex) => {
       // 1. Origin filter
-      if (appliedFilters.origin !== 'all' && ex.origin !== appliedFilters.origin) {
+      if (appliedFilters.origin !== 'all' && getExhibitorOrigin(ex) !== appliedFilters.origin) {
         return false;
       }
 
@@ -989,6 +1006,21 @@ export default function ExhibitorDiscoveryPage() {
       return true;
     });
   }, [exhibitors, appliedFilters]);
+
+  const originCounts = useMemo(() => ({
+    all: exhibitors.length,
+    india: exhibitors.filter((exhibitor) => getExhibitorOrigin(exhibitor) === 'india').length,
+    global: exhibitors.filter((exhibitor) => getExhibitorOrigin(exhibitor) === 'global').length
+  }), [exhibitors]);
+  const hasSelectedFilters =
+    selectedIndustry !== 'All Industries' ||
+    searchProducts.trim() !== '' ||
+    selectedCountry !== 'All Countries' ||
+    originFilter !== 'all' ||
+    appliedFilters.industry !== 'All Industries' ||
+    appliedFilters.product !== '' ||
+    appliedFilters.country !== 'All Countries' ||
+    appliedFilters.origin !== 'all';
 
   const totalPages = Math.max(1, Math.ceil(filteredExhibitors.length / EXHIBITORS_PER_PAGE));
   const activePage = Math.min(currentPage, totalPages);
@@ -1286,50 +1318,36 @@ export default function ExhibitorDiscoveryPage() {
         </div>
       </div>
 
-      {/* 2. Quick Navigation Tabs between Campaigns and Exhibitor Discovery */}
-      <div className="flex items-center gap-2 border-b border-border pb-1">
-        <Link
-          href="/campaigns"
-          className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground rounded-lg transition-colors"
-        >
-          <Mail className="h-4 w-4" />
-          <span>Marketing &amp; Broadcast Campaigns</span>
-        </Link>
-        <div className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-primary border-b-2 border-primary -mb-1.5">
-          <Compass className="h-4 w-4" />
-          <span>Exhibitor Discovery</span>
-          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-primary/10 text-primary">Live</span>
-        </div>
-      </div>
-
-      {/* 3. Filter Section (Requirement 3: Preferred Industry, Search Products, Preferred Country, and Apply Button) */}
+      {/* 2. Filter Section (Requirement 3: Preferred Industry, Search Products, Preferred Country, and Apply Button) */}
       <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
         
         {/* Origin Selector Pills */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3.5">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border/60 pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 shrink-0">
               <Globe className="h-3.5 w-3.5" /> Exhibitor Scope:
             </span>
-            <div className="inline-flex p-1 rounded-xl bg-muted/30 border border-border gap-1">
+            <div className="inline-flex w-fit max-w-full flex-wrap p-1 rounded-xl bg-muted/40 border border-border gap-1">
               <button
                 type="button"
-                onClick={() => setOriginFilter('all')}
+                aria-pressed={originFilter === 'all'}
+                onClick={() => handleOriginFilterChange('all')}
                 className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  originFilter === 'all'
-                    ? 'bg-card text-foreground shadow-xs'
-                    : 'text-muted-foreground hover:text-foreground'
+                originFilter === 'all'
+                  ? 'bg-card text-foreground shadow-sm ring-1 ring-border'
+                  : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                All Scope ({FALLBACK_EXHIBITORS.length})
+                All Scope ({originCounts.all})
               </button>
               <button
                 type="button"
-                onClick={() => setOriginFilter('india')}
+                aria-pressed={originFilter === 'india'}
+                onClick={() => handleOriginFilterChange('india')}
                 className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  originFilter === 'india'
-                    ? 'bg-card text-foreground shadow-xs'
-                    : 'text-muted-foreground hover:text-foreground'
+                originFilter === 'india'
+                  ? 'bg-card text-foreground shadow-sm ring-1 ring-border'
+                  : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <span>🇮🇳</span>
@@ -1337,11 +1355,12 @@ export default function ExhibitorDiscoveryPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setOriginFilter('global')}
+                aria-pressed={originFilter === 'global'}
+                onClick={() => handleOriginFilterChange('global')}
                 className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  originFilter === 'global'
-                    ? 'bg-card text-foreground shadow-xs'
-                    : 'text-muted-foreground hover:text-foreground'
+                originFilter === 'global'
+                  ? 'bg-card text-foreground shadow-sm ring-1 ring-border'
+                  : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <span>🌍</span>
@@ -1350,8 +1369,12 @@ export default function ExhibitorDiscoveryPage() {
             </div>
           </div>
 
-          <div className="text-xs text-muted-foreground font-semibold">
-            <strong className="text-foreground">{filteredExhibitors.length}</strong> matching exhibitors
+          <div
+            aria-live="polite"
+            className="inline-flex items-center gap-2 self-start sm:self-auto rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
+          >
+            <Building className="h-3.5 w-3.5 text-primary" />
+            <span><strong className="text-foreground">{filteredExhibitors.length}</strong> matching exhibitors</span>
           </div>
         </div>
 
@@ -1426,14 +1449,16 @@ export default function ExhibitorDiscoveryPage() {
               <span>Apply Filters</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              title="Reset Filters"
-              className="rounded-xl border border-border bg-background hover:bg-secondary text-muted-foreground hover:text-foreground p-2 text-xs font-semibold transition-colors cursor-pointer"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </button>
+            {hasSelectedFilters && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-background hover:bg-secondary text-muted-foreground hover:text-foreground px-3 py-2 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Reset Filter</span>
+              </button>
+            )}
           </div>
 
         </div>
