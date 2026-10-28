@@ -952,12 +952,7 @@ export default function EventsDirectoryPage() {
         <div className="max-w-7xl mx-auto space-y-4">
           {/* Top Title & Metrics Row */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="space-y-0.5">
-              <nav className="flex items-center gap-1.5 text-xs text-zinc-400 font-medium">
-                <Link href="/" className="hover:text-zinc-900 transition-colors">Home</Link>
-                <span>/</span>
-                <span className="text-zinc-800 font-semibold">Exhibitions Directory</span>
-              </nav>
+            <div>
               <h1 className="text-2xl sm:text-3xl font-black text-zinc-950 tracking-tight flex items-center gap-2">
                 <span>Explore Trade Shows &amp; Expos</span>
               </h1>
@@ -977,7 +972,7 @@ export default function EventsDirectoryPage() {
           <div className="bg-zinc-50/90 border border-zinc-200 rounded-2xl p-2 sm:p-2.5 shadow-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 sm:gap-2.5 items-center">
               {/* 1. Keyword Search */}
-              <div className="lg:col-span-4 relative flex items-center">
+              <div className="lg:col-span-3 relative flex items-center">
                 <Search className="absolute left-3.5 h-4 w-4 text-zinc-400 pointer-events-none" />
                 <input
                   type="text"
@@ -1057,6 +1052,20 @@ export default function EventsDirectoryPage() {
                 >
                   <span>Find Expos</span>
                   <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="lg:col-span-1">
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  disabled={!hasActiveFilters}
+                  aria-label="Reset all filters"
+                  title="Reset all filters"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-2 py-2.5 text-xs font-semibold text-zinc-600 transition-colors hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-zinc-200 disabled:hover:bg-white"
+                >
+                  <RotateCcw className="h-3.5 w-3.5 shrink-0" />
+                  <span>Reset</span>
                 </button>
               </div>
             </div>
@@ -1139,16 +1148,6 @@ export default function EventsDirectoryPage() {
                 <span>Featured</span>
               </button>
 
-              {hasActiveFilters && (
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-zinc-500 hover:text-zinc-950 hover:bg-zinc-100 transition-colors cursor-pointer flex items-center gap-1"
-                >
-                  <RotateCcw className="h-3 w-3" />
-                  <span>Reset</span>
-                </button>
-              )}
             </div>
           </div>
 
@@ -1703,15 +1702,17 @@ export default function EventsDirectoryPage() {
                     </div>
 
                     {/* Footer Row: [Country] on Left, [Exhibit • Get Pass →] on Right */}
-                    <div className="pt-4 border-t border-zinc-100 flex items-center justify-between text-xs">
+                    <div className="flex items-center justify-between gap-2 border-t border-zinc-100 pt-4 text-xs">
                       {/* Left: Country / City with Globe */}
-                      <div className="flex items-center gap-1.5 text-zinc-500 font-semibold truncate max-w-[130px]">
+                      <div className="flex min-w-0 flex-1 items-center gap-1.5 text-zinc-500 font-semibold">
                         <Globe className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
-                        <span className="truncate">{evt.country || evt.city || 'International'}</span>
+                        <span className="truncate" title={evt.country || evt.city || 'International'}>
+                          {evt.country || evt.city || 'International'}
+                        </span>
                       </div>
 
                       {/* Right: Interested • Exhibit • Get Pass → */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex shrink-0 items-center gap-1">
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1719,7 +1720,7 @@ export default function EventsDirectoryPage() {
                             e.stopPropagation();
                             handleToggleInterest(evt);
                           }}
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold transition-all cursor-pointer ${
                             isInterested
                               ? 'bg-amber-400 text-zinc-950 font-black shadow-xs'
                               : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700'
@@ -1740,15 +1741,15 @@ export default function EventsDirectoryPage() {
                         <button
                           type="button"
                           onClick={() => handleGetPass(evt)}
-                          className="cursor-pointer"
+                          className="shrink-0 cursor-pointer"
                         >
                           {isClaimed ? (
-                            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold shadow-2xs">
+                            <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-2xs">
                               <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
                               Pass Issued
                             </span>
                           ) : (
-                            <span className="group/btn inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-zinc-950 text-[#FFCC00] hover:bg-[#FFCC00] hover:text-zinc-950 font-black text-xs transition-all duration-200 shadow-sm hover:shadow-md hover:scale-105 active:scale-95">
+                            <span className="group/btn inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xl bg-zinc-950 px-2.5 py-1.5 text-xs font-black text-[#FFCC00] shadow-sm transition-all duration-200 hover:scale-105 hover:bg-[#FFCC00] hover:text-zinc-950 hover:shadow-md active:scale-95">
                               <span>Get Pass</span>
                               <ArrowRight className="h-3 w-3 group-hover/btn:translate-x-0.5 transition-transform" />
                             </span>
@@ -1856,7 +1857,7 @@ export default function EventsDirectoryPage() {
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-zinc-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-zinc-700 flex items-center gap-3 text-xs font-bold animate-in slide-in-from-bottom-5">
+        <div className="fixed right-4 top-24 z-50 flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-2xl border border-zinc-700 bg-zinc-900 px-5 py-3 text-xs font-bold text-white shadow-2xl animate-in slide-in-from-top-5 sm:right-6">
           <CheckCircle2 className="h-4 w-4 text-[#FFCC00] shrink-0" />
           <span>{toastMessage}</span>
         </div>
