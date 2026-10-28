@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import {
   ChevronLeft,
@@ -113,10 +114,28 @@ const INITIAL_SLIDES = DEFAULT_SIX_EVENTS.map((def, idx) => ({
   badge: BADGE_CONFIG[idx % BADGE_CONFIG.length].label,
   badgeColor: BADGE_CONFIG[idx % BADGE_CONFIG.length].color,
   image: def.banner || FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length],
-  link: def.slug ? `/event/${def.slug}` : '/events'
+  link: def.slug ? `/expo/${def.slug}` : '/events'
 }));
 
+const normalizeBannerLink = (link, slug) => {
+  const fallbackLink = slug ? `/expo/${slug}` : '/events';
+  if (!link) return fallbackLink;
+
+  try {
+    const url = new URL(link, window.location.origin);
+    if (url.origin === window.location.origin && url.pathname.startsWith('/event/')) {
+      url.pathname = url.pathname.replace(/^\/event\//, '/expo/');
+      return `${url.pathname}${url.search}${url.hash}`;
+    }
+  } catch {
+    return fallbackLink;
+  }
+
+  return link;
+};
+
 export default function BannerSlider() {
+  const router = useRouter();
   const [slides, setSlides] = useState(INITIAL_SLIDES);
   const [loading, setLoading] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -203,7 +222,7 @@ export default function BannerSlider() {
             badgeColor: BADGE_CONFIG[i % BADGE_CONFIG.length].color,
             image: b.bannerImage || b.event?.bannerImage || FALLBACK_IMAGES[i % FALLBACK_IMAGES.length],
             slug: b.event?.slug,
-            link: b.ctaLink || (b.event?.slug ? `/event/${b.event.slug}` : '/events'),
+            link: normalizeBannerLink(b.ctaLink, b.event?.slug),
             organizer: b.organizer?.company || b.organizer?.name || 'VisitExpo Verified',
             isCustomBanner: true
           });
@@ -229,7 +248,7 @@ export default function BannerSlider() {
             badgeColor: BADGE_CONFIG[configIdx].color,
             image: bannerImg,
             slug: e.slug,
-            link: e.slug ? `/event/${e.slug}` : '/events',
+            link: e.slug ? `/expo/${e.slug}` : '/events',
             organizer: e.orgName || e.organizer?.company || 'VisitExpo Partner',
             isCustomBanner: false
           });
@@ -246,7 +265,7 @@ export default function BannerSlider() {
             badge: BADGE_CONFIG[configIdx].label,
             badgeColor: BADGE_CONFIG[configIdx].color,
             image: FALLBACK_IMAGES[configIdx],
-            link: def.slug ? `/event/${def.slug}` : '/events'
+            link: def.slug ? `/expo/${def.slug}` : '/events'
           });
         }
 
@@ -260,7 +279,7 @@ export default function BannerSlider() {
             badge: BADGE_CONFIG[idx % BADGE_CONFIG.length].label,
             badgeColor: BADGE_CONFIG[idx % BADGE_CONFIG.length].color,
             image: FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length],
-            link: def.slug ? `/event/${def.slug}` : '/events'
+            link: def.slug ? `/expo/${def.slug}` : '/events'
           }))
         );
       } finally {
@@ -415,7 +434,23 @@ export default function BannerSlider() {
                   key={slide._id || idx}
                   onClick={() => {
                     if (!isActive) setCurrentIndex(idx);
+                    else {
+                      handleBannerClick(slide);
+                      router.push(slide.link);
+                    }
                   }}
+                  onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+                    e.preventDefault();
+                    if (!isActive) setCurrentIndex(idx);
+                    else {
+                      handleBannerClick(slide);
+                      router.push(slide.link);
+                    }
+                  }}
+                  role={isActive ? 'link' : 'button'}
+                  tabIndex={0}
+                  aria-label={isActive ? `View details for ${slide.title}` : `Show ${slide.title}`}
                   className={`relative shrink-0 rounded-3xl overflow-hidden shadow-2xl transition-all duration-700 cursor-pointer group ${
                     isActive
                       ? 'w-[320px] sm:w-[480px] md:w-[580px] lg:w-[640px] h-[340px] sm:h-[380px] md:h-[410px] ring-1 ring-white/20'

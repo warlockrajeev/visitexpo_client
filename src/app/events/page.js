@@ -14,6 +14,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { renderCardDescription } from '../../utils/textFormatters.js';
+import { fetchWordpressEvents } from '../../utils/fetchWordpressEvents.js';
 import Navbar from '../../components/Navbar.js';
 import Footer from '../../components/Footer.js';
 import { useAuth } from '../../context/AuthContext.js';
@@ -273,20 +274,22 @@ export default function EventsDirectoryPage() {
 
   // Fetch events from WordPress API
   useEffect(() => {
+    let isMounted = true;
     const fetchEvents = async () => {
       setLoading(true);
       try {
-        const res = await axios.get('/api/wordpress-events');
-        if (res.data?.success && Array.isArray(res.data?.events)) {
-          setEvents(res.data.events);
-        }
+        const result = await fetchWordpressEvents();
+        if (isMounted) setEvents(result.events);
       } catch (err) {
         console.error('Failed to load events:', err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
     fetchEvents();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Load saved bookmarks, interested, and followed events from localStorage & backend
@@ -1473,13 +1476,19 @@ export default function EventsDirectoryPage() {
 
         {/* Results Count Line */}
         <div className="flex items-center justify-between text-xs text-zinc-500 pb-1">
-          <div>
-            Showing{' '}
-            <strong className="text-zinc-950 font-bold">
-              {filteredEvents.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0}–
-              {Math.min(currentPage * ITEMS_PER_PAGE, filteredEvents.length)}
-            </strong>{' '}
-            of <strong className="text-zinc-950 font-bold">{filteredEvents.length.toLocaleString()}</strong> verified exhibitions
+          <div aria-live="polite">
+            {loading ? (
+              <span>Loading verified exhibitions…</span>
+            ) : (
+              <>
+                Showing{' '}
+                <strong className="text-zinc-950 font-bold">
+                  {filteredEvents.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0}–
+                  {Math.min(currentPage * ITEMS_PER_PAGE, filteredEvents.length)}
+                </strong>{' '}
+                of <strong className="text-zinc-950 font-bold">{filteredEvents.length.toLocaleString()}</strong> verified exhibitions
+              </>
+            )}
           </div>
         </div>
 

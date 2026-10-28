@@ -539,29 +539,42 @@ export default function FollowingPage() {
           </div>
         ) : followedSlugs.size === 0 ? (
           /* EMPTY STATE */
-          <div className="rounded-3xl border border-dashed border-zinc-200 bg-white p-12 sm:p-16 text-center space-y-4 shadow-xs">
-            <div className="h-16 w-16 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto ring-8 ring-blue-50">
-              <Bell className="h-8 w-8 fill-blue-600 text-blue-600" />
-            </div>
-            <h3 className="text-xl font-bold text-zinc-950">No Followed Expos Yet</h3>
-            <p className="text-sm text-zinc-500 max-w-md mx-auto">
-              Follow exhibitions to receive booth notices, dates alerts, and link up with their verified
-              trade show organizers.
-            </p>
-            <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+          <div className="relative isolate overflow-hidden rounded-3xl border border-blue-100 bg-white px-6 py-14 text-center shadow-sm sm:px-12 sm:py-16">
+            <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,rgba(219,234,254,0.65),transparent_58%)]" />
+            <div aria-hidden="true" className="absolute -right-16 -top-20 -z-10 h-64 w-64 rounded-full border border-blue-100/70" />
+            <div aria-hidden="true" className="absolute -right-8 -top-12 -z-10 h-48 w-48 rounded-full border border-blue-100/70" />
+
+            <div className="mx-auto flex max-w-xl flex-col items-center">
+              <div className="relative mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/20 ring-8 ring-blue-50">
+                <Bell className="h-9 w-9 fill-white" />
+                <span className="absolute -right-1 -top-1 h-5 w-5 rounded-full border-4 border-white bg-[#FFCC00]" />
+              </div>
+              <span className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50/80 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-blue-700">
+                <Sparkles className="h-3.5 w-3.5" />
+                Build your expo network
+              </span>
+              <h3 className="text-2xl font-extrabold tracking-tight text-zinc-950 sm:text-3xl">
+                Your next great connection starts here
+              </h3>
+              <p className="mt-3 max-w-lg text-sm leading-6 text-zinc-600 sm:text-base">
+                Follow exhibitions to keep event dates, booth announcements, and verified organizer updates all in one place.
+              </p>
+              <div className="mt-8 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
               <Link
                 href="/events"
-                className="inline-flex items-center gap-2 rounded-2xl bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-black px-6 py-3 text-sm shadow-md transition active:scale-95"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#FFCC00] px-6 py-3 text-sm font-black text-zinc-950 shadow-md shadow-amber-500/20 transition hover:-translate-y-0.5 hover:bg-[#FFB703] hover:shadow-lg active:translate-y-0 active:scale-95"
               >
-                <span>Browse Exhibitions</span>
+                <span>Explore exhibitions</span>
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
                 href="/organizers"
-                className="inline-flex items-center gap-2 rounded-2xl bg-zinc-100 text-zinc-900 hover:bg-zinc-200 font-bold px-6 py-3 text-sm transition"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-6 py-3 text-sm font-bold text-zinc-700 shadow-xs transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-800"
               >
-                <span>Directory of Organizers</span>
+                <Building2 className="h-4 w-4" />
+                <span>Browse organizers</span>
               </Link>
+              </div>
             </div>
           </div>
         ) : activeTab === 'expos' ? (

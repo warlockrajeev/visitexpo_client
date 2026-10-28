@@ -11,6 +11,7 @@ import React, { useEffect, useState, useMemo, lazy, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext.js';
+import { fetchWordpressEvents } from '../utils/fetchWordpressEvents.js';
 import {
   Search,
   Calendar,
@@ -292,20 +293,22 @@ export default function LandingPage() {
     const fetchCriticalData = async () => {
       try {
         // Parallel API calls using Promise.all()
-        const [eventsRes, faqsRes] = await Promise.all([
-          axios.get('/api/wordpress-events', { timeout: 5000 })
-            .catch(err => ({ data: { success: false } })),
+        const [eventsResult, faqsRes] = await Promise.all([
+          fetchWordpressEvents().catch((err) => {
+            console.error('Failed to load homepage events:', err?.message);
+            return { events: [], source: 'unavailable' };
+          }),
           axios.get(`${API_URL}/faqs`, { timeout: 3500 }).catch(err => ({ data: { success: false } }))
         ]);
 
         if (isMounted) {
           // Process events
-          if (eventsRes.data?.success && Array.isArray(eventsRes.data?.events) && eventsRes.data.events.length > 0) {
-            setEvents(eventsRes.data.events);
-            setWpSource(eventsRes.data.source || 'database_stored');
+          if (eventsResult.events.length > 0) {
+            setEvents(eventsResult.events);
+            setWpSource(eventsResult.source || 'database_stored');
             try {
               if (typeof window !== 'undefined') {
-                sessionStorage.setItem('visitexpo_home_events', JSON.stringify(eventsRes.data.events.slice(0, 300)));
+                sessionStorage.setItem('visitexpo_home_events', JSON.stringify(eventsResult.events.slice(0, 300)));
               }
             } catch (_) {}
           }
@@ -1159,7 +1162,11 @@ export default function LandingPage() {
             </span>
             <span>
               Connected to <strong className="text-white">visitexpo.in</strong>
-              {events.length > 0 && ` • ${events.length} Live Events`}
+              {events.length > 0
+                ? ` • ${events.length} Live Events`
+                : isFetchingWp
+                  ? ' • Loading live events…'
+                  : ''}
             </span>
           </div>
 
