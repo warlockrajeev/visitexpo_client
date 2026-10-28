@@ -1585,8 +1585,15 @@ export default function EventsDirectoryPage() {
                       unoptimized
                       className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-108"
                       onError={(e) => {
-                        e.currentTarget.src =
+                        const image = e.currentTarget;
+                        const fallbackImage =
                           evt.fallbackImage || 'https://visitexpo.in/wp-content/uploads/2026/08/Refining-India-2026.jpg';
+
+                        if (image.dataset.fallbackAttempted || image.src === fallbackImage) return;
+
+                        image.dataset.fallbackAttempted = 'true';
+                        image.removeAttribute('srcset');
+                        image.src = fallbackImage;
                       }}
                     />
 
