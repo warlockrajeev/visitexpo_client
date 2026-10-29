@@ -6,7 +6,6 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
 import { buildDashboardEventsUrl } from '../../../utils/dashboardEvents.js';
@@ -31,10 +30,6 @@ import {
   Loader2,
   MessageSquare,
   Smartphone,
-  Compass,
-  Globe,
-  ArrowRight,
-  Sparkles,
   AlertCircle
 } from 'lucide-react';
 
@@ -44,9 +39,13 @@ const API_URL =
     ? 'https://api.visitexpo.in/api'
     : 'http://localhost:5000/api');
 
+const CAMPAIGN_TITLE_PATTERN = /^[\p{L}\p{M}\p{N}][\p{L}\p{M}\p{N}\s.,&'’()\-/#]*$/u;
+const CAMPAIGN_SUBJECT_PATTERN = /^[\p{L}\p{M}\p{N}\s.,!?&'’"():;\-/#@+]+$/u;
+
 export default function CampaignsPage() {
   const { user, accessToken } = useAuth();
   const [events, setEvents] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -143,6 +142,8 @@ export default function CampaignsPage() {
         if (events.length === 0) {
           setError('Could not connect to API server. Ensure backend is running.');
         }
+      } finally {
+        setEventsLoading(false);
       }
     };
     fetchEvents();
@@ -202,8 +203,10 @@ export default function CampaignsPage() {
       errors.title = 'Campaign Title must be at least 3 characters.';
     } else if (trimmedTitle.length > 100) {
       errors.title = 'Campaign Title cannot exceed 100 characters.';
-    } else if (!/[a-zA-Z0-9]/.test(trimmedTitle)) {
-      errors.title = 'Campaign Title must contain letters or numbers (cannot be only special characters).';
+    } else if (!CAMPAIGN_TITLE_PATTERN.test(trimmedTitle)) {
+      errors.title = 'Use letters, numbers, spaces, and common punctuation only in the campaign title.';
+    } else if (!/[\p{L}\p{N}]/u.test(trimmedTitle)) {
+      errors.title = 'Campaign Title must contain at least one letter or number.';
     }
 
     // 2. Email Subject Line Validation (when channel is email)
@@ -214,8 +217,10 @@ export default function CampaignsPage() {
           errors.subject = 'Subject Line must be at least 3 characters.';
         } else if (trimmedSubject.length > 150) {
           errors.subject = 'Subject Line cannot exceed 150 characters.';
-        } else if (!/[a-zA-Z0-9]/.test(trimmedSubject)) {
-          errors.subject = 'Subject Line must contain letters or numbers (cannot be only special characters).';
+        } else if (!CAMPAIGN_SUBJECT_PATTERN.test(trimmedSubject)) {
+          errors.subject = 'Use letters, numbers, spaces, and common punctuation only in the subject line.';
+        } else if (!/[\p{L}\p{N}]/u.test(trimmedSubject)) {
+          errors.subject = 'Subject Line must contain at least one letter or number.';
         }
       }
     }
@@ -228,8 +233,10 @@ export default function CampaignsPage() {
       errors.body = 'Message Body must be at least 10 characters.';
     } else if (trimmedBody.length > 3000) {
       errors.body = 'Message Body cannot exceed 3000 characters.';
-    } else if (!/[a-zA-Z0-9]/.test(trimmedBody)) {
-      errors.body = 'Message Body must contain readable text (cannot be only special characters).';
+    } else if (!/[\p{L}\p{N}]/u.test(trimmedBody)) {
+      errors.body = 'Message Body must contain meaningful text, not only special characters.';
+    } else if (/<[a-z][\s\S]*>/i.test(trimmedBody)) {
+      errors.body = 'HTML tags are not allowed in the message body.';
     }
 
     return {
@@ -242,13 +249,15 @@ export default function CampaignsPage() {
   const handleCreateCampaign = async (e) => {
     e.preventDefault();
 
-    if (!selectedEventId) {
-      showSweetWarning('Please select an active expo event before creating a campaign draft.');
-      return;
+    const { errors } = validateCampaignForm(newCampaign);
+    const hasSelectedEvent = events.some((event) => String(event._id) === String(selectedEventId));
+    if (!hasSelectedEvent) {
+      errors.eventId = events.length
+        ? 'Select an active expo event before saving the campaign draft.'
+        : 'No active expo events are available. Create or activate an event first.';
     }
 
-    const { isValid, errors } = validateCampaignForm(newCampaign);
-    if (!isValid) {
+    if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       showSweetWarning('Please fix the validation errors in the form.');
       return;
@@ -258,7 +267,13 @@ export default function CampaignsPage() {
     try {
       const res = await axios.post(
         `${API_URL}/campaigns`,
-        { ...newCampaign, eventId: selectedEventId },
+        {
+          ...newCampaign,
+          title: newCampaign.title.trim(),
+          subject: newCampaign.subject.trim(),
+          body: newCampaign.body.trim(),
+          eventId: selectedEventId
+        },
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       if (res.data && res.data.success) {
@@ -326,85 +341,10 @@ export default function CampaignsPage() {
 
   const openRate = totalAudience > 0 ? ((avgOpens / totalAudience) * 100).toFixed(1) : '0';
   const clickRate = avgOpens > 0 ? ((avgClicks / avgOpens) * 100).toFixed(1) : '0';
+  const hasSelectedEvent = events.some((event) => String(event._id) === String(selectedEventId));
 
   return (
     <div className="space-y-6">
-      {/* Feature Spotlights (2-Column Responsive Grid) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Spotlight 1: Promotional Email Broadcasting */}
-        <div className="rounded-2xl border border-indigo-200/80 dark:border-indigo-500/30 bg-gradient-to-br from-indigo-50/70 via-card to-purple-50/40 dark:from-indigo-950/40 dark:via-card dark:to-purple-950/20 p-5 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between gap-3.5">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 flex items-center justify-center shrink-0">
-                  <Send className="h-4 w-4" />
-                </div>
-                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20">
-                  Growth Plan Feature
-                </span>
-              </div>
-              <span className="text-[11px] font-mono text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-md border border-border/50">
-                promotion@client.visitexpo.in
-              </span>
-            </div>
-            <div>
-              <h3 className="text-sm sm:text-base font-bold text-foreground">
-                Promotional Email Broadcasting
-              </h3>
-              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">
-                Dispatch authenticated, high-deliverability promotional emails to your CRM leads, registered trade visitors, and followers directly via VisitExpo&apos;s verified cPanel relay.
-              </p>
-            </div>
-          </div>
-          <div>
-            <Link
-              href="/campaigns/email-promotions"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 text-xs font-bold shadow-xs hover:shadow transition-all cursor-pointer group"
-            >
-              <span>Launch Email Promotion</span>
-              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-            </Link>
-          </div>
-        </div>
-
-        {/* Spotlight 2: Exhibitor Discovery Directory */}
-        <div className="rounded-2xl border border-amber-200/80 dark:border-amber-500/30 bg-gradient-to-br from-amber-50/70 via-card to-orange-50/40 dark:from-amber-950/30 dark:via-card dark:to-orange-950/15 p-5 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between gap-3.5">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center shrink-0">
-                  <Compass className="h-4 w-4" />
-                </div>
-                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/20">
-                  B2B Directory
-                </span>
-              </div>
-              <span className="text-[11px] font-semibold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-md border border-border/50">
-                Verified Indian &amp; Global Booths
-              </span>
-            </div>
-            <div>
-              <h3 className="text-sm sm:text-base font-bold text-foreground">
-                Exhibitor Discovery Directory
-              </h3>
-              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">
-                Explore verified Indian and Global exhibitors across major industries. Filter by industry, search products, and connect directly with booth contacts via credit-based inquiries.
-              </p>
-            </div>
-          </div>
-          <div>
-            <Link
-              href="/campaigns/exhibitor-discovery"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 px-4 py-2 text-xs font-bold shadow-xs hover:shadow transition-all cursor-pointer group"
-            >
-              <Compass className="h-3.5 w-3.5" />
-              <span>Go to Exhibitor Discovery</span>
-              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-            </Link>
-          </div>
-        </div>
-      </div>
-
       {/* Header Dropdown & Actions Card */}
       <div className="bg-card p-5 sm:p-6 rounded-2xl border border-border shadow-xs flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
         <div className="flex items-start gap-3.5">
@@ -639,6 +579,48 @@ export default function CampaignsPage() {
 
             <form onSubmit={handleCreateCampaign} noValidate className="space-y-4">
               <div>
+                <label className="mb-1 block text-xs font-bold uppercase text-muted-foreground">
+                  Active Expo Event <span className="text-rose-500">*</span>
+                </label>
+                {events.length > 0 ? (
+                  <SearchableSelect
+                    options={events.map((event) => ({
+                      value: event._id,
+                      label: event.title
+                    }))}
+                    value={selectedEventId}
+                    onChange={(value) => {
+                      setSelectedEventId(value);
+                      setFormErrors((prev) => ({
+                        ...prev,
+                        eventId: value ? '' : 'Select an active expo event before saving the campaign draft.'
+                      }));
+                    }}
+                    placeholder="Select an active expo event..."
+                    searchPlaceholder="Search active events..."
+                    allowClear
+                    error={formErrors.eventId}
+                    className="rounded-lg text-sm"
+                  />
+                ) : eventsLoading ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground" role="status">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Loading active expo events...</span>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900" role="status">
+                    No active expo events are available. Create or activate an event before creating a campaign draft.
+                  </div>
+                )}
+                {formErrors.eventId && events.length > 0 && (
+                  <p id="campaign-event-error" className="mt-1.5 flex items-center gap-1 text-xs font-medium text-rose-500">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{formErrors.eventId}</span>
+                  </p>
+                )}
+              </div>
+
+              <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-bold text-muted-foreground uppercase">
                     Campaign Title <span className="text-rose-500">*</span>
@@ -651,13 +633,25 @@ export default function CampaignsPage() {
                   type="text"
                   value={newCampaign.title}
                   maxLength={100}
+                  required
                   onChange={(e) => {
                     const val = e.target.value;
                     setNewCampaign(prev => ({ ...prev, title: val }));
                     if (formErrors.title) {
-                      setFormErrors(prev => ({ ...prev, title: '' }));
+                      setFormErrors(prev => ({
+                        ...prev,
+                        title: validateCampaignForm({ ...newCampaign, title: val }).errors.title || ''
+                      }));
                     }
                   }}
+                  onBlur={() => {
+                    setFormErrors(prev => ({
+                      ...prev,
+                      title: validateCampaignForm(newCampaign).errors.title || ''
+                    }));
+                  }}
+                  aria-invalid={Boolean(formErrors.title)}
+                  aria-describedby={formErrors.title ? 'campaign-title-error' : undefined}
                   className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none transition-all ${
                     formErrors.title
                       ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-500/5'
@@ -666,7 +660,7 @@ export default function CampaignsPage() {
                   placeholder="E.g. Keynote Speaker Announcement"
                 />
                 {formErrors.title && (
-                  <p className="text-xs text-rose-500 mt-1.5 flex items-center gap-1 font-medium">
+                  <p id="campaign-title-error" className="text-xs text-rose-500 mt-1.5 flex items-center gap-1 font-medium">
                     <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                     <span>{formErrors.title}</span>
                   </p>
@@ -713,9 +707,20 @@ export default function CampaignsPage() {
                       const val = e.target.value;
                       setNewCampaign(prev => ({ ...prev, subject: val }));
                       if (formErrors.subject) {
-                        setFormErrors(prev => ({ ...prev, subject: '' }));
+                        setFormErrors(prev => ({
+                          ...prev,
+                          subject: validateCampaignForm({ ...newCampaign, subject: val }).errors.subject || ''
+                        }));
                       }
                     }}
+                    onBlur={() => {
+                      setFormErrors(prev => ({
+                        ...prev,
+                        subject: validateCampaignForm(newCampaign).errors.subject || ''
+                      }));
+                    }}
+                    aria-invalid={Boolean(formErrors.subject)}
+                    aria-describedby={formErrors.subject ? 'campaign-subject-error' : undefined}
                     className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none transition-all ${
                       formErrors.subject
                         ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-500/5'
@@ -724,7 +729,7 @@ export default function CampaignsPage() {
                     placeholder="E.g. Meet our keynote speakers at CP!"
                   />
                   {formErrors.subject && (
-                    <p className="text-xs text-rose-500 mt-1.5 flex items-center gap-1 font-medium">
+                    <p id="campaign-subject-error" className="text-xs text-rose-500 mt-1.5 flex items-center gap-1 font-medium">
                       <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                       <span>{formErrors.subject}</span>
                     </p>
@@ -745,13 +750,25 @@ export default function CampaignsPage() {
                   rows={4}
                   value={newCampaign.body}
                   maxLength={3000}
+                  required
                   onChange={(e) => {
                     const val = e.target.value;
                     setNewCampaign(prev => ({ ...prev, body: val }));
                     if (formErrors.body) {
-                      setFormErrors(prev => ({ ...prev, body: '' }));
+                      setFormErrors(prev => ({
+                        ...prev,
+                        body: validateCampaignForm({ ...newCampaign, body: val }).errors.body || ''
+                      }));
                     }
                   }}
+                  onBlur={() => {
+                    setFormErrors(prev => ({
+                      ...prev,
+                      body: validateCampaignForm(newCampaign).errors.body || ''
+                    }));
+                  }}
+                  aria-invalid={Boolean(formErrors.body)}
+                  aria-describedby={formErrors.body ? 'campaign-body-error' : undefined}
                   className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none resize-none transition-all placeholder:text-muted-foreground ${
                     formErrors.body
                       ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-500/5'
@@ -760,7 +777,7 @@ export default function CampaignsPage() {
                   placeholder="Enter details or announcements body content..."
                 />
                 {formErrors.body && (
-                  <p className="text-xs text-rose-500 mt-1.5 flex items-center gap-1 font-medium">
+                  <p id="campaign-body-error" className="text-xs text-rose-500 mt-1.5 flex items-center gap-1 font-medium">
                     <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                     <span>{formErrors.body}</span>
                   </p>
@@ -779,7 +796,7 @@ export default function CampaignsPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !hasSelectedEvent}
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold px-4 py-2 text-sm transition-all shadow-sm cursor-pointer btn-press active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (

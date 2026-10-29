@@ -244,15 +244,15 @@ export default function BannerSpotlightPage() {
   // =========================================================================
   if (!hasGrowthPlan) {
     return (
-      <div className="max-w-5xl mx-auto py-8 sm:py-12 px-4 sm:px-6 space-y-8">
+      <div className="mx-auto w-full max-w-5xl space-y-5 pb-28 lg:mr-16 lg:w-[calc(100%-4rem)]">
         {/* Breadcrumb Header */}
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">
             <span>Growth Plan Feature</span>
             <span>&bull;</span>
             <span className="text-amber-700 dark:text-amber-400 font-extrabold">Exclusive Placement</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+          <h1 className="text-xl font-black tracking-tight text-foreground sm:text-2xl">
             Landing Page Banner Spotlight
           </h1>
           <p className="max-w-2xl text-sm text-muted-foreground">
@@ -261,7 +261,7 @@ export default function BannerSpotlightPage() {
         </div>
 
         {/* Feature Showcase Card */}
-        <div className="rounded-3xl border border-border bg-card p-5 sm:p-8 lg:p-10 shadow-sm space-y-8">
+        <div className="space-y-5 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6">
           <div className="flex items-start gap-4">
             <div className="mt-1 h-12 w-12 sm:h-14 sm:w-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
               <Award className="h-6 w-6 sm:h-7 sm:w-7" />
@@ -271,52 +271,52 @@ export default function BannerSpotlightPage() {
                 <Lock className="h-3 w-3" />
                 Growth Plan Exclusive Feature
               </span>
-              <h2 className="max-w-3xl text-xl sm:text-2xl font-black tracking-tight leading-tight text-foreground">
+              <h2 className="max-w-3xl text-lg font-black leading-tight tracking-tight text-foreground sm:text-xl">
                 Get Top Placement on VisitExpo&apos;s Homepage Hero Carousel
               </h2>
             </div>
           </div>
 
-          <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
+          <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground sm:text-sm">
             As a Growth Plan Organizer, you can submit requests to showcase your flagship exhibition directly on the
             <strong> VisitExpo Homepage Hero Banner Slider</strong>. Thousands of verified trade visitors, international buyers, and media professionals browse the hero slider daily.
           </p>
 
           {/* Benefits Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-4 rounded-2xl bg-secondary/50 border border-border space-y-2 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
+          <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="flex h-full flex-col items-start gap-2 rounded-xl border border-border bg-secondary/50 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
               <div className="h-8 w-8 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-bold">
                 10x
               </div>
               <h3 className="text-xs font-bold text-foreground">Maximum Visibility</h3>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
                 Positioned in the prime spot above all other expos on the main homepage.
               </p>
             </div>
 
-            <div className="p-4 rounded-2xl bg-secondary/50 border border-border space-y-2 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
+            <div className="flex h-full flex-col items-start gap-2 rounded-xl border border-border bg-secondary/50 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
               <div className="h-8 w-8 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300 flex items-center justify-center font-bold">
                 <ShieldCheck className="h-5 w-5" />
               </div>
               <h3 className="text-xs font-bold text-foreground">Verified Spotlight Badge</h3>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
                 Custom badge and priority verification build trust and accelerate badge registrations.
               </p>
             </div>
 
-            <div className="p-4 rounded-2xl bg-secondary/50 border border-border space-y-2 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
+            <div className="flex h-full flex-col items-start gap-2 rounded-xl border border-border bg-secondary/50 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
               <div className="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold">
                 <TrendingUp className="h-5 w-5" />
               </div>
               <h3 className="text-xs font-bold text-foreground">Direct CTA Conversion</h3>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
                 Direct buttons to your ticket booking, exhibitor inquiry, and official event desk.
               </p>
             </div>
           </div>
 
           {/* Upgrade CTA Button */}
-          <div className="pt-2 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center">
             <Link
               href="/pricing"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-2.5 text-xs shadow-sm hover:shadow transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]"
@@ -342,11 +342,11 @@ export default function BannerSpotlightPage() {
   const pendingCount = requests.filter(r => r.status === 'pending').length;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 p-4 sm:p-6 pb-20">
+    <div className="mx-auto w-full max-w-6xl min-w-0 space-y-5 pb-28 lg:mr-16 lg:w-[calc(100%-4rem)]">
 
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="space-y-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 space-y-1">
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/30">
               <Award className="h-3 w-3" />
@@ -356,21 +356,21 @@ export default function BannerSpotlightPage() {
               Landing Page Hero Slider
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight">
+          <h1 className="text-xl font-black tracking-tight text-foreground sm:text-2xl">
             Banner Spotlight Manager
           </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground max-w-xl">
+          <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground sm:text-sm">
             Request premier promotional placement on the VisitExpo Homepage Carousel. Once reviewed and approved by our curation team, your event rotates live to thousands of attendees.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex shrink-0 items-center gap-2">
           <button
             onClick={() => {
               fetchMyRequests();
               fetchMyEvents();
             }}
-            className="p-2.5 rounded-xl border border-border bg-card hover:bg-secondary text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+            className="rounded-xl border border-border bg-card p-2.5 text-muted-foreground transition-all hover:bg-secondary hover:text-foreground"
             title="Refresh"
           >
             <RefreshCw className={`h-4 w-4 ${loadingRequests ? 'animate-spin' : ''}`} />
@@ -393,7 +393,7 @@ export default function BannerSpotlightPage() {
               }
               setIsModalOpen(true);
             }}
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold px-5 py-3 text-xs sm:text-sm shadow-lg hover:shadow-indigo-500/20 hover:scale-102 transition-all cursor-pointer"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-700 px-4 py-2.5 text-xs font-bold text-white shadow-md transition-all hover:from-indigo-500 hover:to-indigo-600 hover:shadow-indigo-500/20 sm:px-5 sm:text-sm"
           >
             <Plus className="h-4 w-4" />
             <span>Request Banner Spotlight</span>
@@ -402,8 +402,8 @@ export default function BannerSpotlightPage() {
       </div>
 
       {/* KPI Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-1">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="space-y-1 rounded-xl border border-border bg-card p-3.5 shadow-xs sm:p-4">
           <div className="flex items-center justify-between text-muted-foreground">
             <span className="text-xs font-semibold">Live Banners</span>
             <CheckCircle2 className="h-4 w-4 text-emerald-400" />
@@ -412,7 +412,7 @@ export default function BannerSpotlightPage() {
           <div className="text-[11px] text-muted-foreground">Rotating on Homepage</div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-1">
+        <div className="space-y-1 rounded-xl border border-border bg-card p-3.5 shadow-xs sm:p-4">
           <div className="flex items-center justify-between text-muted-foreground">
             <span className="text-xs font-semibold">Under Review</span>
             <Clock className="h-4 w-4 text-amber-400" />
@@ -421,7 +421,7 @@ export default function BannerSpotlightPage() {
           <div className="text-[11px] text-muted-foreground">Awaiting Admin Approval</div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-1">
+        <div className="space-y-1 rounded-xl border border-border bg-card p-3.5 shadow-xs sm:p-4">
           <div className="flex items-center justify-between text-muted-foreground">
             <span className="text-xs font-semibold">Total Requests</span>
             <Award className="h-4 w-4 text-indigo-400" />
@@ -430,7 +430,7 @@ export default function BannerSpotlightPage() {
           <div className="text-[11px] text-muted-foreground">Lifetime Submissions</div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-1">
+        <div className="space-y-1 rounded-xl border border-border bg-card p-3.5 shadow-xs sm:p-4">
           <div className="flex items-center justify-between text-muted-foreground">
             <span className="text-xs font-semibold">Growth Tier</span>
             <Award className="h-4 w-4 text-amber-400" />
@@ -441,8 +441,8 @@ export default function BannerSpotlightPage() {
       </div>
 
       {/* Requests Table & History */}
-      <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-xs">
-        <div className="p-5 border-b border-border flex items-center justify-between">
+      <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-4">
           <h2 className="text-base font-bold text-foreground">
             My Banner Spotlight Submissions
           </h2>
@@ -457,7 +457,7 @@ export default function BannerSpotlightPage() {
             <p className="text-xs text-muted-foreground">Loading your spotlight requests...</p>
           </div>
         ) : requests.length === 0 ? (
-          <div className="p-12 text-center space-y-4">
+          <div className="space-y-3 p-6 text-center sm:p-8">
             <div className="h-16 w-16 rounded-full bg-secondary text-muted-foreground mx-auto flex items-center justify-center">
               <Award className="h-7 w-7 opacity-50" />
             </div>
@@ -479,7 +479,7 @@ export default function BannerSpotlightPage() {
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-border overflow-x-auto">
+          <div className="divide-y divide-border">
             {requests.map((r) => {
               const statusBadge = {
                 approved: {
@@ -511,16 +511,16 @@ export default function BannerSpotlightPage() {
               const StatusIcon = statusBadge.icon;
 
               return (
-                <div key={r._id} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-secondary/20 transition-colors">
+                <div key={r._id} className="flex flex-col gap-3 p-4 transition-colors hover:bg-secondary/20 sm:p-5 md:flex-row md:items-center md:justify-between">
                   {/* Left: Thumbnail & Details */}
-                  <div className="flex items-start gap-4">
+                  <div className="flex min-w-0 items-start gap-3 sm:gap-4">
                     <img
                       src={r.bannerImage || r.event?.bannerImage || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=300'}
                       alt={r.headline}
                       className="w-24 h-16 sm:w-32 sm:h-20 object-cover rounded-xl border border-border shrink-0 shadow-xs"
                     />
 
-                    <div className="space-y-1">
+                    <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${statusBadge.bg}`}>
                           <StatusIcon className="h-3 w-3" />
@@ -542,11 +542,11 @@ export default function BannerSpotlightPage() {
                         {r.headline}
                       </h3>
 
-                      <p className="text-xs text-muted-foreground line-clamp-1 max-w-xl">
+                      <p className="max-w-2xl whitespace-normal break-words text-xs leading-relaxed text-muted-foreground">
                         {r.subheadline}
                       </p>
 
-                      <div className="flex items-center gap-3 text-[11px] text-muted-foreground pt-1">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-[11px] text-muted-foreground">
                         <span>Exhibition: <strong className="text-foreground">{r.event?.title || 'Unknown Event'}</strong></span>
                         {r.event?.city && <span>&bull; 📍 {r.event.city}</span>}
                         <span>&bull; Submitted: {new Date(r.createdAt).toLocaleDateString()}</span>

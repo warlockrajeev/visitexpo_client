@@ -1263,38 +1263,38 @@ export default function ExhibitorDiscoveryPage() {
     <div className="space-y-6 pb-20 sm:pb-24">
       
       {/* 1. Header & Live Credits Status Bar */}
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col justify-between gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5 md:flex-row md:items-center">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
-              <Compass className="h-7 w-7 text-primary" />
+            <h1 className="flex items-center gap-2 text-xl font-black tracking-tight text-foreground sm:text-2xl">
+              <Compass className="h-6 w-6 shrink-0 text-primary sm:h-7 sm:w-7" />
               <span>Exhibitor Discovery</span>
             </h1>
           </div>
 
-          <p className="text-xs text-muted-foreground mt-1 max-w-2xl leading-relaxed">
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
             Discover verified Indian and global trade exhibitors. Explore product catalogues, request booth demos, and connect directly with manufacturers for <strong>10 credits</strong> per enquiry.
           </p>
         </div>
 
         {/* Live Organizer Credit Balance Widget */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0">
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3.5 flex items-center gap-3 shadow-xs">
-            <div className="h-10 w-10 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0">
+        <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 shadow-xs">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 text-amber-500">
               <Coins className="h-5 w-5" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                 Organizer Credit Balance
               </div>
-              <div className="text-lg font-black text-foreground flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 text-lg font-black text-foreground">
                 <span>{userCredits}</span>
                 <span className="text-xs font-bold text-amber-600 dark:text-amber-400">Credits Available</span>
               </div>
             </div>
           </div>
 
-          <div className="flex sm:flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={handleTopUpCredits}

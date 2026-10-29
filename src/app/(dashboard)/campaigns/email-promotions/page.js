@@ -473,79 +473,79 @@ export default function EmailPromotionsPage() {
   // --------------------------------------------------------------------------
   if (!hasGrowthPlan) {
     return (
-      <div className="space-y-6">
+      <div className="mx-auto w-full max-w-5xl space-y-5">
         {/* Growth Plan Lock Hero Card */}
-        <div className="relative overflow-hidden rounded-3xl border border-border bg-card p-8 sm:p-12 shadow-sm">
-          <div className="max-w-2xl mx-auto text-center space-y-6 relative z-10">
+        <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-7">
+          <div className="relative z-10 mx-auto max-w-3xl space-y-4 text-center">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-xs font-extrabold uppercase tracking-wider">
               <Sparkles className="h-3.5 w-3.5" />
               <span>Exclusive Growth Plan Add-on</span>
             </div>
 
-            <div className="space-y-3">
-              <h1 className="text-3xl sm:text-4xl font-black text-foreground tracking-tight leading-tight">
+            <div className="space-y-2">
+              <h1 className="mx-auto max-w-2xl text-balance text-2xl font-black leading-tight tracking-tight text-foreground sm:text-3xl">
                 Unlock High-Impact Email Promotions to Leads, Visitors &amp; Followers
               </h1>
-              <p className="text-sm text-muted-foreground leading-relaxed">
+              <p className="mx-auto max-w-2xl text-xs leading-relaxed text-muted-foreground sm:text-sm">
                 Reach verified high-intent exhibition attendees directly in their inbox with high deliverability via VisitExpo&apos;s authenticated email relay (<code className="text-xs bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded font-mono">promotion@client.visitexpo.in</code>).
               </p>
             </div>
 
             {/* Feature Highlights Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left pt-2">
-              <div className="p-4 rounded-2xl bg-secondary/50 border border-border space-y-2">
-                <div className="h-8 w-8 rounded-xl bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-bold">
-                  🎯
+            <div className="grid grid-cols-1 items-stretch gap-3 pt-1 text-left sm:grid-cols-2 sm:gap-4">
+              <div className="flex h-full flex-col items-start gap-2 rounded-xl border border-border bg-secondary/40 p-4 transition-colors hover:bg-secondary/70">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-700 dark:text-indigo-300">
+                  <Target className="h-4 w-4" />
                 </div>
                 <h3 className="text-xs font-bold text-foreground">Target 4 High-Intent Audiences</h3>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
                   Broadcast to verified CRM Leads, Registered Trade Visitors, Event Followers, and Interested Attendees with automatic email deduplication.
                 </p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-secondary/50 border border-border space-y-2">
-                <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold">
-                  📬
+              <div className="flex h-full flex-col items-start gap-2 rounded-xl border border-border bg-secondary/40 p-4 transition-colors hover:bg-secondary/70">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <Server className="h-4 w-4" />
                 </div>
                 <h3 className="text-xs font-bold text-foreground">Verified SMTP Warm Relay</h3>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
                   Dispatched via <strong>nexus.herosite.pro:465</strong> for pristine inbox deliverability, bypass spam folders, and guarantee brand reputation.
                 </p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-secondary/50 border border-border space-y-2">
-                <div className="h-8 w-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold">
-                  🎨
+              <div className="flex h-full flex-col items-start gap-2 rounded-xl border border-border bg-secondary/40 p-4 transition-colors hover:bg-secondary/70">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                  <Award className="h-4 w-4" />
                 </div>
                 <h3 className="text-xs font-bold text-foreground">Branded Responsive Templates</h3>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
                   Modern email designs equipped with event banners, official verification tags, organizer contact cards, and custom Call-To-Action buttons.
                 </p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-secondary/50 border border-border space-y-2">
-                <div className="h-8 w-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center font-bold">
-                  📊
+              <div className="flex h-full flex-col items-start gap-2 rounded-xl border border-border bg-secondary/40 p-4 transition-colors hover:bg-secondary/70">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                  <TrendingUp className="h-4 w-4" />
                 </div>
                 <h3 className="text-xs font-bold text-foreground">Live Delivery &amp; Audit Logs</h3>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
                   Detailed recipient audit logs, test-email sandbox, and executive reporting synchronized directly with the platform admin console.
                 </p>
               </div>
             </div>
 
             {/* CTAs */}
-            <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <div className="flex flex-col items-stretch justify-center gap-2 pt-1 sm:flex-row sm:items-center sm:gap-3">
               <Link
                 href="/pricing"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-extrabold text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition-all active:scale-95"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-xs font-extrabold text-white shadow-md shadow-indigo-600/20 transition-all hover:bg-indigo-500 active:scale-95 sm:w-auto"
               >
                 <span>Upgrade to Growth Plan</span>
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
                 href="/chat"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-xs bg-secondary hover:bg-secondary/80 text-foreground border border-border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:translate-y-0"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-5 py-3 text-xs font-bold text-foreground shadow-sm transition-all hover:border-primary/40 hover:bg-secondary/80 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:w-auto"
               >
                 <span>Inquire With VisitExpo Team</span>
               </Link>
