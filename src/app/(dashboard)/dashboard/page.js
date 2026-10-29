@@ -2077,7 +2077,7 @@ function ExhibitorDashboard() {
   // Welcome / Onboarding Screen if no booth profile exists yet
   if (!profile || profiles.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto py-8 px-4 space-y-8">
+      <div className="dashboard-hover-effects max-w-4xl mx-auto py-8 px-4 space-y-8">
         {/* Welcome Hero Card */}
         <div className="bg-card border border-border rounded-3xl p-8 md:p-10 shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
@@ -2238,7 +2238,7 @@ function ExhibitorDashboard() {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-12">
+    <div className="dashboard-hover-effects space-y-6 max-w-6xl mx-auto pb-12">
       {/* Booth/Event Switcher & Add Booth Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card border border-border p-4 rounded-2xl shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-1 min-w-[280px]">

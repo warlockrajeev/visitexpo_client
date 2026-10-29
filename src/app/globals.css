@@ -97,6 +97,26 @@ button[aria-disabled="true"],
   cursor: not-allowed;
 }
 
+.dashboard-hover-effects :is(button:not(:disabled), a.inline-flex[class*="rounded"]) {
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+
+.dashboard-hover-effects :is(button:not(:disabled), a.inline-flex[class*="rounded"]):hover {
+  transform: translateY(-2px);
+  filter: brightness(1.04);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 12%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-hover-effects :is(button:not(:disabled), a.inline-flex[class*="rounded"]) {
+    transition: none;
+  }
+
+  .dashboard-hover-effects :is(button:not(:disabled), a.inline-flex[class*="rounded"]):hover {
+    transform: none;
+  }
+}
+
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));

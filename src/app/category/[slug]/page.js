@@ -38,6 +38,77 @@ import {
   ChevronRight
 } from 'lucide-react';
 
+const getPaginationItems = (currentPage, totalPages) => {
+  const pages = [...new Set([1, currentPage - 1, currentPage, currentPage + 1, totalPages]
+    .filter((page) => page >= 1 && page <= totalPages))]
+    .sort((a, b) => a - b);
+
+  return pages.reduce((items, page, index) => {
+    if (index > 0 && page - pages[index - 1] > 1) {
+      items.push({ type: 'ellipsis', key: `ellipsis-${pages[index - 1]}-${page}` });
+    }
+    items.push({ type: 'page', key: `page-${page}`, page });
+    return items;
+  }, []);
+};
+
+const parseEventDatePart = (value, inheritedDate = {}) => {
+  const cleanedValue = value.replace(/\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:day)?\b,?/gi, '');
+  const monthMatch = cleanedValue.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\b/i);
+  const dayNumbers = [...cleanedValue.matchAll(/\b(\d{1,2})\b/g)]
+    .map((match) => Number(match[1]))
+    .filter((day) => day >= 1 && day <= 31);
+  const yearMatch = cleanedValue.match(/\b(20\d{2})\b/);
+  const month = monthMatch
+    ? new Date(Date.parse(`${monthMatch[1]} 1, 2000`)).getMonth()
+    : inheritedDate.month;
+  const day = dayNumbers[0] ?? inheritedDate.day;
+  const year = yearMatch ? Number(yearMatch[1]) : inheritedDate.year;
+
+  if (month === undefined || day === undefined || year === undefined) return null;
+  const date = new Date(year, month, day);
+  return date.getFullYear() === year && date.getMonth() === month && date.getDate() === day
+    ? date
+    : null;
+};
+
+const getEventDateRange = (event) => {
+  const explicitStart = event.startDate ? new Date(event.startDate) : null;
+  const explicitEnd = event.endDate ? new Date(event.endDate) : null;
+  const startDate = explicitStart && !Number.isNaN(explicitStart.getTime()) ? explicitStart : null;
+  const endDate = explicitEnd && !Number.isNaN(explicitEnd.getTime()) ? explicitEnd : null;
+
+  if (startDate && endDate) return { start: startDate, end: endDate };
+
+  const dateText = (event.dates || '').replace(/\s+(?:-|–|—|to)\s+/i, ' | ');
+  const [startText, endText] = dateText.split(' | ');
+  const sharedMonth = dateText.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\b/i);
+  const sharedYear = dateText.match(/\b(20\d{2})\b/);
+  const sharedDateParts = {
+    ...(sharedMonth ? { month: new Date(Date.parse(`${sharedMonth[1]} 1, 2000`)).getMonth() } : {}),
+    ...(sharedYear ? { year: Number(sharedYear[1]) } : {})
+  };
+  const parsedStart = startText ? parseEventDatePart(startText, sharedDateParts) : null;
+  const parsedEnd = endText
+    ? parseEventDatePart(endText, {
+      ...sharedDateParts,
+      ...(parsedStart ? {
+        month: parsedStart.getMonth(),
+        year: parsedStart.getFullYear()
+      } : {})
+    })
+    : null;
+  const start = startDate || parsedStart || (parsedEnd && startText
+    ? parseEventDatePart(startText, {
+      month: parsedEnd.getMonth(),
+      year: parsedEnd.getFullYear()
+    })
+    : null);
+  const end = endDate || parsedEnd || start;
+
+  return { start, end };
+};
+
 export default function CategoryEventsPage() {
   const { user } = useAuth();
   const params = useParams();
@@ -58,20 +129,26 @@ export default function CategoryEventsPage() {
   const [selectedFormat, setSelectedFormat] = useState('all');
   const [selectedCountry, setSelectedCountry] = useState('all');
   const [selectedDateFilter, setSelectedDateFilter] = useState('all');
-  const [customDate, setCustomDate] = useState('');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   const [categorySearchQuery, setCategorySearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [showMoreAbout, setShowMoreAbout] = useState(false);
 
+  const hasCustomDateRange = Boolean(customStartDate || customEndDate);
   const getDateFilterLabel = () => {
-    if (customDate) {
-      try {
-        const d = new Date(customDate);
-        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      } catch (_) {
-        return customDate;
-      }
+    const formatDate = (value) => new Date(`${value}T00:00:00`).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+
+    if (customStartDate && customEndDate) {
+      return `${formatDate(customStartDate)} – ${formatDate(customEndDate)}`;
     }
+    if (customStartDate) return `From ${formatDate(customStartDate)}`;
+    if (customEndDate) return `Until ${formatDate(customEndDate)}`;
+
     switch (selectedDateFilter) {
       case 'this_month': return 'This Month';
       case 'next_month': return 'Next Month';
@@ -142,25 +219,7 @@ export default function CategoryEventsPage() {
   }, []);
 
   const parseEventDateTimestamp = (evt) => {
-    if (evt.startDate) {
-      const t = new Date(evt.startDate).getTime();
-      if (!isNaN(t)) return t;
-    }
-    const datesStr = evt.dates || '';
-    if (!datesStr) return Number.MAX_SAFE_INTEGER;
-
-    const withoutDay = datesStr.replace(/^[A-Za-z]+,\s*/, '');
-    const startPart = withoutDay.split('-')[0].trim();
-    const yearMatch = datesStr.match(/\b(202[4-9]|203[0-9])\b/);
-    const year = yearMatch ? yearMatch[1] : '2026';
-
-    let toParse = startPart;
-    if (!startPart.includes(year)) {
-      toParse = `${startPart} ${year}`;
-    }
-    const parsed = Date.parse(toParse);
-    if (!isNaN(parsed)) return parsed;
-    return Number.MAX_SAFE_INTEGER;
+    return getEventDateRange(evt).start?.getTime() ?? Number.MAX_SAFE_INTEGER;
   };
 
   // Filter and sort events based on selected format, country, date, and activeSort
@@ -206,16 +265,26 @@ export default function CategoryEventsPage() {
       if (selectedFormat === 'conferences' && !evt.tags?.includes('Conference')) return false;
       if (selectedCountry !== 'all' && (evt.country || '').toLowerCase() !== selectedCountry.toLowerCase()) return false;
 
-      // Date filtering
-      if (customDate) {
-        const evtDates = (evt.dates || '').toLowerCase();
-        const customYear = customDate.split('-')[0];
-        if (customYear && !evtDates.includes(customYear)) return false;
-      } else if (selectedDateFilter === 'this_month') {
-        const currentMonthName = new Date().toLocaleString('en-US', { month: 'short' }).toLowerCase();
-        if (!(evt.dates || '').toLowerCase().includes(currentMonthName)) return false;
-      } else if (selectedDateFilter === '2026') {
-        if (!(evt.dates || '').includes('2026')) return false;
+      const eventDateRange = getEventDateRange(evt);
+      if (customStartDate || customEndDate) {
+        const rangeStart = customStartDate ? new Date(`${customStartDate}T00:00:00`) : null;
+        const rangeEnd = customEndDate ? new Date(`${customEndDate}T23:59:59.999`) : null;
+        if (!eventDateRange.start || !eventDateRange.end) return false;
+        if (rangeStart && eventDateRange.end < rangeStart) return false;
+        if (rangeEnd && eventDateRange.start > rangeEnd) return false;
+      } else if (selectedDateFilter !== 'all') {
+        const now = new Date();
+        const presetRanges = {
+          this_month: [new Date(now.getFullYear(), now.getMonth(), 1), new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)],
+          next_month: [new Date(now.getFullYear(), now.getMonth() + 1, 1), new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59, 999)],
+          next_3_months: [new Date(now.getFullYear(), now.getMonth(), now.getDate()), new Date(now.getFullYear(), now.getMonth() + 3, now.getDate(), 23, 59, 59, 999)],
+          2026: [new Date(2026, 0, 1), new Date(2027, 11, 31, 23, 59, 59, 999)]
+        };
+        const presetRange = presetRanges[selectedDateFilter];
+        if (presetRange && (!eventDateRange.start || !eventDateRange.end
+          || eventDateRange.end < presetRange[0] || eventDateRange.start > presetRange[1])) {
+          return false;
+        }
       }
 
       return true;
@@ -235,7 +304,7 @@ export default function CategoryEventsPage() {
     }
 
     return filtered;
-  }, [category, liveEvents, slug, selectedFormat, selectedCountry, selectedDateFilter, customDate, activeSort]);
+  }, [category, liveEvents, slug, selectedFormat, selectedCountry, selectedDateFilter, customStartDate, customEndDate, activeSort]);
 
   const EVENTS_PER_PAGE = 5;
   const totalPages = Math.max(1, Math.ceil(filteredEvents.length / EVENTS_PER_PAGE));
@@ -251,9 +320,10 @@ export default function CategoryEventsPage() {
     const start = (currentPage - 1) * EVENTS_PER_PAGE;
     return filteredEvents.slice(start, start + EVENTS_PER_PAGE);
   }, [filteredEvents, currentPage]);
+  const paginationItems = getPaginationItems(currentPage, totalPages);
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-zinc-900 font-sans antialiased selection:bg-[#FF2E63] selection:text-white">
+    <div className="min-h-screen w-full min-w-0 bg-[#F8F9FA] text-zinc-900 font-sans antialiased selection:bg-[#FF2E63] selection:text-white">
       {/* Top Navigation */}
       <Navbar />
 
@@ -269,7 +339,7 @@ export default function CategoryEventsPage() {
       {/* 1. TOP SUB-NAV BAR (Events | Companies | People) (VisitExpo Theme)        */}
       {/* ========================================================================= */}
       <div className="bg-white border-b border-zinc-200 pt-20 sm:pt-22">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-6 text-xs sm:text-sm font-bold -mb-px">
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-4 px-4 text-xs font-bold -mb-px sm:gap-6 sm:px-6 sm:text-sm">
           {[
             { id: 'events', label: 'Events', icon: CalendarIcon },
             { id: 'companies', label: 'Companies', icon: Building },
@@ -302,20 +372,22 @@ export default function CategoryEventsPage() {
       {/* ========================================================================= */}
       {/* 2. CATEGORY HERO BANNER (Compact, Space-Efficient Design)                 */}
       {/* ========================================================================= */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-3">
+      <div className="mx-auto w-full max-w-7xl px-4 pt-3 sm:px-6">
         <div className="relative rounded-xl overflow-hidden bg-zinc-950 text-white shadow-xs">
-          {/* Background Auditorium Crowd Image with Dark Overlay */}
+          {/* Category image stays visible while the gradient keeps banner text readable. */}
           <img
             src={category.heroBanner}
             alt={category.name}
-            className="absolute inset-0 w-full h-full object-cover opacity-25"
+            loading="eager"
+            fetchPriority="high"
+            className="absolute inset-0 h-full w-full object-cover object-[center_45%] opacity-100"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/80 to-black/55" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/45 to-black/20" />
 
           {/* Banner Content & Controls - Sleek & Compact */}
           <div className="relative z-10 px-4 py-3 sm:px-6 sm:py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="space-y-0.5 min-w-0">
-              <h1 className="text-lg sm:text-xl md:text-2xl font-extrabold tracking-tight text-white leading-tight truncate">
+              <h1 className="text-lg sm:text-xl md:text-2xl font-extrabold tracking-tight text-white leading-tight break-words">
                 {category.name}
               </h1>
 
@@ -361,13 +433,13 @@ export default function CategoryEventsPage() {
       {/* ========================================================================= */}
       {/* 3. TWO-COLUMN MAIN CONTAINER (LEFT FILTERS, RIGHT EVENTS FEED)            */}
       {/* ========================================================================= */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-5">
+        <div className="grid min-w-0 grid-cols-1 items-start gap-5 sm:gap-8 lg:grid-cols-12">
           
           {/* ===================================================================== */}
           {/* LEFT SIDEBAR: FILTERS & MATCHMAKING (4 of 12 cols) (Screenshots 1-3)  */}
           {/* ===================================================================== */}
-          <div className="lg:col-span-4 space-y-4">
+          <div className="min-w-0 space-y-4 lg:col-span-4">
             
             {/* 1. Auth Status Callout */}
             {!user ? (
@@ -447,11 +519,11 @@ export default function CategoryEventsPage() {
 
                   {/* Prominently Highlighted, High-Contrast Select Date Badge */}
                   <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all duration-200 shadow-xs cursor-pointer group-hover:scale-103 ${
-                    selectedDateFilter !== 'all' || customDate
+                    selectedDateFilter !== 'all' || hasCustomDateRange
                       ? 'bg-[#FF2E63] text-white border border-[#FF2E63] ring-2 ring-rose-500/20 shadow-rose-500/25'
                       : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 border border-amber-400 ring-2 ring-amber-300/40'
                   }`}>
-                    <CalendarIcon className={`h-3.5 w-3.5 ${selectedDateFilter !== 'all' || customDate ? 'text-white' : 'text-zinc-950'}`} />
+                    <CalendarIcon className={`h-3.5 w-3.5 ${selectedDateFilter !== 'all' || hasCustomDateRange ? 'text-white' : 'text-zinc-950'}`} />
                     <span className="tracking-tight">{getDateFilterLabel()}</span>
                     <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openSections.calendar ? 'rotate-180' : ''}`} />
                   </span>
@@ -467,7 +539,7 @@ export default function CategoryEventsPage() {
                         { id: 'next_3_months', label: 'Next 3 Months' },
                         { id: '2026', label: 'Later in 2026 - 2027' }
                       ].map((item) => {
-                        const isSelected = selectedDateFilter === item.id && !customDate;
+                        const isSelected = selectedDateFilter === item.id && !hasCustomDateRange;
                         return (
                           <label
                             key={item.id}
@@ -484,9 +556,11 @@ export default function CategoryEventsPage() {
                                 checked={isSelected}
                                 onChange={() => {
                                   setSelectedDateFilter(item.id);
-                                  setCustomDate('');
+                                  setCustomStartDate('');
+                                  setCustomEndDate('');
+                                  setCurrentPage(1);
                                 }}
-                                className="accent-[#FF2E63] text-[#FF2E63] focus:ring-[#FF2E63]"
+                                className="h-4 w-4 shrink-0 accent-[#FF2E63] focus:ring-[#FF2E63]"
                               />
                               <span>{item.label}</span>
                             </div>
@@ -495,34 +569,66 @@ export default function CategoryEventsPage() {
                       })}
                     </div>
 
-                    {/* Specific Date Picker Input */}
-                    <div className="pt-2 border-t border-zinc-100">
-                      <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">
-                        Or Pick Specific Date
-                      </label>
-                      <input
-                        type="date"
-                        value={customDate}
-                        onChange={(e) => {
-                          setCustomDate(e.target.value);
-                          if (e.target.value) {
-                            setSelectedDateFilter('custom');
-                          }
-                        }}
-                        className="w-full rounded-lg border border-zinc-200 bg-zinc-50 p-2 text-xs text-zinc-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#FF2E63]"
-                      />
+                    {/* Custom date range */}
+                    <div className="space-y-2.5 border-t border-zinc-100 pt-3">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                        Or choose a date range
+                      </p>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <label className="block min-w-0 space-y-1">
+                          <span className="block text-[11px] font-semibold text-zinc-600">Start date</span>
+                          <input
+                            type="date"
+                            value={customStartDate}
+                            max={customEndDate || undefined}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setCustomStartDate(value);
+                              setSelectedDateFilter(value || customEndDate ? 'custom' : 'all');
+                              setCurrentPage(1);
+                              if (value && customEndDate && value > customEndDate) {
+                                setCustomEndDate('');
+                              }
+                            }}
+                            className="block w-full min-w-0 rounded-lg border border-zinc-200 bg-white px-2.5 py-2 text-xs text-zinc-900 shadow-sm outline-none transition focus:border-[#FF2E63] focus:ring-2 focus:ring-rose-100"
+                          />
+                        </label>
+                        <label className="block min-w-0 space-y-1">
+                          <span className="block text-[11px] font-semibold text-zinc-600">End date</span>
+                          <input
+                            type="date"
+                            value={customEndDate}
+                            min={customStartDate || undefined}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setCustomEndDate(value);
+                              setSelectedDateFilter(value || customStartDate ? 'custom' : 'all');
+                              setCurrentPage(1);
+                              if (value && customStartDate && value < customStartDate) {
+                                setCustomStartDate('');
+                              }
+                            }}
+                            className="block w-full min-w-0 rounded-lg border border-zinc-200 bg-white px-2.5 py-2 text-xs text-zinc-900 shadow-sm outline-none transition focus:border-[#FF2E63] focus:ring-2 focus:ring-rose-100"
+                          />
+                        </label>
+                      </div>
+                      <p className="text-[10px] leading-relaxed text-zinc-500">
+                        Events that overlap the selected dates will be shown.
+                      </p>
                     </div>
 
-                    {(selectedDateFilter !== 'all' || customDate) && (
+                    {(selectedDateFilter !== 'all' || hasCustomDateRange) && (
                       <button
                         type="button"
                         onClick={() => {
                           setSelectedDateFilter('all');
-                          setCustomDate('');
+                          setCustomStartDate('');
+                          setCustomEndDate('');
+                          setCurrentPage(1);
                         }}
-                        className="w-full text-center text-[11px] font-bold text-[#FF2E63] hover:underline pt-0.5 cursor-pointer"
+                        className="inline-flex w-full items-center justify-center rounded-lg border border-zinc-200 px-3 py-2 text-[11px] font-bold text-zinc-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-[#FF2E63]"
                       >
-                        Reset Date Filter ✕
+                        Clear date filter
                       </button>
                     )}
                   </div>
@@ -805,10 +911,10 @@ export default function CategoryEventsPage() {
           {/* ===================================================================== */}
           {/* RIGHT COLUMN: EVENTS FEED & PAGINATION (8 of 12 cols)                */}
           {/* ===================================================================== */}
-          <div className="lg:col-span-8 space-y-5">
+          <div className="min-w-0 space-y-5 lg:col-span-8">
             
             {/* Sort Controls & Pagination Top Bar (Screenshot 1) */}
-            <div className="flex items-center justify-between bg-white border border-zinc-200 rounded-xl p-2.5 px-4 shadow-2xs text-xs">
+            <div className="flex min-w-0 flex-col gap-2 rounded-xl border border-zinc-200 bg-white p-2.5 px-4 text-xs shadow-2xs sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2 font-bold">
                 <button
                   type="button"
@@ -841,7 +947,7 @@ export default function CategoryEventsPage() {
               </div>
 
               {/* Quick Pagination */}
-              <div className="flex items-center gap-1 font-bold text-xs">
+              <div className="flex max-w-full items-center gap-1 font-bold text-xs sm:justify-end">
                 {totalPages > 1 && (
                   <button
                     type="button"
@@ -855,16 +961,20 @@ export default function CategoryEventsPage() {
                     «
                   </button>
                 )}
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
+                {paginationItems.map((item) => item.type === 'ellipsis' ? (
+                  <span key={item.key} aria-hidden="true" className="px-1 text-zinc-400">…</span>
+                ) : (
                   <button
-                    key={pg}
+                    key={item.key}
                     type="button"
-                    onClick={() => setCurrentPage(pg)}
-                    className={`h-7 w-7 rounded flex items-center justify-center transition-colors cursor-pointer text-xs font-bold ${
-                      currentPage === pg ? 'bg-zinc-900 text-white shadow-xs' : 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50'
+                    aria-label={`Go to page ${item.page}`}
+                    aria-current={currentPage === item.page ? 'page' : undefined}
+                    onClick={() => setCurrentPage(item.page)}
+                    className={`h-7 w-7 shrink-0 rounded flex items-center justify-center transition-colors cursor-pointer text-xs font-bold ${
+                      currentPage === item.page ? 'bg-zinc-900 text-white shadow-xs' : 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50'
                     }`}
                   >
-                    {pg}
+                    {item.page}
                   </button>
                 ))}
                 {totalPages > 1 && (
@@ -1000,7 +1110,8 @@ export default function CategoryEventsPage() {
                       setSelectedFormat('all');
                       setSelectedCountry('all');
                       setSelectedDateFilter('all');
-                      setCustomDate('');
+                      setCustomStartDate('');
+                      setCustomEndDate('');
                       setCurrentPage(1);
                     }}
                     className="px-4 py-2 rounded-lg bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-bold text-xs transition-colors cursor-pointer"
@@ -1056,7 +1167,7 @@ export default function CategoryEventsPage() {
 
             {/* Bottom Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-end gap-1.5 pt-2">
+              <div className="flex flex-wrap items-center justify-end gap-1.5 pt-2">
                 <button
                   type="button"
                   disabled={currentPage === 1}
@@ -1068,19 +1179,23 @@ export default function CategoryEventsPage() {
                 >
                   « Prev
                 </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
+                {paginationItems.map((item) => item.type === 'ellipsis' ? (
+                  <span key={item.key} aria-hidden="true" className="px-1 text-zinc-400">…</span>
+                ) : (
                   <button
-                    key={pg}
+                    key={item.key}
                     type="button"
+                    aria-label={`Go to page ${item.page}`}
+                    aria-current={currentPage === item.page ? 'page' : undefined}
                     onClick={() => {
-                      setCurrentPage(pg);
+                      setCurrentPage(item.page);
                       window.scrollTo({ top: 400, behavior: 'smooth' });
                     }}
-                    className={`h-8 w-8 rounded-lg flex items-center justify-center font-bold text-xs transition-colors cursor-pointer ${
-                      currentPage === pg ? 'bg-zinc-900 text-white shadow-xs' : 'border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+                    className={`h-8 w-8 shrink-0 rounded-lg flex items-center justify-center font-bold text-xs transition-colors cursor-pointer ${
+                      currentPage === item.page ? 'bg-zinc-900 text-white shadow-xs' : 'border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
                     }`}
                   >
-                    {pg}
+                    {item.page}
                   </button>
                 ))}
                 <button

@@ -61,6 +61,35 @@ const API_URL =
     ? 'https://api.visitexpo.in/api'
     : 'http://localhost:5000/api');
 
+const TICKET_NAME_PATTERN = /^[\p{L}\p{N}][\p{L}\p{M}\p{N}\s.,&'()\-/#]*$/u;
+
+const validateTierTitle = (value) => {
+  const title = value.trim();
+  if (!title) return 'Ticket name is required.';
+  if (!TICKET_NAME_PATTERN.test(title)) {
+    return 'Use letters, numbers, spaces, and common punctuation only.';
+  }
+  if (title.length < 3 || title.length > 100) {
+    return 'Ticket name must be between 3 and 100 characters.';
+  }
+  if (!/[\p{L}]/u.test(title)) {
+    return 'Ticket name must include at least one letter.';
+  }
+  return '';
+};
+
+const validateTierDescription = (value) => {
+  const description = value.trim();
+  if (!description) return '';
+  if (!/[\p{L}]/u.test(description)) {
+    return 'Description must contain meaningful text with at least one letter.';
+  }
+  if (description.length < 3 || description.length > 500) {
+    return 'Description must be between 3 and 500 characters.';
+  }
+  return '';
+};
+
 export default function TicketingPage() {
   const { user, accessToken } = useAuth();
 
@@ -433,17 +462,10 @@ export default function TicketingPage() {
     const description = newTier.description.trim();
     const capacity = Number(newTier.capacity);
     const price = Number(newTier.price);
-    const tierTextPattern = /^[\p{L}\p{N}][\p{L}\p{M}\p{N}\s.,&'()\-/#]*$/u;
-
-    if (!title) {
-      errors.title = 'Ticket name is required.';
-    } else if (title.length < 3 || title.length > 100 || !/[\p{L}]/u.test(title) || !tierTextPattern.test(title)) {
-      errors.title = 'Enter a valid ticket name (3–100 characters, starting with a letter or number).';
-    }
-
-    if (description && (description.length < 3 || description.length > 500 || !/[\p{L}]/u.test(description))) {
-      errors.description = 'Description must contain readable text and be no more than 500 characters.';
-    }
+    const titleError = validateTierTitle(title);
+    const descriptionError = validateTierDescription(description);
+    if (titleError) errors.title = titleError;
+    if (descriptionError) errors.description = descriptionError;
 
     if (!Number.isInteger(capacity) || capacity < 1) {
       errors.capacity = 'Capacity must be a whole number greater than 0.';
@@ -1921,9 +1943,14 @@ export default function TicketingPage() {
                   type="text"
                   value={newTier.title}
                   onChange={(e) => {
-                    setNewTier(prev => ({ ...prev, title: e.target.value }));
-                    setTierFormErrors(prev => ({ ...prev, title: '' }));
+                    const title = e.target.value;
+                    setNewTier(prev => ({ ...prev, title }));
+                    setTierFormErrors(prev => ({
+                      ...prev,
+                      title: title.trim() ? validateTierTitle(title) : (prev.title ? validateTierTitle(title) : '')
+                    }));
                   }}
+                  maxLength={100}
                   aria-invalid={Boolean(tierFormErrors.title)}
                   aria-describedby={tierFormErrors.title ? 'tier-title-error' : undefined}
                   className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary ${tierFormErrors.title ? 'border-destructive' : 'border-border'}`}
@@ -1938,9 +1965,16 @@ export default function TicketingPage() {
                   rows={2}
                   value={newTier.description}
                   onChange={(e) => {
-                    setNewTier(prev => ({ ...prev, description: e.target.value }));
-                    setTierFormErrors(prev => ({ ...prev, description: '' }));
+                    const description = e.target.value;
+                    setNewTier(prev => ({ ...prev, description }));
+                    setTierFormErrors(prev => ({
+                      ...prev,
+                      description: description.trim()
+                        ? validateTierDescription(description)
+                        : (prev.description ? validateTierDescription(description) : '')
+                    }));
                   }}
+                  maxLength={500}
                   aria-invalid={Boolean(tierFormErrors.description)}
                   aria-describedby={tierFormErrors.description ? 'tier-description-error' : undefined}
                   className={`w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none placeholder:text-muted-foreground ${tierFormErrors.description ? 'border-destructive' : 'border-border'}`}

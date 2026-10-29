@@ -944,7 +944,7 @@ export default function EventsDirectoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-zinc-900 font-sans antialiased selection:bg-[#FFCC00] selection:text-zinc-950 pb-10 sm:pb-12">
+    <div className="flex min-h-screen flex-col bg-[#F8F9FA] text-zinc-900 font-sans antialiased selection:bg-[#FFCC00] selection:text-zinc-950">
       {/* Universal Navbar */}
       <Navbar solid={true} />
 
@@ -1447,7 +1447,7 @@ export default function EventsDirectoryPage() {
       </header>
 
       {/* Main Content Area - Event Cards Grid starts right here! */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-5">
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col space-y-5 px-4 pb-6 pt-6 sm:px-6 sm:pb-8">
         <div id="events-grid-anchor" className="scroll-mt-4" />
 
         {/* Top 10 Rated Active Banner */}
