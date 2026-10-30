@@ -23,7 +23,6 @@ import {
   Ticket,
   ArrowRight,
   Check,
-  CheckCircle2,
   SlidersHorizontal,
   LocateFixed,
   Loader2,
@@ -32,9 +31,7 @@ import {
   Building,
   Users,
   Compass,
-  Bookmark,
   Share2,
-  RefreshCw,
   Clock,
   Navigation,
   X
@@ -90,6 +87,7 @@ const CATEGORY_IMAGES = {
 };
 
 const DEFAULT_BANNER = 'https://visitexpo.in/wp-content/uploads/2026/08/ET-TECH-X-2026_new.jpg';
+const EMPTY_DEFAULT_INTERESTS = [];
 
 function getLocalFallbackEvents(locations = [], interests = [], maxCount = 6) {
   if (typeof window === 'undefined') return [];
@@ -151,7 +149,7 @@ export default function RecommendationEngineSection({
   title = 'Recommended For You',
   subtitle = 'Personalized exhibition discovery powered by your location and industry interests.',
   defaultLocation = '',
-  defaultInterests = [],
+  defaultInterests = EMPTY_DEFAULT_INTERESTS,
   limit = 6,
   compact = false
 }) {
@@ -187,8 +185,6 @@ export default function RecommendationEngineSection({
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [criteria, setCriteria] = useState(null);
-  const [savingPreferences, setSavingPreferences] = useState(false);
-  const [savedSuccess, setSavedSuccess] = useState(false);
   const [activeScoreTooltip, setActiveScoreTooltip] = useState(null);
 
   // Close score breakdown tooltip when clicking outside or pressing Escape
@@ -383,43 +379,6 @@ export default function RecommendationEngineSection({
     }
   };
 
-  // Save preferences to backend & localStorage
-  const handleSavePreferences = async () => {
-    setSavingPreferences(true);
-    try {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(
-          'visitexpo_user_preferences',
-          JSON.stringify({
-            locations: selectedLocations,
-            interests: selectedInterests
-          })
-        );
-      }
-
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      if (token && user) {
-        await axios.post(
-          `${API_URL}/events/recommendations/preferences`,
-          {
-            interests: selectedInterests,
-            preferredLocations: selectedLocations
-          },
-          {
-            headers: { Authorization: `Bearer ${token}` }
-          }
-        );
-      }
-
-      setSavedSuccess(true);
-      setTimeout(() => setSavedSuccess(false), 2500);
-    } catch (err) {
-      console.warn('Failed to save preferences:', err);
-    } finally {
-      setSavingPreferences(false);
-    }
-  };
-
   // Helper: Format event dates
   const formatEventDate = (startDate, endDate) => {
     if (!startDate) return 'Dates TBA';
@@ -486,36 +445,6 @@ export default function RecommendationEngineSection({
 
           {/* Quick Actions & Preferences */}
           <div className="flex flex-wrap items-center gap-2.5">
-            {/* Save Preferences Button */}
-            <button
-              type="button"
-              onClick={handleSavePreferences}
-              disabled={savingPreferences}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${
-                savedSuccess
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-white border border-zinc-200 text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50'
-              }`}
-              title="Save current filters to your profile for future visits"
-            >
-              {savedSuccess ? (
-                <>
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  <span>Preferences Saved</span>
-                </>
-              ) : savingPreferences ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-500" />
-                  <span>Saving...</span>
-                </>
-              ) : (
-                <>
-                  <Bookmark className="h-3.5 w-3.5 text-amber-500" />
-                  <span>Save For Me</span>
-                </>
-              )}
-            </button>
-
             {/* Timeframe Selector */}
             <div className="flex items-center bg-white border border-zinc-200 rounded-xl p-1 shadow-2xs text-xs font-semibold text-zinc-600">
               <button
@@ -538,15 +467,6 @@ export default function RecommendationEngineSection({
               </button>
             </div>
 
-            {/* Refresh */}
-            <button
-              type="button"
-              onClick={fetchRecommendations}
-              className="p-2 rounded-xl bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 hover:text-zinc-950 transition-colors shadow-2xs cursor-pointer"
-              title="Refresh recommendations"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-primary' : ''}`} />
-            </button>
           </div>
         </div>
 
@@ -729,11 +649,30 @@ export default function RecommendationEngineSection({
               const scoreGradient = getMatchScoreColor(score);
               const breakdown = ev.scoreBreakdown || {};
               const isTooltipOpen = Boolean(eventId && activeScoreTooltip === eventId);
+              const eventHref = `/expo/${ev.slug || ev.id || ev._id}`;
+              const openEventDetails = () => {
+                try {
+                  sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(ev));
+                } catch (_) {}
+                router.push(eventHref);
+              };
 
               return (
                 <div
                   key={ev._id || ev.id || ev.slug}
-                  className="group bg-white border border-zinc-200 rounded-2xl overflow-hidden hover:border-zinc-300 hover:shadow-xl transition-all duration-300 flex flex-col justify-between relative"
+                  role="link"
+                  tabIndex={0}
+                  aria-label={`View details for ${ev.title}`}
+                  onClick={(e) => {
+                    if (e.target.closest('a, button')) return;
+                    openEventDetails();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+                    e.preventDefault();
+                    openEventDetails();
+                  }}
+                  className="group relative flex cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border border-zinc-200 bg-white transition-all duration-300 hover:border-zinc-300 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
                 >
                   {/* Top Image Banner */}
                   <div className="relative h-48 w-full bg-zinc-100 overflow-hidden">
@@ -839,7 +778,7 @@ export default function RecommendationEngineSection({
                       {/* Event Title */}
                       <h3 className="font-extrabold text-sm sm:text-base text-zinc-900 group-hover:text-[#FF2E63] transition-colors line-clamp-2 leading-tight">
                         <Link
-                          href={`/expo/${ev.slug || ev.id || ev._id}`}
+                          href={eventHref}
                           onClick={() => {
                             try {
                               sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(ev));
@@ -872,7 +811,7 @@ export default function RecommendationEngineSection({
                     {/* Action Bar */}
                     <div className="pt-3 border-t border-zinc-100 flex items-center justify-between gap-2">
                       <Link
-                        href={`/expo/${ev.slug || ev.id || ev._id}`}
+                        href={eventHref}
                         onClick={() => {
                           try {
                             sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(ev));
@@ -899,7 +838,7 @@ export default function RecommendationEngineSection({
                         </Link>
                         <span className="text-zinc-300">•</span>
                         <Link
-                          href={`/expo/${ev.slug || ev.id || ev._id}`}
+                          href={eventHref}
                           onClick={() => {
                             try {
                               sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(ev));

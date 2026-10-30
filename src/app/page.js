@@ -42,7 +42,6 @@ import {
   Headphones,
   QrCode,
   Award,
-  Send,
   Check,
   HelpCircle,
   X,
@@ -205,10 +204,6 @@ export default function LandingPage() {
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
   const [userCityName, setUserCityName] = useState('');
-
-  // Newsletter & Sidebar Widgets State
-  const [newsletterEmail, setNewsletterEmail] = useState('');
-  const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
 
   // Claim Quick Search State
   const [claimSearch, setClaimSearch] = useState('');
@@ -594,27 +589,6 @@ export default function LandingPage() {
   const trendingEvents = useMemo(() => {
     return [...enrichedEvents].sort((a, b) => b.interestedCount - a.interestedCount).slice(0, 3);
   }, [enrichedEvents]);
-
-  const handleNewsletterSubmit = async (e) => {
-    e.preventDefault();
-    if (!newsletterEmail.trim()) return;
-    const emailToSubmit = newsletterEmail.trim();
-    setNewsletterSubscribed(true);
-    showToast('Subscribed! You will receive weekly exhibition alerts in your inbox.');
-    setNewsletterEmail('');
-    try {
-      await axios.post(`${API_URL}/contact`, {
-        role: 'Subscriber',
-        name: 'Newsletter Subscriber',
-        email: emailToSubmit,
-        phone: '',
-        message: 'Subscribed to weekly exhibition alerts and trade updates from landing page newsletter form.',
-        source: 'newsletter'
-      });
-    } catch (err) {
-      console.warn('Newsletter API background sync notice:', err);
-    }
-  };
 
   // Get Pass Handler with SweetAlert Confirmation Modal
   const handleGetPass = async (expo) => {
@@ -1216,78 +1190,90 @@ export default function LandingPage() {
       {/* ========================================================================= */}
       {/* 3. THREE PERSONA ONBOARDING CARDS                                         */}
       {/* ========================================================================= */}
-      <section className="py-10 max-w-6xl mx-auto px-4 sm:px-6">
-        <div className="text-center max-w-2xl mx-auto mb-10 space-y-2">
+      <section className="pt-5 pb-6 sm:pt-6 sm:pb-8 max-w-6xl mx-auto px-4 sm:px-6">
+        <div className="text-center max-w-2xl mx-auto mb-6 space-y-2">
           <h2 className="text-2xl font-bold tracking-tight text-zinc-900">How would you like to participate?</h2>
           <p className="text-xs sm:text-sm text-zinc-500">VisitExpo bridges organizers, exhibitors, and trade visitors on a single platform.</p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid items-stretch gap-4 md:grid-cols-3 md:gap-5">
           
           {/* Organizers Card */}
-          <div className="bg-white border border-zinc-200 rounded-2xl p-6 flex flex-col justify-between hover:border-amber-400 transition-colors shadow-xs">
-            <div className="space-y-3">
-              <div className="h-10 w-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-200">
-                <Building className="h-5 w-5" />
+          <div className="group relative flex h-full min-h-[220px] flex-col justify-between overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50/80 via-white to-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-amber-300 hover:shadow-lg hover:shadow-amber-900/5 sm:p-6">
+            <div aria-hidden="true" className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-amber-200/25 blur-2xl transition-colors group-hover:bg-amber-300/35" />
+            <div className="relative space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-amber-200 bg-white text-amber-600 shadow-sm transition-transform duration-300 group-hover:scale-105">
+                  <Building className="h-5 w-5" />
+                </div>
+                <span className="rounded-full bg-amber-100/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-800">Organize</span>
               </div>
-              <h3 className="text-base font-bold text-zinc-900">For Organizers</h3>
-              <p className="text-xs text-zinc-600 leading-relaxed">
+              <div className="space-y-2">
+                <h3 className="text-base font-bold tracking-tight text-zinc-900">For Organizers</h3>
+                <p className="text-xs leading-relaxed text-zinc-600 sm:text-[13px]">
                 Claim your pre-loaded exhibition listing from visitexpo.in, configure tickets, publish interactive booth maps, and sync attendees in real-time.
-              </p>
+                </p>
+              </div>
             </div>
-            <div className="pt-6">
-              <Link
-                href={user ? '/dashboard' : '/login?role=organizer&signup=true'}
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-600 hover:text-amber-700"
-              >
+            <Link
+              href={user ? '/dashboard' : '/login?role=organizer&signup=true'}
+              className="relative mt-5 inline-flex w-full items-center justify-between rounded-xl border border-amber-200/80 bg-white/80 px-3.5 py-2.5 text-xs font-bold text-amber-800 transition-all hover:border-amber-300 hover:bg-amber-100/70"
+            >
                 <span>{user ? 'Open Organizer Hub' : 'Onboard as Organizer'}</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
+                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+            </Link>
           </div>
 
           {/* Exhibitors Card */}
-          <div className="bg-white border border-zinc-200 rounded-2xl p-6 flex flex-col justify-between hover:border-pink-300 transition-colors shadow-xs">
-            <div className="space-y-3">
-              <div className="h-10 w-10 rounded-xl bg-pink-50 text-[#FF2E63] flex items-center justify-center border border-pink-200">
-                <Store className="h-5 w-5" />
+          <div className="group relative flex h-full min-h-[220px] flex-col justify-between overflow-hidden rounded-2xl border border-pink-200/80 bg-gradient-to-br from-pink-50/70 via-white to-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-pink-300 hover:shadow-lg hover:shadow-pink-900/5 sm:p-6">
+            <div aria-hidden="true" className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-pink-200/25 blur-2xl transition-colors group-hover:bg-pink-300/35" />
+            <div className="relative space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-pink-200 bg-white text-[#FF2E63] shadow-sm transition-transform duration-300 group-hover:scale-105">
+                  <Store className="h-5 w-5" />
+                </div>
+                <span className="rounded-full bg-pink-100/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-pink-800">Exhibit</span>
               </div>
-              <h3 className="text-base font-bold text-zinc-900">For Exhibitors</h3>
-              <p className="text-xs text-zinc-600 leading-relaxed">
+              <div className="space-y-2">
+                <h3 className="text-base font-bold tracking-tight text-zinc-900">For Exhibitors</h3>
+                <p className="text-xs leading-relaxed text-zinc-600 sm:text-[13px]">
                 Reserve prime booth spaces, manage your digital product catalog, register booth staff, and scan visitor leads via QR.
-              </p>
+                </p>
+              </div>
             </div>
-            <div className="pt-6">
-              <Link
-                href={user ? '/dashboard' : '/login?role=exhibitor&signup=true'}
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-[#FF2E63] hover:text-[#E82054]"
-              >
+            <Link
+              href={user ? '/dashboard' : '/login?role=exhibitor&signup=true'}
+              className="relative mt-5 inline-flex w-full items-center justify-between rounded-xl border border-pink-200/80 bg-white/80 px-3.5 py-2.5 text-xs font-bold text-[#D91F50] transition-all hover:border-pink-300 hover:bg-pink-100/70"
+            >
                 <span>{user ? 'Open Exhibitor Hub' : 'Register as Exhibitor'}</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
+                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+            </Link>
           </div>
 
           {/* Visitors Card */}
-          <div className="bg-white border border-zinc-200 rounded-2xl p-6 flex flex-col justify-between hover:border-zinc-300 transition-colors shadow-xs">
-            <div className="space-y-3">
-              <div className="h-10 w-10 rounded-xl bg-zinc-100 text-zinc-700 flex items-center justify-center border border-zinc-200">
-                <Ticket className="h-5 w-5" />
+          <div className="group relative flex h-full min-h-[220px] flex-col justify-between overflow-hidden rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50/70 via-white to-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-sky-300 hover:shadow-lg hover:shadow-sky-900/5 sm:p-6">
+            <div aria-hidden="true" className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-sky-200/25 blur-2xl transition-colors group-hover:bg-sky-300/35" />
+            <div className="relative space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-sky-200 bg-white text-sky-700 shadow-sm transition-transform duration-300 group-hover:scale-105">
+                  <Ticket className="h-5 w-5" />
+                </div>
+                <span className="rounded-full bg-sky-100/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-sky-800">Discover</span>
               </div>
-              <h3 className="text-base font-bold text-zinc-900">For Visitors &amp; Buyers</h3>
-              <p className="text-xs text-zinc-600 leading-relaxed">
+              <div className="space-y-2">
+                <h3 className="text-base font-bold tracking-tight text-zinc-900">For Visitors &amp; Buyers</h3>
+                <p className="text-xs leading-relaxed text-zinc-600 sm:text-[13px]">
                 Discover upcoming trade exhibitions across India and worldwide, get free visitor badges, and schedule B2B meetings.
-              </p>
+                </p>
+              </div>
             </div>
-            <div className="pt-6">
-              <Link
-                href="/events"
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-800 hover:text-zinc-950"
-              >
+            <Link
+              href="/events"
+              className="relative mt-5 inline-flex w-full items-center justify-between rounded-xl border border-sky-200/80 bg-white/80 px-3.5 py-2.5 text-xs font-bold text-sky-900 transition-all hover:border-sky-300 hover:bg-sky-100/70"
+            >
                 <span>Explore All Events</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
+                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+            </Link>
           </div>
 
         </div>
@@ -1360,9 +1346,9 @@ export default function LandingPage() {
                 type="button"
                 onClick={handleToggleNearby}
                 disabled={isDetectingLocation}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 cursor-pointer shadow-2xs ${
                   isNearbyActive
-                    ? 'bg-[#FF2E63] text-white border-[#FF2E63] shadow-xs'
+                    ? 'bg-[#FF2E63] text-white border-[#FF2E63] shadow-xs hover:bg-[#e92759]'
                     : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300'
                 }`}
                 title="Show exhibitions closest to your location"
@@ -1380,7 +1366,7 @@ export default function LandingPage() {
                 )}
               </button>
 
-              <div className="flex items-center gap-2 text-xs font-semibold text-zinc-600 bg-white border border-zinc-200 px-3 py-1.5 rounded-xl shadow-2xs">
+              <div className="flex items-center gap-2 text-xs font-semibold text-zinc-600 bg-white border border-zinc-200 px-3 py-1.5 rounded-xl shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md focus-within:ring-2 focus-within:ring-amber-300">
                 <span>Sort:</span>
                 <select
                   value={sortBy}
@@ -1858,7 +1844,7 @@ export default function LandingPage() {
                       const el = document.getElementById('contact');
                       if (el) el.scrollIntoView({ behavior: 'smooth' });
                     }}
-                    className="flex-1 text-center py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs transition-colors cursor-pointer"
+                    className="flex-1 rounded-lg bg-zinc-900 px-3 py-2 text-center text-xs font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-amber-400 hover:text-zinc-950 hover:shadow-md active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 cursor-pointer"
                   >
                     Talk to Concierge
                   </a>
@@ -1874,52 +1860,12 @@ export default function LandingPage() {
                         window.location.href = 'mailto:contact@visitexpo.in';
                       }
                     }}
-                    className="py-2 px-3 rounded-lg bg-white border border-amber-300 text-amber-900 font-bold text-xs hover:bg-amber-50 transition-colors cursor-pointer"
+                    className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-900 transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-400 hover:bg-amber-100 hover:shadow-md active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 cursor-pointer"
                     title="Email Concierge Support"
                   >
                     <Mail className="h-3.5 w-3.5" />
                   </button>
                 </div>
-              </div>
-
-              {/* ----------------------------------------------------------- */}
-              {/* WEEKLY EXPO ALERTS NEWSLETTER WIDGET                        */}
-              {/* ----------------------------------------------------------- */}
-              <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs space-y-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-900">
-                    <Mail className="h-3.5 w-3.5 text-[#FF2E63]" />
-                    <span>Weekly Trade Expo Newsletter</span>
-                  </div>
-                  <p className="text-[11px] text-zinc-500 leading-relaxed">
-                    Get newly announced exhibitions, delegate discount codes, and VIP passes delivered every Monday.
-                  </p>
-                </div>
-
-                {newsletterSubscribed ? (
-                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                    <span>Subscribed! Check your inbox Monday.</span>
-                  </div>
-                ) : (
-                  <form onSubmit={handleNewsletterSubmit} className="space-y-2">
-                    <input
-                      type="email"
-                      required
-                      placeholder="Your corporate email..."
-                      value={newsletterEmail}
-                      onChange={(e) => setNewsletterEmail(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
-                    />
-                    <button
-                      type="submit"
-                      className="w-full py-2 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <span>Get Free Weekly Alerts</span>
-                      <Send className="h-3 w-3" />
-                    </button>
-                  </form>
-                )}
               </div>
 
             </div>
@@ -2242,7 +2188,7 @@ export default function LandingPage() {
               <div className="pt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link
                   href={mounted && user ? '/events' : '/login?role=visitor&redirect=/events'}
-                  className="inline-flex items-center gap-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold px-8 py-3.5 text-xs sm:text-sm transition-all shadow-md hover:scale-102 cursor-pointer group"
+                  className="inline-flex items-center gap-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-semibold px-8 py-3.5 text-xs sm:text-sm transition-all shadow-md hover:scale-102 cursor-pointer group"
                 >
                   <span>Explore All Events ({events.length || 100}+)</span>
                   <ArrowRight className="h-4 w-4 text-[#FFCC00] group-hover:translate-x-1 transition-transform" />

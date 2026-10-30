@@ -145,10 +145,10 @@ export default function BannerSlider() {
 
   // Responsive dimension tracker for smooth peek/active carousel offset
   const [carouselMetrics, setCarouselMetrics] = useState({
-    activeWidth: 620,
-    inactiveWidth: 260,
-    gap: 24,
-    peekOffset: 70
+    activeWidth: 560,
+    inactiveWidth: 230,
+    gap: 20,
+    peekOffset: 64
   });
 
   // Measure screen size to adjust card dimensions
@@ -157,24 +157,31 @@ export default function BannerSlider() {
       const w = window.innerWidth;
       if (w < 640) {
         setCarouselMetrics({
-          activeWidth: Math.min(w - 60, 340),
+          activeWidth: Math.min(w - 32, 340),
+          inactiveWidth: 160,
+          gap: 12,
+          peekOffset: 16
+        });
+      } else if (w < 768) {
+        setCarouselMetrics({
+          activeWidth: 430,
           inactiveWidth: 190,
-          gap: 14,
-          peekOffset: 20
+          gap: 16,
+          peekOffset: 36
         });
       } else if (w < 1024) {
         setCarouselMetrics({
-          activeWidth: 480,
-          inactiveWidth: 220,
-          gap: 18,
-          peekOffset: 50
+          activeWidth: 500,
+          inactiveWidth: 210,
+          gap: 20,
+          peekOffset: 48
         });
       } else {
         setCarouselMetrics({
-          activeWidth: 620,
-          inactiveWidth: 260,
-          gap: 24,
-          peekOffset: 80
+          activeWidth: 560,
+          inactiveWidth: 230,
+          gap: 20,
+          peekOffset: 64
         });
       }
     };
@@ -343,14 +350,14 @@ export default function BannerSlider() {
 
   if (loading) {
     return (
-      <div className="w-full bg-[#18181b] py-6 px-4">
-        <div className="max-w-6xl mx-auto h-[320px] rounded-3xl bg-zinc-900/60 animate-pulse border border-zinc-800" />
+      <div className="w-full bg-[#18181b] py-4 px-4">
+        <div className="max-w-6xl mx-auto h-[270px] sm:h-[300px] rounded-2xl bg-zinc-900/60 animate-pulse border border-zinc-800" />
       </div>
     );
   }
 
   // Calculate carousel horizontal translation to keep active card centered with peek
-  const { inactiveWidth, gap, peekOffset } = carouselMetrics;
+  const { activeWidth, inactiveWidth, gap, peekOffset } = carouselMetrics;
   const currentTranslateX =
     currentIndex === 0
       ? 0
@@ -359,38 +366,38 @@ export default function BannerSlider() {
   return (
     <section
       aria-label="Featured Exhibitions Banner Slider"
-      className="relative w-full bg-[#16171a] py-6 sm:py-8 border-b border-zinc-800/80 overflow-hidden select-none"
+      className="relative w-full overflow-hidden select-none border-y border-zinc-800/80 bg-gradient-to-b from-[#1b1c20] to-[#141518] py-4 sm:py-5"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
 
         {/* Header Bar */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider bg-amber-400/10 border border-amber-400/30 text-amber-300">
-              <Award className="h-3 w-3 text-amber-400" />
+        <div className="mb-3 flex flex-col gap-3 sm:mb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-amber-300 sm:text-[11px]">
+              <Award className="h-3.5 w-3.5 text-amber-400" />
               Featured Spotlight
             </span>
-            <span className="hidden sm:inline text-xs text-zinc-400 font-medium">
+            <span className="hidden text-xs font-medium text-zinc-400 sm:inline">
               Top 6 Verified Exhibitions &amp; Growth Summits
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-2 sm:justify-end sm:gap-3">
             <Link
               href="/banner-spotlight"
-              className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 hover:text-white transition-colors bg-white/5 hover:bg-white/10 px-3 py-1 rounded-full border border-white/10"
+              className="inline-flex items-center gap-1 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 text-[10px] font-bold text-amber-300 transition-colors hover:bg-amber-400/20 hover:text-white sm:text-[11px]"
             >
               <span>Feature Your Event</span>
               <ArrowRight className="h-3 w-3" />
             </Link>
 
-            {/* Slider Counter & Navigation */}
+            {/* Slider Navigation */}
             {slides.length > 1 && (
-              <div className="flex items-center gap-2 bg-zinc-900/90 border border-zinc-700/60 rounded-full px-2 py-1">
+              <div className="flex items-center gap-1 rounded-full border border-zinc-700/60 bg-zinc-900/90 p-1">
                 <button
                   type="button"
                   onClick={handlePrev}
@@ -399,11 +406,6 @@ export default function BannerSlider() {
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
-                <span className="text-[11px] font-mono font-bold text-zinc-300 px-1">
-                  <span className="text-white">{String(currentIndex + 1).padStart(2, '0')}</span>
-                  <span className="opacity-40"> / </span>
-                  <span>{String(slides.length).padStart(2, '0')}</span>
-                </span>
                 <button
                   type="button"
                   onClick={handleNext}
@@ -420,9 +422,9 @@ export default function BannerSlider() {
         {/* =================================================================== */}
         {/* MULTI-CARD EXPANDING CAROUSEL SLIDER (Matching Reference Design)     */}
         {/* =================================================================== */}
-        <div className="relative w-full overflow-hidden py-1">
+        <div className="relative w-full overflow-hidden rounded-2xl py-1">
           <div
-            className="flex items-center gap-3.5 sm:gap-4 md:gap-6 transition-transform duration-700 ease-out"
+            className="flex items-center gap-3 transition-transform duration-700 ease-out sm:gap-4 md:gap-5"
             style={{
               transform: `translateX(-${currentTranslateX}px)`
             }}
@@ -451,11 +453,12 @@ export default function BannerSlider() {
                   role={isActive ? 'link' : 'button'}
                   tabIndex={0}
                   aria-label={isActive ? `View details for ${slide.title}` : `Show ${slide.title}`}
-                  className={`relative shrink-0 rounded-3xl overflow-hidden shadow-2xl transition-all duration-700 cursor-pointer group ${
+                  className={`group relative h-[250px] shrink-0 cursor-pointer overflow-hidden rounded-2xl shadow-xl transition-all duration-700 sm:h-[270px] md:h-[300px] ${
                     isActive
-                      ? 'w-[320px] sm:w-[480px] md:w-[580px] lg:w-[640px] h-[340px] sm:h-[380px] md:h-[410px] ring-1 ring-white/20'
-                      : 'w-[180px] sm:w-[220px] md:w-[250px] lg:w-[270px] h-[340px] sm:h-[380px] md:h-[410px] opacity-80 hover:opacity-100 hover:scale-[1.01]'
+                      ? 'ring-1 ring-white/20'
+                      : 'opacity-75 hover:opacity-100'
                   }`}
+                  style={{ width: `${isActive ? activeWidth : inactiveWidth}px` }}
                 >
                   {/* Background Cover Image */}
                   <img
@@ -470,22 +473,22 @@ export default function BannerSlider() {
                   />
 
                   {/* Gradient Overlays for maximum text contrast */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-transparent" />
-                  <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-transparent" />
 
                   {/* Content Overlay */}
-                  <div className="absolute inset-0 p-5 sm:p-6 md:p-7 flex flex-col justify-between z-10">
+                  <div className="absolute inset-0 z-10 flex flex-col justify-between p-4 sm:p-5 md:p-6">
 
                     {/* Top Row: Pill Badge + City */}
                     <div className="flex items-start justify-between gap-2">
                       <span
-                        className={`inline-block px-3 py-1 rounded-md text-[11px] font-black uppercase tracking-wider text-white shadow-md ${slide.badgeColor}`}
+                        className={`inline-block rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-md ${slide.badgeColor}`}
                       >
                         {slide.badge}
                       </span>
 
                       {isActive && slide.city && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold text-white bg-black/40 backdrop-blur-md border border-white/20">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/40 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-md sm:text-[11px]">
                           <MapPin className="h-2.5 w-2.5 text-red-400" />
                           {slide.city}
                         </span>
@@ -504,7 +507,7 @@ export default function BannerSlider() {
                         {slide.title}
                       </h3>
 
-                      <div className="flex items-center gap-2 text-xs sm:text-sm text-white/80 font-medium">
+                      <div className="flex items-center gap-2 text-[11px] font-medium text-white/80 sm:text-xs">
                         <span>{slide.timeAgo}</span>
                         {slide.dates && (
                           <>
@@ -515,7 +518,7 @@ export default function BannerSlider() {
                       </div>
 
                       {/* Read More Action Link with circular arrow icon */}
-                      <div className="pt-2">
+                      <div className="pt-1">
                         <Link
                           href={slide.link}
                           onClick={(e) => {
@@ -546,10 +549,10 @@ export default function BannerSlider() {
             type="button"
             onClick={handleNext}
             aria-label="Next Slide"
-            className="absolute top-1/2 -translate-y-1/2 right-3 sm:right-6 md:right-8 z-30 w-12 h-12 md:w-14 md:h-14 rounded-full border-4 border-white/90 bg-white/20 hover:bg-white text-white hover:text-black backdrop-blur-md shadow-2xl flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95"
+            className="absolute right-2 top-1/2 z-30 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white/80 bg-black/30 text-white shadow-lg backdrop-blur-md transition-colors hover:bg-white hover:text-black active:scale-95 sm:right-4 sm:h-10 sm:w-10"
             title="Next Exhibition Banner"
           >
-            <ChevronRight className="h-6 w-6 stroke-[3]" />
+            <ChevronRight className="h-5 w-5 stroke-[2.5]" />
           </button>
 
           {currentIndex > 0 && (
@@ -557,10 +560,10 @@ export default function BannerSlider() {
               type="button"
               onClick={handlePrev}
               aria-label="Previous Slide"
-              className="absolute top-1/2 -translate-y-1/2 left-3 sm:left-6 z-30 w-12 h-12 md:w-14 md:h-14 rounded-full border-4 border-white/90 bg-white/20 hover:bg-white text-white hover:text-black backdrop-blur-md shadow-2xl flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95"
+              className="absolute left-2 top-1/2 z-30 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white/80 bg-black/30 text-white shadow-lg backdrop-blur-md transition-colors hover:bg-white hover:text-black active:scale-95 sm:left-4 sm:h-10 sm:w-10"
               title="Previous Exhibition Banner"
             >
-              <ChevronLeft className="h-6 w-6 stroke-[3]" />
+              <ChevronLeft className="h-5 w-5 stroke-[2.5]" />
             </button>
           )}
 
@@ -568,7 +571,7 @@ export default function BannerSlider() {
 
         {/* Bottom Pagination Dots */}
         {slides.length > 1 && (
-          <div className="flex items-center justify-center gap-1.5 mt-4">
+          <div className="mt-3 flex items-center justify-center gap-1.5 sm:mt-4">
             {slides.map((_, idx) => (
               <button
                 key={idx}

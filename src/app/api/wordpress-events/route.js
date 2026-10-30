@@ -609,6 +609,18 @@ export async function GET(request) {
         venue: loc.venue,
         address: loc.address,
         location: loc.location,
+        listingDate:
+          evt.listingDate ||
+          evt.createdAt ||
+          evt.created_at ||
+          evt.dateCreated ||
+          evt.date_created ||
+          evt.publishedAt ||
+          evt.published_at ||
+          evt.date ||
+          evt.postDate ||
+          evt.post_date ||
+          null,
         startDate: evt.startDate || null,
         endDate: evt.endDate || null,
         dates: formatDateRange(evt.startDate, evt.endDate),

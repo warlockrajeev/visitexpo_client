@@ -2,8 +2,8 @@
 
 /**
  * @file TopRatedExhibitions.js
- * @description Showcases the Top 10 Exhibitions & Trade Shows ranked by Rating on VisitExpo.
- * Displays rank badges (#1 to #10), star ratings, reviews count, location, dates, and visitor pass actions.
+ * @description Showcases the 10 latest Exhibitions & Trade Shows on VisitExpo.
+ * Displays listing order, star ratings, reviews count, location, dates, and visitor pass actions.
  */
 
 import React, { useMemo } from 'react';
@@ -23,20 +23,37 @@ import {
 } from 'lucide-react';
 
 export default function TopRatedExhibitions({ events = [] }) {
-  // Compute Top 10 Events sorted by rating desc, then reviewCount/turnout
+  // Prefer the listing timestamp, then the WordPress post ID (newer posts have higher IDs).
   const top10Events = useMemo(() => {
     if (!events || events.length === 0) return [];
 
+    const listingTime = (event) => {
+      const value =
+        event.listingDate ||
+        event.createdAt ||
+        event.created_at ||
+        event.dateCreated ||
+        event.publishedAt ||
+        event.published_at ||
+        event.date ||
+        event.postDate ||
+        event.post_date;
+      const time = value ? Date.parse(value) : NaN;
+      return Number.isFinite(time) ? time : null;
+    };
+
     const sorted = [...events].sort((a, b) => {
-      const rA = parseFloat(a.rating) || 4.5;
-      const rB = parseFloat(b.rating) || 4.5;
-      if (rB !== rA) return rB - rA;
+      const timeA = listingTime(a);
+      const timeB = listingTime(b);
+      if (timeA !== null && timeB !== null && timeA !== timeB) return timeB - timeA;
 
-      const cA = parseInt(String(a.reviewCount || 0), 10) || 0;
-      const cB = parseInt(String(b.reviewCount || 0), 10) || 0;
-      if (cB !== cA) return cB - cA;
+      const idA = a.wpPostId != null && a.wpPostId !== '' ? Number(a.wpPostId) : null;
+      const idB = b.wpPostId != null && b.wpPostId !== '' ? Number(b.wpPostId) : null;
+      if (Number.isFinite(idA) && Number.isFinite(idB) && idA !== idB) return idB - idA;
 
-      return (a.title || '').localeCompare(b.title || '');
+      if (timeA !== null && timeB === null) return -1;
+      if (timeA === null && timeB !== null) return 1;
+      return 0;
     });
 
     return sorted.slice(0, 10);
@@ -45,21 +62,21 @@ export default function TopRatedExhibitions({ events = [] }) {
   if (top10Events.length === 0) return null;
 
   return (
-    <section className="py-14 bg-gradient-to-b from-white via-amber-50/20 to-white border-y border-zinc-200/80">
+    <section className="pt-10 pb-4 sm:pt-12 sm:pb-6 bg-gradient-to-b from-white via-amber-50/20 to-white border-y border-zinc-200/80">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 rounded-full bg-amber-100/80 border border-amber-300 px-3.5 py-1 text-xs font-black text-amber-900 shadow-2xs">
               <Crown className="h-3.5 w-3.5 fill-amber-500 text-amber-600" />
-              <span>Hall of Fame • Top 10 Highest Rated</span>
+              <span>Latest Listings • Recently Added</span>
             </div>
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-zinc-950 tracking-tight">
-              Top 10 Rated Exhibitions &amp; Expos
+              Latest Exhibitions &amp; Expos
             </h2>
             <p className="text-zinc-600 text-xs sm:text-sm max-w-2xl leading-relaxed">
-              The highest-rated international trade shows, industrial expositions, and B2B summits
-              evaluated by verified trade buyers, delegates, and exhibitors.
+              Discover the newest international trade shows, industrial expositions, and B2B summits
+              recently added to VisitExpo.
             </p>
           </div>
 
@@ -72,7 +89,7 @@ export default function TopRatedExhibitions({ events = [] }) {
           </Link>
         </div>
 
-        {/* Top 10 Events Grid */}
+        {/* Latest Events Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5">
           {top10Events.map((evt, idx) => {
             const rank = idx + 1;
@@ -80,14 +97,21 @@ export default function TopRatedExhibitions({ events = [] }) {
             const ratingNum = parseFloat(evt.rating) || 4.9;
             const reviewCount = evt.reviewCount || (80 + (idx * 17));
 
-            // Rank Styling
+            // Listing-order badge styling
             const isRank1 = rank === 1;
             const isRank2 = rank === 2;
             const isRank3 = rank === 3;
 
             return (
-              <article
+              <Link
+                href={`/expo/${eventSlug}`}
                 key={evt.id || idx}
+                onClick={() => {
+                  try {
+                    sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(evt));
+                  } catch (_) {}
+                }}
+                prefetch={true}
                 className="group relative bg-white border border-zinc-200/90 rounded-2xl overflow-hidden shadow-xs hover:shadow-xl hover:border-amber-400 transition-all duration-300 flex flex-col justify-between"
               >
                 {/* Media Container */}
@@ -114,24 +138,24 @@ export default function TopRatedExhibitions({ events = [] }) {
                     {isRank1 && (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-zinc-950 shadow-md ring-2 ring-white">
                         <Crown className="h-3 w-3 fill-zinc-950" />
-                        <span>#1 Ranked</span>
+                        <span>#1 Latest</span>
                       </span>
                     )}
                     {isRank2 && (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-gradient-to-r from-slate-200 via-zinc-200 to-slate-300 text-zinc-900 shadow-md ring-2 ring-white">
                         <Award className="h-3 w-3 fill-zinc-800" />
-                        <span>#2 Ranked</span>
+                        <span>#2 Latest</span>
                       </span>
                     )}
                     {isRank3 && (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 text-white shadow-md ring-2 ring-white">
                         <Award className="h-3 w-3 fill-white" />
-                        <span>#3 Ranked</span>
+                        <span>#3 Latest</span>
                       </span>
                     )}
                     {!isRank1 && !isRank2 && !isRank3 && (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-zinc-950/85 backdrop-blur-md text-[#FFCC00] shadow-md border border-white/20">
-                        <span>#{rank} Ranked</span>
+                        <span>#{rank} Latest</span>
                       </span>
                     )}
                   </div>
@@ -160,17 +184,7 @@ export default function TopRatedExhibitions({ events = [] }) {
 
                     {/* Title */}
                     <h3 className="text-xs sm:text-sm font-extrabold text-zinc-950 line-clamp-2 leading-snug group-hover:text-amber-600 transition-colors">
-                      <Link
-                        href={`/expo/${eventSlug}`}
-                        onClick={() => {
-                          try {
-                            sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(evt));
-                          } catch (_) {}
-                        }}
-                        prefetch={true}
-                      >
-                        {evt.title}
-                      </Link>
+                      {evt.title}
                     </h3>
 
                     {/* Dates */}
@@ -192,22 +206,15 @@ export default function TopRatedExhibitions({ events = [] }) {
                       {evt.city || 'India'}
                     </span>
 
-                    <Link
-                      href={`/expo/${eventSlug}`}
-                      onClick={() => {
-                        try {
-                          sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(evt));
-                        } catch (_) {}
-                      }}
-                      prefetch={true}
+                    <span
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-950 hover:bg-[#FFCC00] text-[#FFCC00] hover:text-zinc-950 text-[11px] font-black transition-all shadow-2xs active:scale-95 cursor-pointer shrink-0"
                     >
                       <span>View</span>
                       <ArrowRight className="h-3 w-3" />
-                    </Link>
+                    </span>
                   </div>
                 </div>
-              </article>
+              </Link>
             );
           })}
         </div>
