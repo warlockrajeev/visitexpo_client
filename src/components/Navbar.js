@@ -266,7 +266,7 @@ export default function Navbar({ solid = false }) {
       }`}
       style={!scrolled && !mobileMenuOpen && !isSolid ? { borderBottom: 'none' } : undefined}
     >
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between">
+      <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex items-center group">
           <Logo className="h-12 w-12 sm:h-14 sm:w-14 transition-transform duration-200 group-hover:scale-105 drop-shadow-md" />

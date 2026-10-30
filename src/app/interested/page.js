@@ -22,7 +22,7 @@ import {
   Globe,
   ArrowRight,
   Search,
-  Filter,
+  RotateCcw,
   CheckCircle2,
   ExternalLink,
   ChevronRight,
@@ -594,9 +594,9 @@ export default function InterestedEventsPage() {
 
         {/* Filter and Search Bar */}
         {(interestedEvents.length > 0 || interestedSlugs.size > 0) && (
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row items-center gap-3">
-              <div className="relative w-full sm:w-2/3 sm:flex-none">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-3 sm:p-4 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center gap-2">
+              <div className="relative w-full md:w-1/2 md:max-w-md md:flex-none">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                 <input
                   type="text"
@@ -608,11 +608,11 @@ export default function InterestedEventsPage() {
               </div>
 
               {availableCategories.length > 0 && (
-                <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="w-full md:w-56 md:flex-none">
                   <select
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="w-full sm:w-auto px-3.5 py-2 text-xs font-semibold rounded-xl border border-zinc-200 bg-white text-zinc-800 focus:outline-none cursor-pointer"
+                    className="w-full px-3.5 py-2 text-xs font-semibold rounded-xl border border-zinc-200 bg-white text-zinc-800 focus:outline-none cursor-pointer"
                   >
                     <option value="all">All Sectors ({availableCategories.length})</option>
                     {availableCategories.map((c) => (
@@ -622,6 +622,21 @@ export default function InterestedEventsPage() {
                     ))}
                   </select>
                 </div>
+              )}
+
+              {(searchQuery.trim() || selectedCategory !== 'all') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedCategory('all');
+                  }}
+                  className="inline-flex shrink-0 items-center justify-center gap-1.5 self-start rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50 md:self-auto"
+                  title="Clear search and restore all sectors"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>Reset</span>
+                </button>
               )}
             </div>
           </div>

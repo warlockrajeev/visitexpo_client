@@ -32,7 +32,6 @@ import {
   MessageSquare,
   ShieldCheck,
   Ticket,
-  Sparkles,
   Users,
   Layers,
   Star,
@@ -422,7 +421,7 @@ export default function FollowingPage() {
         </div>
       )}
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-20 space-y-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-20 space-y-6">
         {/* Hero Header Banner */}
         <div className="relative overflow-hidden rounded-3xl bg-white border border-zinc-200/90 p-8 sm:p-10 shadow-xs">
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -539,27 +538,23 @@ export default function FollowingPage() {
           </div>
         ) : followedSlugs.size === 0 ? (
           /* EMPTY STATE */
-          <div className="relative isolate overflow-hidden rounded-3xl border border-blue-100 bg-white px-6 py-14 text-center shadow-sm sm:px-12 sm:py-16">
+          <div className="relative isolate flex items-center justify-center overflow-hidden rounded-3xl border border-blue-100 bg-white px-5 py-8 text-center shadow-sm sm:px-8 sm:py-10">
             <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,rgba(219,234,254,0.65),transparent_58%)]" />
             <div aria-hidden="true" className="absolute -right-16 -top-20 -z-10 h-64 w-64 rounded-full border border-blue-100/70" />
             <div aria-hidden="true" className="absolute -right-8 -top-12 -z-10 h-48 w-48 rounded-full border border-blue-100/70" />
 
             <div className="mx-auto flex max-w-xl flex-col items-center">
-              <div className="relative mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/20 ring-8 ring-blue-50">
-                <Bell className="h-9 w-9 fill-white" />
+              <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/20 ring-4 ring-blue-50">
+                <Bell className="h-7 w-7 fill-white" />
                 <span className="absolute -right-1 -top-1 h-5 w-5 rounded-full border-4 border-white bg-[#FFCC00]" />
               </div>
-              <span className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50/80 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-blue-700">
-                <Sparkles className="h-3.5 w-3.5" />
-                Build your expo network
-              </span>
-              <h3 className="text-2xl font-extrabold tracking-tight text-zinc-950 sm:text-3xl">
+              <h3 className="text-xl font-extrabold tracking-tight text-zinc-950 sm:text-2xl">
                 Your next great connection starts here
               </h3>
-              <p className="mt-3 max-w-lg text-sm leading-6 text-zinc-600 sm:text-base">
+              <p className="mt-2 max-w-lg text-sm leading-6 text-zinc-600 sm:text-base">
                 Follow exhibitions to keep event dates, booth announcements, and verified organizer updates all in one place.
               </p>
-              <div className="mt-8 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
+              <div className="mt-5 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
               <Link
                 href="/events"
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#FFCC00] px-6 py-3 text-sm font-black text-zinc-950 shadow-md shadow-amber-500/20 transition hover:-translate-y-0.5 hover:bg-[#FFB703] hover:shadow-lg active:translate-y-0 active:scale-95"
@@ -720,7 +715,7 @@ export default function FollowingPage() {
           /* ============================================================== */
           /* TAB 2: GROUPED ORGANIZERS VIEW                                 */
           /* ============================================================== */
-          <div className="space-y-6">
+          <div className="max-w-5xl space-y-4">
             {paginatedOrganizers.map((group, idx) => {
               const org = group.organizer;
 
@@ -730,7 +725,7 @@ export default function FollowingPage() {
                   className="overflow-hidden rounded-3xl border border-zinc-200/80 bg-white shadow-sm transition-shadow hover:shadow-md"
                 >
                   {/* Organizer Header */}
-                  <div className="flex flex-col gap-5 border-b border-blue-100 bg-gradient-to-r from-blue-50/80 via-white to-white px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+                  <div className="flex flex-col gap-4 border-b border-blue-100 bg-gradient-to-r from-blue-50/80 via-white to-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <div className="flex min-w-0 items-center gap-4">
                       <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-white text-xl font-black text-blue-800 shadow-sm ring-4 ring-blue-50">
                         {(org?.name || 'O').charAt(0).toUpperCase()}
@@ -773,7 +768,7 @@ export default function FollowingPage() {
                   </div>
 
                   {/* Followed Expos under this Organizer */}
-                  <div className="space-y-4 px-5 py-5 sm:px-7 sm:py-6">
+                  <div className="space-y-3 px-4 py-4 sm:px-6 sm:py-5">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <h4 className="text-sm font-bold text-zinc-900">Followed exhibitions</h4>
@@ -784,13 +779,13 @@ export default function FollowingPage() {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <div className={`grid grid-cols-1 gap-3 ${group.expos.length > 1 ? 'xl:grid-cols-2' : ''}`}>
                       {group.expos.map((evt) => (
                         <div
                           key={evt.id}
                           className="group flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md sm:flex-row"
                         >
-                          <div className="relative h-36 shrink-0 overflow-hidden bg-blue-50 sm:h-auto sm:min-h-44 sm:w-36">
+                          <div className="relative h-36 shrink-0 overflow-hidden bg-blue-50 sm:h-auto sm:min-h-40 sm:w-36">
                             <img
                               src={evt.image || 'https://visitexpo.in/wp-content/uploads/2026/08/Refining-India-2026.jpg'}
                               alt={evt.title}
@@ -805,8 +800,8 @@ export default function FollowingPage() {
                             </span>
                           </div>
 
-                          <div className="flex min-w-0 flex-1 flex-col justify-between p-4">
-                            <div className="space-y-3">
+                          <div className="flex min-w-0 flex-1 flex-col justify-between p-3.5">
+                            <div className="space-y-2.5">
                               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-700">
                                 <Bell className="h-3 w-3 fill-blue-600" />
                                 Following
@@ -814,7 +809,7 @@ export default function FollowingPage() {
                               <h5 className="line-clamp-2 text-base font-extrabold leading-snug text-zinc-950 transition-colors group-hover:text-blue-800">
                                 {evt.title}
                               </h5>
-                              <div className="space-y-2">
+                              <div className="space-y-1.5">
                                 <p className="flex items-center gap-2 text-xs font-medium text-zinc-600">
                                   <Calendar className="h-3.5 w-3.5 shrink-0 text-blue-500" />
                                   <span className="line-clamp-1">{evt.dates || 'Upcoming'}</span>

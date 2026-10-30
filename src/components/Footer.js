@@ -115,7 +115,7 @@ export default function Footer({ className = '' }) {
   return (
     <footer className={`bg-zinc-950 text-zinc-400 text-xs border-t border-zinc-800/80 mt-auto w-full ${className}`}>
       {/* Main Grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
+      <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10">
           
           {/* Brand & Newsletter Column */}
@@ -249,8 +249,8 @@ export default function Footer({ className = '' }) {
       </div>
 
       {/* Minimal Bottom Bar */}
-      <div className="border-t border-zinc-900 py-5 px-4 sm:px-6">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-zinc-500 text-[11px]">
+      <div className="border-t border-zinc-900 py-5">
+        <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-3 px-4 text-zinc-500 text-[11px] sm:flex-row sm:px-6 lg:px-8">
           <div>
             &copy; {new Date().getFullYear()} VisitExpo Inc. All rights reserved.
           </div>
