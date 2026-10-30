@@ -203,11 +203,11 @@ export default function Footer({ className = '' }) {
                   Pricing Plans
                 </Link>
               </li>
-              <li>
+              {/* <li>
                 <Link href="/contact" className="hover:text-zinc-200 transition-colors">
                   Contact
                 </Link>
-              </li>
+              </li> */}
             </ul>
           </div>
 

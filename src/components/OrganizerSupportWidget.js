@@ -181,14 +181,24 @@ export default function OrganizerSupportWidget() {
                   const isOrganizer = message.senderRole === 'organizer';
                   return (
                     <div key={message._id} className={`flex ${isOrganizer ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 ${isOrganizer ? 'rounded-br-sm bg-primary text-primary-foreground' : 'rounded-bl-sm border border-border bg-card text-foreground'}`}>
-                        <p className="mb-1 text-[10px] font-bold opacity-75">
-                          {isOrganizer ? 'You' : message.senderName || 'VisitExpo Support'}
-                        </p>
-                        <p className="whitespace-pre-wrap break-words text-xs leading-relaxed">{message.text}</p>
-                        <time className="mt-1.5 block text-right text-[9px] opacity-65">
+                      <div className={`max-w-[85%] rounded-2xl px-3 py-2 shadow-sm ${
+                        isOrganizer
+                          ? 'rounded-br-md border border-amber-400/70 bg-gradient-to-br from-amber-300 to-primary text-zinc-950'
+                          : 'rounded-bl-md border border-border bg-card text-foreground'
+                      }`}>
+                        <div className="mb-0.5 flex items-center justify-between gap-3">
+                          <p className={`text-[10px] font-bold ${
+                            isOrganizer ? 'text-zinc-800/75' : 'text-muted-foreground'
+                          }`}>
+                            {isOrganizer ? 'You' : message.senderName || 'VisitExpo Support'}
+                          </p>
+                          <time className={`text-[9px] ${
+                            isOrganizer ? 'text-zinc-800/60' : 'text-muted-foreground'
+                          }`}>
                           {message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''}
-                        </time>
+                          </time>
+                        </div>
+                        <p className="whitespace-pre-wrap break-words text-[13px] leading-snug">{message.text}</p>
                       </div>
                     </div>
                   );

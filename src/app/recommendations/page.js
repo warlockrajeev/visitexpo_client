@@ -36,7 +36,6 @@ import {
   Compass,
   Bookmark,
   Share2,
-  RefreshCw,
   Clock,
   Navigation,
   Filter,
@@ -497,16 +496,6 @@ export default function RecommendationsPage() {
                       <span>Save My Preferences</span>
                     </>
                   )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={fetchRecommendations}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-zinc-200 transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00] cursor-pointer"
-                  title="Refresh Recommendations"
-                  aria-label="Refresh recommendations"
-                >
-                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-[#FFCC00]' : ''}`} />
                 </button>
               </div>
             </div>

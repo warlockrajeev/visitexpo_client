@@ -2270,7 +2270,7 @@ export default function LandingPage() {
       {/* 4.5 PEOPLE'S REVIEWS ON EVENTS (ATTENDEE & EXHIBITOR SOCIAL PROOF)        */}
       {/* ========================================================================= */}
       <Suspense fallback={<SkeletonSection height="h-96" />}>
-        <section className="py-16 bg-white border-t border-zinc-200/80">
+        <section className="py-8 sm:py-10 bg-white border-t border-zinc-200/80">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <PeoplesReviews />
           </div>
@@ -2280,7 +2280,7 @@ export default function LandingPage() {
       {/* ========================================================================= */}
       {/* 5. DIRECTORY CLAIM FOR ORGANIZERS (Search from live WP events)            */}
       {/* ========================================================================= */}
-      <section id="claim" className="py-16 max-w-4xl mx-auto px-4 sm:px-6">
+      <section id="claim" className="py-8 sm:py-10 max-w-4xl mx-auto px-4 sm:px-6">
         <div className="bg-amber-50/50 border border-amber-200 rounded-2xl p-6 sm:p-8 space-y-6 text-center">
           <div className="max-w-xl mx-auto space-y-2">
             <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-700">For Event Organizers</span>
@@ -2338,7 +2338,7 @@ export default function LandingPage() {
       {/* ========================================================================= */}
       {/* 6. CONTACT & ONBOARDING FORM                                              */}
       {/* ========================================================================= */}
-      <section id="contact" className="py-16 bg-white border-t border-zinc-150">
+      <section id="contact" className="py-8 sm:py-10 bg-white border-t border-zinc-150">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="grid md:grid-cols-12 gap-8 items-start">
             
@@ -2611,7 +2611,7 @@ export default function LandingPage() {
       {/* ========================================================================= */}
       {/* 7. FAQ ACCORDION (Dynamic from Server / Admin)                            */}
       {/* ========================================================================= */}
-      <section className="py-8 sm:py-10 max-w-4xl mx-auto px-4 sm:px-6 space-y-5">
+      <section className="py-5 sm:py-6 max-w-4xl mx-auto px-4 sm:px-6 space-y-4">
         <div className="text-center space-y-2">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
             <HelpCircle className="h-3.5 w-3.5 text-amber-600" />
@@ -2660,16 +2660,16 @@ export default function LandingPage() {
               return (
                 <div
                   key={item._id || idx}
-                  className={`border rounded-2xl overflow-hidden transition-all duration-200 ${
+                  className={`group border rounded-2xl overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-amber-500/10 ${
                     isOpen
                       ? 'border-[#FF2E63]/40 bg-white shadow-sm ring-1 ring-[#FF2E63]/20'
-                      : 'border-zinc-200 bg-white hover:border-zinc-300'
+                      : 'border-zinc-200 bg-white hover:border-amber-300'
                   }`}
                 >
                   <button
                     type="button"
                     onClick={() => toggleFaq(idx)}
-                    className="w-full px-5 py-4 text-left flex items-center justify-between gap-4 font-bold text-zinc-900 cursor-pointer text-xs sm:text-sm"
+                    className="w-full px-5 py-4 text-left flex items-center justify-between gap-4 font-bold text-zinc-900 transition-colors group-hover:text-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#FFCC00] cursor-pointer text-xs sm:text-sm"
                   >
                     <div className="flex items-center gap-2.5 flex-1 min-w-0">
                       {item.category && item.category !== 'General' && (
@@ -2681,7 +2681,9 @@ export default function LandingPage() {
                     </div>
                     <div
                       className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 transition-all ${
-                        isOpen ? 'bg-[#FF2E63] text-white rotate-180' : 'bg-zinc-100 text-zinc-500'
+                        isOpen
+                          ? 'bg-[#FF2E63] text-white rotate-180'
+                          : 'bg-zinc-100 text-zinc-500 group-hover:bg-[#FFCC00] group-hover:text-zinc-950'
                       }`}
                     >
                       <ChevronDown className="h-4 w-4" />
