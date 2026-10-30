@@ -382,10 +382,10 @@ export default function ContactPage() {
       {/* Fixed Navbar */}
       <Navbar />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 space-y-7 px-4 pb-14 pt-16 sm:space-y-8 sm:px-6 sm:pt-20">
+      <main className="mx-auto w-full max-w-7xl flex-1 space-y-5 px-4 pb-12 pt-16 sm:space-y-6 sm:px-6 sm:pt-20 lg:px-8">
         <div>
           {/* Breadcrumb Navigation */}
-          <nav className="mb-4 flex items-center gap-2 text-xs font-medium text-zinc-500">
+          <nav className="mb-3 flex items-center gap-2 text-xs font-medium text-zinc-500">
             <Link href="/" className="hover:text-zinc-900 transition-colors">
               Home
             </Link>
@@ -393,8 +393,8 @@ export default function ContactPage() {
             <span className="text-zinc-900 font-bold">Contact Us</span>
           </nav>
 
-          <div className="rounded-2xl border border-zinc-200 bg-white px-5 py-6 sm:px-8 sm:py-8">
-            <div className="max-w-3xl space-y-2">
+          <div className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 sm:px-7 sm:py-6">
+            <div className="max-w-4xl space-y-2">
               <p className="text-sm font-semibold text-zinc-500">Contact VisitExpo</p>
               <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 sm:text-3xl">
                 We&apos;re Here to Help You Connect
@@ -407,9 +407,9 @@ export default function ContactPage() {
         </div>
 
         {/* Contact Channels Grid */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
           {/* Visit Us */}
-          <div className="flex items-start gap-3 border-b border-zinc-200 px-1 py-4 sm:border-b-0 sm:border-r">
+          <div className="flex items-start gap-3 border-b border-zinc-200 px-1 py-3 md:border-b-0 md:border-r">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600">
               <MapPin className="h-4 w-4" />
             </div>
@@ -422,7 +422,7 @@ export default function ContactPage() {
           </div>
 
           {/* Phone */}
-          <div className="flex items-start gap-3 border-b border-zinc-200 px-1 py-4 sm:border-b-0 sm:border-r">
+          <div className="flex items-start gap-3 border-b border-zinc-200 px-1 py-3 md:border-b-0 md:border-r">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600">
               <Phone className="h-4 w-4" />
             </div>
@@ -436,7 +436,7 @@ export default function ContactPage() {
           </div>
 
           {/* Work With Us */}
-          <div className="flex items-start gap-3 px-1 py-4">
+          <div className="flex items-start gap-3 px-1 py-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600">
               <Mail className="h-4 w-4" />
             </div>
@@ -451,9 +451,9 @@ export default function ContactPage() {
         </div>
 
         {/* Main Section: Interactive Form + Context */}
-        <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-12">
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12 lg:gap-6">
           {/* Left Column: Form */}
-          <div className="space-y-5 rounded-2xl border border-zinc-200 bg-white p-5 sm:p-7 lg:col-span-7">
+          <div className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6 lg:col-span-7">
             <div>
               <h2 className="text-xl font-semibold tracking-tight text-zinc-900">
                 Send Us a Message
@@ -481,7 +481,7 @@ export default function ContactPage() {
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} noValidate className="space-y-5">
+              <form onSubmit={handleSubmit} noValidate className="space-y-4">
                 {errorMessage && (
                   <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700">
                     {errorMessage}
@@ -709,15 +709,15 @@ export default function ContactPage() {
           </div>
 
           {/* Right Column: Key Details & Quick Support FAQ (5 cols) */}
-          <div className="space-y-6 lg:col-span-5">
+          <div className="space-y-4 lg:col-span-5">
             {/* Quick Resolution Card */}
-            <div className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
+            <div className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5 text-emerald-600" />
                 <h3 className="font-bold text-base text-zinc-900">Verified Platform Support</h3>
               </div>
 
-              <div className="space-y-4 text-sm text-zinc-600">
+              <div className="space-y-3 text-sm text-zinc-600">
                 <div className="flex items-start gap-2.5">
                   <div className="h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
                     <CheckCircle2 className="h-3.5 w-3.5" />
@@ -751,7 +751,7 @@ export default function ContactPage() {
             </div>
 
             {/* Accordion FAQ */}
-            <div className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
+            <div className="space-y-2 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5">
               <div className="flex items-center gap-2 border-b border-zinc-100 pb-3">
                 <HelpCircle className="h-4 w-4 text-zinc-500" />
                 <h3 className="text-sm font-semibold text-zinc-900">Frequently Asked Questions</h3>

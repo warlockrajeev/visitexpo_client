@@ -940,15 +940,17 @@ export default function BookmarksPage() {
                 </button>
               </div>
 
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-border bg-background px-3 py-2.5 text-xs font-semibold text-foreground transition hover:bg-secondary"
-                title="Clear search and restore default filters"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                <span>Reset</span>
-              </button>
+              {(searchQuery.trim() || selectedCategory !== 'all' || sortBy !== 'upcoming') && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-border bg-background px-3 py-2.5 text-xs font-semibold text-foreground transition hover:bg-secondary"
+                  title="Clear search and restore default filters"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>Reset</span>
+                </button>
+              )}
             </div>
           </div>
         )}
