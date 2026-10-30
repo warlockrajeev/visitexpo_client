@@ -48,6 +48,30 @@ const isControlKey = (e) => {
   );
 };
 
+const EMAIL_PATTERN =
+  /^[a-zA-Z0-9_%+-]+(?:\.[a-zA-Z0-9_%+-]+)*@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+const EMAIL_INPUT_CHARACTERS = /^[a-zA-Z0-9._%+-@]$/;
+const NAME_INPUT_CHARACTERS = /^[\p{L} ]$/u;
+const sanitizePhone = (value) => {
+  let sanitized = '';
+  let digitCount = 0;
+
+  for (const character of value) {
+    if (/^\d$/.test(character)) {
+      if (digitCount < 15) {
+        sanitized += character;
+        digitCount += 1;
+      }
+    } else if (character === '+' && sanitized.length === 0) {
+      sanitized += character;
+    } else if (character === ' ' || character === '-') {
+      sanitized += character;
+    }
+  }
+
+  return sanitized;
+};
+
 const CONTACT_ROLES = [
   { id: 'Visitor', label: 'Visitor / Delegate', icon: Ticket },
   { id: 'Organizer', label: 'Event Organizer', icon: Building },
@@ -153,9 +177,15 @@ export default function ContactPage() {
 
   const validatePhone = (val) => {
     if (!val || !val.trim()) return '';
+    if (!/^\+?[\d -]+$/.test(val)) {
+      return 'Use digits, spaces, hyphens, and an optional + at the beginning.';
+    }
     const digits = val.replace(/\D/g, '');
+    if (!digits) {
+      return 'Enter a phone number with 10–15 digits.';
+    }
     if (digits.length < 10) {
-      return 'Please enter a valid phone number (at least 10 digits).';
+      return 'Phone number must contain at least 10 digits.';
     }
     if (digits.length > 15) {
       return 'Phone number cannot exceed 15 digits.';
@@ -167,6 +197,24 @@ export default function ContactPage() {
       return 'Indian mobile numbers must start with 6, 7, 8, or 9.';
     }
     return '';
+  };
+
+  const validateName = (val) => {
+    if (!val.trim()) return 'Please enter your full name.';
+    if (!/^\p{L}+(?: +\p{L}+)*$/u.test(val.trim())) {
+      return 'Name can contain letters and spaces only.';
+    }
+    if (val.trim().replace(/ +/g, ' ').length < 2) {
+      return 'Please enter a name with at least 2 letters.';
+    }
+    return '';
+  };
+
+  const validateEmail = (val) => {
+    if (!val.trim()) return 'Please enter your email address.';
+    return EMAIL_PATTERN.test(val.trim())
+      ? ''
+      : 'Please enter a valid email address (e.g. name@company.com).';
   };
 
   const validateMessage = (val) => {
@@ -207,43 +255,113 @@ export default function ContactPage() {
     }
   };
 
+  const handleNameKeyDown = (e) => {
+    if (isControlKey(e) || e.isComposing || e.key.length !== 1) return;
+    if (!NAME_INPUT_CHARACTERS.test(e.key)) {
+      e.preventDefault();
+      setNameError('Name can contain letters and spaces only.');
+    }
+  };
+
+  const handleNameChange = (e) => {
+    const value = e.target.value.replace(/[^\p{L} ]/gu, '');
+    setName(value);
+    setErrorMessage(null);
+    if (e.target.value !== value) {
+      setNameError('Name can contain letters and spaces only.');
+      return;
+    }
+    if (nameError) setNameError(validateName(value));
+  };
+
+  const handleNamePaste = (e) => {
+    const pastedText = e.clipboardData.getData('text');
+    const sanitizedText = pastedText.replace(/[^\p{L} ]/gu, '');
+    if (pastedText !== sanitizedText) {
+      e.preventDefault();
+      const input = e.currentTarget;
+      const value =
+        name.slice(0, input.selectionStart) +
+        sanitizedText +
+        name.slice(input.selectionEnd);
+      setName(value);
+      setErrorMessage(null);
+      setNameError('Name can contain letters and spaces only.');
+    }
+  };
+
+  const handleEmailKeyDown = (e) => {
+    if (isControlKey(e) || e.isComposing || e.key.length !== 1) return;
+    if (!EMAIL_INPUT_CHARACTERS.test(e.key)) {
+      e.preventDefault();
+      setEmailError('Email can contain letters, numbers, and valid email symbols only.');
+    }
+  };
+
+  const handleEmailChange = (e) => {
+    const value = e.target.value.replace(/[^a-zA-Z0-9._%+-@]/g, '');
+    setEmail(value);
+    setErrorMessage(null);
+    if (e.target.value !== value) {
+      setEmailError('Email can contain letters, numbers, and valid email symbols only.');
+      return;
+    }
+    if (emailError) setEmailError(validateEmail(value));
+  };
+
   const handlePhoneKeyDown = (e) => {
     if (isControlKey(e)) return;
-    if (/[a-zA-Z]/.test(e.key)) {
-      e.preventDefault();
-      triggerPhoneWarning('Letters cannot be entered in phone number.');
-      return;
+    const input = e.currentTarget;
+    const selectedValue = input.value.slice(input.selectionStart, input.selectionEnd);
+    if (!/^\d$/.test(e.key) && e.key !== ' ' && e.key !== '-') {
+      if (
+        e.key !== '+' ||
+        input.selectionStart !== 0 ||
+        (input.value.includes('+') && !selectedValue.includes('+'))
+      ) {
+        e.preventDefault();
+        triggerPhoneWarning('Use digits, spaces, hyphens, and an optional + at the beginning.');
+        return;
+      }
     }
-    if (e.key === '+' && (e.target.selectionStart !== 0 || e.target.value.includes('+'))) {
+    if (
+      /^\d$/.test(e.key) &&
+      input.value.replace(/\D/g, '').length - selectedValue.replace(/\D/g, '').length >= 15
+    ) {
       e.preventDefault();
-      triggerPhoneWarning('+ country code can only be at the beginning.');
-      return;
-    }
-    if ((e.key === '-' || e.key === ')') && e.target.selectionStart === 0) {
-      e.preventDefault();
-      triggerPhoneWarning('Phone number cannot start with a hyphen or parenthesis.');
-      return;
-    }
-    if (!/^[0-9+\s\-()]$/.test(e.key)) {
-      e.preventDefault();
-      triggerPhoneWarning(`Symbol (${e.key}) is not allowed in phone number.`);
-      return;
+      triggerPhoneWarning('Phone number cannot exceed 15 digits.');
     }
   };
 
   const handlePhoneChange = (e) => {
-    let val = e.target.value;
-    val = val.replace(/[^0-9+\s\-()]/g, '');
-    val = val.replace(/^[-)\s]+/, '');
-    if (val.includes('+')) {
-      const hasLeadingPlus = val.startsWith('+');
-      val = (hasLeadingPlus ? '+' : '') + val.replace(/\+/g, '');
-    }
-    val = val.replace(/-{2,}/g, '-');
+    const rawValue = e.target.value;
+    const val = sanitizePhone(rawValue);
     setPhone(val);
-    if (phoneError) {
-      setPhoneError(validatePhone(val));
+    setErrorMessage(null);
+    if (rawValue !== val) {
+      triggerPhoneWarning(rawValue.replace(/\D/g, '').length > 15
+        ? 'Phone number cannot exceed 15 digits.'
+        : 'Use digits, spaces, hyphens, and an optional + at the beginning.');
     }
+    if (phoneError) setPhoneError(validatePhone(val));
+  };
+
+  const handlePhonePaste = (e) => {
+    const pastedText = e.clipboardData.getData('text');
+    const input = e.currentTarget;
+    const nextValue = phone.slice(0, input.selectionStart) +
+      pastedText +
+      phone.slice(input.selectionEnd);
+    const sanitized = sanitizePhone(nextValue);
+    e.preventDefault();
+    setPhone(sanitized);
+    setErrorMessage(null);
+    if (nextValue !== sanitized) {
+      triggerPhoneWarning(nextValue.replace(/\D/g, '').length > 15
+        ? 'Phone number cannot exceed 15 digits.'
+        : 'Use digits, spaces, hyphens, and an optional + at the beginning.');
+    }
+    if (phoneError) setPhoneError(validatePhone(sanitized));
   };
 
   useEffect(() => {
@@ -264,7 +382,7 @@ export default function ContactPage() {
         '';
 
       if (foundPhone) {
-        setPhone(foundPhone);
+        setPhone(String(foundPhone).replace(/\D/g, '').slice(0, 15));
       } else if (typeof window !== 'undefined') {
         const token = localStorage.getItem('visitexpo_access_token');
         if (token) {
@@ -274,7 +392,7 @@ export default function ContactPage() {
             .then((r) => r.json())
             .then((data) => {
               if (data?.user?.phone) {
-                setPhone(data.user.phone);
+                setPhone(String(data.user.phone).replace(/\D/g, '').slice(0, 15));
                 try {
                   const curr = JSON.parse(localStorage.getItem('visitexpo_user') || '{}');
                   localStorage.setItem('visitexpo_user', JSON.stringify({ ...curr, phone: data.user.phone }));
@@ -301,40 +419,19 @@ export default function ContactPage() {
     const finalEmail = (email || user?.email || '').trim();
     const finalPhone = phone.trim();
     const finalMessage = message.trim();
-
-    if (!finalName) {
-      setNameError('Please enter your full name.');
-      setErrorMessage('Please enter your full name.');
-      return;
-    }
-    if (finalName.length < 2 || !/^[a-zA-Z\s.'-]+$/.test(finalName)) {
-      setNameError('Please enter a valid name (letters only).');
-      setErrorMessage('Please enter a valid name (letters only).');
-      return;
-    }
-
-    if (!finalEmail) {
-      setEmailError('Please enter your email address.');
-      setErrorMessage('Please enter your email address.');
-      return;
-    }
-    if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(finalEmail)) {
-      setEmailError('Please enter a valid email address (e.g. name@company.com).');
-      setErrorMessage('Please enter a valid email address.');
-      return;
-    }
-
+    const nameValidationError = validateName(finalName);
+    const emailValidationError = validateEmail(finalEmail);
     const phoneValidationErr = validatePhone(finalPhone);
-    if (phoneValidationErr) {
-      setPhoneError(phoneValidationErr);
-      setErrorMessage(phoneValidationErr);
-      return;
-    }
-
     const messageValidationErr = validateMessage(finalMessage);
-    if (messageValidationErr) {
-      setMessageError(messageValidationErr);
-      setErrorMessage(messageValidationErr);
+    setNameError(nameValidationError);
+    setEmailError(emailValidationError);
+    setPhoneError(phoneValidationErr);
+    setMessageError(messageValidationErr);
+
+    const firstValidationError =
+      nameValidationError || emailValidationError || phoneValidationErr || messageValidationErr;
+    if (firstValidationError) {
+      setErrorMessage(firstValidationError);
       return;
     }
 
@@ -393,57 +490,72 @@ export default function ContactPage() {
             <span className="text-zinc-900 font-bold">Contact Us</span>
           </nav>
 
-          <div className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 sm:px-7 sm:py-6">
-            <div className="max-w-4xl space-y-2">
-              <p className="text-sm font-semibold text-zinc-500">Contact VisitExpo</p>
-              <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 sm:text-3xl">
-                We&apos;re Here to Help You Connect
-              </h1>
-              <p className="max-w-2xl text-sm leading-relaxed text-zinc-600">
-                Have questions regarding trade exhibition listings, reserving exhibitor booth space, downloading digital visitor passes, or API integration? Connect directly with our team.
-              </p>
+          <div className="relative isolate overflow-hidden rounded-3xl border border-rose-100 bg-gradient-to-br from-white via-white to-rose-50 px-5 py-7 shadow-sm sm:px-8 sm:py-9">
+            <div aria-hidden="true" className="absolute -right-16 -top-20 -z-10 h-64 w-64 rounded-full bg-[#FF2E63]/5 blur-3xl" />
+            <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-center">
+              <div className="max-w-3xl space-y-3">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-100 bg-rose-50 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-[#D92352]">
+                  <HelpCircle className="h-3.5 w-3.5" />
+                  Contact VisitExpo
+                </span>
+                <h1 className="text-3xl font-bold tracking-tight text-zinc-950 sm:text-4xl">
+                  We&apos;re Here to Help You Connect
+                </h1>
+                <p className="max-w-2xl text-sm leading-relaxed text-zinc-600 sm:text-base">
+                  Have questions about event listings, exhibitor booths, visitor passes, or integrations? Our team is ready to help.
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-3 rounded-2xl border border-white bg-white/80 px-4 py-3 shadow-sm md:min-w-52">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-zinc-500">Typical response</p>
+                  <p className="text-sm font-bold text-zinc-900">Within 4 business hours</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Contact Channels Grid */}
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {/* Visit Us */}
-          <div className="flex items-start gap-3 border-b border-zinc-200 px-1 py-3 md:border-b-0 md:border-r">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600">
+          <div className="flex h-full items-start gap-3.5 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs transition hover:-translate-y-0.5 hover:border-rose-200 hover:shadow-sm sm:p-5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-[#D92352]">
               <MapPin className="h-4 w-4" />
             </div>
-            <div className="min-w-0 space-y-1 pr-3">
-              <h3 className="text-sm font-semibold text-zinc-900">Visit Us</h3>
-              <p className="text-xs leading-relaxed text-zinc-600">
+            <div className="min-w-0 space-y-1.5">
+              <h3 className="text-sm font-bold text-zinc-950">Visit Our Office</h3>
+              <p className="text-xs leading-relaxed text-zinc-600 sm:text-sm">
                 LEO MEO iT SOLUTIONS, Gate 3, Nesco Center, Western Express Highway, Goregaon East, Mumbai 400063.
               </p>
             </div>
           </div>
 
           {/* Phone */}
-          <div className="flex items-start gap-3 border-b border-zinc-200 px-1 py-3 md:border-b-0 md:border-r">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600">
+          <div className="flex h-full items-start gap-3.5 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs transition hover:-translate-y-0.5 hover:border-rose-200 hover:shadow-sm sm:p-5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
               <Phone className="h-4 w-4" />
             </div>
-            <div className="space-y-1">
-              <h3 className="text-sm font-semibold text-zinc-900">Direct Helpline</h3>
-              <p className="text-xs text-zinc-500">Mon – Fri, 9am – 6pm IST</p>
-              <a href="tel:+919323677688" className="text-xs font-medium text-zinc-800 hover:underline">
+            <div className="space-y-1.5">
+              <h3 className="text-sm font-bold text-zinc-950">Direct Helpline</h3>
+              <p className="text-xs text-zinc-500">Monday–Friday, 9am–6pm IST</p>
+              <a href="tel:+919323677688" className="text-sm font-semibold text-zinc-800 transition hover:text-[#D92352]">
                 +91 93236 77688
               </a>
             </div>
           </div>
 
           {/* Work With Us */}
-          <div className="flex items-start gap-3 px-1 py-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600">
+          <div className="flex h-full items-start gap-3.5 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs transition hover:-translate-y-0.5 hover:border-rose-200 hover:shadow-sm sm:col-span-2 sm:p-5 lg:col-span-1">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
               <Mail className="h-4 w-4" />
             </div>
-            <div className="space-y-1">
-              <h3 className="text-sm font-semibold text-zinc-900">Email Support</h3>
+            <div className="space-y-1.5">
+              <h3 className="text-sm font-bold text-zinc-950">Email Support</h3>
               <p className="text-xs text-zinc-500">Inquiries, partnerships &amp; support</p>
-              <a href="mailto:support@visitexpo.in" className="text-xs font-medium text-zinc-800 hover:underline">
+              <a href="mailto:support@visitexpo.in" className="text-sm font-semibold text-zinc-800 transition hover:text-[#D92352]">
                 support@visitexpo.in
               </a>
             </div>
@@ -453,18 +565,24 @@ export default function ContactPage() {
         {/* Main Section: Interactive Form + Context */}
         <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12 lg:gap-6">
           {/* Left Column: Form */}
-          <div className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6 lg:col-span-7">
-            <div>
-              <h2 className="text-xl font-semibold tracking-tight text-zinc-900">
-                Send Us a Message
-              </h2>
-              <p className="mt-1 text-sm text-zinc-500">
+          <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm lg:col-span-7">
+            <div className="flex items-start gap-3 border-b border-zinc-100 bg-gradient-to-r from-rose-50/80 via-white to-white px-5 py-5 sm:px-7">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#FF2E63] text-white shadow-sm shadow-rose-200">
+                <Send className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold tracking-tight text-zinc-950 sm:text-2xl">
+                  Send Us a Message
+                </h2>
+                <p className="mt-1 text-sm leading-relaxed text-zinc-600">
                 Fill in the details below and an event specialist will reach out within 4 business hours.
-              </p>
+                </p>
+              </div>
             </div>
 
-            {submitted ? (
-              <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 p-6 text-center">
+            <div className="space-y-5 p-4 sm:p-7">
+              {submitted ? (
+              <div className="space-y-3 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white p-6 text-center">
                 <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white text-emerald-600">
                   <CheckCircle2 className="h-5 w-5" />
                 </div>
@@ -481,7 +599,7 @@ export default function ContactPage() {
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} noValidate className="space-y-4">
+              <form onSubmit={handleSubmit} noValidate className="space-y-5">
                 {errorMessage && (
                   <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700">
                     {errorMessage}
@@ -490,8 +608,8 @@ export default function ContactPage() {
 
                 {/* Role Selection */}
                 <div>
-                  <div className="mb-2 flex items-center justify-between">
-                    <label className="block text-sm font-medium text-zinc-700">
+                  <div className="mb-2.5 flex items-center justify-between gap-2">
+                    <label className="block text-sm font-semibold text-zinc-800">
                       I am inquiring as a:
                     </label>
                     {user && (
@@ -501,7 +619,7 @@ export default function ContactPage() {
                       </span>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
                     {CONTACT_ROLES.map((role) => {
                       const Icon = role.icon;
                       const isSelected = selectedRole === role.id;
@@ -515,15 +633,15 @@ export default function ContactPage() {
                             if (!isDisabled) setSelectedRole(role.id);
                           }}
                           title={isDisabled ? `Disabled: Your account is registered as a ${user.role || 'Visitor'}` : role.label}
-                          className={`flex flex-col items-center justify-center gap-1.5 rounded-lg border px-2 py-3 text-xs transition-colors ${
+                          className={`flex min-h-20 flex-col items-center justify-center gap-2 rounded-xl border px-2 py-3 text-xs font-medium transition-all ${
                             isSelected
-                              ? 'border-zinc-900 bg-zinc-900 font-medium text-white'
+                              ? 'border-[#FF2E63] bg-rose-50 text-rose-800 shadow-sm ring-1 ring-rose-100'
                               : isDisabled
                               ? 'cursor-not-allowed border-zinc-200 bg-zinc-50 text-zinc-400 opacity-50'
-                              : 'border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50'
+                              : 'border-zinc-200 bg-white text-zinc-600 hover:border-rose-200 hover:bg-rose-50/60'
                           }`}
                         >
-                          <Icon className={`h-4 w-4 ${isSelected ? 'text-[#FFCC00]' : 'text-zinc-500'}`} />
+                          <Icon className={`h-4 w-4 ${isSelected ? 'text-[#D92352]' : 'text-zinc-500'}`} />
                           <span className="text-center leading-tight">{role.label}</span>
                         </button>
                       );
@@ -549,11 +667,13 @@ export default function ContactPage() {
                       disabled={Boolean(user)}
                       readOnly={Boolean(user)}
                       value={name}
-                      onChange={(e) => {
-                        setName(e.target.value.replace(/[^a-zA-Z\s.'-]/g, ''));
-                        if (nameError) setNameError('');
-                      }}
+                      onKeyDown={handleNameKeyDown}
+                      onChange={handleNameChange}
+                      onPaste={handleNamePaste}
+                      onBlur={() => setNameError(validateName(name))}
                       placeholder="e.g. Rajeev Haldar"
+                      aria-invalid={Boolean(nameError)}
+                      aria-describedby={nameError ? 'contact-name-feedback' : undefined}
                       className={`w-full rounded-lg border px-3.5 py-2.5 text-sm transition-colors ${
                         user
                           ? 'bg-zinc-100 text-zinc-600 border-zinc-200 cursor-not-allowed select-none'
@@ -562,8 +682,8 @@ export default function ContactPage() {
                           : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FF2E63]'
                       }`}
                     />
-                    {nameError && !user && (
-                      <p className="mt-1 text-[11px] font-medium text-rose-500 flex items-center gap-1 animate-in fade-in">
+                    {nameError && (
+                      <p id="contact-name-feedback" className="mt-1 text-[11px] font-medium text-rose-500 flex items-center gap-1 animate-in fade-in">
                         <AlertCircle className="h-3 w-3 shrink-0 text-rose-500" />
                         <span>{nameError}</span>
                       </p>
@@ -582,17 +702,18 @@ export default function ContactPage() {
                       )}
                     </div>
                     <input
-                      type="text"
+                      type="email"
                       inputMode="email"
                       autoComplete="email"
                       disabled={Boolean(user)}
                       readOnly={Boolean(user)}
                       value={email}
-                      onChange={(e) => {
-                        setEmail(e.target.value.replace(/\s/g, ''));
-                        if (emailError) setEmailError('');
-                      }}
+                      onKeyDown={handleEmailKeyDown}
+                      onChange={handleEmailChange}
+                      onBlur={() => setEmailError(validateEmail(email))}
                       placeholder="e.g. rajeev@visitexpo.in"
+                      aria-invalid={Boolean(emailError)}
+                      aria-describedby={emailError ? 'contact-email-feedback' : undefined}
                       className={`w-full rounded-lg border px-3.5 py-2.5 text-sm transition-colors ${
                         user
                           ? 'bg-zinc-100 text-zinc-600 border-zinc-200 cursor-not-allowed select-none'
@@ -601,8 +722,8 @@ export default function ContactPage() {
                           : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FF2E63]'
                       }`}
                     />
-                    {emailError && !user && (
-                      <p className="mt-1 text-[11px] font-medium text-rose-500 flex items-center gap-1 animate-in fade-in">
+                    {emailError && (
+                      <p id="contact-email-feedback" className="mt-1 text-[11px] font-medium text-rose-500 flex items-center gap-1 animate-in fade-in">
                         <AlertCircle className="h-3 w-3 shrink-0 text-rose-500" />
                         <span>{emailError}</span>
                       </p>
@@ -629,8 +750,11 @@ export default function ContactPage() {
                       value={phone}
                       onKeyDown={handlePhoneKeyDown}
                       onChange={handlePhoneChange}
+                      onPaste={handlePhonePaste}
                       onBlur={() => setPhoneError(validatePhone(phone))}
-                      placeholder="e.g. +91 98765 43210"
+                      placeholder="Enter phone number (10–15 digits)"
+                      aria-invalid={Boolean(phoneError)}
+                      aria-describedby={phoneError || phoneWarning ? 'phone-number-feedback' : undefined}
                       className={`w-full rounded-lg border px-3.5 py-2.5 text-sm transition-colors ${
                         phoneError || phoneWarning
                           ? 'bg-rose-50/40 border-rose-500 text-zinc-900 focus:bg-white focus:outline-none ring-1 ring-rose-500/20'
@@ -638,7 +762,7 @@ export default function ContactPage() {
                       }`}
                     />
                     {(phoneWarning || phoneError) && (
-                      <p className="mt-1 text-[11px] font-medium text-rose-500 flex items-center gap-1 animate-in fade-in">
+                      <p id="phone-number-feedback" className="mt-1 text-[11px] font-medium text-rose-500 flex items-center gap-1 animate-in fade-in">
                         <AlertCircle className="h-3 w-3 shrink-0 text-rose-500" />
                         <span>{phoneWarning || phoneError}</span>
                       </p>
@@ -705,70 +829,81 @@ export default function ContactPage() {
                   <span>{submitting ? 'Sending inquiry...' : 'Send Message'}</span>
                 </button>
               </form>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Right Column: Key Details & Quick Support FAQ (5 cols) */}
           <div className="space-y-4 lg:col-span-5">
             {/* Quick Resolution Card */}
-            <div className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-emerald-600" />
-                <h3 className="font-bold text-base text-zinc-900">Verified Platform Support</h3>
+            <div className="overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-sm">
+              <div className="flex items-center gap-3 border-b border-emerald-100 bg-gradient-to-r from-emerald-50 to-white px-4 py-4 sm:px-5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-zinc-950 sm:text-base">Verified Platform Support</h3>
+                  <p className="mt-0.5 text-xs text-zinc-500">Reliable help for your VisitExpo account</p>
+                </div>
               </div>
 
-              <div className="space-y-3 text-sm text-zinc-600">
-                <div className="flex items-start gap-2.5">
-                  <div className="h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
+              <div className="space-y-2.5 p-4 sm:p-5">
+                <div className="flex items-start gap-3 rounded-2xl border border-zinc-100 bg-zinc-50/70 p-3">
+                  <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                    <CheckCircle2 className="h-4 w-4" />
                   </div>
-                  <div>
-                    <strong className="text-zinc-900 block font-semibold">Real-Time Data Sync</strong>
-                    <span>Changes to your published events or booth inventory sync live across the platform.</span>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <div className="h-5 w-5 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                  </div>
-                  <div>
-                    <strong className="text-zinc-900 block font-semibold">Organizer Ownership Claim</strong>
-                    <span>Fast-track verification for official event organizers with existing WordPress directory listings.</span>
+                  <div className="space-y-0.5 text-sm leading-relaxed text-zinc-600">
+                    <strong className="block font-semibold text-zinc-900">Real-Time Data Sync</strong>
+                    <span className="text-xs">Published event and booth changes sync across the platform.</span>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-2.5">
-                  <div className="h-5 w-5 rounded-full bg-pink-50 text-[#FF2E63] flex items-center justify-center shrink-0 mt-0.5">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
+                <div className="flex items-start gap-3 rounded-2xl border border-zinc-100 bg-zinc-50/70 p-3">
+                  <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                    <CheckCircle2 className="h-4 w-4" />
                   </div>
-                  <div>
-                    <strong className="text-zinc-900 block font-semibold">Delegate Entry Passes</strong>
-                    <span>Instant barcode generation and re-issuance for lost visitor passes.</span>
+                  <div className="space-y-0.5 text-sm leading-relaxed text-zinc-600">
+                    <strong className="block font-semibold text-zinc-900">Organizer Ownership Claim</strong>
+                    <span className="text-xs">Fast-track verification for official event organizers.</span>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 rounded-2xl border border-zinc-100 bg-zinc-50/70 p-3">
+                  <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-[#D92352]">
+                    <CheckCircle2 className="h-4 w-4" />
+                  </div>
+                  <div className="space-y-0.5 text-sm leading-relaxed text-zinc-600">
+                    <strong className="block font-semibold text-zinc-900">Delegate Entry Passes</strong>
+                    <span className="text-xs">Quick barcode generation and re-issuance for lost passes.</span>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Accordion FAQ */}
-            <div className="space-y-2 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5">
-              <div className="flex items-center gap-2 border-b border-zinc-100 pb-3">
-                <HelpCircle className="h-4 w-4 text-zinc-500" />
-                <h3 className="text-sm font-semibold text-zinc-900">Frequently Asked Questions</h3>
+            <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
+              <div className="flex items-center gap-3 border-b border-zinc-100 bg-zinc-50/80 px-4 py-4 sm:px-5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-[#D92352]">
+                  <HelpCircle className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-zinc-950">Frequently Asked Questions</h3>
+                  <p className="mt-0.5 text-xs text-zinc-500">Quick answers to common questions</p>
+                </div>
               </div>
 
-              <div>
+              <div className="px-4 sm:px-5">
                 {FAQS.map((faq, idx) => {
                   const isOpen = openFaq === idx;
                   return (
                     <div
                       key={idx}
-                      className="border-b border-zinc-100 py-1 text-sm last:border-b-0"
+                      className="border-b border-zinc-100 text-sm last:border-b-0"
                     >
                       <button
                         type="button"
                         onClick={() => setOpenFaq(isOpen ? null : idx)}
-                        className="flex w-full items-center justify-between gap-3 py-3 text-left font-medium text-zinc-800 transition-colors hover:text-zinc-950"
+                        className="flex w-full items-center justify-between gap-3 py-3.5 text-left font-semibold text-zinc-700 transition-colors hover:text-[#D92352]"
                       >
                         <span className="leading-snug">{faq.q}</span>
                         <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${isOpen ? 'rotate-180 text-[#FF2E63]' : 'text-zinc-400'}`} />

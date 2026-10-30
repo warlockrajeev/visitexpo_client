@@ -44,8 +44,7 @@ import {
   Sliders,
   ShieldCheck,
   Star,
-  X,
-  Sparkles
+  X
 } from 'lucide-react';
 import { detectUserLocation } from '@/utils/geoUtils.js';
 
@@ -456,100 +455,84 @@ export default function RecommendationsPage() {
 
       {/* Main Content Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-16 sm:pt-20 pb-16 space-y-4 sm:space-y-5 flex-1 w-full">
-        <div>
-          {/* Breadcrumb Navigation */}
-          <nav className="flex items-center gap-2 text-xs font-medium text-zinc-500 mb-2 sm:mb-2.5">
-            <Link href="/" className="hover:text-zinc-900 transition-colors">
-              Home
-            </Link>
-            <span>/</span>
-            <span className="text-zinc-900 font-bold">Recommended For You</span>
-          </nav>
+        {/* Hero Header Banner */}
+        <section className="relative overflow-hidden rounded-2xl bg-zinc-950 text-white shadow-lg sm:rounded-3xl">
+          <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/85 to-zinc-900/90" />
+          <div className="relative z-10 space-y-5 p-5 sm:p-7 md:space-y-6 md:p-8">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
+              <div className="min-w-0 max-w-3xl space-y-3.5">
+                <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-white sm:text-3xl lg:text-4xl">
+                  Events Recommended For You
+                </h1>
+                <p className="max-w-2xl text-sm font-normal leading-relaxed text-zinc-300 sm:text-base">
+                  Discover trade shows and business expos scored against your geographic radius, selected industry clusters, and schedule readiness.
+                </p>
+              </div>
 
-          {/* Hero Header Banner */}
-          <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden bg-zinc-950 text-white shadow-lg">
-            <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/85 to-zinc-900/90 z-0" />
-            <div className="relative z-10 p-5 sm:p-6 md:p-7 space-y-3.5">
-              
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-2 max-w-2xl">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-[11px] font-bold text-[#FFCC00]">
-                    <Sparkles className="h-3.5 w-3.5 text-[#FF2E63]" />
-                    <span>Personalized Matchmaking Engine • AI Discovery</span>
+              {/* Save Preferences CTA */}
+              <div className="flex w-full shrink-0 items-center gap-2.5 lg:w-auto lg:self-center">
+                <button
+                  type="button"
+                  onClick={handleSavePreferences}
+                  disabled={savingPreferences}
+                  className={`inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-bold transition-all shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-70 sm:flex-none sm:text-sm ${
+                    savedSuccess
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-[#FFCC00] text-zinc-950 hover:bg-[#FFB703]'
+                  }`}
+                >
+                  {savedSuccess ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span>Preferences Saved</span>
+                    </>
+                  ) : savingPreferences ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin text-zinc-950" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Bookmark className="h-4 w-4" />
+                      <span>Save My Preferences</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={fetchRecommendations}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-zinc-200 transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00] cursor-pointer"
+                  title="Refresh Recommendations"
+                  aria-label="Refresh recommendations"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-[#FFCC00]' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Stats Pill Bar */}
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/15 pt-4 text-xs text-zinc-300 sm:text-sm">
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-white">{events.length}</span> expos tailored to your profile
+              </div>
+              <span className="hidden text-zinc-600 sm:inline">•</span>
+              <div className="flex items-center gap-1.5">
+                <span>Top Match:</span>
+                <span className="font-extrabold text-emerald-400">{events[0]?.matchScore || 95}%</span>
+              </div>
+              {detectedCity && (
+                <>
+                  <span className="hidden text-zinc-600 sm:inline">•</span>
+                  <div className="flex items-center gap-1 text-zinc-300">
+                    <MapPin className="h-3.5 w-3.5 text-[#FF2E63]" />
+                    <span>GPS: {detectedCity}</span>
                   </div>
-                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-white leading-tight">
-                    Events Recommended For You
-                  </h1>
-                  <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed font-normal">
-                    Discover trade shows and business expos scored against your geographic radius, selected industry clusters, and schedule readiness.
-                  </p>
-                </div>
-
-                {/* Save Preferences CTA */}
-                <div className="flex items-center gap-2.5 shrink-0 self-start md:self-center">
-                  <button
-                    type="button"
-                    onClick={handleSavePreferences}
-                    disabled={savingPreferences}
-                    className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer ${
-                      savedSuccess
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 font-black'
-                    }`}
-                  >
-                    {savedSuccess ? (
-                      <>
-                        <CheckCircle2 className="h-4 w-4" />
-                        <span>Preferences Saved</span>
-                      </>
-                    ) : savingPreferences ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin text-zinc-950" />
-                        <span>Saving...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Bookmark className="h-4 w-4" />
-                        <span>Save My Preferences</span>
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={fetchRecommendations}
-                    className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-zinc-200 border border-white/15 transition-colors cursor-pointer"
-                    title="Refresh Recommendations"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-[#FFCC00]' : ''}`} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Quick Stats Pill Bar */}
-              <div className="pt-2.5 flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-zinc-300 border-t border-white/10">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-white">{events.length}</span> expos tailored to your profile
-                </div>
-                <span className="text-zinc-600">•</span>
-                <div className="flex items-center gap-1.5">
-                  <span>Top Match:</span>
-                  <span className="text-emerald-400 font-extrabold">{events[0]?.matchScore || 95}%</span>
-                </div>
-                {detectedCity && (
-                  <>
-                    <span className="text-zinc-600">•</span>
-                    <div className="flex items-center gap-1 text-zinc-300">
-                      <MapPin className="h-3.5 w-3.5 text-[#FF2E63]" />
-                      <span>GPS: {detectedCity}</span>
-                    </div>
-                  </>
-                )}
-              </div>
-
+                </>
+              )}
             </div>
           </div>
-        </div>
+        </section>
 
         {/* ===================================================================== */}
         {/* INTERACTIVE CONTROLS CONTAINER                                        */}

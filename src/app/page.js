@@ -858,11 +858,17 @@ export default function LandingPage() {
       return 'Phone number cannot contain letters';
     }
     if (/[^0-9+\s\-()]/.test(trimmed)) {
-      return 'Phone contains invalid symbols (only digits, +, - allowed)';
+      return 'Use digits and standard phone formatting (+, spaces, hyphens, or parentheses)';
+    }
+    if (
+      trimmed.includes('+') &&
+      (!trimmed.startsWith('+') || trimmed.indexOf('+') !== trimmed.lastIndexOf('+'))
+    ) {
+      return 'Use + only once, at the beginning of the country code';
     }
     const digits = trimmed.replace(/\D/g, '');
     if (digits.length < 7) {
-      return 'Phone number is too short (minimum 7 digits)';
+      return 'Phone number must contain at least 7 digits';
     }
     if (digits.length > 15) {
       return 'Phone number cannot exceed 15 digits';
@@ -2502,10 +2508,15 @@ export default function LandingPage() {
                           id="contact-phone-input"
                           name="contactPhone"
                           type="tel"
+                          inputMode="tel"
+                          autoComplete="tel"
+                          maxLength={24}
                           placeholder="+91 93236 77688"
                           value={contactPhone}
                           onChange={handlePhoneChange}
                           onBlur={handlePhoneBlur}
+                          aria-invalid={Boolean(contactErrors.phone)}
+                          aria-describedby={contactErrors.phone ? 'contact-phone-error' : 'contact-phone-hint'}
                           className={`w-full rounded-lg border py-2 pl-3 pr-8 text-xs text-zinc-900 transition-all ${
                             contactErrors.phone
                               ? 'border-red-500 bg-red-50/20 ring-2 ring-red-500/20 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/30'
@@ -2524,6 +2535,11 @@ export default function LandingPage() {
                         <p id="contact-phone-error" className="text-[11px] text-red-600 mt-1 font-semibold flex items-center gap-1 animate-in fade-in duration-150">
                           <AlertCircle className="h-3 w-3 shrink-0 text-red-600" />
                           <span>{contactErrors.phone}</span>
+                        </p>
+                      )}
+                      {!contactErrors.phone && (
+                        <p id="contact-phone-hint" className="mt-1 text-[10px] text-zinc-500">
+                          Enter 7–15 digits, including country code if applicable.
                         </p>
                       )}
                     </div>
@@ -2696,7 +2712,7 @@ export default function LandingPage() {
                 <Ticket className="h-3 w-3" />
                 Organizer Pricing &amp; Plans
               </span>
-              <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-white leading-tight">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-extrabold tracking-tight text-white leading-tight">
                 Transparent Pricing Built to Scale Your Exhibitions
               </h2>
               <p className="text-xs text-zinc-400 max-w-xl leading-normal">

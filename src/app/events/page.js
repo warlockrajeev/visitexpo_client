@@ -51,7 +51,7 @@ import {
   Crown,
   Ticket
 } from 'lucide-react';
-import { showSweetConfirm, showSweetSuccess, showSweetAlert } from '@/utils/sweetalert.js';
+import { showSweetConfirm, showSweetAlert } from '@/utils/sweetalert.js';
 import {
   calculateDistanceKm,
   resolveEventCoordinates,
@@ -80,6 +80,15 @@ const API_URL =
   (typeof window !== 'undefined' && window.location.hostname.includes('visitexpo.in')
     ? 'https://api.visitexpo.in/api'
     : 'http://localhost:5000/api');
+
+const escapeHtml = (value) =>
+  String(value ?? '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[character]);
 
 function DirectoryDropdown({ value, options, onChange, searchable = false, icon: Icon }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -221,6 +230,7 @@ export default function EventsDirectoryPage() {
   const [followedSlugs, setFollowedSlugs] = useState(new Set());
   const [interestedSlugs, setInterestedSlugs] = useState(new Set());
   const [claimedPassIds, setClaimedPassIds] = useState(new Set());
+  const passRegistrationInFlight = useRef(new Set());
   const [toastMessage, setToastMessage] = useState(null);
 
   // Read URL query parameters on initial page load
@@ -776,6 +786,46 @@ export default function EventsDirectoryPage() {
   const handleGetPass = async (evt) => {
     const slug = (evt.slug || evt.id || '').toLowerCase().trim();
     const idKey = String(evt.id || evt._id || slug).trim();
+    const formatDate = (date) => {
+      if (!date) return '';
+      const parsedDate = new Date(date);
+      return Number.isNaN(parsedDate.getTime())
+        ? ''
+        : new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(parsedDate);
+    };
+    const dateRange = [formatDate(evt.startDate), formatDate(evt.endDate)].filter(Boolean).join(' - ');
+    const eventTitle = escapeHtml(evt.title || 'Exhibition');
+    const eventDates = escapeHtml(evt.dates || evt.date || dateRange || 'Dates to be announced');
+    const eventVenue = escapeHtml(evt.venue || 'Venue to be announced');
+    const eventLocation = escapeHtml(
+      [evt.city, evt.state, evt.country].filter(Boolean).join(', ') ||
+        evt.location ||
+        evt.address ||
+        'Location to be announced'
+    );
+    const eventDetailsHtml = `
+      <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;margin:12px 0 16px;background:#fffbeb;border:1px solid #fde68a;border-radius:16px;text-align:left;">
+        <div style="display:flex;align-items:center;justify-content:center;flex:none;width:42px;height:42px;border-radius:13px;background:#fef3c7;color:#92400e;font-size:21px;">&#127915;</div>
+        <div style="min-width:0;">
+          <div style="font-size:15px;line-height:1.4;font-weight:800;color:#18181b;overflow-wrap:anywhere;">${eventTitle}</div>
+          <div style="margin-top:3px;font-size:11px;font-weight:600;color:#71717a;">Visitor registration details</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:16px;text-align:left;">
+        <div style="padding:10px 12px;border:1px solid #e4e4e7;border-radius:12px;background:#fff;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#a1a1aa;">Event dates</div>
+          <div style="margin-top:3px;font-size:12px;font-weight:600;color:#3f3f46;">${eventDates}</div>
+        </div>
+        <div style="padding:10px 12px;border:1px solid #e4e4e7;border-radius:12px;background:#fff;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#a1a1aa;">Venue</div>
+          <div style="margin-top:3px;font-size:12px;font-weight:600;color:#3f3f46;overflow-wrap:anywhere;">${eventVenue}</div>
+        </div>
+        <div style="padding:10px 12px;border:1px solid #e4e4e7;border-radius:12px;background:#fff;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#a1a1aa;">Location</div>
+          <div style="margin-top:3px;font-size:12px;font-weight:600;color:#3f3f46;overflow-wrap:anywhere;">${eventLocation}</div>
+        </div>
+      </div>
+    `;
     const isAlreadyClaimed =
       claimedPassIds.has(idKey) ||
       claimedPassIds.has(slug) ||
@@ -783,45 +833,52 @@ export default function EventsDirectoryPage() {
       (evt.id && claimedPassIds.has(String(evt.id)));
 
     if (isAlreadyClaimed) {
-      await showSweetAlert(
+      const result = await showSweetAlert(
         {
-          title: 'Visitor Pass Already Issued! ✓',
+          title: 'Pass Already Registered',
           icon: 'success',
-          confirmButtonText: 'Great, Understood',
+          confirmButtonText: 'View My Pass',
+          showCancelButton: true,
+          cancelButtonText: 'Close',
+          reverseButtons: true,
+          width: 'min(92vw, 540px)',
           html: `
-            <div style="font-size: 13px; line-height: 1.6; text-align: left; padding: 4px;">
-              <p style="margin-bottom: 8px; font-weight: 500;">You already have an active complimentary pass for:</p>
-              <div style="font-weight: 800; font-size: 15px; margin-bottom: 6px; color: #10b981;">${evt.title}</div>
-              ${evt.dates ? `<p style="font-size: 12px; margin-bottom: 4px; font-weight: 600;">📅 ${evt.dates}</p>` : ''}
-              ${evt.venue || evt.city ? `<p style="font-size: 12px; opacity: 0.8; margin-bottom: 12px;">📍 ${[evt.venue, evt.city].filter(Boolean).join(', ')}</p>` : ''}
-              <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 12px; font-size: 12px; font-weight: 600; color: #059669;">
-                ✓ Active pass registered to your account.<br />
-                ✓ Present your name / registered email at the registration gate for fast-track badge printing.
-              </div>
+            <div style="text-align:left;">
+              <p style="margin:0;color:#52525b;font-size:13px;line-height:1.6;">An active pass is already registered for this event. You can view or print it from your visitor dashboard.</p>
+              ${eventDetailsHtml}
             </div>
           `
-        },
-        'success'
+        }
       );
+      if (result?.isConfirmed) router.push('/dashboard');
       return;
     }
 
     const confirmed = await showSweetConfirm(
       {
-        title: 'Confirm Free Visitor Pass?',
+        title: 'Confirm Your Visitor Pass',
         icon: 'question',
-        confirmButtonText: 'Yes, Issue Pass',
+        confirmButtonText: 'Confirm & Get Pass',
         cancelButtonText: 'Cancel',
         isDanger: false,
+      },
+      '',
+      {
+        width: 'min(92vw, 560px)',
+        padding: '1.25rem',
         html: `
-          <div style="font-size: 13px; line-height: 1.6; text-align: left; padding: 4px;">
-            <p style="margin-bottom: 8px; font-weight: 500;">Confirm your complimentary registration and digital badge for:</p>
-            <div style="font-weight: 800; font-size: 15px; margin-bottom: 6px; color: #f59e0b;">${evt.title}</div>
-            ${evt.dates ? `<p style="font-size: 12px; margin-bottom: 4px; font-weight: 600;">📅 ${evt.dates}</p>` : ''}
-            ${evt.venue || evt.city ? `<p style="font-size: 12px; opacity: 0.8; margin-bottom: 12px;">📍 ${[evt.venue, evt.city].filter(Boolean).join(', ')}</p>` : ''}
-            <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 12px; padding: 12px; font-size: 12px; color: #d97706; font-weight: 600;">
-              ✓ Free gate admission to exhibition halls<br />
-              ✓ Digital badge synced directly with your visitor account
+          <div style="text-align:left;">
+            <p style="margin:0;color:#52525b;font-size:13px;line-height:1.6;">Review the event details before confirming your complimentary visitor registration.</p>
+            ${eventDetailsHtml}
+            <div style="display:grid;grid-template-columns:1fr;gap:8px;padding:13px 14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;text-align:left;">
+              <div style="display:flex;align-items:center;gap:9px;color:#166534;font-size:12px;font-weight:700;">
+                <span style="display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#dcfce7;">&#10003;</span>
+                Free entry to the exhibition halls
+              </div>
+              <div style="display:flex;align-items:center;gap:9px;color:#166534;font-size:12px;font-weight:700;">
+                <span style="display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#dcfce7;">&#10003;</span>
+                Digital visitor pass generated after confirmation
+              </div>
             </div>
           </div>
         `
@@ -836,35 +893,93 @@ export default function EventsDirectoryPage() {
     }
 
     const eventId = evt._id || evt.id;
-    if (eventId && user?.email) {
-      try {
-        await axios.post(`${API_URL}/visitors/register`, {
-          eventId,
-          name: user?.name || user?.email?.split('@')[0] || 'Visitor',
-          email: user?.email,
-          phone: user?.phone || '+91-9999999999',
-          company: user?.organization?.name || user?.company || 'Trade Attendee',
-          designation: 'Business Visitor',
-          country: 'India',
-          attendanceType: 'in_person'
-        });
-      } catch (_) {}
+    if (!eventId || !user?.email) {
+      await showSweetAlert({
+        title: 'Unable to Register',
+        icon: 'error',
+        text: 'Event or visitor details are unavailable. Please try again after refreshing the page.'
+      });
+      return;
     }
 
-    setClaimedPassIds((prev) => {
-      const next = new Set(prev);
-      const keys = [evt.id, evt._id, evt.slug, slug, idKey].filter(Boolean).map(String);
-      keys.forEach((k) => next.add(k));
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('visitexpo_claimed_passes', JSON.stringify(Array.from(next)));
-      }
-      return next;
-    });
+    const requestKey = String(eventId);
+    if (passRegistrationInFlight.current.has(requestKey)) return;
+    passRegistrationInFlight.current.add(requestKey);
 
-    showSweetSuccess(
-      `Your complimentary digital pass for "${evt.title}" is ready and registered to your visitor account!`,
-      'Visitor Pass Confirmed! 🎉'
-    );
+    try {
+      const res = await axios.post(`${API_URL}/visitors/register`, {
+        eventId,
+        name: user?.name || user?.email?.split('@')[0] || 'Visitor',
+        email: user?.email,
+        phone: user?.phone || '+91-9999999999',
+        company: user?.organization?.name || user?.company || 'Trade Attendee',
+        designation: 'Business Visitor',
+        country: 'India',
+        attendanceType: 'in_person'
+      });
+
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Registration could not be completed.');
+      }
+
+      setClaimedPassIds((prev) => {
+        const next = new Set(prev);
+        const keys = [evt.id, evt._id, evt.slug, slug, idKey].filter(Boolean).map(String);
+        keys.forEach((key) => next.add(key));
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('visitexpo_claimed_passes', JSON.stringify(Array.from(next)));
+        }
+        return next;
+      });
+
+      const result = await showSweetAlert({
+        title: 'Your Visitor Pass Is Ready',
+        icon: 'success',
+        confirmButtonText: 'View & Download Pass',
+        cancelButtonText: 'Done',
+        showCancelButton: true,
+        reverseButtons: true,
+        width: 'min(92vw, 540px)',
+        html: `
+          <div style="text-align:left;">
+            <p style="margin:0 0 14px;color:#52525b;font-size:13px;line-height:1.6;">Your free visitor registration is confirmed. View your digital pass in <strong style="color:#18181b;">My Passes &amp; Badges</strong>, where you can print or save it.</p>
+            ${eventDetailsHtml}
+            <div style="padding:12px 14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;color:#166534;font-size:12px;font-weight:700;">
+              Digital pass generated for ${escapeHtml(user.name || user.email)}.
+            </div>
+          </div>
+        `
+      });
+      if (result?.isConfirmed) router.push('/dashboard');
+    } catch (error) {
+      const message = error.response?.data?.error || error.message || 'Registration could not be completed. Please try again.';
+      const duplicate = /already registered/i.test(message);
+      if (duplicate) {
+        setClaimedPassIds((prev) => {
+          const next = new Set(prev);
+          [evt.id, evt._id, evt.slug, slug, idKey].filter(Boolean).forEach((key) => next.add(String(key)));
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('visitexpo_claimed_passes', JSON.stringify(Array.from(next)));
+          }
+          return next;
+        });
+      }
+      const result = await showSweetAlert({
+        title: duplicate ? 'Pass Already Registered' : 'Registration Unsuccessful',
+        icon: duplicate ? 'info' : 'error',
+        text: duplicate
+          ? 'You are already registered for this event. Open My Passes & Badges to view or print your pass.'
+          : message,
+        confirmButtonText: duplicate ? 'View My Pass' : 'Close',
+        showCancelButton: duplicate,
+        cancelButtonText: 'Close',
+        reverseButtons: true,
+        width: 'min(92vw, 540px)'
+      });
+      if (duplicate && result?.isConfirmed) router.push('/dashboard');
+    } finally {
+      passRegistrationInFlight.current.delete(requestKey);
+    }
   };
 
   const handleToggleNearby = async () => {

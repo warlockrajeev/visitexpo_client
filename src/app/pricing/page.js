@@ -2479,7 +2479,7 @@ export default function PricingPage() {
 
               <button
                 onClick={handleCloseModal}
-                className="p-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900 border border-zinc-200/80 hover:border-zinc-300 transition-all duration-200 cursor-pointer hover:rotate-90 active:scale-95 flex items-center justify-center shadow-xs"
+                className="p-2 rounded-xl bg-zinc-100 hover:bg-red-100 text-zinc-500 hover:text-red-600 border border-zinc-200/80 hover:border-red-200 transition-all duration-200 cursor-pointer hover:rotate-90 active:scale-95 flex items-center justify-center shadow-xs"
                 title="Close dialog"
               >
                 <X className="h-5 w-5" />
@@ -2510,10 +2510,10 @@ export default function PricingPage() {
                     }}
                     className={`w-full px-3.5 py-2.5 rounded-xl border text-zinc-900 transition-colors ${
                       Boolean(user?.name)
-                        ? 'bg-zinc-100 text-zinc-600 border-zinc-200 cursor-not-allowed select-none opacity-85'
+                        ? 'bg-zinc-200 text-zinc-600 border-zinc-300 cursor-not-allowed select-none'
                         : formErrors.name
-                        ? 'bg-zinc-50 border-rose-500 focus:bg-white focus:outline-none focus:border-rose-500 ring-1 ring-rose-500/20'
-                        : 'bg-zinc-50 border-zinc-300 focus:bg-white focus:outline-none focus:border-[#FFCC00]'
+                        ? 'bg-white border-rose-500 focus:bg-white focus:outline-none focus:border-rose-500 ring-1 ring-rose-500/20'
+                        : 'bg-white border-zinc-300 focus:bg-white focus:outline-none focus:border-[#FFCC00]'
                     }`}
                   />
                   {formErrors.name && !Boolean(user?.name) && (
@@ -2536,7 +2536,7 @@ export default function PricingPage() {
                       setFormTouched((prev) => ({ ...prev, org: true }));
                       setFormErrors((prev) => ({ ...prev, org: validateField('org', formOrg) }));
                     }}
-                    className={`w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 border text-zinc-900 focus:bg-white focus:outline-none transition-colors ${
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-white border text-zinc-900 focus:bg-white focus:outline-none transition-colors ${
                       formErrors.org
                         ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/20'
                         : 'border-zinc-300 focus:border-[#FFCC00]'
@@ -2578,10 +2578,10 @@ export default function PricingPage() {
                     }}
                     className={`w-full px-3.5 py-2.5 rounded-xl border text-zinc-900 transition-colors ${
                       Boolean(user?.email)
-                        ? 'bg-zinc-100 text-zinc-600 border-zinc-200 cursor-not-allowed select-none opacity-85'
+                        ? 'bg-zinc-200 text-zinc-600 border-zinc-300 cursor-not-allowed select-none'
                         : formErrors.email
-                        ? 'bg-zinc-50 border-rose-500 focus:bg-white focus:outline-none focus:border-rose-500 ring-1 ring-rose-500/20'
-                        : 'bg-zinc-50 border-zinc-300 focus:bg-white focus:outline-none focus:border-[#FFCC00]'
+                        ? 'bg-white border-rose-500 focus:bg-white focus:outline-none focus:border-rose-500 ring-1 ring-rose-500/20'
+                        : 'bg-white border-zinc-300 focus:bg-white focus:outline-none focus:border-[#FFCC00]'
                     }`}
                   />
                   {formErrors.email && !Boolean(user?.email) && (
@@ -2615,10 +2615,10 @@ export default function PricingPage() {
                     }}
                     className={`w-full px-3.5 py-2.5 rounded-xl border text-zinc-900 transition-colors ${
                       Boolean(user?.phone)
-                        ? 'bg-zinc-100 text-zinc-600 border-zinc-200 cursor-not-allowed select-none opacity-85'
+                        ? 'bg-zinc-200 text-zinc-600 border-zinc-300 cursor-not-allowed select-none'
                         : formErrors.phone
-                        ? 'bg-zinc-50 border-rose-500 focus:bg-white focus:outline-none focus:border-rose-500 ring-1 ring-rose-500/20'
-                        : 'bg-zinc-50 border-zinc-300 focus:bg-white focus:outline-none focus:border-[#FFCC00]'
+                        ? 'bg-white border-rose-500 focus:bg-white focus:outline-none focus:border-rose-500 ring-1 ring-rose-500/20'
+                        : 'bg-white border-zinc-300 focus:bg-white focus:outline-none focus:border-[#FFCC00]'
                     }`}
                   />
                   {formErrors.phone && !Boolean(user?.phone) && (
