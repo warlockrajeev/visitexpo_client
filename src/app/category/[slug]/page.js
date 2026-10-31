@@ -14,6 +14,7 @@ import ShareModal from '../../../components/ShareModal.js';
 import { useAuth } from '../../../context/AuthContext.js';
 import { getCategoryBySlug, CATEGORIES_CONFIG } from '../../../data/categoryEventsData.js';
 import { renderCardDescription } from '../../../utils/textFormatters.js';
+import { sortEventsByStartDate } from '../../../utils/eventDates.js';
 import {
   Search,
   Calendar as CalendarIcon,
@@ -242,6 +243,8 @@ export default function CategoryEventsPage() {
           id: e.id,
           slug: e.slug || e.id,
           title: e.title,
+          startDate: e.startDate,
+          endDate: e.endDate,
           dates: e.dates || 'Upcoming 2026',
           daysToGo: 'Upcoming',
           edition: e.edition || 'Annual Edition',
@@ -303,7 +306,7 @@ export default function CategoryEventsPage() {
       });
     }
 
-    return filtered;
+    return sortEventsByStartDate(filtered);
   }, [category, liveEvents, slug, selectedFormat, selectedCountry, selectedDateFilter, customStartDate, customEndDate, activeSort]);
 
   const EVENTS_PER_PAGE = 5;

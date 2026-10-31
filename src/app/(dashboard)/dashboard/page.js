@@ -85,6 +85,7 @@ import {
 import { useAuth } from '../../../context/AuthContext.js';
 import { renderCardDescription } from '../../../utils/textFormatters.js';
 import ShowCountdownTimer from '../../../components/ShowCountdownTimer.js';
+import { sortEventsByStartDate } from '../../../utils/eventDates.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -419,7 +420,8 @@ export function OrganizerDashboardInner() {
   ];
 
   const engagementQuery = engagementSearch.trim().toLowerCase();
-  const filteredEngagements = engagements.filter((eng) => {
+  const accessibleEngagements = isFreePlan ? engagements.slice(0, 3) : engagements;
+  const filteredEngagements = accessibleEngagements.filter((eng) => {
     if (!engagementQuery) return true;
     const status = eng.type === 'both'
       ? 'interested following'
@@ -440,11 +442,12 @@ export function OrganizerDashboardInner() {
     ].some((value) => String(value || '').toLowerCase().includes(engagementQuery));
   });
 
-  const totalEngagementPages = Math.max(1, Math.ceil(filteredEngagements.length / engagementPageSize));
+  const effectiveEngagementPageSize = isFreePlan ? 3 : engagementPageSize;
+  const totalEngagementPages = Math.max(1, Math.ceil(filteredEngagements.length / effectiveEngagementPageSize));
   const safeEngagementPage = Math.min(Math.max(1, engagementPage), totalEngagementPages);
   const paginatedEngagements = filteredEngagements.slice(
-    (safeEngagementPage - 1) * engagementPageSize,
-    safeEngagementPage * engagementPageSize
+    (safeEngagementPage - 1) * effectiveEngagementPageSize,
+    safeEngagementPage * effectiveEngagementPageSize
   );
 
   const activePlanId = ((myPlan?.basePlan || myPlan?.subscription?.plan || myPlan?.plan || user?.basePlan || user?.plan || 'free') === 'growth' ? 'enterprise' : (myPlan?.basePlan || myPlan?.subscription?.plan || myPlan?.plan || user?.basePlan || user?.plan || 'free')).toLowerCase();
@@ -1453,16 +1456,8 @@ export function OrganizerDashboardInner() {
                   </td>
                 </tr>
               ) : paginatedEngagements.length > 0 ? (
-                paginatedEngagements.map((eng, index) => {
-                  const isBlurred = isFreePlan && index >= 3;
-
-                  return (
-                    <tr
-                      key={eng._id}
-                      className={`transition-colors ${
-                        isBlurred ? 'filter blur-[4px] opacity-40 select-none pointer-events-none' : 'hover:bg-muted/10'
-                      }`}
-                    >
+                paginatedEngagements.map((eng) => (
+                    <tr key={eng._id} className="transition-colors hover:bg-muted/10">
                       <td className="p-3">
                         <div className="flex items-center gap-2.5">
                           <img
@@ -1472,8 +1467,8 @@ export function OrganizerDashboardInner() {
                           />
                           <div className="min-w-0">
                             <span className="font-bold text-foreground block truncate">
-                              {isBlurred ? `${eng.userName?.split(' ')[0] || 'Delegate'} ••••••` : eng.userName}
-                              {isEnterprisePlan && !isBlurred && (
+                              {eng.userName}
+                              {isEnterprisePlan && (
                                 <span className="ml-1 inline-flex items-center gap-0.5 text-[9px] font-bold text-indigo-600 bg-indigo-500/10 px-1.5 py-0.2 rounded border border-indigo-500/20">
                                   <Crown className="h-2.5 w-2.5" /> VIP Lead
                                 </span>
@@ -1485,15 +1480,15 @@ export function OrganizerDashboardInner() {
                       </td>
                       <td className="p-3">
                         <div className="text-xs text-foreground">
-                          {isBlurred ? (eng.userEmail ? eng.userEmail.substring(0, 2) + '••••@••••.com' : '••••@••••.com') : eng.userEmail}
+                          {eng.userEmail}
                         </div>
                         <div className="text-[10px] text-muted-foreground">
-                          {isBlurred ? (eng.userPhone ? eng.userPhone.substring(0, 4) + ' ••••••••' : '—') : (eng.userPhone || '—')}
+                          {eng.userPhone || '—'}
                         </div>
                       </td>
                       <td className="p-3">
                         <div className="font-semibold text-foreground truncate max-w-xs">
-                          {isBlurred ? (eng.userCompany ? `${eng.userCompany.substring(0, 4)}••••` : 'Independent Buyer') : (eng.userCompany || 'Independent Buyer')}
+                          {eng.userCompany || 'Independent Buyer'}
                         </div>
                         <div className="text-[10px] text-muted-foreground capitalize">{eng.userRole || 'visitor'}</div>
                       </td>
@@ -1523,8 +1518,7 @@ export function OrganizerDashboardInner() {
                         {eng.createdAt ? new Date(eng.createdAt).toLocaleDateString() : 'Recent'}
                       </td>
                     </tr>
-                  );
-                })
+                  ))
               ) : (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-muted-foreground">
@@ -1545,13 +1539,17 @@ export function OrganizerDashboardInner() {
             </tbody>
           </table>
 
-          {isFreePlan && engagements.length > 3 && (
+          {isFreePlan && (
             <div className="p-3.5 m-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center space-y-2">
               <p className="text-xs font-bold text-foreground flex items-center justify-center gap-1.5">
-                <Lock className="h-3.5 w-3.5 text-amber-500" /> Free Plan: Showing 3 of {engagements.length} interested people &amp; followers
+                <Lock className="h-3.5 w-3.5 text-amber-500" />
+                Free Plan: Access is limited to 3 interested people &amp; followers
               </p>
               <p className="text-[11px] text-muted-foreground">
-                Upgrade to Starter for normal access or Enterprise for advance level delegate insights.
+                Showing up to {Math.min(3, engagements.length)} of {engagements.length} records.
+                {engagements.length > 3
+                  ? ` Upgrade to view the remaining ${engagements.length - 3} records.`
+                  : ' Upgrade to Starter or Enterprise for expanded access as more records arrive.'}
               </p>
               <Link
                 href="/pricing"
@@ -1568,33 +1566,42 @@ export function OrganizerDashboardInner() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-border/60 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
               <span>
-                Showing <strong className="text-foreground">{Math.min((safeEngagementPage - 1) * engagementPageSize + 1, filteredEngagements.length)}</strong>–<strong className="text-foreground">{Math.min(safeEngagementPage * engagementPageSize, filteredEngagements.length)}</strong> of <strong className="text-foreground">{filteredEngagements.length}</strong> delegates
-                {filteredEngagements.length !== engagements.length && (
+                Showing <strong className="text-foreground">{Math.min((safeEngagementPage - 1) * effectiveEngagementPageSize + 1, filteredEngagements.length)}</strong>–<strong className="text-foreground">{Math.min(safeEngagementPage * effectiveEngagementPageSize, filteredEngagements.length)}</strong> of <strong className="text-foreground">{filteredEngagements.length}</strong> accessible delegates
+                {filteredEngagements.length !== accessibleEngagements.length && (
                   <span className="ml-1 text-[11px] text-muted-foreground/80">
-                    (filtered from {engagements.length})
+                    (filtered from {accessibleEngagements.length} accessible)
+                  </span>
+                )}
+                {isFreePlan && (
+                  <span className="ml-1 text-[11px] text-muted-foreground/80">
+                    ({engagements.length} total records)
                   </span>
                 )}
               </span>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2">
-                <span>Rows per page:</span>
-                <select
-                  value={engagementPageSize}
-                  onChange={(e) => {
-                    setEngagementPageSize(Number(e.target.value));
-                    setEngagementPage(1);
-                  }}
-                  className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-                  aria-label="Rows per page"
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                </select>
-              </label>
+              {isFreePlan ? (
+                <span className="text-[11px] font-semibold">Free plan access: up to 3 records</span>
+              ) : (
+                <label className="flex items-center gap-2">
+                  <span>Rows per page:</span>
+                  <select
+                    value={engagementPageSize}
+                    onChange={(e) => {
+                      setEngagementPageSize(Number(e.target.value));
+                      setEngagementPage(1);
+                    }}
+                    className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                    aria-label="Rows per page"
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                </label>
+              )}
 
               <div className="flex items-center gap-1.5">
                 <button
@@ -2913,16 +2920,17 @@ function VisitorDashboard() {
     }).filter(Boolean)
   );
 
-  const filteredExpos = expos.filter(exp => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      (exp.title && exp.title.toLowerCase().includes(q)) ||
-      (exp.city && exp.city.toLowerCase().includes(q)) ||
-      (exp.category && exp.category.toLowerCase().includes(q)) ||
-      (exp.venue && exp.venue.toLowerCase().includes(q))
-    );
-  });
+  const filteredExpos = sortEventsByStartDate(expos
+    .filter((exp) => {
+      if (!searchQuery) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        (exp.title && exp.title.toLowerCase().includes(q)) ||
+        (exp.city && exp.city.toLowerCase().includes(q)) ||
+        (exp.category && exp.category.toLowerCase().includes(q)) ||
+        (exp.venue && exp.venue.toLowerCase().includes(q))
+      );
+    }));
 
   return (
     <div className="space-y-4 max-w-7xl mx-auto pb-10 font-sans">

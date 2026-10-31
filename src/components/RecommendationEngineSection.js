@@ -37,6 +37,7 @@ import {
   X
 } from 'lucide-react';
 import { detectUserLocation, formatDistance, calculateDistanceKm } from '../utils/geoUtils.js';
+import { sortEventsByStartDate } from '../utils/eventDates.js';
 import { useAuth } from '../context/AuthContext.js';
 import EventPassAvailability from './EventPassAvailability.js';
 import StableEventImage from './StableEventImage.js';
@@ -643,7 +644,7 @@ export default function RecommendationEngineSection({
         ) : (
           /* Cards Grid */
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {events.map((ev) => {
+            {sortEventsByStartDate(events).map((ev) => {
               const imageUrl = resolveImage(ev);
               const eventId = String(ev._id || ev.id || ev.slug || '');
               const score = ev.matchScore || 85;

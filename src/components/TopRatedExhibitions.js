@@ -2,13 +2,13 @@
 
 /**
  * @file TopRatedExhibitions.js
- * @description Showcases the 10 latest Exhibitions & Trade Shows on VisitExpo.
+ * @description Showcases upcoming Exhibitions & Trade Shows in start-date order.
  * Displays listing order, star ratings, reviews count, location, dates, and visitor pass actions.
  */
 
 import React, { useMemo } from 'react';
 import Link from 'next/link';
-import { isEventExpired } from '../utils/eventDates.js';
+import { isEventExpired, sortEventsByStartDate } from '../utils/eventDates.js';
 import {
   Star,
   Calendar,
@@ -30,35 +30,7 @@ export default function TopRatedExhibitions({ events = [] }) {
     const activeEvents = events.filter((event) => !isEventExpired(event));
     if (activeEvents.length === 0) return [];
 
-    const listingTime = (event) => {
-      const value =
-        event.listingDate ||
-        event.createdAt ||
-        event.created_at ||
-        event.dateCreated ||
-        event.publishedAt ||
-        event.published_at ||
-        event.date ||
-        event.postDate ||
-        event.post_date;
-      const time = value ? Date.parse(value) : NaN;
-      return Number.isFinite(time) ? time : null;
-    };
-
-    const sorted = [...activeEvents].sort((a, b) => {
-      const timeA = listingTime(a);
-      const timeB = listingTime(b);
-      if (timeA !== null && timeB !== null && timeA !== timeB) return timeB - timeA;
-
-      const idA = a.wpPostId != null && a.wpPostId !== '' ? Number(a.wpPostId) : null;
-      const idB = b.wpPostId != null && b.wpPostId !== '' ? Number(b.wpPostId) : null;
-      if (Number.isFinite(idA) && Number.isFinite(idB) && idA !== idB) return idB - idA;
-
-      if (timeA !== null && timeB === null) return -1;
-      if (timeA === null && timeB !== null) return 1;
-      return 0;
-    });
-
+    const sorted = sortEventsByStartDate(activeEvents);
     return sorted.slice(0, 10);
   }, [events]);
 
@@ -72,22 +44,22 @@ export default function TopRatedExhibitions({ events = [] }) {
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 rounded-full bg-amber-100/80 border border-amber-300 px-3.5 py-1 text-xs font-black text-amber-900 shadow-2xs">
               <Crown className="h-3.5 w-3.5 fill-amber-500 text-amber-600" />
-              <span>Latest Listings • Recently Added</span>
+              <span>Upcoming • Nearest Dates First</span>
             </div>
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-zinc-950 tracking-tight">
-              Latest Exhibitions &amp; Expos
+              Upcoming Exhibitions &amp; Expos
             </h2>
             <p className="text-zinc-600 text-xs sm:text-sm max-w-2xl leading-relaxed">
               Discover the newest international trade shows, industrial expositions, and B2B summits
-              recently added to VisitExpo.
+              Discover upcoming international trade shows, industrial expositions, and B2B summits, ordered by start date.
             </p>
           </div>
 
           <Link
-            href="/events?sort=rating&top10=true"
+            href="/events?sort=upcoming"
             className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-extrabold text-zinc-950 hover:text-amber-600 transition-colors group cursor-pointer shrink-0"
           >
-            <span>Explore All Ranked Expos</span>
+            <span>Explore All Upcoming Expos</span>
             <ArrowRight className="h-4 w-4 text-zinc-950 group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>

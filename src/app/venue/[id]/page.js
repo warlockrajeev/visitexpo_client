@@ -19,6 +19,7 @@ import axios from 'axios';
 import Navbar from '../../../components/Navbar.js';
 import Footer from '../../../components/Footer.js';
 import { getVenueById, VENUES_DATA, slugifyVenue } from '../../../data/venuesData.js';
+import { sortEventsByStartDate } from '../../../utils/eventDates.js';
 import {
   MapPin,
   Star,
@@ -185,7 +186,7 @@ export default function VenueDetailsPage() {
     const vSlug = venue.slug || venue.id;
     const vCity = (venue.city || '').toLowerCase();
 
-    return allDbEvents.filter((ev) => {
+    const matchingEvents = allDbEvents.filter((ev) => {
       const evVenue = (ev.venue || '').toLowerCase();
       const evCity = (ev.city || '').toLowerCase();
       const evAddr = (ev.address || '').toLowerCase();
@@ -220,16 +221,17 @@ export default function VenueDetailsPage() {
 
       return false;
     });
+    return sortEventsByStartDate(matchingEvents);
   }, [venue, allDbEvents]);
 
   // Split into upcoming and past
   const now = useMemo(() => new Date(), []);
 
   const upcomingMatchedEvents = useMemo(() => {
-    return matchedDbEvents.filter((ev) => {
+    return sortEventsByStartDate(matchedDbEvents.filter((ev) => {
       const end = ev.endDate ? new Date(ev.endDate) : ev.startDate ? new Date(ev.startDate) : null;
       return !end || end >= now;
-    });
+    }));
   }, [matchedDbEvents, now]);
 
   const pastMatchedEvents = useMemo(() => {
@@ -281,6 +283,8 @@ export default function VenueDetailsPage() {
         id: ev._id || ev.id || ev.slug,
         slug: ev.slug || ev._id,
         title: ev.title || 'Exhibition Fair',
+        startDate: ev.startDate,
+        endDate: ev.endDate,
         dates: dateFormatted,
         category: ev.category || 'Trade Exhibition',
         turnout: ev.attendeesCount ? `${ev.attendeesCount.toLocaleString()}+ Attendees` : '15,000+ Visitors',
@@ -317,12 +321,12 @@ export default function VenueDetailsPage() {
       });
     }
 
-    return list;
+    return sortEventsByStartDate(list);
   }, [matchedDbEvents, venue, now]);
 
   // Filtered calendar events based on active tab and search
   const filteredCalendarEvents = useMemo(() => {
-    return unifiedCalendarEvents.filter((ev) => {
+    return sortEventsByStartDate(unifiedCalendarEvents.filter((ev) => {
       // Tab filter
       if (eventFilterTab === 'upcoming' && ev.isPast) return false;
       if (eventFilterTab === 'past' && !ev.isPast) return false;
@@ -337,7 +341,7 @@ export default function VenueDetailsPage() {
       }
 
       return true;
-    });
+    }));
   }, [unifiedCalendarEvents, eventFilterTab, eventSearchQuery]);
 
   // Handlers

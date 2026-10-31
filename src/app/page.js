@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext.js';
 import { fetchWordpressEvents } from '../utils/fetchWordpressEvents.js';
-import { isEventExpired } from '../utils/eventDates.js';
+import { isEventExpired, sortEventsByStartDate } from '../utils/eventDates.js';
 import { allowEventPassClaim } from '../utils/eventPasses.js';
 import {
   Search,
@@ -611,7 +611,7 @@ export default function LandingPage() {
       }
     }
 
-    return result;
+    return sortEventsByStartDate(result);
   }, [enrichedEvents, searchQuery, selectedCountry, selectedState, selectedCity, selectedCategory, activeCategoryTab, quickFilter, formatFilter, entryTypeFilter, dateRangeFilter, sortBy, isNearbyActive, userLocation]);
 
   // Displayed slice
@@ -621,7 +621,7 @@ export default function LandingPage() {
 
   // Top trending trade shows for sidebar discovery
   const trendingEvents = useMemo(() => {
-    return [...enrichedEvents].sort((a, b) => b.interestedCount - a.interestedCount).slice(0, 3);
+    return sortEventsByStartDate(enrichedEvents).slice(0, 3);
   }, [enrichedEvents]);
 
   // Get Pass Handler with SweetAlert Confirmation Modal

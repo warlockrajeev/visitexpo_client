@@ -15,7 +15,7 @@ import Footer from '@/components/Footer.js';
 import ShowCountdownTimer from '@/components/ShowCountdownTimer.js';
 import EventPassAvailability from '@/components/EventPassAvailability.js';
 import { allowEventPassClaim } from '@/utils/eventPasses.js';
-import { isEventExpired } from '@/utils/eventDates.js';
+import { isEventExpired, sortEventsByStartDate } from '@/utils/eventDates.js';
 import { useAuth } from '@/context/AuthContext.js';
 import axios from 'axios';
 import {
@@ -704,7 +704,7 @@ export default function BookmarksPage() {
       list.sort((a, b) => (a.category || '').localeCompare(b.category || ''));
     }
 
-    return list;
+    return sortEventsByStartDate(list);
   }, [allEvents, savedEventIds, savedDetailsMap, backendBookmarkedEvents, selectedCategory, searchQuery, sortBy]);
 
   // Distinct Categories in bookmarks
@@ -718,9 +718,8 @@ export default function BookmarksPage() {
 
   // Curated Suggested Expos for empty state
   const suggestedExpos = useMemo(() => {
-    return allEvents
+    return sortEventsByStartDate(allEvents
       .filter((e) => !isEventSaved(e))
-      .slice(0, 6)
       .map((e) => ({
         id: e._id || e.id,
         slug: e.slug || e.id,
@@ -734,7 +733,7 @@ export default function BookmarksPage() {
         category: e.category || (Array.isArray(e.categories) ? e.categories[0] : 'Trade Show'),
         image: e.banner || e.image || 'https://visitexpo.in/wp-content/uploads/2026/08/Refining-India-2026.jpg',
         organizer: e.organizer?.name || e.orgName || 'Verified Organizer'
-      }));
+      })).slice(0, 6));
   }, [allEvents, savedEventIds]);
 
   return (

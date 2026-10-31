@@ -16,7 +16,7 @@ import axios from 'axios';
 import { renderCardDescription } from '../../utils/textFormatters.js';
 import { fetchWordpressEvents } from '../../utils/fetchWordpressEvents.js';
 import { allowEventPassClaim } from '../../utils/eventPasses.js';
-import { isEventExpired } from '../../utils/eventDates.js';
+import { isEventExpired, sortEventsByStartDate } from '../../utils/eventDates.js';
 import Navbar from '../../components/Navbar.js';
 import Footer from '../../components/Footer.js';
 import EventPassAvailability from '../../components/EventPassAvailability.js';
@@ -608,7 +608,7 @@ export default function EventsDirectoryPage() {
       }
     }
 
-    return list;
+    return sortEventsByStartDate(list);
   }, [events, searchQuery, selectedCategory, selectedState, selectedCity, selectedCountry, selectedVenue, fromDate, toDate, sortBy, featuredOnly, isNearbyActive, userLocation, top10Only, freePassOnly, minRating, dateQuickFilter, sortReferenceTime]);
 
   // Reset page when filters change

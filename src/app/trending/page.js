@@ -14,6 +14,7 @@ import Navbar from '@/components/Navbar.js';
 import ShareModal from '@/components/ShareModal.js';
 import { useAuth } from '@/context/AuthContext.js';
 import { renderCardDescription } from '@/utils/textFormatters.js';
+import { sortEventsByStartDate } from '@/utils/eventDates.js';
 import {
   TrendingUp,
   Search,
@@ -134,7 +135,7 @@ export default function TrendingEventsPage() {
       return countB - countA;
     });
 
-    return list;
+    return sortEventsByStartDate(list);
   }, [events, searchQuery, selectedCategory, sortBy]);
 
   const [shareModalData, setShareModalData] = useState(null);

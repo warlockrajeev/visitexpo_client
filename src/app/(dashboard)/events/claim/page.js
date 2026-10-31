@@ -10,7 +10,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
 import { useAuth } from '../../../../context/AuthContext.js';
-import { isEventExpired } from '../../../../utils/eventDates.js';
+import { isEventExpired, sortEventsByStartDate } from '../../../../utils/eventDates.js';
 import {
   ShieldCheck,
   Search,
@@ -332,7 +332,7 @@ export default function ClaimEventPage() {
 
   const filteredEvents = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
-    return wpEvents.filter(evt => {
+    const filtered = wpEvents.filter(evt => {
       if (isEventExpired(evt)) return false;
       const cleanTitle = (evt.title || '').toLowerCase().trim();
       const isSystem = EXCLUDED_SYSTEM_TITLES.some(sys => cleanTitle === sys || cleanTitle.includes(sys));
@@ -345,6 +345,7 @@ export default function ClaimEventPage() {
         (evt.venue && evt.venue.toLowerCase().includes(q))
       );
     });
+    return sortEventsByStartDate(filtered);
   }, [wpEvents, searchTerm]);
 
   return (

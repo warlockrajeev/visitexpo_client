@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { sortEventsByStartDate } from '../utils/eventDates.js';
 import {
   ChevronLeft,
   ChevronRight,
@@ -169,7 +170,7 @@ export default function BannerSlider() {
         });
 
         // 2. Fill remaining slots with the 6 events from DB
-        const eventsSource = rawEvents.filter((event) => !isEventExpired(event));
+        const eventsSource = sortEventsByStartDate(rawEvents.filter((event) => !isEventExpired(event)));
         eventsSource.forEach((e, idx) => {
           if (combined.length >= 6) return;
           const configIdx = combined.length % BADGE_CONFIG.length;

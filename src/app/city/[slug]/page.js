@@ -18,6 +18,7 @@ import Navbar from '../../../components/Navbar.js';
 import EventPassAvailability from '../../../components/EventPassAvailability.js';
 import { allowEventPassClaim } from '../../../utils/eventPasses.js';
 import ShareModal from '../../../components/ShareModal.js';
+import { sortEventsByStartDate } from '../../../utils/eventDates.js';
 import {
   MapPin,
   Calendar,
@@ -518,7 +519,7 @@ export default function CityEventsPage() {
     const cityNameLower = cityProfile.name.toLowerCase();
     const slugLower = slug.replace(/-/g, ' ');
 
-    return allEvents.filter((item) => {
+    const filtered = allEvents.filter((item) => {
       const c = (item.city || '').toLowerCase();
       const v = (item.venue || '').toLowerCase();
       const co = (item.country || '').toLowerCase();
@@ -559,6 +560,7 @@ export default function CityEventsPage() {
 
       return true;
     });
+    return sortEventsByStartDate(filtered);
   }, [allEvents, cityProfile, slug, searchQuery, selectedCategory, selectedFormat]);
 
   return (

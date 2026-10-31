@@ -17,6 +17,7 @@ import Navbar from '../../../components/Navbar.js';
 import EventPassAvailability from '../../../components/EventPassAvailability.js';
 import { allowEventPassClaim } from '../../../utils/eventPasses.js';
 import OrganizerChatWidget from '../../../components/OrganizerChatWidget.js';
+import { sortEventsByStartDate } from '../../../utils/eventDates.js';
 import {
   Building,
   Calendar,
@@ -477,7 +478,7 @@ export default function OrganizerProfilePage() {
     const sTerm = (org.searchTerm || org.shortName || org.name).toLowerCase();
     const slugLower = slug.replace(/-/g, ' ');
 
-    return allEvents.filter((item) => {
+    const filtered = allEvents.filter((item) => {
       const o = (item.organizer || '').toLowerCase();
       const t = (item.title || '').toLowerCase();
       const d = (item.description || '').toLowerCase();
@@ -508,6 +509,7 @@ export default function OrganizerProfilePage() {
 
       return true;
     });
+    return sortEventsByStartDate(filtered);
   }, [allEvents, org, slug, searchQuery, selectedFormat]);
 
   return (

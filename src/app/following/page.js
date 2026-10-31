@@ -14,6 +14,7 @@ import Footer from '@/components/Footer.js';
 import { useAuth } from '@/context/AuthContext.js';
 import axios from 'axios';
 import { showSweetConfirm } from '@/utils/sweetalert.js';
+import { sortEventsByStartDate } from '@/utils/eventDates.js';
 import {
   Bell,
   BellRing,
@@ -315,6 +316,8 @@ export default function FollowingPage() {
           id: d.id || key,
           slug: d.slug || key,
           title: d.title || key.replace(/-/g, ' ').toUpperCase(),
+          startDate: d.startDate,
+          endDate: d.endDate,
           dates: d.dates || 'Upcoming Edition 2026',
           venue: d.venue || d.city || 'Exhibition Centre',
           city: d.city || 'India',
@@ -376,7 +379,7 @@ export default function FollowingPage() {
       );
     }
 
-    return list;
+    return sortEventsByStartDate(list);
   }, [allEvents, followedSlugs, organizersDirectory, savedDetailsMap, searchQuery]);
 
   // Grouped Organizers View: which organizers manage your followed expos

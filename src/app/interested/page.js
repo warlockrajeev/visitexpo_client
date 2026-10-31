@@ -14,6 +14,7 @@ import Footer from '@/components/Footer.js';
 import GoogleCalendarButton from '@/components/GoogleCalendarButton.js';
 import EventPassAvailability from '@/components/EventPassAvailability.js';
 import { allowEventPassClaim } from '@/utils/eventPasses.js';
+import { sortEventsByStartDate } from '@/utils/eventDates.js';
 import { useAuth } from '@/context/AuthContext.js';
 import axios from 'axios';
 import {
@@ -429,6 +430,8 @@ export default function InterestedEventsPage() {
           id: b.eventId || b.eventSlug || b._id || key,
           slug: b.eventSlug || b.slug || key,
           title: b.eventTitle || b.title || key.replace(/-/g, ' ').toUpperCase(),
+          startDate: b.startDate,
+          endDate: b.endDate,
           dates: b.eventDates || b.dates || 'Upcoming Edition 2026',
           venue: b.eventVenue || b.venue || 'Exhibition Centre',
           city: b.eventCity || b.city || 'India',
@@ -449,6 +452,8 @@ export default function InterestedEventsPage() {
           id: d.id || key,
           slug: d.slug || key,
           title: d.title || key.replace(/-/g, ' ').toUpperCase(),
+          startDate: d.startDate,
+          endDate: d.endDate,
           dates: d.dates || 'Upcoming Edition 2026',
           venue: d.venue || d.city || 'Exhibition Centre',
           city: d.city || 'India',
@@ -510,7 +515,7 @@ export default function InterestedEventsPage() {
       );
     }
 
-    return list;
+    return sortEventsByStartDate(list);
   }, [allEvents, interestedSlugs, backendInterestedEvents, savedDetailsMap, selectedCategory, searchQuery]);
 
   // Distinct Categories in interested events

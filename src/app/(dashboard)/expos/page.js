@@ -10,6 +10,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
+import { sortEventsByStartDate } from '../../../utils/eventDates.js';
 import {
   Calendar,
   MapPin,
@@ -104,6 +105,8 @@ export default function ExposPage() {
               id: e._id || e.id,
               title: e.title,
               image: e.banner || e.logo,
+              startDate: e.startDate,
+              endDate: e.endDate,
               category: e.category || 'Trade & Industry',
               entryType: 'Free Visitor Pass',
               dates: e.startDate ? `${new Date(e.startDate).toLocaleDateString()} - ${new Date(e.endDate || e.startDate).toLocaleDateString()}` : 'Upcoming 2026',
@@ -244,7 +247,7 @@ export default function ExposPage() {
       });
     }
 
-    return result;
+    return sortEventsByStartDate(result);
   }, [events, searchQuery, selectedCity, selectedCategories, isAllCategories, sortBy]);
 
   // Reset pagination when filter criteria change

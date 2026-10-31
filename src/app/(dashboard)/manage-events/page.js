@@ -11,6 +11,7 @@ import Link from 'next/link';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
 import { validateEventImage } from '../../../utils/imageValidation.js';
+import { sortEventsByStartDate } from '../../../utils/eventDates.js';
 import SearchableSelect from '../../../components/SearchableSelect.js';
 import {
   Calendar,
@@ -1010,7 +1011,7 @@ export default function EventsPage() {
   };
 
   // Filters
-  const filteredEvents = events.filter(evt => {
+  const filteredEvents = sortEventsByStartDate(events.filter(evt => {
     const matchesSearch =
       evt.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       evt.venue.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1018,7 +1019,7 @@ export default function EventsPage() {
     
     if (statusFilter === 'all') return matchesSearch;
     return matchesSearch && evt.status === statusFilter;
-  });
+  }));
 
   return (
     <div className="space-y-6">

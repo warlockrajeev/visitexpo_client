@@ -18,6 +18,7 @@ import Navbar from '@/components/Navbar.js';
 import Footer from '@/components/Footer.js';
 import EventPassAvailability from '@/components/EventPassAvailability.js';
 import StableEventImage from '@/components/StableEventImage.js';
+import { sortEventsByStartDate } from '@/utils/eventDates.js';
 import { useAuth } from '@/context/AuthContext.js';
 import axios from 'axios';
 import {
@@ -409,7 +410,7 @@ export default function RecommendationsPage() {
       list.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
     }
 
-    return list;
+    return sortEventsByStartDate(list);
   }, [events, searchQuery, sortBy]);
 
   // Pagination State & Controls

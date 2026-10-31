@@ -71,28 +71,6 @@ export default function ActionDiscoveryBanner({ onKeywordClick }) {
       action: 'events',
       search: 'auto'
     },
-    {
-      id: 'healthcare-pharma',
-      title: 'Healthcare & Pharma Expos',
-      desc: 'Accredited medical devices, pharma manufacturing & clinical tech',
-      badge: 'Accredited',
-      category: 'visitors',
-      icon: ShieldCheck,
-      color: 'from-rose-500/10 to-red-500/10 text-rose-600 border-rose-200',
-      action: 'events',
-      search: 'health'
-    },
-    {
-      id: 'infra-construction',
-      title: 'Smart Infra & Real Estate',
-      desc: 'Architecture, municipal engineering, construction & realty',
-      badge: 'Mega Projects',
-      category: 'visitors',
-      icon: Building2,
-      color: 'from-cyan-500/10 to-sky-500/10 text-cyan-600 border-cyan-200',
-      action: 'events',
-      search: 'construction'
-    }
   ];
 
   // Business Action Tracks (For Exhibitors & Organizers)
@@ -179,10 +157,10 @@ export default function ActionDiscoveryBanner({ onKeywordClick }) {
         <div className="flex w-full justify-center overflow-x-auto no-scrollbar pb-1">
             <div className="inline-flex items-center gap-1 p-1.5 bg-zinc-100/90 rounded-2xl border border-zinc-200/80 shadow-2xs">
               {[
-                { id: 'all', label: 'All Pathways', icon: Layers, count: 8 },
-                { id: 'visitors', label: 'Visitor Tracks', icon: Ticket, count: 4 },
-                { id: 'exhibitors', label: 'Exhibitor Floor', icon: Building2, count: 2 },
-                { id: 'organizers', label: 'Organizer Hub', icon: ShieldCheck, count: 2 }
+                { id: 'all', label: 'All Pathways', icon: Layers, count: discoveryTracks.length + businessActions.length },
+                { id: 'visitors', label: 'Visitor Tracks', icon: Ticket, count: discoveryTracks.length },
+                { id: 'exhibitors', label: 'Exhibitor Floor', icon: Building2, count: businessActions.filter((item) => item.category === 'exhibitors').length },
+                { id: 'organizers', label: 'Organizer Hub', icon: ShieldCheck, count: businessActions.filter((item) => item.category === 'organizers').length }
               ].map((tab) => {
                 const IconComp = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -226,7 +204,8 @@ export default function ActionDiscoveryBanner({ onKeywordClick }) {
           {/* ----------------------------------------------------------------------- */}
           {/* CARD 1: CURATED EXPO DISCOVERY (Visitors & Buyers)                      */}
           {/* ----------------------------------------------------------------------- */}
-          <div className="lg:col-span-7 bg-white rounded-3xl border border-zinc-200/90 p-6 sm:p-8 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-6 relative overflow-hidden group">
+          {filteredDiscovery.length > 0 && (
+          <div className={`${filteredActions.length === 0 ? 'lg:col-span-12' : 'lg:col-span-7'} bg-white rounded-3xl border border-zinc-200/90 p-6 sm:p-8 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-6 relative overflow-hidden group`}>
             
             {/* Ambient subtle glow background */}
             <div className="absolute -top-24 -right-24 w-60 h-60 bg-amber-200/20 rounded-full blur-3xl pointer-events-none" />
@@ -301,11 +280,13 @@ export default function ActionDiscoveryBanner({ onKeywordClick }) {
             </div>
 
           </div>
+          )}
 
           {/* ----------------------------------------------------------------------- */}
           {/* CARD 2: THE BUSINESS ACTION FLOOR (Exhibitors & Organizers)             */}
           {/* ----------------------------------------------------------------------- */}
-          <div className="lg:col-span-5 bg-zinc-950 text-white rounded-3xl border border-zinc-800/90 p-6 sm:p-8 shadow-md flex flex-col justify-between space-y-6 relative overflow-hidden group">
+          {filteredActions.length > 0 && (
+          <div className={`${filteredDiscovery.length === 0 ? 'lg:col-span-12' : 'lg:col-span-5'} bg-zinc-950 text-white rounded-3xl border border-zinc-800/90 p-6 sm:p-8 shadow-md flex flex-col justify-between space-y-6 relative overflow-hidden group`}>
             
             {/* Ambient luxury accent glow */}
             <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-bl from-[#FF2E63]/20 via-pink-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
@@ -402,6 +383,7 @@ export default function ActionDiscoveryBanner({ onKeywordClick }) {
             </div>
 
           </div>
+          )}
 
         </div>
 
