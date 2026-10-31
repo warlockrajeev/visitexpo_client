@@ -17,6 +17,7 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar.js';
 import Footer from '@/components/Footer.js';
 import EventPassAvailability from '@/components/EventPassAvailability.js';
+import StableEventImage from '@/components/StableEventImage.js';
 import { useAuth } from '@/context/AuthContext.js';
 import axios from 'axios';
 import {
@@ -735,13 +736,10 @@ export default function RecommendationsPage() {
                 >
                   {/* Banner Image */}
                   <div className="relative h-48 w-full bg-zinc-100 overflow-hidden">
-                    <img
+                    <StableEventImage
                       src={ev.bannerImage || ev.image || ev.banner || DEFAULT_BANNER}
                       alt={ev.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      onError={(e) => {
-                        e.currentTarget.src = DEFAULT_BANNER;
-                      }}
+                      className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
 

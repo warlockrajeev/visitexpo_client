@@ -8,6 +8,7 @@
 
 import React, { useMemo } from 'react';
 import Link from 'next/link';
+import { isEventExpired } from '../utils/eventDates.js';
 import {
   Star,
   Calendar,
@@ -26,6 +27,8 @@ export default function TopRatedExhibitions({ events = [] }) {
   // Prefer the listing timestamp, then the WordPress post ID (newer posts have higher IDs).
   const top10Events = useMemo(() => {
     if (!events || events.length === 0) return [];
+    const activeEvents = events.filter((event) => !isEventExpired(event));
+    if (activeEvents.length === 0) return [];
 
     const listingTime = (event) => {
       const value =
@@ -42,7 +45,7 @@ export default function TopRatedExhibitions({ events = [] }) {
       return Number.isFinite(time) ? time : null;
     };
 
-    const sorted = [...events].sort((a, b) => {
+    const sorted = [...activeEvents].sort((a, b) => {
       const timeA = listingTime(a);
       const timeB = listingTime(b);
       if (timeA !== null && timeB !== null && timeA !== timeB) return timeB - timeA;

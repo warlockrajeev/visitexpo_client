@@ -16,6 +16,7 @@ import axios from 'axios';
 import { renderCardDescription } from '../../utils/textFormatters.js';
 import { fetchWordpressEvents } from '../../utils/fetchWordpressEvents.js';
 import { allowEventPassClaim } from '../../utils/eventPasses.js';
+import { isEventExpired } from '../../utils/eventDates.js';
 import Navbar from '../../components/Navbar.js';
 import Footer from '../../components/Footer.js';
 import EventPassAvailability from '../../components/EventPassAvailability.js';
@@ -430,9 +431,15 @@ export default function EventsDirectoryPage() {
   // Filtered & Sorted Events
   const filteredEvents = useMemo(() => {
     let list = [...events];
+    const hasSearchQuery = Boolean(searchQuery.trim());
+
+    // Keep concluded events out of browsing and filters, but allow direct searches to find them.
+    if (!hasSearchQuery) {
+      list = list.filter((event) => !isEventExpired(event));
+    }
 
     // Search Query (Enter Name ...)
-    if (searchQuery.trim()) {
+    if (hasSearchQuery) {
       const q = searchQuery.toLowerCase().trim();
       list = list.filter(
         (e) =>

@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext.js';
 import { fetchWordpressEvents } from '../utils/fetchWordpressEvents.js';
+import { isEventExpired } from '../utils/eventDates.js';
 import { allowEventPassClaim } from '../utils/eventPasses.js';
 import {
   Search,
@@ -469,6 +470,8 @@ export default function LandingPage() {
   // Filtered Events with 10times facets & sorting
   const filteredEvents = useMemo(() => {
     let result = enrichedEvents.filter((item) => {
+      if (!searchQuery.trim() && isEventExpired(item)) return false;
+
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const matches =

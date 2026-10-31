@@ -561,11 +561,16 @@ export default function VisitorsCRMPage() {
   };
 
   // Helper: Copy virtual join link
-  const copyJoinLink = (visitorId) => {
-    const mockLink = `https://visitexpo.in/virtual-stream?visitorId=${visitorId}`;
-    navigator.clipboard.writeText(mockLink);
-    setCopiedId(visitorId);
-    setTimeout(() => setCopiedId(null), 2000);
+  const copyJoinLink = async (visitorId) => {
+    const joinLink = `${window.location.origin}/virtual-stream?visitorId=${encodeURIComponent(visitorId)}`;
+    try {
+      await navigator.clipboard.writeText(joinLink);
+      setCopiedId(visitorId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (copyError) {
+      console.error('Could not copy virtual join link:', copyError);
+      showSweetError('Could not copy the join link. Please try again.');
+    }
   };
 
   // Computed Fields

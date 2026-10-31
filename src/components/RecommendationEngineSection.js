@@ -39,6 +39,7 @@ import {
 import { detectUserLocation, formatDistance, calculateDistanceKm } from '../utils/geoUtils.js';
 import { useAuth } from '../context/AuthContext.js';
 import EventPassAvailability from './EventPassAvailability.js';
+import StableEventImage from './StableEventImage.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -677,14 +678,10 @@ export default function RecommendationEngineSection({
                 >
                   {/* Top Image Banner */}
                   <div className="relative h-48 w-full bg-zinc-100 overflow-hidden">
-                    <img
+                    <StableEventImage
                       src={imageUrl}
                       alt={ev.title}
-                      loading="lazy"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      onError={(e) => {
-                        e.currentTarget.src = DEFAULT_BANNER;
-                      }}
+                      className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
 
