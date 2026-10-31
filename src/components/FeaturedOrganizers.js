@@ -561,7 +561,7 @@ export default function FeaturedOrganizers({ onSelectOrganizer, activeOrganizer 
   return (
     <section id="organizers" className="relative z-20 space-y-3.5">
       {/* Header matching Screenshot & 10times UI */}
-      <div className="flex items-end justify-between gap-4">
+      <div>
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-lg sm:text-xl font-bold text-zinc-900 tracking-tight">
@@ -576,33 +576,29 @@ export default function FeaturedOrganizers({ onSelectOrganizer, activeOrganizer 
             Worldwide leading event organisers • Connected directly to live backend directory
           </p>
         </div>
-
-        {/* Left / Right Slider Arrows */}
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => scroll('left')}
-            aria-label="Previous organizers"
-            className="h-8 w-8 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 hover:border-zinc-300 text-zinc-700 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => scroll('right')}
-            aria-label="Next organizers"
-            className="h-8 w-8 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 hover:border-zinc-300 text-zinc-700 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
       </div>
 
       {/* Horizontal Carousel of Square Logo Cards */}
       <div className="relative">
+        <button
+          type="button"
+          onClick={() => scroll('left')}
+          aria-label="Previous organizers"
+          className="group absolute left-0 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 shadow-md transition-all duration-200 hover:scale-110 hover:border-blue-200 hover:bg-blue-600 hover:text-white hover:shadow-lg active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        >
+          <ChevronLeft className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-0.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => scroll('right')}
+          aria-label="Next organizers"
+          className="group absolute right-0 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 shadow-md transition-all duration-200 hover:scale-110 hover:border-blue-200 hover:bg-blue-600 hover:text-white hover:shadow-lg active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        >
+          <ChevronRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+        </button>
         <div
           ref={scrollContainerRef}
-          className="flex items-center gap-3 overflow-x-auto scrollbar-none pt-9 pb-2 px-0.5 scroll-smooth"
+          className="flex items-center gap-3 overflow-x-auto scrollbar-none px-11 pt-9 pb-2 scroll-smooth"
         >
           {organizers.map((org) => {
             const isHovered = hoveredOrg === org.id;

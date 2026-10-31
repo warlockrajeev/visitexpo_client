@@ -572,17 +572,8 @@ export default function CityEventsPage() {
       )}
 
       {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-24 sm:pt-28 pb-16 space-y-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-24 sm:pt-28 pb-16 space-y-6">
         
-        {/* Breadcrumb Navigation */}
-        <nav className="flex items-center gap-2 text-xs font-medium text-zinc-500">
-          <Link href="/" className="hover:text-zinc-900 transition-colors">Home</Link>
-          <span>/</span>
-          <Link href="/#cities" className="hover:text-zinc-900 transition-colors">Cities</Link>
-          <span>/</span>
-          <span className="text-zinc-900 font-bold">{cityProfile.name}</span>
-        </nav>
-
         {/* Hero Banner Card */}
         <div className="relative rounded-3xl overflow-hidden bg-zinc-950 text-white shadow-xl">
           <img
@@ -592,14 +583,14 @@ export default function CityEventsPage() {
           />
           <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/75 to-black/40" />
 
-          <div className="relative z-10 p-6 sm:p-10 md:p-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="space-y-3 max-w-2xl">
+          <div className="relative z-10 p-5 sm:p-7 md:p-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div className="space-y-2.5 max-w-2xl">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold text-amber-300">
                 <MapPin className="h-3.5 w-3.5" />
                 <span>{cityProfile.country} • {cityProfile.region}</span>
               </div>
 
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white">
+              <h1 className="text-3xl sm:text-4xl md:text-[2.65rem] font-extrabold tracking-tight text-white">
                 Exhibitions &amp; Trade Shows in {cityProfile.name}
               </h1>
 
@@ -607,7 +598,7 @@ export default function CityEventsPage() {
                 {cityProfile.tagline}
               </p>
 
-              <div className="pt-2 flex flex-wrap items-center gap-4 text-xs font-semibold text-zinc-300">
+              <div className="pt-1 flex flex-wrap items-center gap-4 text-xs font-semibold text-zinc-300">
                 <div className="flex items-center gap-1.5">
                   <Building className="h-4 w-4 text-amber-400" />
                   <span>{loading ? '...' : `${cityEvents.length} Verified Exhibitions`}</span>
@@ -647,7 +638,7 @@ export default function CityEventsPage() {
         <div className="bg-white border border-zinc-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
           <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
             {/* Search Input */}
-            <div className="relative flex-1">
+            <div className="relative w-full min-w-0 md:flex-1 md:max-w-2xl">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
               <input
                 type="text"

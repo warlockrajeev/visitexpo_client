@@ -155,12 +155,12 @@ export default function ActionDiscoveryBanner({ onKeywordClick }) {
 
   return (
     <section className="w-full bg-gradient-to-b from-zinc-50 via-white to-zinc-50/60 py-14 sm:py-18 border-y border-zinc-200/80">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
         
         {/* ========================================================================= */}
         {/* HEADER & SEGMENTED TABS                                                   */}
         {/* ========================================================================= */}
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-3 border-b border-zinc-200/70">
+        <div className="pb-5 border-b border-zinc-200/70">
           <div className="space-y-2.5 max-w-xl">
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-zinc-900 leading-tight">
               Navigate Industry Opportunities.{' '}
@@ -173,8 +173,10 @@ export default function ActionDiscoveryBanner({ onKeywordClick }) {
             </p>
           </div>
 
-          {/* Segmented Filter Switcher */}
-          <div className="shrink-0 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 lg:pb-0">
+        </div>
+
+        {/* Segmented Filter Switcher */}
+        <div className="flex w-full justify-center overflow-x-auto no-scrollbar pb-1">
             <div className="inline-flex items-center gap-1 p-1.5 bg-zinc-100/90 rounded-2xl border border-zinc-200/80 shadow-2xs">
               {[
                 { id: 'all', label: 'All Pathways', icon: Layers, count: 8 },
@@ -214,7 +216,6 @@ export default function ActionDiscoveryBanner({ onKeywordClick }) {
                 );
               })}
             </div>
-          </div>
         </div>
 
         {/* ========================================================================= */}
@@ -440,4 +441,3 @@ export default function ActionDiscoveryBanner({ onKeywordClick }) {
     </section>
   );
 }
-

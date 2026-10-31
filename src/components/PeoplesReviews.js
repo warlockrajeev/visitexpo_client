@@ -7,7 +7,7 @@
  * "Write a Review" modal submits to the backend for admin moderation.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
 import axios from 'axios';
 import {
   Star,
@@ -15,6 +15,7 @@ import {
   ChevronRight,
   CheckCircle2,
   ThumbsUp,
+  ThumbsDown,
   MessageSquare,
   X,
   Send,
@@ -26,6 +27,35 @@ const API_URL =
   (typeof window !== 'undefined' && window.location.hostname.includes('visitexpo.in')
     ? 'https://api.visitexpo.in/api'
     : 'http://localhost:5000/api');
+const HELPFUL_VOTES_STORAGE_KEY = 'visitexpo_helpful_review_votes';
+const NOT_HELPFUL_VOTES_STORAGE_KEY = 'visitexpo_not_helpful_review_votes';
+
+function getHelpfulVotesSnapshot() {
+  try {
+    return JSON.stringify({
+      helpful: localStorage.getItem(HELPFUL_VOTES_STORAGE_KEY) || '[]',
+      notHelpful: localStorage.getItem(NOT_HELPFUL_VOTES_STORAGE_KEY) || '[]'
+    });
+  } catch {
+    return JSON.stringify({ helpful: '[]', notHelpful: '[]' });
+  }
+}
+
+function subscribeToHelpfulVotes(callback) {
+  const handleStorage = (event) => {
+    if ([HELPFUL_VOTES_STORAGE_KEY, NOT_HELPFUL_VOTES_STORAGE_KEY].includes(event.key)) callback();
+  };
+  window.addEventListener('storage', handleStorage);
+  window.addEventListener('visitexpo:helpful-votes-changed', callback);
+  return () => {
+    window.removeEventListener('storage', handleStorage);
+    window.removeEventListener('visitexpo:helpful-votes-changed', callback);
+  };
+}
+
+function notifyHelpfulVotesChanged() {
+  window.dispatchEvent(new Event('visitexpo:helpful-votes-changed'));
+}
 
 const FALLBACK_REVIEWS = [
   {
@@ -155,6 +185,7 @@ function formatApiReview(r) {
     headline: r.headline || 'Great experience at the event!',
     review: r.review,
     helpfulCount: r.helpfulCount || 0,
+    notHelpfulCount: r.notHelpfulCount || 0,
     tags: Array.isArray(r.tags) && r.tags.length > 0 ? r.tags : ['Verified Attendee']
   };
 }
@@ -167,6 +198,44 @@ const AVATAR_GRADIENTS = [
   'from-rose-500 to-red-600',
   'from-cyan-600 to-blue-600'
 ];
+
+function validateReviewField(field, value) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  const letter = /\p{L}/u;
+  const alphanumericCount = (text.match(/[\p{L}\p{N}]/gu) || []).length;
+  const humanText = /^[\p{L}\p{M}\p{N}\s.,!?'"’“”&()/\-:;]+$/u;
+
+  if (field === 'name') {
+    if (!text) return 'Your full name is required.';
+    if (text.length < 2 || text.length > 120 || !letter.test(text) || !/^[\p{L}\p{M}\s.'’-]+$/u.test(text)) {
+      return 'Enter a valid name using letters, spaces, apostrophes, or hyphens.';
+    }
+  } else if (field === 'title' && text) {
+    if (text.length < 2 || text.length > 80 || !letter.test(text) || !humanText.test(text)) {
+      return 'Enter a valid designation using letters and common punctuation.';
+    }
+  } else if (field === 'company' && text) {
+    if (text.length < 2 || text.length > 120 || alphanumericCount < 2 || !humanText.test(text)) {
+      return 'Enter a valid company name with at least two letters or numbers.';
+    }
+  } else if (field === 'eventTitle') {
+    if (!text) return 'Event or expo name is required.';
+    if (text.length < 2 || text.length > 160 || alphanumericCount < 2 || !humanText.test(text)) {
+      return 'Enter a valid event name using letters, numbers, and common punctuation.';
+    }
+  } else if (field === 'headline' && text) {
+    if (text.length < 2 || text.length > 300 || alphanumericCount < 2 || !humanText.test(text)) {
+      return 'Enter a meaningful headline using letters, numbers, and common punctuation.';
+    }
+  } else if (field === 'review') {
+    if (!text) return 'Your review is required.';
+    if (text.length < 4 || text.length > 2000 || alphanumericCount < 4 || !humanText.test(text)) {
+      return 'Enter at least 4 letters or numbers and use only common punctuation.';
+    }
+  }
+
+  return '';
+}
 
 function ReviewAvatar({ name, avatar }) {
   const [error, setError] = useState(false);
@@ -203,7 +272,29 @@ function ReviewAvatar({ name, avatar }) {
 export default function PeoplesReviews() {
   const [reviews, setReviews] = useState(FALLBACK_REVIEWS);
   const [startIndex, setStartIndex] = useState(0);
-  const [helpfulVoted, setHelpfulVoted] = useState({});
+  const helpfulVotesSerialized = useSyncExternalStore(
+    subscribeToHelpfulVotes,
+    getHelpfulVotesSnapshot,
+    () => JSON.stringify({ helpful: '[]', notHelpful: '[]' })
+  );
+  const reviewVotes = useMemo(() => {
+    try {
+      const savedVotes = JSON.parse(helpfulVotesSerialized);
+      const readIds = (value) => {
+        const ids = JSON.parse(value);
+        return Array.isArray(ids) ? Object.fromEntries(ids.map((id) => [String(id), true])) : {};
+      };
+      return {
+        helpful: readIds(savedVotes.helpful),
+        notHelpful: readIds(savedVotes.notHelpful)
+      };
+    } catch {
+      return { helpful: {}, notHelpful: {} };
+    }
+  }, [helpfulVotesSerialized]);
+  const helpfulVoted = reviewVotes.helpful;
+  const notHelpfulVoted = reviewVotes.notHelpful;
+  const [helpfulVoteError, setHelpfulVoteError] = useState('');
 
   // Review Modal State
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -220,6 +311,7 @@ export default function PeoplesReviews() {
   });
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewSubmittedToast, setReviewSubmittedToast] = useState(false);
+  const [reviewFormErrors, setReviewFormErrors] = useState({});
 
   // Fetch featured reviews from API on mount
   useEffect(() => {
@@ -249,25 +341,88 @@ export default function PeoplesReviews() {
     setStartIndex((prev) => (prev >= maxIndex ? 0 : prev + 1));
   };
 
-  const handleHelpfulClick = async (reviewId) => {
-    if (helpfulVoted[reviewId]) return;
-    setHelpfulVoted((prev) => ({ ...prev, [reviewId]: true }));
+  const handleHelpfulClick = async (reviewId, reaction = 'helpful') => {
+    const voteId = String(reviewId);
+    if (helpfulVoted[voteId] || notHelpfulVoted[voteId]) return;
+    setHelpfulVoteError('');
     setReviews((prev) =>
       prev.map((r) =>
-        r.id === reviewId ? { ...r, helpfulCount: r.helpfulCount + 1 } : r
+        String(r.id) === voteId
+          ? {
+              ...r,
+              helpfulCount: r.helpfulCount + (reaction === 'helpful' ? 1 : 0),
+              notHelpfulCount: (r.notHelpfulCount || 0) + (reaction === 'notHelpful' ? 1 : 0)
+            }
+          : r
       )
     );
-    // Fire API call to persist helpful count (fire-and-forget)
+
     try {
-      await axios.post(`${API_URL}/reviews/${reviewId}/helpful`);
-    } catch (_) {
-      // Silently ignore
+      const storageKey = reaction === 'helpful' ? HELPFUL_VOTES_STORAGE_KEY : NOT_HELPFUL_VOTES_STORAGE_KEY;
+      const savedVotes = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      const votes = new Set(Array.isArray(savedVotes) ? savedVotes.map(String) : []);
+      votes.add(voteId);
+      localStorage.setItem(storageKey, JSON.stringify([...votes]));
+      notifyHelpfulVotesChanged();
+
+      const endpoint = reaction === 'helpful' ? 'helpful' : 'not-helpful';
+      const response = await axios.post(`${API_URL}/reviews/${encodeURIComponent(voteId)}/${endpoint}`);
+      if (!response.data?.success) {
+        throw new Error(response.data?.error || 'Could not save your review reaction.');
+      }
+
+      const countKey = reaction === 'helpful' ? 'helpfulCount' : 'notHelpfulCount';
+      const savedCount = response.data?.data?.[countKey];
+      if (Number.isFinite(savedCount)) {
+        setReviews((prev) =>
+          prev.map((review) =>
+            String(review.id) === voteId ? { ...review, [countKey]: savedCount } : review
+          )
+        );
+      }
+    } catch (err) {
+      console.error('Error saving review reaction:', err);
+      setReviews((prev) =>
+        prev.map((review) =>
+          String(review.id) === voteId
+            ? {
+                ...review,
+                helpfulCount: Math.max(0, review.helpfulCount - (reaction === 'helpful' ? 1 : 0)),
+                notHelpfulCount: Math.max(
+                  0,
+                  (review.notHelpfulCount || 0) - (reaction === 'notHelpful' ? 1 : 0)
+                )
+              }
+            : review
+        )
+      );
+      try {
+        const storageKey = reaction === 'helpful' ? HELPFUL_VOTES_STORAGE_KEY : NOT_HELPFUL_VOTES_STORAGE_KEY;
+        const savedVotes = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify(Array.isArray(savedVotes) ? savedVotes.filter((id) => String(id) !== voteId) : [])
+        );
+        notifyHelpfulVotesChanged();
+      } catch (storageError) {
+        console.error('Could not clear failed review reaction:', storageError);
+      }
+      setHelpfulVoteError('Your reaction could not be saved. Please try again.');
     }
   };
 
   const handleCreateReview = async (e) => {
     e.preventDefault();
-    if (!newReview.name || !newReview.review || !newReview.eventTitle) return;
+    const errors = {
+      name: validateReviewField('name', newReview.name),
+      title: validateReviewField('title', newReview.title),
+      company: validateReviewField('company', newReview.company),
+      eventTitle: validateReviewField('eventTitle', newReview.eventTitle),
+      headline: validateReviewField('headline', newReview.headline),
+      review: validateReviewField('review', newReview.review)
+    };
+    setReviewFormErrors(errors);
+    if (Object.values(errors).some(Boolean)) return;
 
     setReviewSubmitting(true);
     try {
@@ -295,6 +450,7 @@ export default function PeoplesReviews() {
         review: '',
         tags: ''
       });
+      setReviewFormErrors({});
 
       setReviewSubmittedToast(true);
       setTimeout(() => {
@@ -308,6 +464,22 @@ export default function PeoplesReviews() {
     }
   };
 
+  const handleReviewFieldChange = (field, value) => {
+    const sanitizedValue = value.replace(/[<>]/g, '');
+    setNewReview((prev) => ({ ...prev, [field]: sanitizedValue }));
+    setReviewFormErrors((prev) => ({
+      ...prev,
+      [field]: sanitizedValue !== value
+        ? 'Angle brackets (< and >) are not allowed.'
+        : validateReviewField(field, sanitizedValue)
+    }));
+  };
+
+  const reviewInputClass = (field) =>
+    `w-full rounded-lg border ${reviewFormErrors[field] ? 'border-red-400' : 'border-zinc-200'} bg-zinc-50 py-2 px-3 text-xs text-zinc-900 focus:bg-white focus:outline-none focus:ring-1 ${
+      reviewFormErrors[field] ? 'focus:ring-red-400' : 'focus:ring-zinc-900'
+    }`;
+
   // Slice exactly 3 reviews for display
   const currentReviews = reviews.slice(startIndex, startIndex + visibleCount);
 
@@ -320,12 +492,17 @@ export default function PeoplesReviews() {
           <span>Review submitted successfully! It will appear after admin approval.</span>
         </div>
       )}
+      {helpfulVoteError && (
+        <p role="alert" className="text-xs font-medium text-red-600">
+          {helpfulVoteError}
+        </p>
+      )}
 
       {/* Section Header with Slider Navigation Arrows */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <h2 className="text-lg sm:text-xl font-bold text-zinc-900 tracking-tight">
-            People's Reviews on Events
+            People&apos;s Reviews on Events
           </h2>
           <p className="text-xs sm:text-sm text-zinc-500 font-normal mt-0.5">
             Real ratings &amp; feedback from verified trade attendees, buyers, and exhibitors
@@ -368,7 +545,12 @@ export default function PeoplesReviews() {
       {/* 3 Reviews Grid matching 3 visible reviews */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {currentReviews.map((item) => {
-          const isVoted = Boolean(helpfulVoted[item.id]);
+          const reaction = helpfulVoted[String(item.id)]
+            ? 'helpful'
+            : notHelpfulVoted[String(item.id)]
+              ? 'notHelpful'
+              : null;
+          const isVoted = reaction !== null;
 
           return (
             <div
@@ -418,7 +600,7 @@ export default function PeoplesReviews() {
                 {/* Headline & Review Text */}
                 <div className="space-y-1">
                   <h5 className="text-xs font-bold text-zinc-900 leading-snug">
-                    "{item.headline}"
+                    &quot;{item.headline}&quot;
                   </h5>
                   <p className="text-xs text-zinc-600 leading-relaxed line-clamp-3">
                     {item.review}
@@ -438,25 +620,46 @@ export default function PeoplesReviews() {
                 </div>
               </div>
 
-              {/* Bottom: Role Pill & Helpful Button */}
+              {/* Bottom: Role Pill & Review Reactions */}
               <div className="pt-3 mt-3 border-t border-zinc-150 flex items-center justify-between text-xs">
                 <span className="text-[10px] font-bold text-zinc-600 bg-zinc-100 px-2 py-0.5 rounded-md">
                   {item.role}
                 </span>
 
-                <button
-                  type="button"
-                  onClick={() => handleHelpfulClick(item.id)}
-                  disabled={isVoted}
-                  className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-lg transition-colors cursor-pointer ${
-                    isVoted
-                      ? 'text-emerald-600 bg-emerald-50'
-                      : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100'
-                  }`}
-                >
-                  <ThumbsUp className={`h-3 w-3 ${isVoted ? 'fill-emerald-600' : ''}`} />
-                  <span>Helpful ({item.helpfulCount})</span>
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleHelpfulClick(item.id, 'helpful')}
+                    disabled={isVoted}
+                    aria-pressed={reaction === 'helpful'}
+                    className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold transition-colors ${
+                      reaction === 'helpful'
+                        ? 'bg-emerald-50 text-emerald-600'
+                        : isVoted
+                          ? 'cursor-not-allowed text-zinc-300'
+                          : 'cursor-pointer text-zinc-500 hover:bg-emerald-50 hover:text-emerald-600'
+                    }`}
+                  >
+                    <ThumbsUp className={`h-3 w-3 ${reaction === 'helpful' ? 'fill-emerald-600' : ''}`} />
+                    <span>Helpful ({item.helpfulCount})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleHelpfulClick(item.id, 'notHelpful')}
+                    disabled={isVoted}
+                    aria-pressed={reaction === 'notHelpful'}
+                    className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold transition-colors ${
+                      reaction === 'notHelpful'
+                        ? 'bg-rose-50 text-rose-600'
+                        : isVoted
+                          ? 'cursor-not-allowed text-zinc-300'
+                          : 'cursor-pointer text-zinc-500 hover:bg-rose-50 hover:text-rose-600'
+                    }`}
+                  >
+                    <ThumbsDown className={`h-3 w-3 ${reaction === 'notHelpful' ? 'fill-rose-600' : ''}`} />
+                    <span>Not helpful ({item.notHelpfulCount || 0})</span>
+                  </button>
+                </div>
               </div>
             </div>
           );
@@ -498,7 +701,7 @@ export default function PeoplesReviews() {
             </div>
 
             {/* Modal Form Body */}
-            <form onSubmit={handleCreateReview} className="p-6 overflow-y-auto space-y-4 text-xs">
+            <form noValidate onSubmit={handleCreateReview} className="p-6 overflow-y-auto space-y-4 text-xs">
               <div className="grid sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">
@@ -506,12 +709,14 @@ export default function PeoplesReviews() {
                   </label>
                   <input
                     type="text"
-                    required
+                    maxLength={120}
+                    aria-invalid={Boolean(reviewFormErrors.name)}
                     placeholder="e.g. Vikram Malhotra"
                     value={newReview.name}
-                    onChange={(e) => setNewReview((prev) => ({ ...prev, name: e.target.value }))}
-                    className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2 px-3 text-xs text-zinc-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                    onChange={(e) => handleReviewFieldChange('name', e.target.value)}
+                    className={reviewInputClass('name')}
                   />
+                  {reviewFormErrors.name && <p className="mt-1 text-[10px] text-red-600">{reviewFormErrors.name}</p>}
                 </div>
 
                 <div>
@@ -539,11 +744,14 @@ export default function PeoplesReviews() {
                   </label>
                   <input
                     type="text"
+                    maxLength={80}
+                    aria-invalid={Boolean(reviewFormErrors.title)}
                     placeholder="e.g. Head of Sourcing"
                     value={newReview.title}
-                    onChange={(e) => setNewReview((prev) => ({ ...prev, title: e.target.value }))}
-                    className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2 px-3 text-xs text-zinc-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                    onChange={(e) => handleReviewFieldChange('title', e.target.value)}
+                    className={reviewInputClass('title')}
                   />
+                  {reviewFormErrors.title && <p className="mt-1 text-[10px] text-red-600">{reviewFormErrors.title}</p>}
                 </div>
 
                 <div>
@@ -552,11 +760,14 @@ export default function PeoplesReviews() {
                   </label>
                   <input
                     type="text"
+                    maxLength={120}
+                    aria-invalid={Boolean(reviewFormErrors.company)}
                     placeholder="e.g. Apex Industrial Corp"
                     value={newReview.company}
-                    onChange={(e) => setNewReview((prev) => ({ ...prev, company: e.target.value }))}
-                    className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2 px-3 text-xs text-zinc-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                    onChange={(e) => handleReviewFieldChange('company', e.target.value)}
+                    className={reviewInputClass('company')}
                   />
+                  {reviewFormErrors.company && <p className="mt-1 text-[10px] text-red-600">{reviewFormErrors.company}</p>}
                 </div>
               </div>
 
@@ -567,12 +778,14 @@ export default function PeoplesReviews() {
                   </label>
                   <input
                     type="text"
-                    required
+                    maxLength={160}
+                    aria-invalid={Boolean(reviewFormErrors.eventTitle)}
                     placeholder="e.g. Automation Expo 2026"
                     value={newReview.eventTitle}
-                    onChange={(e) => setNewReview((prev) => ({ ...prev, eventTitle: e.target.value }))}
-                    className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2 px-3 text-xs text-zinc-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                    onChange={(e) => handleReviewFieldChange('eventTitle', e.target.value)}
+                    className={reviewInputClass('eventTitle')}
                   />
+                  {reviewFormErrors.eventTitle && <p className="mt-1 text-[10px] text-red-600">{reviewFormErrors.eventTitle}</p>}
                 </div>
 
                 <div>
@@ -599,11 +812,14 @@ export default function PeoplesReviews() {
                 </label>
                 <input
                   type="text"
+                  maxLength={300}
+                  aria-invalid={Boolean(reviewFormErrors.headline)}
                   placeholder="e.g. Seamless buyer badge retrieval and high ROI"
                   value={newReview.headline}
-                  onChange={(e) => setNewReview((prev) => ({ ...prev, headline: e.target.value }))}
-                  className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2 px-3 text-xs text-zinc-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                  onChange={(e) => handleReviewFieldChange('headline', e.target.value)}
+                  className={reviewInputClass('headline')}
                 />
+                {reviewFormErrors.headline && <p className="mt-1 text-[10px] text-red-600">{reviewFormErrors.headline}</p>}
               </div>
 
               <div>
@@ -612,12 +828,14 @@ export default function PeoplesReviews() {
                 </label>
                 <textarea
                   rows={3}
-                  required
+                  maxLength={2000}
+                  aria-invalid={Boolean(reviewFormErrors.review)}
                   placeholder="Share details on exhibition layout, crowd quality, networking, or stall ROI..."
                   value={newReview.review}
-                  onChange={(e) => setNewReview((prev) => ({ ...prev, review: e.target.value }))}
-                  className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2 px-3 text-xs text-zinc-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900 resize-none"
+                  onChange={(e) => handleReviewFieldChange('review', e.target.value)}
+                  className={`${reviewInputClass('review')} resize-none`}
                 />
+                {reviewFormErrors.review && <p className="mt-1 text-[10px] text-red-600">{reviewFormErrors.review}</p>}
               </div>
 
               {/* Submit Button */}

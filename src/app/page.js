@@ -196,7 +196,7 @@ export default function LandingPage() {
   const [dateRangeFilter, setDateRangeFilter] = useState('all'); // 'all' | 'month' | '30days' | '90days'
   const [formatFilter, setFormatFilter] = useState('all'); // 'all' | 'in_person' | 'hybrid'
   const [entryTypeFilter, setEntryTypeFilter] = useState('all'); // 'all' | 'free'
-  const [sortBy, setSortBy] = useState('upcoming'); // 'upcoming' | 'rating' | 'popularity'
+  const [sortBy, setSortBy] = useState('latest'); // 'latest' | 'upcoming' | 'rating' | 'popularity'
   const [visibleEventCount, setVisibleEventCount] = useState(8);
 
   // Proximity / Nearby State
@@ -557,7 +557,36 @@ export default function LandingPage() {
       });
     } else {
       // 10times Sorting
-      if (sortBy === 'rating') {
+      if (sortBy === 'latest') {
+        const listingTime = (item) => {
+          const value =
+            item.listingDate ||
+            item.createdAt ||
+            item.created_at ||
+            item.dateCreated ||
+            item.publishedAt ||
+            item.published_at ||
+            item.date ||
+            item.postDate ||
+            item.post_date;
+          const time = value ? Date.parse(value) : NaN;
+          return Number.isFinite(time) ? time : null;
+        };
+
+        result = [...result].sort((a, b) => {
+          const timeA = listingTime(a);
+          const timeB = listingTime(b);
+          if (timeA !== null && timeB !== null && timeA !== timeB) return timeB - timeA;
+
+          const idA = a.wpPostId != null && a.wpPostId !== '' ? Number(a.wpPostId) : null;
+          const idB = b.wpPostId != null && b.wpPostId !== '' ? Number(b.wpPostId) : null;
+          if (Number.isFinite(idA) && Number.isFinite(idB) && idA !== idB) return idB - idA;
+
+          if (timeA !== null && timeB === null) return -1;
+          if (timeA === null && timeB !== null) return 1;
+          return 0;
+        });
+      } else if (sortBy === 'rating') {
         result = [...result].sort((a, b) => parseFloat(b.rating) - parseFloat(a.rating));
       } else if (sortBy === 'popularity') {
         result = [...result].sort((a, b) => b.interestedCount - a.interestedCount);
@@ -1117,7 +1146,7 @@ export default function LandingPage() {
       {/* ========================================================================= */}
       {/* 1 & 2. HERO CONTAINER (Continuous Event Management Background)           */}
       {/* ========================================================================= */}
-      <div className="relative overflow-hidden bg-zinc-950 border-b border-zinc-800 pt-20 sm:pt-24">
+      <div className="relative w-screen overflow-hidden bg-zinc-950 border-b border-zinc-800 pt-20 sm:pt-24">
         
         {/* Continuous Background Image & Dark Overlays spanning Navbar & Hero */}
         <div className="absolute inset-0 z-0 pointer-events-none">
@@ -1373,6 +1402,7 @@ export default function LandingPage() {
                   onChange={(e) => setSortBy(e.target.value)}
                   className="bg-transparent font-bold text-zinc-900 focus:outline-none cursor-pointer text-xs"
                 >
+                  <option value="latest">Latest Listings</option>
                   <option value="upcoming">Upcoming Date</option>
                   <option value="rating">Highest Rated (★)</option>
                   <option value="popularity">Most Interested (👥)</option>
@@ -2004,25 +2034,8 @@ export default function LandingPage() {
                             {expo.edition}
                           </span>
 
-                          {/* Quick Follow & Bookmark Buttons */}
+                          {/* Quick Bookmark Button */}
                           <div className="absolute bottom-3 right-3 flex items-center gap-1.5 z-10">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleTriggerGated('follow', expo);
-                              }}
-                              className={`p-2 rounded-full backdrop-blur-xs transition-transform active:scale-90 cursor-pointer shadow-sm ${
-                                followedEventSlugs.has((expo.slug || expo.id || '').toLowerCase().trim())
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-white/90 hover:bg-white text-zinc-700'
-                              }`}
-                              title={followedEventSlugs.has((expo.slug || expo.id || '').toLowerCase().trim()) ? 'Following' : 'Follow Event'}
-                            >
-                              <Bell className={`h-3.5 w-3.5 ${followedEventSlugs.has((expo.slug || expo.id || '').toLowerCase().trim()) ? 'fill-white text-white' : 'text-zinc-700'}`} />
-                            </button>
-
                             <button
                               type="button"
                               onClick={(e) => {
