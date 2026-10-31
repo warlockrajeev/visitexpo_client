@@ -1,3 +1,6 @@
+import QRCode from 'qrcode';
+import { showSweetError } from './sweetalert.js';
+
 /**
  * @file printBadge.js
  * @description Dedicated, standalone badge printing utility for VisitExpo.
@@ -5,18 +8,37 @@
  * the clean badge card is printed, with crisp vector QR and zero background bleed.
  */
 
-export const printBadge = (pass) => {
+export const printBadge = async (pass) => {
   if (typeof window === 'undefined' || !pass) return;
 
   const eventTitle = pass.event?.title || 'Trade Exhibition';
   const eventVenue = pass.event?.venue || '';
   const eventCity = pass.event?.city || 'India';
   const eventLocation = [eventVenue, eventCity].filter(Boolean).join(', ');
+  const eventDates =
+    pass.event?.dates ||
+    [pass.event?.startDate, pass.event?.endDate]
+      .filter(Boolean)
+      .map((date) => new Date(date).toLocaleDateString())
+      .join(' - ');
   const attendeeName = pass.name || 'Visitor';
+  const attendeeEmail = pass.email || '';
   const attendeeCompany = pass.company || 'Trade Visitor';
-  const passId = pass._id ? String(pass._id).slice(-8).toUpperCase() : 'VISITOR';
+  const passType = pass.attendanceType === 'virtual' ? 'Free Virtual Visitor Pass' : 'Free In-person Visitor Pass';
+  const passId = pass.passId || `VIS-${pass._id || 'VISITOR'}`;
   const qrData = pass.qrCode || `VIS-${pass._id || passId}`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
+  let qrUrl;
+  try {
+    qrUrl = await QRCode.toDataURL(qrData, {
+      errorCorrectionLevel: 'H',
+      margin: 2,
+      width: 600
+    });
+  } catch (error) {
+    console.error('Could not generate visitor badge QR code:', error);
+    await showSweetError('The visitor pass QR code could not be generated. Please try again.', 'Unable to Prepare Pass');
+    return;
+  }
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -81,6 +103,12 @@ export const printBadge = (pass) => {
       color: #64748b;
       margin-bottom: 18px;
     }
+    .event-dates {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: -12px;
+      margin-bottom: 18px;
+    }
     .attendee-card {
       background: #f8fafc;
       border: 1px solid #e2e8f0;
@@ -108,6 +136,12 @@ export const printBadge = (pass) => {
       color: #d97706;
       text-transform: uppercase;
       letter-spacing: 0.5px;
+    }
+    .attendee-email {
+      font-size: 10px;
+      color: #64748b;
+      margin-top: 4px;
+      overflow-wrap: anywhere;
     }
     .qr-card {
       background: #ffffff;
@@ -154,14 +188,16 @@ export const printBadge = (pass) => {
     <div class="badge-pill">VisitExpo Verified Badge</div>
     <div class="event-title">${escapeHtml(eventTitle)}</div>
     ${eventLocation ? `<div class="event-location">${escapeHtml(eventLocation)}</div>` : ''}
+    ${eventDates ? `<div class="event-dates">${escapeHtml(eventDates)}</div>` : ''}
     <div class="attendee-card">
       <div class="attendee-label">Attendee</div>
       <div class="attendee-name">${escapeHtml(attendeeName)}</div>
-      <div class="attendee-role">${escapeHtml(attendeeCompany)}</div>
+      <div class="attendee-role">${escapeHtml(passType)}</div>
+      <div class="attendee-email">${escapeHtml(attendeeEmail)}${attendeeCompany ? ` · ${escapeHtml(attendeeCompany)}` : ''}</div>
     </div>
     <div class="qr-card">
       <img class="qr-image" src="${qrUrl}" alt="Digital Entry Badge QR Code" />
-      <span class="qr-code-text">VIS-${passId}</span>
+      <span class="qr-code-text">${escapeHtml(passId)}</span>
     </div>
     <div class="badge-footer">
       Present this digital pass at the entrance scanner for instant check-in.

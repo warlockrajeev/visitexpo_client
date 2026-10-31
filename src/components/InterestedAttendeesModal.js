@@ -18,7 +18,6 @@ import {
   ShieldCheck,
   CheckCircle2,
   MessageSquare,
-  Lock,
   ArrowRight,
   Filter
 } from 'lucide-react';
@@ -32,6 +31,9 @@ export default function InterestedAttendeesModal({
   onToggleFollowAttendee,
   isUserInterested = false,
   currentUser = null,
+  totalInterestedCount = 0,
+  totalFollowersCount = 0,
+  attendeesLoadError = '',
   onTriggerGated,
   onConnectAttendee
 }) {
@@ -53,12 +55,8 @@ export default function InterestedAttendeesModal({
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const match =
-        att.name.toLowerCase().includes(q) ||
-        att.company.toLowerCase().includes(q) ||
-        att.designation.toLowerCase().includes(q) ||
-        att.city.toLowerCase().includes(q) ||
-        att.country.toLowerCase().includes(q) ||
-        att.objective.toLowerCase().includes(q);
+        [att.name, att.company, att.designation, att.city, att.country, att.objective]
+          .some((value) => String(value || '').toLowerCase().includes(q));
       if (!match) return false;
     }
 
@@ -66,7 +64,7 @@ export default function InterestedAttendeesModal({
   });
 
   const totalFollowedCount = followedAttendeeIds.size;
-  const followersTotal = (event?.followersCount || 1058) + (isUserInterested ? 1 : 0);
+  const attendeeTypes = Array.from(new Set(attendees.map((attendee) => attendee.type).filter(Boolean)));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
@@ -80,10 +78,10 @@ export default function InterestedAttendeesModal({
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-[#FFCC00]/25 text-amber-950 border border-amber-300 flex items-center gap-1">
                 <Users className="h-3 w-3 text-amber-900" />
-                Live Network ({followersTotal.toLocaleString()})
+                Interested: {totalInterestedCount.toLocaleString()} · Followers: {totalFollowersCount.toLocaleString()}
               </span>
               <span className="text-xs text-zinc-500 font-semibold hidden sm:inline">
-                Verified Exhibition Attendees
+                Actual event engagement profiles
               </span>
             </div>
             
@@ -134,10 +132,11 @@ export default function InterestedAttendeesModal({
           {/* Type Filter Pills */}
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar text-xs font-semibold">
             {[
-              { id: 'all', label: `All Attendees (${attendees.length})` },
-              { id: 'Trade Buyer', label: 'Trade Buyers' },
-              { id: 'Exhibitor & Brand', label: 'Exhibitors & Brands' },
-              { id: 'VIP Delegate', label: 'VIP Delegates' },
+              { id: 'all', label: `All Profiles (${attendees.length})` },
+              ...attendeeTypes.map((type) => ({
+                id: type,
+                label: `${type} (${attendees.filter((attendee) => attendee.type === type).length})`
+              })),
               { id: 'following', label: `Following (${totalFollowedCount})` }
             ].map((tab) => (
               <button
@@ -186,7 +185,18 @@ export default function InterestedAttendeesModal({
           )}
 
           {/* Empty Search State */}
-          {filteredList.length === 0 && (
+          {attendeesLoadError ? (
+            <div role="alert" className="text-center py-12 space-y-2 text-zinc-500">
+              <Users className="h-8 w-8 mx-auto text-zinc-300" />
+              <div className="text-xs font-bold text-zinc-800">{attendeesLoadError}</div>
+            </div>
+          ) : filteredList.length === 0 && attendees.length === 0 ? (
+            <div className="text-center py-12 space-y-2 text-zinc-500">
+              <Users className="h-8 w-8 mx-auto text-zinc-300" />
+              <div className="text-xs font-bold text-zinc-800">No registered attendees found yet.</div>
+              <p className="text-[11px]">Attendee profiles will appear here when people register interest or follow this event.</p>
+            </div>
+          ) : filteredList.length === 0 && (
             <div className="text-center py-12 space-y-2 text-zinc-500">
               <Users className="h-8 w-8 mx-auto text-zinc-300" />
               <div className="text-xs font-bold text-zinc-800">No attendees match your search.</div>
@@ -216,9 +226,12 @@ export default function InterestedAttendeesModal({
                 {/* Left: Avatar + Details */}
                 <div className="flex items-start gap-3.5 min-w-0">
                   {/* Avatar */}
-                  <div className="relative h-11 w-11 rounded-full overflow-hidden shrink-0 border border-zinc-200">
-                    <img src={att.avatar} alt={att.name} className="w-full h-full object-cover" />
-                    <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white" />
+                  <div className="relative h-11 w-11 rounded-full overflow-hidden shrink-0 border border-zinc-200 bg-zinc-100 flex items-center justify-center">
+                    {att.avatar ? (
+                      <img src={att.avatar} alt={att.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xs font-bold text-zinc-600">{String(att.name || '?').slice(0, 1).toUpperCase()}</span>
+                    )}
                   </div>
 
                   {/* Profile Info */}
@@ -232,8 +245,7 @@ export default function InterestedAttendeesModal({
                       )}
                       {att.isRealUser && (
                         <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-300 flex items-center gap-1">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          Live Registered
+                          {att.isInterested ? 'Interested' : 'Following'}
                         </span>
                       )}
                       <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
@@ -247,26 +259,34 @@ export default function InterestedAttendeesModal({
                       </span>
                     </div>
 
-                    <div className="text-xs font-semibold text-zinc-700 truncate">
-                      {att.designation}
-                    </div>
+                    {att.designation && (
+                      <div className="text-xs font-semibold text-zinc-700 truncate">
+                        {att.designation}
+                      </div>
+                    )}
 
-                    <div className="flex items-center gap-3 text-[11px] text-zinc-500 flex-wrap">
-                      <span className="flex items-center gap-1">
-                        <Building className="h-3 w-3 text-zinc-400" />
-                        <span className="truncate max-w-xs">{att.company}</span>
-                      </span>
-                      <span>•</span>
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3 text-[#FF2E63]" />
-                        <span>{att.city}, {att.country}</span>
-                      </span>
-                    </div>
+                    {(att.company || att.city || att.country) && (
+                      <div className="flex items-center gap-3 text-[11px] text-zinc-500 flex-wrap">
+                        {att.company && (
+                          <span className="flex items-center gap-1">
+                            <Building className="h-3 w-3 text-zinc-400" />
+                            <span className="truncate max-w-xs">{att.company}</span>
+                          </span>
+                        )}
+                        {att.city || att.country ? (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3 text-[#FF2E63]" />
+                            <span>{[att.city, att.country].filter(Boolean).join(', ')}</span>
+                          </span>
+                        ) : null}
+                      </div>
+                    )}
 
-                    {/* Sourcing Objective */}
-                    <div className="text-[11px] text-zinc-600 italic pt-0.5">
-                      "{att.objective}"
-                    </div>
+                    {att.objective && (
+                      <div className="text-[11px] text-zinc-600 italic pt-0.5">
+                        "{att.objective}"
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -315,9 +335,10 @@ export default function InterestedAttendeesModal({
         {/* ========================================================================= */}
         <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2 text-zinc-600 text-[11px] text-center sm:text-left">
-            <Lock className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+            <Users className="h-3.5 w-3.5 text-amber-600 shrink-0" />
             <span>
-              Showing verified preview attendees. Unlock full attendee telephone &amp; meeting scheduler with your free pass.
+              Showing {filteredList.length.toLocaleString()} of {attendees.length.toLocaleString()} available profiles.
+              Totals from real event activity: {totalInterestedCount.toLocaleString()} interested · {totalFollowersCount.toLocaleString()} followers.
             </span>
           </div>
 

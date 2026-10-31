@@ -15,6 +15,7 @@ import EventPassAvailability from '../../../components/EventPassAvailability.js'
 import { allowEventPassClaim } from '../../../utils/eventPasses.js';
 import { showSweetConfirm, showSweetSuccess, showSweetError } from '../../../utils/sweetalert.js';
 import { printBadge } from '../../../utils/printBadge.js';
+import { issueVisitorPass } from '../../../utils/visitorPass.js';
 import {
   Users,
   Target,
@@ -2887,22 +2888,14 @@ function VisitorDashboard() {
     setClaimingEventId(eventId);
 
     try {
-      const res = await axios.post(`${API_URL}/visitors/register`, {
-        eventId,
-        name: user?.name || user?.email?.split('@')[0] || 'Visitor',
-        email: user?.email,
-        phone: user?.phone || '+91-9999999999',
-        company: user?.organization?.name || 'Trade Attendee',
-        designation: 'Business Visitor',
-        country: 'India',
-        attendanceType: 'in_person'
+      const pass = await issueVisitorPass({
+        endpoint: `${API_URL}/visitors/register`,
+        event,
+        user
       });
-
-      if (res.data && res.data.success) {
-        setClaimSuccessMessage(`Pass confirmed for "${event.title}"! Your digital badge is ready below.`);
-        await fetchMyPasses();
-        showSweetSuccess(`Your digital entry badge for "${event.title}" is ready and available under My Passes & Badges.`, 'Pass Confirmed! 🎉');
-      }
+      if (!pass) return;
+      setClaimSuccessMessage(`Pass confirmed for "${event.title}"! Your digital badge is ready below.`);
+      await fetchMyPasses();
     } catch (err) {
       const errMsg = err.response?.data?.error || 'Registration could not be completed. You may already be registered.';
       setClaimError(errMsg);

@@ -23,6 +23,7 @@ import {
   Ticket,
   ArrowRight,
   Check,
+  CheckCircle2,
   SlidersHorizontal,
   LocateFixed,
   Loader2,
@@ -38,6 +39,11 @@ import {
 } from 'lucide-react';
 import { detectUserLocation, formatDistance, calculateDistanceKm } from '../utils/geoUtils.js';
 import { sortEventsByStartDate } from '../utils/eventDates.js';
+import {
+  hasClaimedPass,
+  readClaimedPasses,
+  syncClaimedPassesFromServer
+} from '../utils/claimedPasses.js';
 import { useAuth } from '../context/AuthContext.js';
 import EventPassAvailability from './EventPassAvailability.js';
 import StableEventImage from './StableEventImage.js';
@@ -186,9 +192,49 @@ export default function RecommendationEngineSection({
   const [detectedCityName, setDetectedCityName] = useState('');
   const [timeframe, setTimeframe] = useState('upcoming'); // 'all' | 'upcoming' | '30days'
   const [events, setEvents] = useState([]);
+  const [claimedPasses, setClaimedPasses] = useState(() => readClaimedPasses());
   const [loading, setLoading] = useState(true);
   const [criteria, setCriteria] = useState(null);
   const [activeScoreTooltip, setActiveScoreTooltip] = useState(null);
+
+  useEffect(() => {
+    const refreshClaimedPasses = () => setClaimedPasses(readClaimedPasses());
+    window.addEventListener('visitexpo:pass-claimed', refreshClaimedPasses);
+    window.addEventListener('storage', refreshClaimedPasses);
+    window.addEventListener('pageshow', refreshClaimedPasses);
+    window.addEventListener('focus', refreshClaimedPasses);
+    refreshClaimedPasses();
+
+    return () => {
+      window.removeEventListener('visitexpo:pass-claimed', refreshClaimedPasses);
+      window.removeEventListener('storage', refreshClaimedPasses);
+      window.removeEventListener('pageshow', refreshClaimedPasses);
+      window.removeEventListener('focus', refreshClaimedPasses);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user?.email || typeof window === 'undefined') return undefined;
+    let active = true;
+    const token =
+      localStorage.getItem('visitexpo_access_token') ||
+      localStorage.getItem('visitexpo_token');
+    if (!token) return undefined;
+
+    axios.get(`${API_URL}/visitors/my-passes`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then((response) => {
+      if (!active || !response.data?.success) return;
+      const passes = response.data.data?.docs || response.data.data || [];
+      setClaimedPasses(syncClaimedPassesFromServer(passes));
+    }).catch((error) => {
+      console.warn('Could not sync confirmed passes for recommendations:', error);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [user?.email]);
 
   // Close score breakdown tooltip when clicking outside or pressing Escape
   useEffect(() => {
@@ -653,6 +699,7 @@ export default function RecommendationEngineSection({
               const breakdown = ev.scoreBreakdown || {};
               const isTooltipOpen = Boolean(eventId && activeScoreTooltip === eventId);
               const eventHref = `/expo/${ev.slug || ev.id || ev._id}`;
+              const isPassClaimed = hasClaimedPass(ev, claimedPasses);
               const openEventDetails = () => {
                 try {
                   sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(ev));
@@ -836,21 +883,31 @@ export default function RecommendationEngineSection({
                           Exhibit
                         </Link>
                         <span className="text-zinc-300">•</span>
-                        <EventPassAvailability event={ev}>
+                        {isPassClaimed ? (
                           <Link
-                            href={eventHref}
-                            onClick={() => {
-                              try {
-                                sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(ev));
-                              } catch (_) {}
-                            }}
-                            prefetch={true}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold text-xs shadow-xs transition-transform active:scale-95 cursor-pointer"
+                            href="/my-badges"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-extrabold text-xs shadow-xs transition-transform active:scale-95 cursor-pointer"
                           >
-                            <span>Get Pass</span>
-                            <ArrowRight className="h-3 w-3 text-primary" />
+                            <CheckCircle2 className="h-3 w-3" />
+                            <span>View Pass</span>
                           </Link>
-                        </EventPassAvailability>
+                        ) : (
+                          <EventPassAvailability event={ev}>
+                            <Link
+                              href={eventHref}
+                              onClick={() => {
+                                try {
+                                  sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(ev));
+                                } catch (_) {}
+                              }}
+                              prefetch={true}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold text-xs shadow-xs transition-transform active:scale-95 cursor-pointer"
+                            >
+                              <span>Get Pass</span>
+                              <ArrowRight className="h-3 w-3 text-primary" />
+                            </Link>
+                          </EventPassAvailability>
+                        )}
                       </div>
                     </div>
 

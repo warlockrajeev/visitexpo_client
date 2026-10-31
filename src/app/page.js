@@ -14,6 +14,12 @@ import { useAuth } from '../context/AuthContext.js';
 import { fetchWordpressEvents } from '../utils/fetchWordpressEvents.js';
 import { isEventExpired, sortEventsByStartDate } from '../utils/eventDates.js';
 import { allowEventPassClaim } from '../utils/eventPasses.js';
+import { issueVisitorPass } from '../utils/visitorPass.js';
+import {
+  hasClaimedPass as isEventPassClaimed,
+  readClaimedPasses,
+  syncClaimedPassesFromServer
+} from '../utils/claimedPasses.js';
 import {
   Search,
   Calendar,
@@ -336,6 +342,7 @@ export default function LandingPage() {
 
   // Hydrate saved bookmarks, followed events, and claimed passes from localStorage
   useEffect(() => {
+    const refreshClaimedPasses = () => setIssuedTicketIds(readClaimedPasses());
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem('visitexpo_saved_events');
@@ -348,14 +355,45 @@ export default function LandingPage() {
           const parsed = JSON.parse(followed);
           if (Array.isArray(parsed)) setFollowedEventSlugs(new Set(parsed.map(s => String(s).toLowerCase().trim())));
         }
-        const claimed = localStorage.getItem('visitexpo_claimed_passes');
-        if (claimed) {
-          const parsed = JSON.parse(claimed);
-          if (Array.isArray(parsed)) setIssuedTicketIds(new Set(parsed.map(String)));
-        }
+        refreshClaimedPasses();
       } catch (_) {}
+
+      window.addEventListener('visitexpo:pass-claimed', refreshClaimedPasses);
+      window.addEventListener('storage', refreshClaimedPasses);
+      window.addEventListener('pageshow', refreshClaimedPasses);
+      window.addEventListener('focus', refreshClaimedPasses);
     }
+
+    return () => {
+      window.removeEventListener('visitexpo:pass-claimed', refreshClaimedPasses);
+      window.removeEventListener('storage', refreshClaimedPasses);
+      window.removeEventListener('pageshow', refreshClaimedPasses);
+      window.removeEventListener('focus', refreshClaimedPasses);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!user?.email || typeof window === 'undefined') return undefined;
+    let active = true;
+    const token =
+      localStorage.getItem('visitexpo_access_token') ||
+      localStorage.getItem('visitexpo_token');
+    if (!token) return undefined;
+
+    axios.get(`${API_URL}/visitors/my-passes`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then((response) => {
+      if (!active || !response.data?.success) return;
+      const passes = response.data.data?.docs || response.data.data || [];
+      setIssuedTicketIds(syncClaimedPassesFromServer(passes));
+    }).catch((error) => {
+      console.warn('Could not sync confirmed visitor passes on event listings:', error);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [user?.email]);
 
   // DEFERRED: Fetch user-specific data separately (not blocking initial render)
   useEffect(() => {
@@ -630,12 +668,7 @@ export default function LandingPage() {
     if (!(await allowEventPassClaim(expo))) return;
     const slugKey = (expo.slug || expo.id || '').toLowerCase().trim();
     const idKey = String(expo.id || expo._id || expo.wpPostId || slugKey).trim();
-    const isAlreadyClaimed =
-      issuedTicketIds.has(idKey) ||
-      issuedTicketIds.has(slugKey) ||
-      (expo._id && issuedTicketIds.has(String(expo._id))) ||
-      (expo.id && issuedTicketIds.has(String(expo.id))) ||
-      (expo.wpPostId && issuedTicketIds.has(String(expo.wpPostId)));
+    const isAlreadyClaimed = isEventPassClaimed(expo, issuedTicketIds);
 
     if (isAlreadyClaimed) {
       await showSweetAlert(
@@ -691,21 +724,12 @@ export default function LandingPage() {
       return;
     }
 
-    const eventId = expo._id || expo.id || expo.wpPostId;
-    if (eventId && user?.email) {
-      try {
-        await axios.post(`${API_URL}/visitors/register`, {
-          eventId,
-          name: user?.name || user?.email?.split('@')[0] || 'Visitor',
-          email: user?.email,
-          phone: user?.phone || '+91-9999999999',
-          company: user?.organization?.name || user?.company || 'Trade Attendee',
-          designation: 'Business Visitor',
-          country: 'India',
-          attendanceType: 'in_person'
-        });
-      } catch (_) {}
-    }
+    const pass = await issueVisitorPass({
+      endpoint: `${API_URL}/visitors/register`,
+      event: expo,
+      user
+    });
+    if (!pass) return;
 
     setIssuedTicketIds((prev) => {
       const next = new Set(prev);
@@ -719,10 +743,6 @@ export default function LandingPage() {
       return next;
     });
 
-    showSweetSuccess(
-      `Your complimentary digital pass for "${expo.title}" is ready and registered to your visitor account!`,
-      'Visitor Pass Confirmed! 🎉'
-    );
   };
 
   // Gated Action Handler - routes directly to the single unified login page
@@ -1995,12 +2015,7 @@ export default function LandingPage() {
                       savedEventIds.has(expoIdKey) ||
                       savedEventIds.has(expoSlugKey) ||
                       (expo._id && savedEventIds.has(expo._id));
-                    const isTicketClaimed =
-                      issuedTicketIds.has(expoIdKey) ||
-                      issuedTicketIds.has(expoSlugKey) ||
-                      (expo._id && issuedTicketIds.has(String(expo._id))) ||
-                      (expo.id && issuedTicketIds.has(String(expo.id))) ||
-                      (expo.wpPostId && issuedTicketIds.has(String(expo.wpPostId)));
+                    const isTicketClaimed = isEventPassClaimed(expo, issuedTicketIds);
 
                     return (
                       <div

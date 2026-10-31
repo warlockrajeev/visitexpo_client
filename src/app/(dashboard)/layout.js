@@ -18,6 +18,7 @@ import {
   Target,
   Mail,
   Ticket,
+  QrCode,
   CreditCard,
   Settings,
   LogOut,
@@ -365,6 +366,7 @@ export default function DashboardLayout({ children }) {
   const navigation = user.role === 'visitor'
     ? [
         { name: 'My Passes & Badges', href: '/dashboard', icon: Ticket },
+        { name: 'My Badges', href: '/my-badges', icon: QrCode },
         { name: 'Saved Bookmarks', href: '/bookmarks', icon: Bookmark },
         { name: 'Interested Events', href: '/interested', icon: Star },
         { name: 'Followed Expos', href: '/following', icon: Bell },
@@ -376,6 +378,7 @@ export default function DashboardLayout({ children }) {
     : (user.role === 'exhibitor' || isExhibitorView)
     ? [
         { name: 'Exhibitor Hub', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'My Badges', href: '/my-badges', icon: QrCode },
         { name: 'Saved Bookmarks', href: '/bookmarks', icon: Bookmark },
         { name: 'Interested Events', href: '/interested', icon: Star },
         { name: 'Followed Expos', href: '/following', icon: Bell },
@@ -384,6 +387,7 @@ export default function DashboardLayout({ children }) {
       ]
     : [
         { name: 'Dashboard Hub', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'My Badges', href: '/my-badges', icon: QrCode },
         {
           name: 'Live Chat',
           href: '/chat',
@@ -442,6 +446,7 @@ export default function DashboardLayout({ children }) {
     if (path === '/organizers') return 'Event Organizers & Exhibitions Directory';
     if (path === '/chat') return 'Live Chat Desk & Attendee Hub';
     if (path === '/expos') return 'Live Exhibitions & Passes';
+    if (path === '/my-badges') return 'My Confirmed Badges';
     if (path === '/events/wizard') return 'Event Onboarding Wizard';
     if (path === '/events/claim') return 'Claim Existing Event';
     if (path === '/manage-events') return 'Event Management';

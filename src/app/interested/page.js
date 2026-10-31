@@ -15,6 +15,7 @@ import GoogleCalendarButton from '@/components/GoogleCalendarButton.js';
 import EventPassAvailability from '@/components/EventPassAvailability.js';
 import { allowEventPassClaim } from '@/utils/eventPasses.js';
 import { sortEventsByStartDate } from '@/utils/eventDates.js';
+import { issueVisitorPass } from '@/utils/visitorPass.js';
 import { useAuth } from '@/context/AuthContext.js';
 import axios from 'axios';
 import {
@@ -349,21 +350,12 @@ export default function InterestedEventsPage() {
 
     if (!confirmed) return;
 
-    const eventId = evt._id || evt.id;
-    if (eventId && user?.email) {
-      try {
-        await axios.post(`/api/visitors/register`, {
-          eventId,
-          name: user?.name || user?.email?.split('@')[0] || 'Visitor',
-          email: user?.email,
-          phone: user?.phone || '+91-9999999999',
-          company: user?.organization?.name || user?.company || 'Trade Attendee',
-          designation: 'Business Visitor',
-          country: 'India',
-          attendanceType: 'in_person'
-        });
-      } catch (_) {}
-    }
+    const pass = await issueVisitorPass({
+      endpoint: '/api/visitors/register',
+      event: evt,
+      user
+    });
+    if (!pass) return;
 
     setClaimedPassIds((prev) => {
       const next = new Set(prev);
@@ -375,10 +367,6 @@ export default function InterestedEventsPage() {
       return next;
     });
 
-    showSweetSuccess(
-      `Your complimentary digital pass for "${evt.title}" is ready and registered to your visitor account!`,
-      'Visitor Pass Confirmed! 🎉'
-    );
   };
 
   // Match helper for interested events

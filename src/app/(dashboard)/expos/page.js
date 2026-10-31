@@ -32,6 +32,8 @@ import {
 } from 'lucide-react';
 import { showSweetConfirm, showSweetSuccess, showSweetError } from '../../../utils/sweetalert.js';
 import { printBadge } from '../../../utils/printBadge.js';
+import { issueVisitorPass } from '../../../utils/visitorPass.js';
+import { getEventPassKeys, hasClaimedPass, readClaimedPasses } from '../../../utils/claimedPasses.js';
 import ShowCountdownTimer from '../../../components/ShowCountdownTimer.js';
 import SearchableSelect from '../../../components/SearchableSelect.js';
 import EventPassAvailability from '../../../components/EventPassAvailability.js';
@@ -50,6 +52,7 @@ export default function ExposPage() {
   const [events, setEvents] = useState([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [passes, setPasses] = useState([]);
+  const [storedClaimedPasses, setStoredClaimedPasses] = useState(() => readClaimedPasses());
   const [loadingPasses, setLoadingPasses] = useState(false);
 
   // Filters & Pagination State
@@ -65,6 +68,22 @@ export default function ExposPage() {
   const [claimSuccessMessage, setClaimSuccessMessage] = useState('');
   const [claimError, setClaimError] = useState('');
   const [selectedPassForBadge, setSelectedPassForBadge] = useState(null);
+
+  useEffect(() => {
+    const refreshClaimedPasses = () => setStoredClaimedPasses(readClaimedPasses());
+    window.addEventListener('visitexpo:pass-claimed', refreshClaimedPasses);
+    window.addEventListener('storage', refreshClaimedPasses);
+    window.addEventListener('pageshow', refreshClaimedPasses);
+    window.addEventListener('focus', refreshClaimedPasses);
+    refreshClaimedPasses();
+
+    return () => {
+      window.removeEventListener('visitexpo:pass-claimed', refreshClaimedPasses);
+      window.removeEventListener('storage', refreshClaimedPasses);
+      window.removeEventListener('pageshow', refreshClaimedPasses);
+      window.removeEventListener('focus', refreshClaimedPasses);
+    };
+  }, []);
 
   // Fetch events from WordPress endpoint and backend with instant sessionStorage hydration
   useEffect(() => {
@@ -136,7 +155,7 @@ export default function ExposPage() {
 
   // Fetch visitor's existing passes
   const fetchMyPasses = async () => {
-    if (!accessToken || user?.role !== 'visitor') return;
+    if (!accessToken) return;
     setLoadingPasses(true);
     try {
       const res = await axios.get(`${API_URL}/visitors/my-passes`, {
@@ -158,13 +177,10 @@ export default function ExposPage() {
 
   // Set of registered event IDs
   const registeredEventIds = useMemo(() => {
-    return new Set(
-      passes.map(p => {
-        if (p.event && typeof p.event === 'object') return p.event._id;
-        return p.event;
-      }).filter(Boolean)
-    );
-  }, [passes]);
+    const keys = new Set(storedClaimedPasses);
+    passes.forEach((pass) => getEventPassKeys(pass).forEach((key) => keys.add(key)));
+    return keys;
+  }, [passes, storedClaimedPasses]);
 
   // Cities list
   const availableCities = useMemo(() => {
@@ -297,22 +313,14 @@ export default function ExposPage() {
     setClaimingId(eventId);
 
     try {
-      const res = await axios.post(`${API_URL}/visitors/register`, {
-        eventId,
-        name: user?.name || user?.email?.split('@')[0] || 'Visitor',
-        email: user?.email,
-        phone: user?.phone || '+91-9999999999',
-        company: user?.organization?.name || 'Trade Attendee',
-        designation: 'Business Visitor',
-        country: 'India',
-        attendanceType: 'in_person'
+      const pass = await issueVisitorPass({
+        endpoint: `${API_URL}/visitors/register`,
+        event: expo,
+        user
       });
-
-      if (res.data && res.data.success) {
-        setClaimSuccessMessage(`Pass confirmed for "${expo.title}"! Your QR badge is active.`);
-        await fetchMyPasses();
-        showSweetSuccess(`Your digital entry badge for "${expo.title}" is ready and available under My Passes & Badges.`, 'Pass Confirmed! 🎉');
-      }
+      if (!pass) return;
+      setClaimSuccessMessage(`Pass confirmed for "${expo.title}"! Your QR badge is active.`);
+      await fetchMyPasses();
     } catch (err) {
       const errMsg = err.response?.data?.error || 'Registration could not be completed. You may already be registered.';
       setClaimError(errMsg);
@@ -356,7 +364,7 @@ export default function ExposPage() {
 
         <div className="flex flex-wrap items-center gap-3 shrink-0">
           <Link
-            href="/dashboard"
+            href="/my-badges"
             className="inline-flex items-center gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground px-3.5 py-2 text-xs font-bold transition-all shadow-sm cursor-pointer"
           >
             <Ticket className="h-4 w-4" /> View My Confirmed Badges ({passes.length})
@@ -586,7 +594,7 @@ export default function ExposPage() {
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {paginatedEvents.map((expo) => {
               const expoId = expo.id || expo._id;
-              const isClaimed = registeredEventIds.has(expoId);
+              const isClaimed = hasClaimedPass(expo, registeredEventIds);
               const isClaiming = claimingId === expoId;
 
               return (

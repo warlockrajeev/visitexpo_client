@@ -26,6 +26,12 @@ import Footer from '../../../components/Footer.js';
 import InterestedAttendeesModal from '../../../components/InterestedAttendeesModal.js';
 import EventPassAvailability from '../../../components/EventPassAvailability.js';
 import { allowEventPassClaim } from '../../../utils/eventPasses.js';
+import { issueVisitorPass } from '../../../utils/visitorPass.js';
+import {
+  hasClaimedPass as isEventPassClaimed,
+  readClaimedPasses,
+  syncClaimedPassesFromServer
+} from '../../../utils/claimedPasses.js';
 import OrganizerChatWidget from '../../../components/OrganizerChatWidget.js';
 import GoogleCalendarButton from '../../../components/GoogleCalendarButton.js';
 import GoogleCalendarModal from '../../../components/GoogleCalendarModal.js';
@@ -493,7 +499,6 @@ export default function ExpoDetailsPage() {
             title: decodeHtmlEntities(parsed.title),
             rating: parsed.rating || (4.5 + ((charSum % 5) * 0.1)).toFixed(1),
             reviewCount: parsed.reviewCount || (80 + (charSum % 180)),
-            followersCount: parsed.followersCount || parsed.interestedCount || (1100 + (charSum % 2900)),
             edition: parsed.edition || `${8 + (charSum % 15)}th Edition`,
             timings: parsed.timings || '9:00 AM – 5:00 PM (General Admission)',
             entryType: parsed.entryType || (parsed.isFreeEvent === false ? `Paid Admission — ${getCurrencySymbol(parsed.currency || 'INR')}${parsed.paidTicketPrice || 500}` : 'Free Ticket for Industry Professionals'),
@@ -524,7 +529,6 @@ export default function ExpoDetailsPage() {
               title: decodeHtmlEntities(match.title),
               rating: match.rating || (4.5 + ((charSum % 5) * 0.1)).toFixed(1),
               reviewCount: match.reviewCount || (80 + (charSum % 180)),
-              followersCount: match.followersCount || match.interestedCount || (1100 + (charSum % 2900)),
               edition: match.edition || `${8 + (charSum % 15)}th Edition`,
               timings: match.timings || '9:00 AM – 5:00 PM (General Admission)',
               entryType: match.entryType || (match.isFreeEvent === false ? `Paid Admission — ${getCurrencySymbol(match.currency || 'INR')}${match.paidTicketPrice || 500}` : 'Free Ticket for Industry Professionals'),
@@ -571,9 +575,11 @@ export default function ExpoDetailsPage() {
   const [applyingSpeaker, setApplyingSpeaker] = useState(false);
   const [isAppliedDelegation, setIsAppliedDelegation] = useState(false);
 
-  const hasClaimedPass = Boolean(isPassClaimed || isInterested);
+  const hasClaimedPass = Boolean(isPassClaimed);
   const [showAttendeesModal, setShowAttendeesModal] = useState(false);
   const [attendees, setAttendees] = useState([]);
+  const [engagementCounts, setEngagementCounts] = useState({ interested: 0, followers: 0 });
+  const [attendeesLoadError, setAttendeesLoadError] = useState('');
   const [followedAttendeeIds, setFollowedAttendeeIds] = useState(new Set());
   const [attendeeFilter, setAttendeeFilter] = useState('all');
   const [attendeeSearch, setAttendeeSearch] = useState('');
@@ -1240,7 +1246,7 @@ export default function ExpoDetailsPage() {
     return () => {
       isCancelled = true;
     };
-  }, [slug, event]);
+  }, [slug]);
 
   // Fetch Event by slug or ID from dedicated API route or fallback to WordPress API
   useEffect(() => {
@@ -1305,7 +1311,6 @@ export default function ExpoDetailsPage() {
             image: resolvedImage || found.image || prev?.image,
             rating: found.rating || prev?.rating || (4.5 + ((charSum % 5) * 0.1)).toFixed(1),
             reviewCount: found.reviewCount || prev?.reviewCount || (80 + (charSum % 180)),
-            followersCount: found.followersCount || found.interestedCount || prev?.followersCount || (1100 + (charSum % 2900)),
             edition: found.edition || prev?.edition || `${8 + (charSum % 15)}th Edition`,
             timings: found.timings || prev?.timings || '9:00 AM – 5:00 PM (General Admission)',
             entryType: found.entryType || prev?.entryType || (found.isFreeEvent === false ? `Paid Admission — ${getCurrencySymbol(found.currency || 'INR')}${found.paidTicketPrice || 500}` : 'Free Ticket for Industry Professionals'),
@@ -1331,7 +1336,6 @@ export default function ExpoDetailsPage() {
             dates: 'Upcoming 2026',
             rating: '4.8',
             reviewCount: 120,
-            followersCount: 1420,
             edition: 'Annual Edition',
             image: resolvedFallbackImage,
             description:
@@ -1359,21 +1363,8 @@ export default function ExpoDetailsPage() {
     if (typeof window !== 'undefined' && slug) {
       try {
         const savedInterested = localStorage.getItem(`visitexpo_interested_${slug}`);
-        if (savedInterested === 'true') {
-          setIsInterested(true);
-          setIsPassClaimed(true);
-        }
-
-        const savedClaimed = localStorage.getItem('visitexpo_claimed_passes');
-        if (savedClaimed) {
-          try {
-            const set = new Set(JSON.parse(savedClaimed));
-            const keys = [slug, event?.slug, event?.id, event?._id].filter(Boolean).map(String);
-            if (keys.some((k) => set.has(k))) {
-              setIsPassClaimed(true);
-            }
-          } catch (_) {}
-        }
+        if (savedInterested === 'true') setIsInterested(true);
+        setIsPassClaimed(isEventPassClaimed(event || { slug }, readClaimedPasses()));
 
         const savedFollowExpo = localStorage.getItem(`visitexpo_follow_expo_${slug}`);
         if (savedFollowExpo === 'true') setIsFollowingExpo(true);
@@ -1394,7 +1385,42 @@ export default function ExpoDetailsPage() {
         console.error('Error loading social state from localStorage:', err);
       }
     }
-  }, [slug]);
+  }, [slug, event]);
+
+  useEffect(() => {
+    if (!user?.email || !event || typeof window === 'undefined') return undefined;
+    let active = true;
+    const refreshClaimStatus = () => {
+      setIsPassClaimed(isEventPassClaimed(event, readClaimedPasses()));
+    };
+    const token = localStorage.getItem('visitexpo_access_token') || localStorage.getItem('visitexpo_token');
+
+    window.addEventListener('visitexpo:pass-claimed', refreshClaimStatus);
+    window.addEventListener('storage', refreshClaimStatus);
+    window.addEventListener('pageshow', refreshClaimStatus);
+    window.addEventListener('focus', refreshClaimStatus);
+
+    if (token) {
+      axios.get(`${API_URL}/visitors/my-passes`, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then((response) => {
+        if (!active || !response.data?.success) return;
+        const passes = response.data.data?.docs || response.data.data || [];
+        const claimed = syncClaimedPassesFromServer(passes);
+        setIsPassClaimed(isEventPassClaimed(event, claimed));
+      }).catch((error) => {
+        console.warn('Could not sync event pass status:', error);
+      });
+    }
+
+    return () => {
+      active = false;
+      window.removeEventListener('visitexpo:pass-claimed', refreshClaimStatus);
+      window.removeEventListener('storage', refreshClaimStatus);
+      window.removeEventListener('pageshow', refreshClaimStatus);
+      window.removeEventListener('focus', refreshClaimStatus);
+    };
+  }, [event, user?.email]);
 
   // Fetch verified attendees from Social API & sync user status
   useEffect(() => {
@@ -1408,16 +1434,21 @@ export default function ExpoDetailsPage() {
           if (Array.isArray(res.data.data.attendees)) {
             setAttendees(res.data.data.attendees);
           }
+          setEngagementCounts({
+            interested: Number(res.data.data.counts?.interested ?? res.data.data.interestedCount) || 0,
+            followers: Number(res.data.data.counts?.followers ?? res.data.data.followersCount) || 0
+          });
+          setAttendeesLoadError('');
           if (res.data.data.userStatus) {
             setIsInterested(!!res.data.data.userStatus.isInterested);
             setIsFollowingExpo(!!res.data.data.userStatus.isFollower);
-            if (res.data.data.userStatus.isInterested) {
-              setIsPassClaimed(true);
-            }
           }
         }
       } catch (err) {
-        console.warn('Using fallback seed for social data:', err);
+        console.warn('Could not load real event attendee data:', err);
+        setAttendees([]);
+        setEngagementCounts({ interested: 0, followers: 0 });
+        setAttendeesLoadError('Real attendee records are temporarily unavailable.');
       }
     };
     if (slug) fetchSocialData();
@@ -1502,15 +1533,6 @@ export default function ExpoDetailsPage() {
     ];
   }, [event]);
 
-  // Social Proof Attendee Avatars
-  const attendeeAvatars = [
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=120&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=120&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=120&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=120&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=120&auto=format&fit=crop'
-  ];
-
   // Dynamic "Listed In" Tags based on real backend event metadata
   const listedInTags = useMemo(() => {
     const tags = new Set();
@@ -1576,29 +1598,6 @@ export default function ExpoDetailsPage() {
     }
     const next = !isInterested;
     setIsInterested(next);
-    if (!next) {
-      setIsPassClaimed(false);
-      if (typeof window !== 'undefined') {
-        try {
-          const rawClaimed = localStorage.getItem('visitexpo_claimed_passes');
-          if (rawClaimed) {
-            const set = new Set(JSON.parse(rawClaimed));
-            [event?.id, event?._id, event?.slug, slug].filter(Boolean).forEach((k) => set.delete(String(k)));
-            localStorage.setItem('visitexpo_claimed_passes', JSON.stringify(Array.from(set)));
-          }
-        } catch (_) {}
-      }
-    } else {
-      setIsPassClaimed(true);
-      if (typeof window !== 'undefined') {
-        try {
-          const rawClaimed = localStorage.getItem('visitexpo_claimed_passes');
-          const nextClaimed = new Set(rawClaimed ? JSON.parse(rawClaimed) : []);
-          [event?.id, event?._id, event?.slug, slug].filter(Boolean).forEach((k) => nextClaimed.add(String(k)));
-          localStorage.setItem('visitexpo_claimed_passes', JSON.stringify(Array.from(nextClaimed)));
-        } catch (_) {}
-      }
-    }
     if (typeof window !== 'undefined') {
       try {
         const raw = localStorage.getItem('visitexpo_interested_events');
@@ -1637,6 +1636,12 @@ export default function ExpoDetailsPage() {
       if (res.data?.data?.isInterested !== undefined) {
         setIsInterested(res.data.data.isInterested);
       }
+      if (res.data?.data?.counts) {
+        setEngagementCounts({
+          interested: Number(res.data.data.counts.interested) || 0,
+          followers: Number(res.data.data.counts.followers) || 0
+        });
+      }
       if (typeof window !== 'undefined') {
         try {
           localStorage.setItem('visitexpo_last_engagement_trigger', String(Date.now()));
@@ -1651,8 +1656,13 @@ export default function ExpoDetailsPage() {
       const queryParams = new URLSearchParams();
       if (user?.email) queryParams.set('email', user.email);
       const refreshRes = await axios.get(`/api/events/${slug}/social?${queryParams.toString()}`);
-      if (refreshRes.data?.data?.attendees) {
-        setAttendees(refreshRes.data.data.attendees);
+      if (refreshRes.data?.data) {
+        setAttendees(Array.isArray(refreshRes.data.data.attendees) ? refreshRes.data.data.attendees : []);
+        setEngagementCounts({
+          interested: Number(refreshRes.data.data.counts?.interested ?? refreshRes.data.data.interestedCount) || 0,
+          followers: Number(refreshRes.data.data.counts?.followers ?? refreshRes.data.data.followersCount) || 0
+        });
+        setAttendeesLoadError('');
       }
     } catch (err) {
       console.warn('Failed to persist interest to server:', err);
@@ -1701,21 +1711,12 @@ export default function ExpoDetailsPage() {
 
     if (!confirmed) return;
 
-    const eventId = event?._id || event?.id;
-    if (eventId && user?.email) {
-      try {
-        await axios.post(`${API_URL}/visitors/register`, {
-          eventId,
-          name: user?.name || user?.email?.split('@')[0] || 'Visitor',
-          email: user?.email,
-          phone: user?.phone || '+91-9999999999',
-          company: user?.organization?.name || user?.company || 'Trade Attendee',
-          designation: 'Business Visitor',
-          country: 'India',
-          attendanceType: 'in_person'
-        });
-      } catch (_) {}
-    }
+    const pass = await issueVisitorPass({
+      endpoint: `${API_URL}/visitors/register`,
+      event,
+      user
+    });
+    if (!pass) return;
 
     setIsPassClaimed(true);
     setIsInterested(true);
@@ -1755,10 +1756,6 @@ export default function ExpoDetailsPage() {
       });
     } catch (_) {}
 
-    showSweetSuccess(
-      `Your complimentary digital pass for "${event?.title || 'this event'}" is ready and registered to your visitor account!`,
-      'Visitor Pass Confirmed! 🎉'
-    );
   };
 
   const handleApplyToSpeak = async () => {
@@ -1883,8 +1880,13 @@ export default function ExpoDetailsPage() {
       const queryParams = new URLSearchParams();
       if (user?.email) queryParams.set('email', user.email);
       const refreshRes = await axios.get(`/api/events/${slug}/social?${queryParams.toString()}`);
-      if (refreshRes.data?.data?.attendees) {
-        setAttendees(refreshRes.data.data.attendees);
+      if (refreshRes.data?.data) {
+        setAttendees(Array.isArray(refreshRes.data.data.attendees) ? refreshRes.data.data.attendees : []);
+        setEngagementCounts({
+          interested: Number(refreshRes.data.data.counts?.interested ?? refreshRes.data.data.interestedCount) || 0,
+          followers: Number(refreshRes.data.data.counts?.followers ?? refreshRes.data.data.followersCount) || 0
+        });
+        setAttendeesLoadError('');
       }
     } catch (err) {
       console.warn('Failed to persist follow to server:', err);
@@ -2162,8 +2164,8 @@ export default function ExpoDetailsPage() {
     );
   }
 
-  const followersCount = (event?.followersCount || 1058) + (isFollowingExpo ? 1 : 0);
-  const interestedCount = (event?.interestedCount || (event?.followersCount ? Math.floor(event.followersCount * 0.86) : 920)) + (isInterested ? 1 : 0);
+  const followersCount = engagementCounts.followers;
+  const interestedCount = engagementCounts.interested;
   const ratingValue = event?.rating || '4.0';
   const reviewsCount = event?.reviewCount || 88;
   const editionLabel = event?.edition || '11th Edition';
@@ -2363,20 +2365,22 @@ export default function ExpoDetailsPage() {
                         {user?.name?.charAt(0) || 'You'}
                       </div>
                     )}
-                    {(attendees.length > 0
-                      ? attendees.slice(0, isInterested ? 4 : 5)
-                      : attendeeAvatars.map((src, i) => ({ avatar: src, id: i }))
-                    ).map((att, idx) => (
-                      <img
+                    {attendees.slice(0, isInterested ? 4 : 5).map((att, idx) => (
+                      <div
                         key={att.id || idx}
-                        src={att.avatar || att}
-                        alt="Attendee"
-                        className="inline-block h-7 w-7 rounded-full ring-2 ring-white object-cover group-hover:scale-105 transition-transform"
-                      />
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-full ring-2 ring-white bg-zinc-200 text-[10px] font-bold text-zinc-700 group-hover:scale-105 transition-transform overflow-hidden"
+                        title={att.name}
+                      >
+                        {att.avatar
+                          ? <img src={att.avatar} alt={att.name} className="h-full w-full object-cover" />
+                          : String(att.name || '?').slice(0, 1).toUpperCase()}
+                      </div>
                     ))}
-                    <div className="h-7 w-7 rounded-full bg-zinc-900 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white group-hover:bg-[#FF2E63] transition-colors">
-                      +
-                    </div>
+                    {attendees.length > 0 && (
+                      <div className="h-7 w-7 rounded-full bg-zinc-900 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white group-hover:bg-[#FF2E63] transition-colors">
+                        +
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-col">
@@ -2782,7 +2786,7 @@ export default function ExpoDetailsPage() {
                 <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200 flex items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-2 text-zinc-600">
                     <Lock className="h-4 w-4 text-amber-600 shrink-0" />
-                    <span>Want to connect with all 1,000+ trade buyers? Unlock direct contact details with your free pass.</span>
+                    <span>Want to connect with interested event attendees? Unlock available contact details with your free pass.</span>
                   </div>
                   <EventPassAvailability event={event}>
                     <button
@@ -3198,7 +3202,7 @@ export default function ExpoDetailsPage() {
                         Interested Trade Attendees &amp; Followers
                       </span>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 text-[#FF2E63] border border-rose-200">
-                        {interestedCount.toLocaleString()} confirmed
+                        {interestedCount.toLocaleString()} interested
                       </span>
                     </div>
                     <p className="text-xs text-zinc-500">
@@ -3217,7 +3221,7 @@ export default function ExpoDetailsPage() {
 
                 {/* 4 Cards Grid */}
                 <div className="grid sm:grid-cols-2 gap-3">
-                  {(attendees.length > 0 ? attendees.slice(0, 4) : []).map((att) => {
+                  {attendees.filter((att) => att.isInterested).slice(0, 4).map((att) => {
                     const isFollowing = followedAttendeeIds.has(att.id);
                     return (
                       <div
@@ -3226,25 +3230,32 @@ export default function ExpoDetailsPage() {
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-start gap-2.5 min-w-0">
-                            <div className="relative h-10 w-10 rounded-full overflow-hidden shrink-0 border border-zinc-200">
-                              <img src={att.avatar} alt={att.name} className="w-full h-full object-cover" />
-                              <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+                            <div className="relative h-10 w-10 rounded-full overflow-hidden shrink-0 border border-zinc-200 bg-zinc-100 flex items-center justify-center">
+                              {att.avatar
+                                ? <img src={att.avatar} alt={att.name} className="w-full h-full object-cover" />
+                                : <span className="text-xs font-bold text-zinc-600">{String(att.name || '?').slice(0, 1).toUpperCase()}</span>}
                             </div>
                             <div className="min-w-0">
                               <div className="text-xs font-extrabold text-zinc-900 truncate flex items-center gap-1">
                                 <span>{att.name}</span>
                                 {att.verified && <ShieldCheck className="h-3 w-3 text-blue-600 shrink-0" />}
                               </div>
-                              <div className="text-[11px] font-semibold text-zinc-700 truncate">{att.designation}</div>
-                              <div className="text-[10px] text-zinc-500 truncate">{att.company} • {att.city}</div>
+                              {att.designation && <div className="text-[11px] font-semibold text-zinc-700 truncate">{att.designation}</div>}
+                              {(att.company || att.city || att.country) && (
+                                <div className="text-[10px] text-zinc-500 truncate">
+                                  {[att.company, att.city, att.country].filter(Boolean).join(' • ')}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
 
                         {/* Objective */}
-                        <div className="text-[10px] text-zinc-600 bg-white px-2 py-1 rounded border border-zinc-200/80 italic line-clamp-1">
-                          "{att.objective}"
-                        </div>
+                        {att.objective && (
+                          <div className="text-[10px] text-zinc-600 bg-white px-2 py-1 rounded border border-zinc-200/80 italic line-clamp-1">
+                            "{att.objective}"
+                          </div>
+                        )}
 
                         {/* Action buttons */}
                         <div className="flex items-center justify-between gap-2 pt-1 border-t border-zinc-100">
@@ -3553,7 +3564,7 @@ export default function ExpoDetailsPage() {
                       Stall Space Reservation
                     </div>
                     <h4 className="text-sm font-bold text-zinc-900">
-                      Showcase your products to {interestedCount.toLocaleString()}+ verified trade buyers
+                      Connect with {interestedCount.toLocaleString()} people interested in this event
                     </h4>
                     <p className="text-xs text-zinc-600">
                       Raw space starts from <strong className="text-zinc-900">{event?.boothCost || '145 USD / sqm'}</strong>. Standard shell schemes available.
@@ -4788,12 +4799,18 @@ export default function ExpoDetailsPage() {
                 <div className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
                   Recently Interested
                 </div>
-                {(attendees.length > 0 ? attendees.slice(0, 2) : []).map((att) => {
+                {attendees.filter((att) => att.isInterested).slice(0, 2).map((att) => {
                   const isFollowing = followedAttendeeIds.has(att.id);
                   return (
                     <div key={att.id} className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-200/80 flex items-center justify-between gap-2.5">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <img src={att.avatar} alt={att.name} className="h-8 w-8 rounded-full object-cover shrink-0 border border-zinc-200" />
+                        {att.avatar ? (
+                          <img src={att.avatar} alt={att.name} className="h-8 w-8 rounded-full object-cover shrink-0 border border-zinc-200" />
+                        ) : (
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-zinc-100 text-xs font-bold text-zinc-600">
+                            {String(att.name || '?').slice(0, 1).toUpperCase()}
+                          </span>
+                        )}
                         <div className="min-w-0">
                           <div className="text-xs font-bold text-zinc-900 truncate">{att.name}</div>
                           <div className="text-[10px] text-zinc-500 truncate">{att.company}</div>
@@ -4982,6 +4999,9 @@ export default function ExpoDetailsPage() {
         onClose={() => setShowAttendeesModal(false)}
         event={event}
         attendees={attendees}
+        totalInterestedCount={interestedCount}
+        totalFollowersCount={followersCount}
+        attendeesLoadError={attendeesLoadError}
         followedAttendeeIds={followedAttendeeIds}
         onToggleFollowAttendee={handleToggleFollowAttendee}
         isUserInterested={isInterested}

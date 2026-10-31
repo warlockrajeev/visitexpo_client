@@ -16,6 +16,13 @@ import axios from 'axios';
 import { renderCardDescription } from '../../utils/textFormatters.js';
 import { fetchWordpressEvents } from '../../utils/fetchWordpressEvents.js';
 import { allowEventPassClaim } from '../../utils/eventPasses.js';
+import { issueVisitorPass } from '../../utils/visitorPass.js';
+import {
+  hasClaimedPass,
+  readClaimedPasses,
+  rememberClaimedPass,
+  syncClaimedPassesFromServer
+} from '../../utils/claimedPasses.js';
 import { isEventExpired, sortEventsByStartDate } from '../../utils/eventDates.js';
 import Navbar from '../../components/Navbar.js';
 import Footer from '../../components/Footer.js';
@@ -316,8 +323,7 @@ export default function EventsDirectoryPage() {
         if (followed) setFollowedSlugs(new Set(JSON.parse(followed)));
         const interested = localStorage.getItem('visitexpo_interested_events');
         if (interested) setInterestedSlugs(new Set(JSON.parse(interested)));
-        const claimed = localStorage.getItem('visitexpo_claimed_passes');
-        if (claimed) setClaimedPassIds(new Set(JSON.parse(claimed)));
+        setClaimedPassIds(readClaimedPasses());
       } catch (_) {}
     }
 
@@ -368,6 +374,39 @@ export default function EventsDirectoryPage() {
         });
     }
   }, [user]);
+
+  useEffect(() => {
+    const refreshClaimedPasses = () => setClaimedPassIds(readClaimedPasses());
+    window.addEventListener('visitexpo:pass-claimed', refreshClaimedPasses);
+    window.addEventListener('storage', refreshClaimedPasses);
+    window.addEventListener('pageshow', refreshClaimedPasses);
+    window.addEventListener('focus', refreshClaimedPasses);
+    refreshClaimedPasses();
+
+    return () => {
+      window.removeEventListener('visitexpo:pass-claimed', refreshClaimedPasses);
+      window.removeEventListener('storage', refreshClaimedPasses);
+      window.removeEventListener('pageshow', refreshClaimedPasses);
+      window.removeEventListener('focus', refreshClaimedPasses);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user?.email || typeof window === 'undefined') return;
+    const token = localStorage.getItem('visitexpo_access_token') || localStorage.getItem('visitexpo_token');
+    if (!token) return;
+
+    axios.get(`${API_URL}/visitors/my-passes`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then((response) => {
+      if (response.data?.success) {
+        const passes = response.data.data?.docs || response.data.data || [];
+        setClaimedPassIds(syncClaimedPassesFromServer(passes));
+      }
+    }).catch((error) => {
+      console.warn('Could not sync confirmed visitor passes:', error);
+    });
+  }, [user?.email]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -847,7 +886,7 @@ export default function EventsDirectoryPage() {
         {
           title: 'Pass Already Registered',
           icon: 'success',
-          confirmButtonText: 'View My Pass',
+          confirmButtonText: 'View Pass',
           showCancelButton: true,
           cancelButtonText: 'Close',
           reverseButtons: true,
@@ -860,7 +899,7 @@ export default function EventsDirectoryPage() {
           `
         }
       );
-      if (result?.isConfirmed) router.push('/dashboard');
+      if (result?.isConfirmed) router.push('/my-badges');
       return;
     }
 
@@ -917,62 +956,20 @@ export default function EventsDirectoryPage() {
     passRegistrationInFlight.current.add(requestKey);
 
     try {
-      const res = await axios.post(`${API_URL}/visitors/register`, {
-        eventId,
-        name: user?.name || user?.email?.split('@')[0] || 'Visitor',
-        email: user?.email,
-        phone: user?.phone || '+91-9999999999',
-        company: user?.organization?.name || user?.company || 'Trade Attendee',
-        designation: 'Business Visitor',
-        country: 'India',
-        attendanceType: 'in_person'
+      const pass = await issueVisitorPass({
+        endpoint: `${API_URL}/visitors/register`,
+        event: evt,
+        user
       });
+      if (!pass) return;
 
-      if (!res.data?.success) {
-        throw new Error(res.data?.error || 'Registration could not be completed.');
-      }
+      setClaimedPassIds(rememberClaimedPass(evt, pass));
 
-      setClaimedPassIds((prev) => {
-        const next = new Set(prev);
-        const keys = [evt.id, evt._id, evt.slug, slug, idKey].filter(Boolean).map(String);
-        keys.forEach((key) => next.add(key));
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('visitexpo_claimed_passes', JSON.stringify(Array.from(next)));
-        }
-        return next;
-      });
-
-      const result = await showSweetAlert({
-        title: 'Your Visitor Pass Is Ready',
-        icon: 'success',
-        confirmButtonText: 'View & Download Pass',
-        cancelButtonText: 'Done',
-        showCancelButton: true,
-        reverseButtons: true,
-        width: 'min(92vw, 540px)',
-        html: `
-          <div style="text-align:left;">
-            <p style="margin:0 0 14px;color:#52525b;font-size:13px;line-height:1.6;">Your free visitor registration is confirmed. View your digital pass in <strong style="color:#18181b;">My Passes &amp; Badges</strong>, where you can print or save it.</p>
-            ${eventDetailsHtml}
-            <div style="padding:12px 14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;color:#166534;font-size:12px;font-weight:700;">
-              Digital pass generated for ${escapeHtml(user.name || user.email)}.
-            </div>
-          </div>
-        `
-      });
-      if (result?.isConfirmed) router.push('/dashboard');
     } catch (error) {
       const message = error.response?.data?.error || error.message || 'Registration could not be completed. Please try again.';
       const duplicate = /already registered/i.test(message);
       if (duplicate) {
-        setClaimedPassIds((prev) => {
-          const next = new Set(prev);
-          [evt.id, evt._id, evt.slug, slug, idKey].filter(Boolean).forEach((key) => next.add(String(key)));
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('visitexpo_claimed_passes', JSON.stringify(Array.from(next)));
-          }
-          return next;
-        });
+        setClaimedPassIds(rememberClaimedPass(evt));
       }
       const result = await showSweetAlert({
         title: duplicate ? 'Pass Already Registered' : 'Registration Unsuccessful',
@@ -1696,7 +1693,7 @@ export default function EventsDirectoryPage() {
               const isSaved = savedEventIds.has(evt.id) || savedEventIds.has(eventSlug);
               const isInterested = interestedSlugs.has(String(eventSlug).toLowerCase()) || interestedSlugs.has(String(evt.id).toLowerCase());
               const isFollowing = followedSlugs.has(String(eventSlug).toLowerCase()) || followedSlugs.has(String(evt.id).toLowerCase());
-              const isClaimed = claimedPassIds.has(evt.id);
+              const isClaimed = hasClaimedPass(evt, claimedPassIds);
               const wpImg =
                 wpEventImages[String(evt.slug || '').toLowerCase()] ||
                 wpEventImages[String(evt.id)] ||
@@ -1882,7 +1879,7 @@ export default function EventsDirectoryPage() {
                         <EventPassAvailability event={evt}>
                           <button
                             type="button"
-                            onClick={() => handleGetPass(evt)}
+                            onClick={() => isClaimed ? router.push('/my-badges') : handleGetPass(evt)}
                             className="shrink-0 cursor-pointer"
                           >
                             {isClaimed ? (
