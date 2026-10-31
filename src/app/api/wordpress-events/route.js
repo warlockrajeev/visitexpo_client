@@ -446,7 +446,9 @@ export async function GET(request) {
 
     // 1. Fetch from high-speed database-backed directory endpoint on Express server (MongoDB Atlas)
     try {
-      const allRes = await fetch(`${BACKEND_API_URL}/events/all-directory`, {
+      const directoryUrl = new URL(`${BACKEND_API_URL}/events/all-directory`);
+      if (forceRefresh) directoryUrl.searchParams.set('refresh', 'true');
+      const allRes = await fetch(directoryUrl, {
         cache: 'no-store',
         signal: AbortSignal.timeout(2500)
       });

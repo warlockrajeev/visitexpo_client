@@ -24,6 +24,8 @@ import { getCurrencySymbol } from '../../(dashboard)/events/wizard/page.js';
 import Navbar from '../../../components/Navbar.js';
 import Footer from '../../../components/Footer.js';
 import InterestedAttendeesModal from '../../../components/InterestedAttendeesModal.js';
+import EventPassAvailability from '../../../components/EventPassAvailability.js';
+import { allowEventPassClaim } from '../../../utils/eventPasses.js';
 import OrganizerChatWidget from '../../../components/OrganizerChatWidget.js';
 import GoogleCalendarButton from '../../../components/GoogleCalendarButton.js';
 import GoogleCalendarModal from '../../../components/GoogleCalendarModal.js';
@@ -1254,7 +1256,7 @@ export default function ExpoDetailsPage() {
 
         // 1. Direct single-event endpoint (returns genuine WordPress/MongoDB data, real images, FAQs, schedule, etc.)
         try {
-          const detailRes = await axios.get(`/api/events/${encodeURIComponent(cleanSlug)}`, { timeout: 4000 });
+          const detailRes = await axios.get(`/api/events/${encodeURIComponent(cleanSlug)}?refresh=true`, { timeout: 4000 });
           if (detailRes.data?.success && detailRes.data?.data) {
             found = detailRes.data.data;
           }
@@ -1658,6 +1660,7 @@ export default function ExpoDetailsPage() {
   };
 
   const handleClaimVisitorPass = async () => {
+    if (!(await allowEventPassClaim(event))) return;
     if (hasClaimedPass) {
       await showSweetAlert(
         {
@@ -2587,24 +2590,26 @@ export default function ExpoDetailsPage() {
                       <span>{isFollowingExpo ? 'Following Event ✓' : 'Follow Updates'}</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={handleClaimVisitorPass}
-                      className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 ${
-                        hasClaimedPass
-                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
-                          : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 ring-1 ring-amber-400'
-                      }`}
-                    >
-                      {hasClaimedPass ? (
-                        <>
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                          <span>Pass Confirmed ✓</span>
-                        </>
-                      ) : (
-                        <span>Claim Free Pass</span>
-                      )}
-                    </button>
+                    <EventPassAvailability event={event}>
+                      <button
+                        type="button"
+                        onClick={handleClaimVisitorPass}
+                        className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 ${
+                          hasClaimedPass
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                            : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 ring-1 ring-amber-400'
+                        }`}
+                      >
+                        {hasClaimedPass ? (
+                          <>
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                            <span>Pass Confirmed ✓</span>
+                          </>
+                        ) : (
+                          <span>Claim Free Pass</span>
+                        )}
+                      </button>
+                    </EventPassAvailability>
                   </div>
                 </div>
 
@@ -2779,24 +2784,26 @@ export default function ExpoDetailsPage() {
                     <Lock className="h-4 w-4 text-amber-600 shrink-0" />
                     <span>Want to connect with all 1,000+ trade buyers? Unlock direct contact details with your free pass.</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleClaimVisitorPass}
-                    className={`px-4 py-1.5 rounded-lg font-bold text-xs shrink-0 cursor-pointer transition-colors flex items-center gap-1.5 ${
-                      hasClaimedPass
-                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                        : 'bg-zinc-900 text-white hover:bg-zinc-800'
-                    }`}
-                  >
-                    {hasClaimedPass ? (
-                      <>
-                        <CheckCircle2 className="h-3.5 w-3.5 text-white" />
-                        <span>Badge Claimed ✓</span>
-                      </>
-                    ) : (
-                      <span>Claim Badge</span>
-                    )}
-                  </button>
+                  <EventPassAvailability event={event}>
+                    <button
+                      type="button"
+                      onClick={handleClaimVisitorPass}
+                      className={`px-4 py-1.5 rounded-lg font-bold text-xs shrink-0 cursor-pointer transition-colors flex items-center gap-1.5 ${
+                        hasClaimedPass
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                          : 'bg-zinc-900 text-white hover:bg-zinc-800'
+                      }`}
+                    >
+                      {hasClaimedPass ? (
+                        <>
+                          <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                          <span>Badge Claimed ✓</span>
+                        </>
+                      ) : (
+                        <span>Claim Badge</span>
+                      )}
+                    </button>
+                  </EventPassAvailability>
                 </div>
               </div>
             )}
@@ -4176,24 +4183,26 @@ export default function ExpoDetailsPage() {
                       <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                       <span>Pre-registration open for trade professionals</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleClaimVisitorPass}
-                      className={`w-full py-2.5 rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
-                        hasClaimedPass
-                          ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                      }`}
-                    >
-                      {hasClaimedPass ? (
-                        <>
-                          <CheckCircle2 className="h-4 w-4 text-white" />
-                          <span>Pass Confirmed ✓</span>
-                        </>
-                      ) : (
-                        <span>Claim Free Pass Now</span>
-                      )}
-                    </button>
+                    <EventPassAvailability event={event} className="w-full">
+                      <button
+                        type="button"
+                        onClick={handleClaimVisitorPass}
+                        className={`w-full py-2.5 rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
+                          hasClaimedPass
+                            ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                            : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        }`}
+                      >
+                        {hasClaimedPass ? (
+                          <>
+                            <CheckCircle2 className="h-4 w-4 text-white" />
+                            <span>Pass Confirmed ✓</span>
+                          </>
+                        ) : (
+                          <span>Claim Free Pass Now</span>
+                        )}
+                      </button>
+                    </EventPassAvailability>
                   </div>
 
                   {/* Deal 2: Early Bird Stall Space */}
@@ -4824,24 +4833,26 @@ export default function ExpoDetailsPage() {
               <p className="text-xs text-zinc-600 leading-relaxed">
                 Registered attendees receive a verified digital QR pass compatible with fast-track entry kiosks at {event?.city}.
               </p>
-              <button
-                type="button"
-                onClick={handleClaimVisitorPass}
-                className={`w-full py-2.5 px-3 rounded-xl font-extrabold text-xs shadow-xs transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 active:scale-98 ${
-                  hasClaimedPass
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
-                    : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 ring-1 ring-amber-400'
-                }`}
-              >
-                {hasClaimedPass ? (
-                  <>
-                    <CheckCircle2 className="h-4 w-4 text-white shrink-0" />
-                    <span>Pass Claimed ✓ (View Details)</span>
-                  </>
-                ) : (
-                  <span>Claim Free Visitor Pass</span>
-                )}
-              </button>
+              <EventPassAvailability event={event} className="w-full">
+                <button
+                  type="button"
+                  onClick={handleClaimVisitorPass}
+                  className={`w-full py-2.5 px-3 rounded-xl font-extrabold text-xs shadow-xs transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 active:scale-98 ${
+                    hasClaimedPass
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
+                      : 'bg-[#FFCC00] hover:bg-[#FFB703] text-zinc-950 ring-1 ring-amber-400'
+                  }`}
+                >
+                  {hasClaimedPass ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 text-white shrink-0" />
+                      <span>Pass Claimed ✓ (View Details)</span>
+                    </>
+                  ) : (
+                    <span>Claim Free Visitor Pass</span>
+                  )}
+                </button>
+              </EventPassAvailability>
             </div>
 
             {/* Sidebar Card 4: Need Help Desk */}
@@ -4944,13 +4955,15 @@ export default function ExpoDetailsPage() {
                       <span>View Details</span>
                       <ChevronRight className="h-3 w-3 text-zinc-500" />
                     </Link>
-                    <Link
-                      href={`/expo/${rec.slug || rec.id || rec._id}`}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-zinc-950 text-[#FFCC00] hover:bg-[#FFCC00] hover:text-zinc-950 font-black text-xs transition-all shadow-sm active:scale-95 cursor-pointer"
-                    >
-                      <span>Get Pass</span>
-                      <ArrowRight className="h-3 w-3" />
-                    </Link>
+                    <EventPassAvailability event={rec}>
+                      <Link
+                        href={`/expo/${rec.slug || rec.id || rec._id}`}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-zinc-950 text-[#FFCC00] hover:bg-[#FFCC00] hover:text-zinc-950 font-black text-xs transition-all shadow-sm active:scale-95 cursor-pointer"
+                      >
+                        <span>Get Pass</span>
+                        <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    </EventPassAvailability>
                   </div>
                 </div>
               ))}

@@ -900,6 +900,22 @@ export default function EventsPage() {
         });
         if (res.data && res.data.success) {
           setEvents(prev => prev.map(evt => (evt._id === currentEventId ? res.data.event : evt)));
+          void axios
+            .get('/api/wordpress-events', {
+              params: { refresh: 'true' },
+              timeout: 10000
+            })
+            .then((directoryRes) => {
+              if (Array.isArray(directoryRes.data?.events)) {
+                sessionStorage.setItem(
+                  'visitexpo_home_events',
+                  JSON.stringify(directoryRes.data.events.slice(0, 300))
+                );
+              }
+            })
+            .catch((refreshError) => {
+              console.warn('Could not refresh the public event directory after saving:', refreshError);
+            });
         }
       } else {
         // Create Endpoint

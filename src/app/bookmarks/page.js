@@ -13,6 +13,9 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar.js';
 import Footer from '@/components/Footer.js';
 import ShowCountdownTimer from '@/components/ShowCountdownTimer.js';
+import EventPassAvailability from '@/components/EventPassAvailability.js';
+import { allowEventPassClaim } from '@/utils/eventPasses.js';
+import { isEventExpired } from '@/utils/eventDates.js';
 import { useAuth } from '@/context/AuthContext.js';
 import axios from 'axios';
 import {
@@ -460,6 +463,7 @@ export default function BookmarksPage() {
 
   // Handle Claim Pass (with Theme-Aware Interactive Confirmation Pop-up)
   const handleClaimPass = async (evt) => {
+    if (!(await allowEventPassClaim(evt))) return;
     const slug = (evt.slug || evt.id || '').toLowerCase().trim();
     const idKey = String(evt.id || evt._id || slug).trim();
     const isAlreadyClaimed =
@@ -1121,6 +1125,7 @@ export default function BookmarksPage() {
                 claimedPassIds.has(eventSlug) ||
                 (evt._id && claimedPassIds.has(String(evt._id))) ||
                 (evt.id && claimedPassIds.has(String(evt.id)));
+              const isExpired = isEventExpired(evt);
               const isInterested =
                 interestedSlugs.has(eventSlug) ||
                 interestedSlugs.has(idKey);
@@ -1197,24 +1202,26 @@ export default function BookmarksPage() {
                         <Star className={`h-4 w-4 ${isInterested ? 'fill-amber-500 text-amber-500' : ''}`} />
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleClaimPass(evt)}
-                        className="cursor-pointer"
-                        title={isClaimed ? 'Pass already issued - click to view details' : 'Claim free pass'}
-                      >
-                        {isClaimed ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 text-xs font-bold shadow-2xs hover:bg-emerald-100 transition-colors">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                            <span>Pass Issued</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-amber-400 text-primary-foreground font-black px-3.5 py-1.5 text-xs transition shadow-sm hover:shadow-md hover:scale-105 active:scale-95">
-                            <Ticket className="h-3.5 w-3.5" />
-                            <span>Get Pass</span>
-                          </span>
-                        )}
-                      </button>
+                      <EventPassAvailability event={evt}>
+                        <button
+                          type="button"
+                          onClick={() => handleClaimPass(evt)}
+                          className="cursor-pointer"
+                          title={isClaimed ? 'Pass already issued - click to view details' : 'Claim free pass'}
+                        >
+                          {isClaimed ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 text-xs font-bold shadow-2xs hover:bg-emerald-100 transition-colors">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                              <span>Pass Issued</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-amber-400 text-primary-foreground font-black px-3.5 py-1.5 text-xs transition shadow-sm hover:shadow-md hover:scale-105 active:scale-95">
+                              <Ticket className="h-3.5 w-3.5" />
+                              <span>Get Pass</span>
+                            </span>
+                          )}
+                        </button>
+                      </EventPassAvailability>
 
                       <button
                         type="button"
@@ -1260,8 +1267,14 @@ export default function BookmarksPage() {
                       </span>
 
                       <div className="flex items-center gap-1.5">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-amber-400 to-yellow-300 text-black shadow-md">
-                          Free Pass
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-black shadow-md ${
+                            isExpired
+                              ? 'bg-zinc-200 text-zinc-700'
+                              : 'bg-gradient-to-r from-amber-400 to-yellow-300 text-black'
+                          }`}
+                        >
+                          {isExpired ? 'Past Show' : 'Free Pass'}
                         </span>
 
                         {/* Remove Bookmark Button */}
@@ -1336,24 +1349,26 @@ export default function BookmarksPage() {
                         </button>
 
                         {/* Claim Pass / Pass Issued Button with Confirmation Pop-up */}
-                        <button
-                          type="button"
-                          onClick={() => handleClaimPass(evt)}
-                          className="cursor-pointer"
-                          title={isClaimed ? 'Pass already issued - click to view details' : 'Claim free pass'}
-                        >
-                          {isClaimed ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 text-xs font-bold shadow-2xs hover:bg-emerald-100 transition-colors">
-                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                              <span>Pass Issued</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary hover:bg-amber-400 text-primary-foreground font-black text-xs transition shadow-sm hover:shadow-md hover:scale-105 active:scale-95">
-                              <span>Get Pass</span>
-                              <ArrowRight className="h-3 w-3" />
-                            </span>
-                          )}
-                        </button>
+                        <EventPassAvailability event={evt}>
+                          <button
+                            type="button"
+                            onClick={() => handleClaimPass(evt)}
+                            className="cursor-pointer"
+                            title={isClaimed ? 'Pass already issued - click to view details' : 'Claim free pass'}
+                          >
+                            {isClaimed ? (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 text-xs font-bold shadow-2xs hover:bg-emerald-100 transition-colors">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                                <span>Pass Issued</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary hover:bg-amber-400 text-primary-foreground font-black text-xs transition shadow-sm hover:shadow-md hover:scale-105 active:scale-95">
+                                <span>Get Pass</span>
+                                <ArrowRight className="h-3 w-3" />
+                              </span>
+                            )}
+                          </button>
+                        </EventPassAvailability>
                       </div>
                     </div>
                   </div>

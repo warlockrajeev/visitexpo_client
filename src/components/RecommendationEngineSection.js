@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { detectUserLocation, formatDistance, calculateDistanceKm } from '../utils/geoUtils.js';
 import { useAuth } from '../context/AuthContext.js';
+import EventPassAvailability from './EventPassAvailability.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -837,19 +838,21 @@ export default function RecommendationEngineSection({
                           Exhibit
                         </Link>
                         <span className="text-zinc-300">•</span>
-                        <Link
-                          href={eventHref}
-                          onClick={() => {
-                            try {
-                              sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(ev));
-                            } catch (_) {}
-                          }}
-                          prefetch={true}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold text-xs shadow-xs transition-transform active:scale-95 cursor-pointer"
-                        >
-                          <span>Get Pass</span>
-                          <ArrowRight className="h-3 w-3 text-primary" />
-                        </Link>
+                        <EventPassAvailability event={ev}>
+                          <Link
+                            href={eventHref}
+                            onClick={() => {
+                              try {
+                                sessionStorage.setItem('visitexpo_active_expo', JSON.stringify(ev));
+                              } catch (_) {}
+                            }}
+                            prefetch={true}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold text-xs shadow-xs transition-transform active:scale-95 cursor-pointer"
+                          >
+                            <span>Get Pass</span>
+                            <ArrowRight className="h-3 w-3 text-primary" />
+                          </Link>
+                        </EventPassAvailability>
                       </div>
                     </div>
 

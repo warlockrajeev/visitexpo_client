@@ -5,9 +5,11 @@
  * @description Visitor CRM dashboard page for managing registrations, in-person check-ins, and virtual attendees.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import axios from 'axios';
+import QRCode from 'qrcode';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../../../context/AuthContext.js';
 import { buildDashboardEventsUrl } from '../../../utils/dashboardEvents.js';
@@ -264,7 +266,41 @@ export default function VisitorsCRMPage() {
   // Modal State for onboarding
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedQR, setSelectedQR] = useState(null); // For displaying mock QR modal
+  const [qrImageResult, setQrImageResult] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+  const processedBadgeScan = useRef('');
+
+  useEffect(() => {
+    let isCurrent = true;
+    if (!selectedQR?.qrCode) return undefined;
+    const qrPayload = selectedQR.scanUrl || selectedQR.qrCode;
+
+    QRCode.toDataURL(qrPayload, {
+      errorCorrectionLevel: 'H',
+      margin: 2,
+      width: 320,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      }
+    })
+      .then((dataUrl) => {
+        if (isCurrent) setQrImageResult({ payload: qrPayload, dataUrl });
+      })
+      .catch((qrError) => {
+        console.error('Could not generate visitor badge QR code:', qrError);
+        if (isCurrent) {
+          setQrImageResult({
+            payload: qrPayload,
+            error: 'Could not generate this visitor badge QR code.'
+          });
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [selectedQR]);
 
   // Form State
   const [newVisitor, setNewVisitor] = useState({
@@ -364,14 +400,14 @@ export default function VisitorsCRMPage() {
   }, [user, accessToken]);
 
   // 2. Fetch Visitors
-  const fetchVisitors = async () => {
-    if (!selectedEventId) return;
+  const fetchVisitors = useCallback(async (targetEventId = selectedEventId) => {
+    if (!targetEventId) return;
     setLoading(true);
     setError('');
     try {
       const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
       const res = await axios.get(`${API_URL}/visitors`, {
-        params: { eventId: selectedEventId, limit: 100 },
+        params: { eventId: targetEventId, limit: 100 },
         headers
       });
       if (res.data && res.data.success) {
@@ -383,11 +419,11 @@ export default function VisitorsCRMPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken, selectedEventId]);
 
   useEffect(() => {
     fetchVisitors();
-  }, [selectedEventId, accessToken]);
+  }, [fetchVisitors]);
 
   // Fetch interested & followers for selected event or platform-wide
   useEffect(() => {
@@ -413,22 +449,50 @@ export default function VisitorsCRMPage() {
   }, [selectedEventId, events]);
 
   // 3. Handle Physical Check-In
-  const handlePhysicalCheckIn = async (qrCode) => {
+  const handlePhysicalCheckIn = useCallback(async (qrCode, eventId = selectedEventId) => {
     try {
       const res = await axios.post(
         `${API_URL}/visitors/checkin`,
-        { qrCode, eventId: selectedEventId },
+        { qrCode, eventId },
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       if (res.data && res.data.success) {
-        // Refresh local list
-        fetchVisitors();
+        await fetchVisitors(eventId);
+        const visitor = res.data.visitor;
+        const visitorLabel = visitor?.company
+          ? `${visitor.name} from ${visitor.company}`
+          : visitor?.name || 'Visitor';
+        showSweetSuccess(
+          `${visitorLabel} checked in successfully${visitor?.eventTitle ? ` for ${visitor.eventTitle}` : ''}.`
+        );
+        return true;
       }
     } catch (err) {
       console.error('Checkin error', err);
       showSweetError(err.response?.data?.error || 'Check-in failed');
+      return false;
     }
-  };
+  }, [accessToken, fetchVisitors, selectedEventId]);
+
+  useEffect(() => {
+    if (!accessToken || typeof window === 'undefined') return;
+
+    const url = new URL(window.location.href);
+    const badgeToken = url.searchParams.get('badgeToken');
+    const badgeEventId = url.searchParams.get('eventId');
+    if (!badgeToken || !badgeEventId) return;
+
+    const scanKey = `${badgeEventId}:${badgeToken}`;
+    if (processedBadgeScan.current === scanKey) return;
+    processedBadgeScan.current = scanKey;
+
+    setSelectedEventId(badgeEventId);
+    handlePhysicalCheckIn(badgeToken, badgeEventId).finally(() => {
+      url.searchParams.delete('badgeToken');
+      url.searchParams.delete('eventId');
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    });
+  }, [accessToken, handlePhysicalCheckIn]);
 
   // 4. Handle Virtual Join Simulation
   const handleVirtualJoin = async (email) => {
@@ -1040,7 +1104,13 @@ export default function VisitorsCRMPage() {
                             )}
                             {vis.attendanceType === 'in_person' ? (
                               <button
-                                onClick={() => setSelectedQR({ name: vis.name, qrCode: vis.qrCode, company: vis.company })}
+                                onClick={() => setSelectedQR({
+                                  name: vis.name,
+                                  qrCode: vis.qrCode,
+                                  company: vis.company,
+                                  eventTitle: events.find(event => event._id === selectedEventId)?.title || 'Event Badge',
+                                  scanUrl: `${window.location.origin}/visitors?badgeToken=${encodeURIComponent(vis.qrCode || '')}&eventId=${encodeURIComponent(selectedEventId)}`
+                                })}
                                 className="inline-flex items-center gap-1.5 rounded-lg bg-secondary hover:bg-secondary/80 px-2.5 py-1.5 text-xs font-semibold text-foreground border border-border shadow-sm transition-all cursor-pointer"
                               >
                                 <QrCode className="h-4 w-4 text-muted-foreground" /> View Badge
@@ -1125,18 +1195,35 @@ export default function VisitorsCRMPage() {
             
             {/* Physical Badge Layout */}
             <div className="border border-border/80 rounded-xl p-4 bg-muted/5 mt-4">
-              <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Global Tech Expo 2026</span>
+              <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{selectedQR.eventTitle}</span>
               <h3 className="text-lg font-bold text-foreground mt-2">{selectedQR.name}</h3>
               <p className="text-xs text-muted-foreground font-medium">{selectedQR.company || 'Visitor'}</p>
               
-              {/* Mock QR Code Drawing */}
-              <div className="my-6 mx-auto flex h-40 w-40 flex-col items-center justify-center border-2 border-dashed border-muted-foreground/30 bg-white p-2 rounded-lg shadow-inner">
-                <QrCode className="h-32 w-32 text-black" />
+              <div className="my-6 mx-auto flex h-44 w-44 items-center justify-center border border-border/70 bg-white p-2 rounded-lg shadow-inner">
+                {qrImageResult?.payload === (selectedQR.scanUrl || selectedQR.qrCode) && qrImageResult.dataUrl ? (
+                  <Image
+                    src={qrImageResult.dataUrl}
+                    alt={`Scannable access badge for ${selectedQR.name}`}
+                    width={320}
+                    height={320}
+                    unoptimized
+                    className="h-full w-full object-contain"
+                  />
+                ) : (
+                  <div className="px-3 text-xs text-center text-muted-foreground" role="alert">
+                    {!selectedQR.qrCode
+                      ? 'This visitor does not have a badge token yet.'
+                      : qrImageResult?.payload === (selectedQR.scanUrl || selectedQR.qrCode) && qrImageResult.error
+                        ? qrImageResult.error
+                        : 'Generating scannable badge...'}
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-border/60 pt-3 text-[10px] text-muted-foreground">
                 <span className="font-semibold text-foreground uppercase">PHYSICAL ACCESS BADGE</span>
-                <p className="mt-1 font-mono tracking-wider text-[9px]">{selectedQR.qrCode}</p>
+                <p className="mt-1 break-all font-mono tracking-wider text-[9px]">{selectedQR.qrCode || 'Badge token unavailable'}</p>
+                <p className="mt-1 text-[9px]">Scan while signed in as event staff to validate entry.</p>
               </div>
             </div>
             

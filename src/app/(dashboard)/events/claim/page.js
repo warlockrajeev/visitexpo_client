@@ -6,10 +6,11 @@
  * Fetches all live VisitExpo event directory items, allows domain email verification, proof document upload, and claim moderation tracking.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
 import { useAuth } from '../../../../context/AuthContext.js';
+import { isEventExpired } from '../../../../utils/eventDates.js';
 import {
   ShieldCheck,
   Search,
@@ -54,6 +55,9 @@ export default function ClaimEventPage() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [quota, setQuota] = useState(null);
   const [loadingQuota, setLoadingQuota] = useState(true);
+  const [claimHistory, setClaimHistory] = useState([]);
+  const [loadingClaimHistory, setLoadingClaimHistory] = useState(true);
+  const [claimHistoryError, setClaimHistoryError] = useState('');
 
   // Form State
   const [claimForm, setClaimForm] = useState({
@@ -94,10 +98,6 @@ export default function ClaimEventPage() {
           errorMsg = `Phone number cannot exceed 15 digits (currently ${cleanDigits.length}).`;
         }
       }
-    } else if (name === 'proofFileName') {
-      if (!value || !value.trim()) {
-        errorMsg = 'Upload proof of ownership document is mandatory.';
-      }
     } else if (name === 'additionalNotes') {
       if (value && value.length > 1000) {
         errorMsg = `Notes cannot exceed 1000 characters (currently ${value.length}).`;
@@ -111,7 +111,6 @@ export default function ClaimEventPage() {
       officialEmail: validateSingleField('officialEmail', claimForm.officialEmail),
       website: validateSingleField('website', claimForm.website),
       phone: validateSingleField('phone', claimForm.phone),
-      proofFileName: validateSingleField('proofFileName', claimForm.proofFileName),
       additionalNotes: validateSingleField('additionalNotes', claimForm.additionalNotes)
     };
     const activeErrors = Object.fromEntries(Object.entries(errors).filter(([_, v]) => Boolean(v)));
@@ -169,6 +168,20 @@ export default function ClaimEventPage() {
 
   const fetchQuota = async () => {
     try {
+      const storedToken =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('visitexpo_access_token') || localStorage.getItem('visitexpo_token')
+          : null;
+      if (!accessToken && storedToken) {
+        const authenticatedRes = await axios.get(`${API_URL}/wordpress/claim-quota`, {
+          headers: { Authorization: `Bearer ${storedToken}` }
+        });
+        if (authenticatedRes.data?.success && authenticatedRes.data.quota) {
+          setQuota(authenticatedRes.data.quota);
+          return;
+        }
+      }
+
       const config = accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {};
       const res = await axios.get(`${API_URL}/wordpress/claim-quota`, config);
       if (res.data?.success && res.data.quota) {
@@ -184,6 +197,31 @@ export default function ClaimEventPage() {
   useEffect(() => {
     fetchQuota();
   }, [accessToken, user]);
+
+  const fetchClaimHistory = useCallback(async () => {
+    try {
+      const storedToken =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('visitexpo_access_token') || localStorage.getItem('visitexpo_token')
+          : null;
+      const token = accessToken || storedToken;
+      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+      const res = await axios.get(`${API_URL}/wordpress/claim-history`, config);
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        setClaimHistory(res.data.data);
+      }
+      setClaimHistoryError('');
+    } catch (err) {
+      console.error('Could not fetch claim request history:', err);
+      setClaimHistoryError(err.response?.data?.error || 'Could not load claim request history.');
+    } finally {
+      setLoadingClaimHistory(false);
+    }
+  }, [accessToken]);
+
+  useEffect(() => {
+    fetchClaimHistory();
+  }, [fetchClaimHistory]);
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
@@ -233,6 +271,11 @@ export default function ClaimEventPage() {
       setError('Please select an event to claim.');
       return;
     }
+    if (isEventExpired(selectedEvent)) {
+      setError('This show has concluded and is no longer available to claim.');
+      setSelectedEvent(null);
+      return;
+    }
 
     const isValid = validateAllFields();
     if (!isValid) {
@@ -267,9 +310,12 @@ export default function ClaimEventPage() {
       const res = await axios.post(`${API_URL}/wordpress/onboard-organizer`, payload, config);
 
       if (res.data && res.data.success) {
+        if (res.data.quota) {
+          setQuota(res.data.quota);
+        }
+        await fetchClaimHistory();
         setSubmitting(false);
         setSubmitted(true);
-        fetchQuota();
       }
     } catch (err) {
       console.error('Claim submission error', err);
@@ -287,6 +333,7 @@ export default function ClaimEventPage() {
   const filteredEvents = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
     return wpEvents.filter(evt => {
+      if (isEventExpired(evt)) return false;
       const cleanTitle = (evt.title || '').toLowerCase().trim();
       const isSystem = EXCLUDED_SYSTEM_TITLES.some(sys => cleanTitle === sys || cleanTitle.includes(sys));
       if (isSystem) return false;
@@ -428,6 +475,70 @@ export default function ClaimEventPage() {
         </div>
       )}
 
+      <section className="bg-card border border-border rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary" /> Claim Request History
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1">
+          Track pending, approved, and rejected claims submitted from your account.
+            </p>
+          </div>
+          {claimHistory.length > 0 && (
+            <span className="text-[10px] font-bold text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">
+              {claimHistory.length} {claimHistory.length === 1 ? 'request' : 'requests'}
+            </span>
+          )}
+        </div>
+
+        {loadingClaimHistory ? (
+          <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" /> Loading claim history...
+          </div>
+        ) : claimHistoryError ? (
+          <p role="alert" className="text-xs text-destructive">{claimHistoryError}</p>
+        ) : claimHistory.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-border px-4 py-5 text-center text-xs text-muted-foreground">
+            You have not submitted any event claim requests yet.
+          </p>
+        ) : (
+          <div className="divide-y divide-border rounded-xl border border-border">
+            {claimHistory.map((claim) => {
+              const isApproved = claim.status === 'approved' || claim.status === 'published';
+              const isRejected = claim.status === 'rejected';
+              return (
+                <div key={claim.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4">
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-bold text-foreground truncate">{claim.title}</h4>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      {[claim.venue, claim.city].filter(Boolean).join(', ')}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Submitted {claim.claimedAt ? new Date(claim.claimedAt).toLocaleString() : 'Date unavailable'}
+                    </p>
+                  </div>
+                  <span className={`inline-flex items-center gap-1.5 self-start sm:self-center rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                    isApproved
+                      ? 'bg-emerald-500/10 text-emerald-600'
+                      : isRejected
+                        ? 'bg-destructive/10 text-destructive'
+                        : 'bg-amber-500/10 text-amber-600'
+                  }`}>
+                    {isApproved
+                      ? <CheckCircle2 className="h-3.5 w-3.5" />
+                      : isRejected
+                        ? <AlertCircle className="h-3.5 w-3.5" />
+                        : <Clock className="h-3.5 w-3.5" />}
+                    {isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Pending review'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
       {submitted ? (
         /* Submission Confirmation Card */
         <div className="bg-card border border-border rounded-2xl p-8 shadow-sm text-center max-w-xl mx-auto space-y-6">
@@ -443,7 +554,7 @@ export default function ClaimEventPage() {
               Ownership Verification Submitted
             </h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              We have received your claim request for <strong className="text-foreground">{selectedEvent?.title}</strong>. Our admin team will verify your domain email and uploaded documentation within 24 hours.
+              We have received your claim request for <strong className="text-foreground">{selectedEvent?.title}</strong>. Our admin team will review your ownership details.
             </p>
           </div>
 
@@ -455,7 +566,7 @@ export default function ClaimEventPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Proof Document:</span>
-              <span className="font-semibold text-foreground">{claimForm.proofFileName || 'Authorization Letter'}</span>
+              <span className="font-semibold text-foreground">{claimForm.proofFileName || 'Not provided'}</span>
             </div>
           </div>
 
@@ -621,7 +732,7 @@ export default function ClaimEventPage() {
                   {/* Document Proof Upload */}
                   <div>
                     <label className="block text-xs font-bold text-muted-foreground uppercase mb-1 flex items-center justify-between">
-                      <span>Upload Proof of Ownership (Incorporation Cert / Authorization Letter) *</span>
+                      <span>Upload Proof of Ownership (Incorporation Cert / Authorization Letter) <span className="normal-case font-normal">(Optional)</span></span>
                       {fieldErrors.proofFileName && (
                         <span className="text-[10px] text-red-500 font-semibold lowercase">
                           {fieldErrors.proofFileName}
@@ -638,7 +749,7 @@ export default function ClaimEventPage() {
                       <Upload className={`h-5 w-5 ${fieldErrors.proofFileName ? 'text-red-500' : claimForm.proofFileName ? 'text-primary' : 'text-muted-foreground'}`} />
                       <div className="flex-1 overflow-hidden">
                         <span className={`text-xs font-semibold truncate block ${claimForm.proofFileName ? 'text-foreground' : 'text-muted-foreground'}`}>
-                          {claimForm.proofFileName || 'Click to select PDF or Image file'}
+                          {claimForm.proofFileName || 'Click to select a PDF or image file (optional)'}
                         </span>
                         <span className="text-[10px] text-muted-foreground">PDF, JPG, PNG up to 5MB</span>
                       </div>

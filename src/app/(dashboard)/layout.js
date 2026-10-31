@@ -546,8 +546,16 @@ export default function DashboardLayout({ children }) {
           </button>
 
           <div className="flex items-center gap-3 rounded-xl bg-card p-3 border border-border shadow-sm">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground font-bold uppercase text-xs">
-              {user?.name?.slice(0, 2) || 'OR'}
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-secondary text-secondary-foreground font-bold uppercase text-xs shrink-0">
+              {user?.organization?.logo || user?.photoURL ? (
+                <img
+                  src={user?.organization?.logo || user?.photoURL}
+                  alt={`${user?.organization?.name || user?.name || 'Organizer'} logo`}
+                  className="h-full w-full object-contain"
+                />
+              ) : (
+                user?.name?.slice(0, 2) || 'OR'
+              )}
             </div>
             <div className="flex-1 overflow-hidden">
               <p className="text-xs font-bold truncate text-foreground">{user?.name || 'User'}</p>

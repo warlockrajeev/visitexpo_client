@@ -15,6 +15,8 @@ import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext.js';
 import { showSweetAlert, showSweetConfirm, showSweetSuccess } from '../../../utils/sweetalert.js';
 import Navbar from '../../../components/Navbar.js';
+import EventPassAvailability from '../../../components/EventPassAvailability.js';
+import { allowEventPassClaim } from '../../../utils/eventPasses.js';
 import ShareModal from '../../../components/ShareModal.js';
 import {
   MapPin,
@@ -413,6 +415,7 @@ export default function CityEventsPage() {
 
   const handleClaimPass = async (evt) => {
     if (!evt) return;
+    if (!(await allowEventPassClaim(evt))) return;
     const slugKey = (evt.slug || evt.id || '').toLowerCase().trim();
     const idKey = String(evt.id || evt._id || evt.wpPostId || slugKey).trim();
     const isAlreadyClaimed =
@@ -868,25 +871,27 @@ export default function CityEventsPage() {
 
                         <span className="text-zinc-300">•</span>
 
-                        {isClaimed ? (
-                          <button
-                            type="button"
-                            onClick={() => handleClaimPass(expo)}
-                            className="text-xs font-extrabold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer transition-colors"
-                            title="Pass registered - click to view badge details"
-                          >
-                            <CheckCircle2 className="h-3.5 w-3.5" /> Pass Ready
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleClaimPass(expo)}
-                            className="text-xs font-extrabold text-zinc-900 hover:text-[#FF2E63] cursor-pointer flex items-center gap-1 transition-colors"
-                          >
-                            <span>Get Pass</span>
-                            <ArrowRight className="h-3.5 w-3.5" />
-                          </button>
-                        )}
+                        <EventPassAvailability event={expo}>
+                          {isClaimed ? (
+                            <button
+                              type="button"
+                              onClick={() => handleClaimPass(expo)}
+                              className="text-xs font-extrabold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer transition-colors"
+                              title="Pass registered - click to view badge details"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Pass Ready
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleClaimPass(expo)}
+                              className="text-xs font-extrabold text-zinc-900 hover:text-[#FF2E63] cursor-pointer flex items-center gap-1 transition-colors"
+                            >
+                              <span>Get Pass</span>
+                              <ArrowRight className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </EventPassAvailability>
                       </div>
                     </div>
 

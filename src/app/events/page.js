@@ -15,8 +15,10 @@ import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { renderCardDescription } from '../../utils/textFormatters.js';
 import { fetchWordpressEvents } from '../../utils/fetchWordpressEvents.js';
+import { allowEventPassClaim } from '../../utils/eventPasses.js';
 import Navbar from '../../components/Navbar.js';
 import Footer from '../../components/Footer.js';
+import EventPassAvailability from '../../components/EventPassAvailability.js';
 import { useAuth } from '../../context/AuthContext.js';
 import wpEventImages from '@/data/wordpress-event-images.json';
 import {
@@ -784,6 +786,7 @@ export default function EventsDirectoryPage() {
   };
 
   const handleGetPass = async (evt) => {
+    if (!(await allowEventPassClaim(evt))) return;
     const slug = (evt.slug || evt.id || '').toLowerCase().trim();
     const idKey = String(evt.id || evt._id || slug).trim();
     const formatDate = (date) => {
@@ -1869,23 +1872,25 @@ export default function EventsDirectoryPage() {
                           Exhibit
                         </Link>
                         <span className="text-zinc-300 font-bold">•</span>
-                        <button
-                          type="button"
-                          onClick={() => handleGetPass(evt)}
-                          className="shrink-0 cursor-pointer"
-                        >
-                          {isClaimed ? (
-                            <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-2xs">
-                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                              Pass Issued
-                            </span>
-                          ) : (
-                            <span className="group/btn inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xl bg-zinc-950 px-2.5 py-1.5 text-xs font-black text-[#FFCC00] shadow-sm transition-all duration-200 hover:scale-105 hover:bg-[#FFCC00] hover:text-zinc-950 hover:shadow-md active:scale-95">
-                              <span>Get Pass</span>
-                              <ArrowRight className="h-3 w-3 group-hover/btn:translate-x-0.5 transition-transform" />
-                            </span>
-                          )}
-                        </button>
+                        <EventPassAvailability event={evt}>
+                          <button
+                            type="button"
+                            onClick={() => handleGetPass(evt)}
+                            className="shrink-0 cursor-pointer"
+                          >
+                            {isClaimed ? (
+                              <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-2xs">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                Pass Issued
+                              </span>
+                            ) : (
+                              <span className="group/btn inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xl bg-zinc-950 px-2.5 py-1.5 text-xs font-black text-[#FFCC00] shadow-sm transition-all duration-200 hover:scale-105 hover:bg-[#FFCC00] hover:text-zinc-950 hover:shadow-md active:scale-95">
+                                <span>Get Pass</span>
+                                <ArrowRight className="h-3 w-3 group-hover/btn:translate-x-0.5 transition-transform" />
+                              </span>
+                            )}
+                          </button>
+                        </EventPassAvailability>
                       </div>
                     </div>
                   </div>

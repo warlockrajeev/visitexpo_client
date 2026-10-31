@@ -12,6 +12,8 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar.js';
 import Footer from '@/components/Footer.js';
 import GoogleCalendarButton from '@/components/GoogleCalendarButton.js';
+import EventPassAvailability from '@/components/EventPassAvailability.js';
+import { allowEventPassClaim } from '@/utils/eventPasses.js';
 import { useAuth } from '@/context/AuthContext.js';
 import axios from 'axios';
 import {
@@ -289,6 +291,7 @@ export default function InterestedEventsPage() {
 
   // Handle Claim Pass (with Theme-Aware Interactive Confirmation Pop-up)
   const handleClaimPass = async (evt) => {
+    if (!(await allowEventPassClaim(evt))) return;
     const slug = (evt.slug || evt.id || '').toLowerCase().trim();
     const idKey = String(evt.id || evt._id || slug).trim();
     const isAlreadyClaimed =
@@ -818,23 +821,25 @@ export default function InterestedEventsPage() {
                         </button>
 
                         {/* Claim Pass / Pass Issued Button */}
-                        <button
-                          type="button"
-                          onClick={() => handleClaimPass(evt)}
-                          className="cursor-pointer shrink-0"
-                        >
-                          {isClaimed ? (
-                            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold shadow-2xs">
-                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                              <span>Pass Issued</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-zinc-950 text-[#FFCC00] hover:bg-[#FFCC00] hover:text-zinc-950 font-black text-xs transition shadow-sm active:scale-95">
-                              <span>Get Pass</span>
-                              <ArrowRight className="h-3 w-3" />
-                            </span>
-                          )}
-                        </button>
+                        <EventPassAvailability event={evt} className="shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleClaimPass(evt)}
+                            className="cursor-pointer shrink-0"
+                          >
+                            {isClaimed ? (
+                              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold shadow-2xs">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                <span>Pass Issued</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-zinc-950 text-[#FFCC00] hover:bg-[#FFCC00] hover:text-zinc-950 font-black text-xs transition shadow-sm active:scale-95">
+                                <span>Get Pass</span>
+                                <ArrowRight className="h-3 w-3" />
+                              </span>
+                            )}
+                          </button>
+                        </EventPassAvailability>
                       </div>
                     </div>
                   </div>

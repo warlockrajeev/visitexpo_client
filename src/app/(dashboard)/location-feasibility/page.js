@@ -105,6 +105,7 @@ export default function LocationFeasibilityPage() {
   const [paymentMethod, setPaymentMethod] = useState('upi');
 
   const printRef = useRef(null);
+  const reportRequestId = useRef(0);
 
   // Pagination state for Exhibitions Present
   const [eventsPage, setEventsPage] = useState(1);
@@ -130,8 +131,10 @@ export default function LocationFeasibilityPage() {
 
   // Fetch Feasibility & Event Presence Report
   const fetchFeasibilityReport = async (city, category) => {
+    const requestId = ++reportRequestId.current;
     setLoading(true);
     setError(null);
+    setReport(null);
     try {
       const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
       const catParam = category && category !== 'All Sectors' ? category : '';
@@ -140,16 +143,25 @@ export default function LocationFeasibilityPage() {
         headers
       });
 
+      if (requestId !== reportRequestId.current) return;
       if (res.data?.success && res.data.data) {
         setReport(res.data.data);
       } else {
-        setError('Could not retrieve market feasibility data.');
+        setError(res.data?.message || res.data?.error || 'Could not retrieve market feasibility data.');
       }
     } catch (err) {
       console.error('Error fetching market feasibility:', err);
-      setError(err.response?.data?.message || 'Failed to connect to location intelligence server.');
+      if (requestId === reportRequestId.current) {
+        setError(
+          err.response?.data?.message ||
+          err.response?.data?.error ||
+          'Failed to connect to location intelligence server.'
+        );
+      }
     } finally {
-      setLoading(false);
+      if (requestId === reportRequestId.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -163,6 +175,9 @@ export default function LocationFeasibilityPage() {
     if (customCityInput.trim()) {
       setSelectedCity(customCityInput.trim());
       setCustomCityInput('');
+    } else {
+      setReport(null);
+      setError('Please enter a city name to analyze.');
     }
   };
 
@@ -447,6 +462,33 @@ export default function LocationFeasibilityPage() {
               </div>
             </div>
           </div>
+
+          {report.summary.scoreBreakdown && (
+            <section className="grid grid-cols-2 lg:grid-cols-4 gap-3" aria-label="Feasibility score factors">
+              {[
+                ['Audience demand', report.summary.scoreBreakdown.audienceDemand],
+                ['Competition', report.summary.scoreBreakdown.competition],
+                ['Venue readiness', report.summary.scoreBreakdown.venueReadiness],
+                ['Sector fit', report.summary.scoreBreakdown.sectorFit]
+              ].map(([label, factor]) => (
+                <div key={label} className="rounded-xl border border-border bg-card p-3">
+                  <div className="flex items-center justify-between gap-2 text-[11px]">
+                    <span className="font-semibold text-muted-foreground">{label}</span>
+                    <span className="font-bold text-foreground">{factor.score}/{factor.maximum}</span>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all"
+                      style={{ width: `${(factor.score / factor.maximum) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+              <p className="col-span-2 lg:col-span-4 text-[10px] text-muted-foreground">
+                Score factors use city-specific audience activity, active event listings, known venue inventory, and selected-sector competition.
+              </p>
+            </section>
+          )}
 
           {/* Key Strategic Projections Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

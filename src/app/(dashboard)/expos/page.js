@@ -33,6 +33,8 @@ import { showSweetConfirm, showSweetSuccess, showSweetError } from '../../../uti
 import { printBadge } from '../../../utils/printBadge.js';
 import ShowCountdownTimer from '../../../components/ShowCountdownTimer.js';
 import SearchableSelect from '../../../components/SearchableSelect.js';
+import EventPassAvailability from '../../../components/EventPassAvailability.js';
+import { allowEventPassClaim } from '../../../utils/eventPasses.js';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -261,6 +263,7 @@ export default function ExposPage() {
 
   // 1-Click Pass Claim
   const handleClaimPass = async (expo) => {
+    if (!(await allowEventPassClaim(expo))) return;
     setClaimError('');
     setClaimSuccessMessage('');
     const eventId = expo.id || expo._id;
@@ -650,28 +653,30 @@ export default function ExposPage() {
                         Details
                       </Link>
 
-                      {isClaimed ? (
-                        <div className="py-2 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-bold flex items-center gap-1.5">
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Pass Active
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleClaimPass(expo)}
-                          disabled={isClaiming}
-                          className="flex items-center justify-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-2 px-3.5 text-xs transition-all shadow-md shadow-primary/10 cursor-pointer disabled:opacity-50"
-                        >
-                          {isClaiming ? (
-                            <>
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Issuing...
-                            </>
-                          ) : (
-                            <>
-                              <Ticket className="h-3.5 w-3.5" /> Claim Free Pass
-                            </>
-                          )}
-                        </button>
-                      )}
+                      <EventPassAvailability event={expo}>
+                        {isClaimed ? (
+                          <div className="py-2 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-bold flex items-center gap-1.5">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Pass Active
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleClaimPass(expo)}
+                            disabled={isClaiming}
+                            className="flex items-center justify-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-2 px-3.5 text-xs transition-all shadow-md shadow-primary/10 cursor-pointer disabled:opacity-50"
+                          >
+                            {isClaiming ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Issuing...
+                              </>
+                            ) : (
+                              <>
+                                <Ticket className="h-3.5 w-3.5" /> Claim Free Pass
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </EventPassAvailability>
                     </div>
                   </div>
                 </div>

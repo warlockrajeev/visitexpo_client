@@ -27,8 +27,8 @@ let cachedWpDocs = null;
 let cachedWpDocsTimestamp = 0;
 const WP_DOCS_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
-async function getWpDocs() {
-  if (cachedWpDocs && (Date.now() - cachedWpDocsTimestamp < WP_DOCS_CACHE_TTL)) {
+async function getWpDocs(forceRefresh = false) {
+  if (!forceRefresh && cachedWpDocs && (Date.now() - cachedWpDocsTimestamp < WP_DOCS_CACHE_TTL)) {
     return cachedWpDocs;
   }
   try {
@@ -314,7 +314,7 @@ export async function GET(request, { params }) {
     // 3. Fallback to WordPress Event Lookup if not yet synced to MongoDB
     let wpDoc = null;
     try {
-      const docs = await getWpDocs();
+      const docs = await getWpDocs(forceRefresh);
       wpDoc = docs.find(d => {
         const s = (d.slug || '').toLowerCase().trim();
         const id = String(d.id || '').trim();

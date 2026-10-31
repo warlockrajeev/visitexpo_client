@@ -11,6 +11,8 @@ import Link from 'next/link';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import SearchableSelect from '../../../components/SearchableSelect.js';
+import EventPassAvailability from '../../../components/EventPassAvailability.js';
+import { allowEventPassClaim } from '../../../utils/eventPasses.js';
 import { showSweetConfirm, showSweetSuccess, showSweetError } from '../../../utils/sweetalert.js';
 import { printBadge } from '../../../utils/printBadge.js';
 import {
@@ -2847,6 +2849,7 @@ function VisitorDashboard() {
 
   // Handle 1-click pass booking
   const handleClaimPass = async (event) => {
+    if (!(await allowEventPassClaim(event))) return;
     setClaimError('');
     setClaimSuccessMessage('');
     const eventId = event._id || event.id;
@@ -3499,28 +3502,30 @@ function VisitorDashboard() {
                     </div>
 
                     <div className="pt-2 border-t border-border">
-                      {isClaimed ? (
-                        <div className="w-full py-2 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs">
-                          <CheckCircle2 className="h-4 w-4" /> Pass Confirmed
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleClaimPass(expo)}
-                          disabled={isClaiming}
-                          className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-primary hover:bg-amber-400 text-primary-foreground font-bold py-2.5 text-xs transition-all duration-200 shadow-sm hover:shadow-md hover:shadow-primary/20 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] cursor-pointer disabled:opacity-50"
-                        >
-                          {isClaiming ? (
-                            <>
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Issuing Badge...
-                            </>
-                          ) : (
-                            <>
-                              <Ticket className="h-3.5 w-3.5 transition-transform duration-200 group-hover/expo:rotate-12" /> Claim Free Visitor Pass
-                            </>
-                          )}
-                        </button>
-                      )}
+                      <EventPassAvailability event={expo} className="w-full">
+                        {isClaimed ? (
+                          <div className="w-full py-2 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs">
+                            <CheckCircle2 className="h-4 w-4" /> Pass Confirmed
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleClaimPass(expo)}
+                            disabled={isClaiming}
+                            className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-primary hover:bg-amber-400 text-primary-foreground font-bold py-2.5 text-xs transition-all duration-200 shadow-sm hover:shadow-md hover:shadow-primary/20 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] cursor-pointer disabled:opacity-50"
+                          >
+                            {isClaiming ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Issuing Badge...
+                              </>
+                            ) : (
+                              <>
+                                <Ticket className="h-3.5 w-3.5 transition-transform duration-200 group-hover/expo:rotate-12" /> Claim Free Visitor Pass
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </EventPassAvailability>
                     </div>
                   </div>
                 </div>

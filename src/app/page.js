@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext.js';
 import { fetchWordpressEvents } from '../utils/fetchWordpressEvents.js';
+import { allowEventPassClaim } from '../utils/eventPasses.js';
 import {
   Search,
   Calendar,
@@ -59,6 +60,7 @@ import {
 import axios from 'axios';
 import { showSweetAlert, showSweetConfirm, showSweetSuccess, showSweetWarning } from '../utils/sweetalert.js';
 import Navbar, { Logo } from '../components/Navbar.js';
+import EventPassAvailability from '../components/EventPassAvailability.js';
 import ActionDiscoveryBanner from '../components/ActionDiscoveryBanner.js';
 import AdvertiseModal from '../components/AdvertiseModal.js';
 import BrowseByCategory from '../components/BrowseByCategory.js';
@@ -622,6 +624,7 @@ export default function LandingPage() {
   // Get Pass Handler with SweetAlert Confirmation Modal
   const handleGetPass = async (expo) => {
     if (!expo) return;
+    if (!(await allowEventPassClaim(expo))) return;
     const slugKey = (expo.slug || expo.id || '').toLowerCase().trim();
     const idKey = String(expo.id || expo._id || expo.wpPostId || slugKey).trim();
     const isAlreadyClaimed =
@@ -2168,25 +2171,27 @@ export default function LandingPage() {
                               
                               <span className="text-zinc-300">•</span>
 
-                              {isTicketClaimed ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleGetPass(expo)}
-                                  className="text-xs font-extrabold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer transition-colors"
-                                  title="Pass registered - click to view badge details"
-                                >
-                                  <CheckCircle2 className="h-3.5 w-3.5" /> Pass Ready
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleGetPass(expo)}
-                                  className="text-xs font-extrabold text-zinc-900 hover:text-[#FF2E63] cursor-pointer flex items-center gap-0.5 transition-colors"
-                                >
-                                  <span>Get Pass</span>
-                                  <ArrowRight className="h-3.5 w-3.5" />
-                                </button>
-                              )}
+                              <EventPassAvailability event={expo}>
+                                {isTicketClaimed ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleGetPass(expo)}
+                                    className="text-xs font-extrabold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer transition-colors"
+                                    title="Pass registered - click to view badge details"
+                                  >
+                                    <CheckCircle2 className="h-3.5 w-3.5" /> Pass Ready
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleGetPass(expo)}
+                                    className="text-xs font-extrabold text-zinc-900 hover:text-[#FF2E63] cursor-pointer flex items-center gap-0.5 transition-colors"
+                                  >
+                                    <span>Get Pass</span>
+                                    <ArrowRight className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </EventPassAvailability>
                             </div>
                           </div>
 

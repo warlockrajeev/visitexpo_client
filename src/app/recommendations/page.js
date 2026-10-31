@@ -16,6 +16,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import Link from 'next/link';
 import Navbar from '@/components/Navbar.js';
 import Footer from '@/components/Footer.js';
+import EventPassAvailability from '@/components/EventPassAvailability.js';
 import { useAuth } from '@/context/AuthContext.js';
 import axios from 'axios';
 import {
@@ -878,13 +879,15 @@ export default function RecommendationsPage() {
                           Exhibit
                         </Link>
                         <span className="text-zinc-300">•</span>
-                        <Link
-                          href={`/expo/${ev.slug || ev.id || ev._id}`}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold text-xs shadow-xs"
-                        >
-                          <span>Get Pass</span>
-                          <ArrowRight className="h-3 w-3 text-primary" />
-                        </Link>
+                        <EventPassAvailability event={ev}>
+                          <Link
+                            href={`/expo/${ev.slug || ev.id || ev._id}`}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold text-xs shadow-xs"
+                          >
+                            <span>Get Pass</span>
+                            <ArrowRight className="h-3 w-3 text-primary" />
+                          </Link>
+                        </EventPassAvailability>
                       </div>
                     </div>
 

@@ -895,7 +895,17 @@ export default function SettingsPage() {
       };
       const res = await axios.post(`${API_URL}/upload`, uploadData, { headers });
       if (res.data && res.data.success) {
-        setOrgForm((prev) => ({ ...prev, logoUrl: res.data.url }));
+        const logoUrl = res.data.url;
+        setOrgForm((prev) => ({ ...prev, logoUrl }));
+        if (user && updateUser) {
+          updateUser({
+            ...user,
+            organization: {
+              ...(typeof user.organization === 'object' ? user.organization : {}),
+              logo: logoUrl
+            }
+          });
+        }
         setSaveSuccess('Logo uploaded! Click "Save Profile" to persist changes.');
         setTimeout(() => setSaveSuccess(''), 4000);
       }
@@ -1607,7 +1617,7 @@ export default function SettingsPage() {
                 className="hidden"
               />
 
-              {/* Logo Upload & URL Box */}
+              {/* Logo Upload */}
               <div className="space-y-3 p-4 border border-border rounded-2xl bg-muted/10">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-bold text-muted-foreground uppercase">
@@ -1650,6 +1660,15 @@ export default function SettingsPage() {
                           onClick={() => {
                             setOrgForm((prev) => ({ ...prev, logoUrl: '' }));
                             setLogoValidation(null);
+                            if (user && updateUser) {
+                              updateUser({
+                                ...user,
+                                organization: {
+                                  ...(typeof user.organization === 'object' ? user.organization : {}),
+                                  logo: ''
+                                }
+                              });
+                            }
                           }}
                           className="inline-flex items-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white px-3.5 py-2 text-xs font-bold transition-all cursor-pointer active:scale-95"
                         >
@@ -1659,15 +1678,6 @@ export default function SettingsPage() {
                       )}
                     </div>
 
-                    <div>
-                      <input
-                        type="text"
-                        value={orgForm.logoUrl}
-                        onChange={(e) => setOrgForm((prev) => ({ ...prev, logoUrl: e.target.value }))}
-                        placeholder="https://example.com/logo.png (or click Upload above)"
-                        className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
                   </div>
                 </div>
               </div>
