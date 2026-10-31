@@ -40,82 +40,16 @@ const BADGE_CONFIG = [
   { label: 'SPOTLIGHT', color: 'bg-[#10B981]' }
 ];
 
-const RELATIVE_TIMESTAMPS = [
-  '35 mins ago',
-  'Yesterday',
-  '2 hours ago',
-  'Yesterday',
-  'Just now',
-  '3 days ago'
-];
+const isEventExpired = (event) => {
+  const endDate = event?.endDate || event?.startDate;
+  if (!endDate) return false;
 
-// Default 6 real events fallback
-const DEFAULT_SIX_EVENTS = [
-  {
-    _id: 'def-1',
-    title: 'World Education Fair 2025',
-    city: 'Mumbai',
-    dates: '18 May 2025',
-    banner: 'https://visitexpo.in/wp-content/uploads/2025/05/download-1-1.png',
-    slug: 'world-education-fair-world-education-fair-2025',
-    organizer: 'Edwise Overseas Education Consultants'
-  },
-  {
-    _id: 'def-2',
-    title: 'Asset Integrity & Maintenance India Summit',
-    city: 'Mumbai',
-    dates: '24-25 May 2025',
-    banner: 'https://visitexpo.in/wp-content/uploads/2025/05/a-1.jpg',
-    slug: 'annual-asset-integrity-and-maintenance-india-summit-2025',
-    organizer: 'Industrial Engineering Council India'
-  },
-  {
-    _id: 'def-3',
-    title: 'Annual Conference on IT & OT in Oil & Gas',
-    city: 'New Delhi',
-    dates: '12-13 Jun 2025',
-    banner: 'https://visitexpo.in/wp-content/uploads/2025/05/IT-OT-in-oil-gas-1.jpg',
-    slug: 'annual-conference-on-it-ot-in-oil-gas-2025',
-    organizer: 'Energy Trade & Infrastructure Forum'
-  },
-  {
-    _id: 'def-4',
-    title: 'Electric Expo Ahmedabad 2025',
-    city: 'Ahmedabad',
-    dates: '08-10 Jul 2025',
-    banner: 'https://visitexpo.in/wp-content/uploads/2025/05/images-2-11.jpeg',
-    slug: 'electric-expo-ahemdabad',
-    organizer: 'Gujarat Electrical Association'
-  },
-  {
-    _id: 'def-5',
-    title: 'Dubai Real Estate Investment Conclave',
-    city: 'Ahmedabad',
-    dates: '15-16 Aug 2025',
-    banner: 'https://visitexpo.in/wp-content/uploads/2025/05/images-2-10.jpeg',
-    slug: 'dubai-real-estate-event-in-ahmedabad-2025',
-    organizer: 'Global Realty Advisory'
-  },
-  {
-    _id: 'def-6',
-    title: 'International Clean Energy & Solar Expo',
-    city: 'Madurai',
-    dates: '20-22 Sep 2025',
-    banner: 'https://visitexpo.in/wp-content/uploads/2025/05/qww-1.jpg',
-    slug: 'dubai-real-estate-event-in-madurai-2025',
-    organizer: 'CleanEnergy Trade Council'
-  }
-];
+  const parsedDate = new Date(endDate);
+  if (Number.isNaN(parsedDate.getTime())) return false;
 
-// Prepared initial slides for instant SSR and zero flicker
-const INITIAL_SLIDES = DEFAULT_SIX_EVENTS.map((def, idx) => ({
-  ...def,
-  timeAgo: RELATIVE_TIMESTAMPS[idx % RELATIVE_TIMESTAMPS.length],
-  badge: BADGE_CONFIG[idx % BADGE_CONFIG.length].label,
-  badgeColor: BADGE_CONFIG[idx % BADGE_CONFIG.length].color,
-  image: def.banner || FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length],
-  link: def.slug ? `/expo/${def.slug}` : '/events'
-}));
+  parsedDate.setHours(23, 59, 59, 999);
+  return parsedDate < new Date();
+};
 
 const normalizeBannerLink = (link, slug) => {
   const fallbackLink = slug ? `/expo/${slug}` : '/events';
@@ -136,8 +70,8 @@ const normalizeBannerLink = (link, slug) => {
 
 export default function BannerSlider() {
   const router = useRouter();
-  const [slides, setSlides] = useState(INITIAL_SLIDES);
-  const [loading, setLoading] = useState(false);
+  const [slides, setSlides] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [touchStart, setTouchStart] = useState(null);
@@ -199,7 +133,7 @@ export default function BannerSlider() {
       try {
         const [bannersRes, eventsRes] = await Promise.allSettled([
           axios.get(`${API_URL}/banners/active`, { timeout: 2500 }),
-          axios.get(`${API_URL}/events?limit=8&status=published`, { timeout: 2500 })
+          axios.get(`${API_URL}/events?limit=50&status=published&sort=%7B%22createdAt%22%3A-1%7D`, { timeout: 2500 })
         ]);
 
         if (!isMounted) return;
@@ -218,13 +152,12 @@ export default function BannerSlider() {
         const combined = [];
 
         // 1. Add custom approved banners first if available
-        activeBanners.forEach((b, i) => {
+        activeBanners.filter((banner) => !isEventExpired(banner.event)).forEach((b, i) => {
           combined.push({
             _id: b._id || `banner-${i}`,
             title: b.headline || b.event?.title || 'Featured Exhibition',
             city: b.event?.city || 'India',
-            dates: b.event?.dates || 'Upcoming 2025',
-            timeAgo: RELATIVE_TIMESTAMPS[i % RELATIVE_TIMESTAMPS.length],
+            dates: b.event?.dates || '',
             badge: b.badgeText || BADGE_CONFIG[i % BADGE_CONFIG.length].label,
             badgeColor: BADGE_CONFIG[i % BADGE_CONFIG.length].color,
             image: b.bannerImage || b.event?.bannerImage || FALLBACK_IMAGES[i % FALLBACK_IMAGES.length],
@@ -236,7 +169,7 @@ export default function BannerSlider() {
         });
 
         // 2. Fill remaining slots with the 6 events from DB
-        const eventsSource = rawEvents.length > 0 ? rawEvents : DEFAULT_SIX_EVENTS;
+        const eventsSource = rawEvents.filter((event) => !isEventExpired(event));
         eventsSource.forEach((e, idx) => {
           if (combined.length >= 6) return;
           const configIdx = combined.length % BADGE_CONFIG.length;
@@ -249,8 +182,7 @@ export default function BannerSlider() {
             city: e.city || 'India',
             dates: e.startDate
               ? new Date(e.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-              : (e.dates || 'Upcoming 2025'),
-            timeAgo: RELATIVE_TIMESTAMPS[configIdx],
+              : (e.dates || ''),
             badge: BADGE_CONFIG[configIdx].label,
             badgeColor: BADGE_CONFIG[configIdx].color,
             image: bannerImg,
@@ -261,34 +193,10 @@ export default function BannerSlider() {
           });
         });
 
-        // Fallback safety: ensure exactly 6 slides minimum
-        while (combined.length < 6) {
-          const idx = combined.length;
-          const def = DEFAULT_SIX_EVENTS[idx % DEFAULT_SIX_EVENTS.length];
-          const configIdx = idx % BADGE_CONFIG.length;
-          combined.push({
-            ...def,
-            timeAgo: RELATIVE_TIMESTAMPS[configIdx],
-            badge: BADGE_CONFIG[configIdx].label,
-            badgeColor: BADGE_CONFIG[configIdx].color,
-            image: FALLBACK_IMAGES[configIdx],
-            link: def.slug ? `/expo/${def.slug}` : '/events'
-          });
-        }
-
         setSlides(combined.slice(0, 6));
       } catch (err) {
-        console.warn('Banner data load fallback:', err);
-        setSlides(
-          DEFAULT_SIX_EVENTS.map((def, idx) => ({
-            ...def,
-            timeAgo: RELATIVE_TIMESTAMPS[idx % RELATIVE_TIMESTAMPS.length],
-            badge: BADGE_CONFIG[idx % BADGE_CONFIG.length].label,
-            badgeColor: BADGE_CONFIG[idx % BADGE_CONFIG.length].color,
-            image: FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length],
-            link: def.slug ? `/expo/${def.slug}` : '/events'
-          }))
-        );
+        console.error('Failed to load featured spotlight events:', err);
+        setSlides([]);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -355,6 +263,8 @@ export default function BannerSlider() {
       </div>
     );
   }
+
+  if (slides.length === 0) return null;
 
   // Calculate carousel horizontal translation to keep active card centered with peek
   const { activeWidth, inactiveWidth, gap, peekOffset } = carouselMetrics;
@@ -507,15 +417,11 @@ export default function BannerSlider() {
                         {slide.title}
                       </h3>
 
-                      <div className="flex items-center gap-2 text-[11px] font-medium text-white/80 sm:text-xs">
-                        <span>{slide.timeAgo}</span>
-                        {slide.dates && (
-                          <>
-                            <span className="opacity-40">·</span>
-                            <span className="truncate">{slide.dates}</span>
-                          </>
-                        )}
-                      </div>
+                      {slide.dates && (
+                        <div className="text-[11px] font-medium text-white/80 sm:text-xs">
+                          {slide.dates}
+                        </div>
+                      )}
 
                       {/* Read More Action Link with circular arrow icon */}
                       <div className="pt-1">
